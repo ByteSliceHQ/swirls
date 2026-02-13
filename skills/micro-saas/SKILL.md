@@ -8,7 +8,7 @@ user-invocable: true
 allowed-tools: [Bash, Read, Write, Edit]
 metadata:
   last_verified: "2026-02-13"
-  repository: "https://github.com/cipherstash/swirls"
+  repository: "https://github.com/byteslicehq/swirls"
   documentation: "https://swirls.ai/docs"
 ---
 
