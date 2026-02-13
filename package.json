@@ -1,0 +1,39 @@
+{
+  "name": "swirls",
+  "version": "0.0.1",
+  "description": "The Swiss army knife for building AI workflows.",
+  "author": "ByteSlice, LLC.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/byte-slice/swirls"
+  },
+  "homepage": "https://swirls.ai",
+  "bugs": {
+    "url": "https://github.com/byte-slice/swirls/issues"
+  },
+  "keywords": [
+    "swirls",
+    "ai",
+    "workflows",
+    "mcp",
+    "openai",
+    "anthropic",
+    "google",
+    "llm",
+    "agentic",
+    "ai-agent",
+    "ai-workflow",
+    "ai-agentic",
+    "ai-agentic-workflow"
+  ],
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
