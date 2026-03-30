@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "organization": "Swirls",
+  "date": "March 2026",
+  "abstract": "Comprehensive authoring guide for the Swirls DSL. Covers file structure, graph declarations, all 11 node types, embedded TypeScript/JSON/SQL blocks, the context object, resources, triggers, persistence, reviews, and known parser pitfalls.",
+  "references": ["https://swirls.ai", "https://docs.swirls.ai"]
+}
