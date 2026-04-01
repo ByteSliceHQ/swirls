@@ -40,7 +40,7 @@ node recent {
     ORDER BY created_at DESC
     LIMIT 10
   }
-  outputSchema: @json {
+  schema: @json {
     {
       "type": "array",
       "items": {

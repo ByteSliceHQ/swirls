@@ -30,7 +30,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 | 2 | Graph & Node Basics | CRITICAL | `graph-` | Root node, flow block, edges, DAG rules |
 | 3 | Node Types | CRITICAL | `node-` | All 11 node types, required/optional fields |
 | 4 | TypeScript Blocks | CRITICAL | `ts-` | @ts patterns, sandbox limits, safe code |
-| 5 | Schema & Typing | HIGH | `schema-` | JSON Schema, inputSchema/outputSchema |
+| 5 | Schema & Typing | HIGH | `schema-` | JSON Schema, inputSchema/outputSchema/schema |
 | 6 | Context Object | HIGH | `context-` | context.nodes, context.reviews, context.secrets, context.meta |
 | 7 | Resources & Triggers | HIGH | `resource-` | Forms, webhooks, schedules, trigger bindings |
 | 8 | Persistence & Streams | MEDIUM | `stream-` | Persistence block, stream nodes, SQL |
@@ -73,7 +73,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 
 ### 5. Schema & Typing
 - `schema-json-schema` - JSON Schema format in @json blocks
-- `schema-input-output` - inputSchema (root only) and outputSchema patterns
+- `schema-input-output` - inputSchema (root only), outputSchema (root only), and schema (non-root nodes) patterns
 - `schema-inline-syntax` - Inline object literal schema syntax (no @json)
 
 ### 6. Context Object

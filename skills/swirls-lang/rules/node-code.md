@@ -31,7 +31,7 @@ This fails silently at runtime. Code nodes have no access to `fetch`, `require`,
 node normalize {
   type: code
   label: "Normalize"
-  outputSchema: @json {
+  schema: @json {
     {
       "type": "object",
       "required": ["name", "email"],
@@ -67,7 +67,7 @@ Code node fields:
 | Field | Required | Type |
 |-------|----------|------|
 | `code` | yes | `@ts` block or `@ts "file.ts.swirls"` |
-| `outputSchema` | no | `@json` block |
+| `schema` | no | `@json` block (use `outputSchema` only on root nodes) |
 | `inputSchema` | no | `@json` block (usually only on root) |
 | `review` | no | Review config block |
 | `secrets` | no | Array of secret key identifiers |

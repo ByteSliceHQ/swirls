@@ -24,7 +24,7 @@ node recent {
     ORDER BY created_at DESC
     LIMIT 10
   }
-  outputSchema: @json {
+  schema: @json {
     {
       "type": "array",
       "items": {
@@ -47,4 +47,4 @@ Stream node fields:
 |-------|----------|------|
 | `stream` | yes | String (stream/graph name) |
 | `query` | no | `@sql` block |
-| `outputSchema` | no | `@json` block |
+| `schema` | no | `@json` block (use `outputSchema` only on root nodes) |

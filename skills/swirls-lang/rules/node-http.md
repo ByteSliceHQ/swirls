@@ -40,7 +40,7 @@ node call_api {
       query: context.nodes.root.output.query,
     })
   }
-  outputSchema: @json {
+  schema: @json {
     {
       "type": "object",
       "properties": {
@@ -60,4 +60,4 @@ HTTP node fields:
 | `method` | no | "GET", "POST", "PUT", "DELETE", "PATCH" (default: "GET") |
 | `headers` | no | Object (avoid hyphenated keys) |
 | `body` | no | `@ts` block |
-| `outputSchema` | no | `@json` block |
+| `schema` | no | `@json` block (use `outputSchema` only on root nodes) |

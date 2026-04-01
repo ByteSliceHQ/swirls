@@ -1,12 +1,12 @@
 ---
-title: inputSchema and outputSchema
+title: inputSchema, outputSchema, and schema
 impact: HIGH
 tags: schema, inputSchema, outputSchema, root, typing
 ---
 
-## inputSchema and outputSchema
+## inputSchema, outputSchema, and schema
 
-`inputSchema` defines the shape of data a node receives. `outputSchema` defines what it produces. The LSP uses these to type `context.nodes.<name>.input` and `context.nodes.<name>.output` for autocomplete and validation.
+`inputSchema` defines the shape of data a node receives. `outputSchema` (on root nodes) and `schema` (on non-root nodes) define what a node produces. The LSP uses these to type `context.nodes.<name>.input` and `context.nodes.<name>.output` for autocomplete and validation. Using `outputSchema` on non-root nodes causes a parse error.
 
 **Key rule:** `inputSchema` is meaningful only on the root node. It defines the shape of the trigger payload. On non-root nodes, input is derived from upstream node outputs via the flow edges.
 
@@ -25,9 +25,9 @@ node process {
 }
 ```
 
-Defining `inputSchema` on non-root nodes is allowed but rarely useful. The LSP infers input types from upstream `outputSchema` declarations.
+Defining `inputSchema` on non-root nodes is allowed but rarely useful. The LSP infers input types from upstream `schema` declarations.
 
-**Correct (inputSchema on root, outputSchema on all nodes):**
+**Correct (inputSchema on root, outputSchema on root, schema on non-root nodes):**
 
 ```swirls
 root {
@@ -64,7 +64,7 @@ root {
 node greet {
   type: code
   label: "Greet"
-  outputSchema: @json {
+  schema: @json {
     {
       "type": "object",
       "required": ["greeting"],
@@ -77,4 +77,4 @@ node greet {
 }
 ```
 
-Best practice: define `outputSchema` on every node that produces data. This enables LSP autocomplete for all downstream `@ts` blocks.
+Best practice: define `outputSchema` on the root node and `schema` on every non-root node that produces data. This enables LSP autocomplete for all downstream `@ts` blocks. Using `outputSchema` on non-root nodes causes a parse error.
