@@ -11,10 +11,11 @@ Before running `bunx swirls doctor`, verify every item on this checklist. Each i
 **Parser safety (silent drops):**
 
 - [ ] Comments use ASCII only (no box-drawing, arrows, em dashes, or other Unicode)
-- [ ] No `headers` field with hyphenated keys on `http` nodes
+- [ ] No `headers` field using plain object literals with hyphenated keys (use a `@ts` block instead)
 - [ ] No literal `"` characters inside `@ts` blocks (use `String.fromCharCode(34)`)
 - [ ] No nested template literals inside `@ts` blocks (use concatenation)
 - [ ] No `$${...}` patterns in template literals (use concatenation)
+- [ ] No nested `@ts` or `@json` blocks inside other code blocks (use a single block that returns the full object)
 
 **Structure validation:**
 

@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Swirls Language
@@ -70,6 +70,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `ts-no-double-quotes` - Use String.fromCharCode(34) instead of literal double-quote
 - `ts-no-nested-templates` - Use concatenation instead of nested template literals
 - `ts-no-dollar-interpolation` - Avoid $${} in template literals
+- `ts-no-nested-code-blocks` - Never nest @ts/@json blocks inside other code blocks
 
 ### 5. Schema & Typing
 - `schema-json-schema` - JSON Schema format in @json blocks

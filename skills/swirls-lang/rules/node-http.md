@@ -51,13 +51,41 @@ node call_api {
 }
 ```
 
-**Warning:** Do not use `headers` with hyphenated keys like `Content-Type`. The parser treats hyphens as subtraction operators and silently drops the rest of the file. HTTP nodes default to JSON content type. See the parser-hyphenated-headers rule.
+**Correct (HTTP node with custom headers):**
+
+When you need custom headers (including hyphenated keys like `Content-Type` or `x-api-key`), use a single `@ts` block that returns the entire headers object. Never nest `@ts` blocks inside other `@ts` blocks.
+
+```swirls
+node call_api {
+  type: http
+  label: "Call External API"
+  method: "POST"
+  url: "https://api.example.com/data"
+  secrets: [API_KEY]
+  headers: @ts {
+    return {
+      "x-api-key": context.secrets.API_KEY,
+      "x-request-id": "abc123",
+      "Content-Type": "application/json"
+    }
+  }
+  body: @ts {
+    return JSON.stringify({
+      query: context.nodes.root.output.query
+    })
+  }
+}
+```
+
+**Note:** Do not use HTTP nodes to call AI/LLM APIs directly. Use `ai` nodes instead — they handle model routing, authentication, and response parsing automatically.
+
+**Warning:** Do not use `headers` as a plain object literal with hyphenated keys like `Content-Type`. The parser treats hyphens as subtraction operators and silently drops the rest of the file. Always use a `@ts` block for headers so keys are JavaScript strings. See the parser-hyphenated-headers and ts-no-nested-code-blocks rules.
 
 HTTP node fields:
 | Field | Required | Type |
 |-------|----------|------|
 | `url` | yes | `@ts` block or string |
 | `method` | no | "GET", "POST", "PUT", "DELETE", "PATCH" (default: "GET") |
-| `headers` | no | Object (avoid hyphenated keys) |
+| `headers` | no | `@ts` block returning an object (use string keys for hyphenated names) |
 | `body` | no | `@ts` block |
 | `schema` | no | `@json` block (use `outputSchema` only on root nodes) |

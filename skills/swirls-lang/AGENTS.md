@@ -880,14 +880,41 @@ node call_api {
 }
 ```
 
-**Warning:** Do not use `headers` with hyphenated keys like `Content-Type`. The parser treats hyphens as subtraction operators and silently drops the rest of the file. HTTP nodes default to JSON content type. See the parser-hyphenated-headers rule.
+**Correct (HTTP node with custom headers):**
+
+When you need custom headers (including hyphenated keys like `Content-Type` or `x-api-key`), use a single `@ts` block that returns the entire headers object. Never nest `@ts` blocks inside other `@ts` blocks.
+
+```swirls
+node call_api {
+  type: http
+  label: "Call External API"
+  method: "POST"
+  url: "https://api.example.com/data"
+  secrets: [API_KEY]
+  headers: @ts {
+    return {
+      "x-api-key": context.secrets.API_KEY,
+      "Content-Type": "application/json"
+    }
+  }
+  body: @ts {
+    return JSON.stringify({
+      query: context.nodes.root.output.query
+    })
+  }
+}
+```
+
+**Warning:** Do not use `headers` as a plain object literal with hyphenated keys like `Content-Type`. The parser treats hyphens as subtraction operators and silently drops the rest of the file. Always use a `@ts` block for headers so keys are JavaScript strings. See the parser-hyphenated-headers and ts-no-nested-code-blocks rules.
+
+**Note:** Do not use HTTP nodes to call AI/LLM APIs directly. Use `ai` nodes instead — they handle model routing, authentication, and response parsing automatically.
 
 HTTP node fields:
 | Field | Required | Type |
 |-------|----------|------|
 | `url` | yes | `@ts` block or string |
 | `method` | no | "GET", "POST", "PUT", "DELETE", "PATCH" (default: "GET") |
-| `headers` | no | Object (avoid hyphenated keys) |
+| `headers` | no | `@ts` block returning an object (use string keys for hyphenated names) |
 | `body` | no | `@ts` block |
 | `schema` | no | `@json` block (use `outputSchema` only on root nodes) |
 
@@ -1148,7 +1175,9 @@ const email = context.nodes.root.input.email ?? ""
 return { email: email.toLowerCase() }
 ```
 
-The `@ts` prefix is used for: `code`, `prompt`, `router`, `from`, `to`, `subject`, `text`, `html`, `replyTo`, `url`, `body`, `input`, `path`, and persistence `condition` fields.
+The `@ts` prefix is used for: `code`, `prompt`, `router`, `from`, `to`, `subject`, `text`, `html`, `replyTo`, `url`, `body`, `headers`, `input`, `path`, and persistence `condition` fields.
+
+**No nesting:** `@ts` blocks cannot contain other `@ts` blocks. Each `@ts` block is a leaf that contains executable code. If a field needs to produce a compound value (e.g., a headers object with multiple keys), use a single `@ts` block that returns the entire object. See section 4.7.
 
 Brace balancing: the lexer counts `{` and `}` depth to find the closing brace. Inner braces (objects, if-blocks, functions) are fine as long as they are balanced.
 
@@ -1401,6 +1430,73 @@ node process {
 | Access secrets | `context.secrets.KEY_NAME` in @ts block |
 
 Code nodes are strictly for reshaping inputs, normalizing strings, computing derived values, and structuring outputs. Break your workflow into multiple nodes with the right types.
+
+---
+
+### 4.7. No Nested Code Blocks
+
+`@ts` and `@json` blocks cannot be nested inside other `@ts` or `@json` blocks. Each code block must appear at the field level — never inside another code block. When a field needs to produce a compound value (like an object with multiple keys), use a single `@ts` block that returns the entire object.
+
+**Incorrect (nested @ts blocks inside a @ts block):**
+
+```swirls
+node call_api {
+  type: http
+  label: "Call API"
+  url: "https://api.example.com/data"
+  method: "POST"
+  headers: @ts {
+    x-api-key: @ts {
+      return context.secrets.API_KEY
+    }
+    x-request-id: "abc123"
+  }
+}
+```
+
+**Incorrect (nested @ts blocks on individual values):**
+
+```swirls
+node call_api {
+  type: http
+  label: "Call API"
+  url: "https://api.example.com/data"
+  method: "POST"
+  body: @ts {
+    query: @ts {
+      return context.nodes.root.output.query
+    }
+    limit: 10
+  }
+}
+```
+
+**Correct (single @ts block returning the full object):**
+
+```swirls
+node call_api {
+  type: http
+  label: "Call API"
+  url: "https://api.example.com/data"
+  method: "POST"
+  secrets: [API_KEY]
+  headers: @ts {
+    return {
+      "x-api-key": context.secrets.API_KEY,
+      "x-request-id": "abc123",
+      "Content-Type": "application/json"
+    }
+  }
+  body: @ts {
+    return JSON.stringify({
+      query: context.nodes.root.output.query,
+      limit: 10
+    })
+  }
+}
+```
+
+Rule: a code block (`@ts`, `@json`, `@sql`) is always a leaf — it contains executable code, never other code blocks. If you need to build a structured value, write one `@ts` block that constructs and returns the whole object.
 
 ---
 
@@ -2398,9 +2494,9 @@ node call_api {
 headers: { "Content-Type": "application/json" }
 ```
 
-Even quoted keys with hyphens cause the same issue.
+Even quoted keys with hyphens cause the same issue. This applies to plain object literals — the parser sees the hyphen as a subtraction operator.
 
-**Correct (omit the headers field entirely):**
+**Correct (use a @ts block that returns the headers object):**
 
 ```swirls
 node call_api {
@@ -2408,13 +2504,24 @@ node call_api {
   label: "Call API"
   method: "POST"
   url: @ts { return "https://api.example.com" }
+  headers: @ts {
+    return {
+      "Content-Type": "application/json",
+      "x-api-key": context.secrets.API_KEY,
+      "Authorization": "Bearer " + context.secrets.AUTH_TOKEN
+    }
+  }
   body: @ts {
     return JSON.stringify({ query: context.nodes.root.output.query })
   }
 }
 ```
 
-HTTP nodes default to JSON content type. There is currently no safe way to set custom headers with hyphenated keys. If you need `application/x-www-form-urlencoded`, the server may infer it from the body format.
+By using a `@ts` block, header keys are JavaScript string literals — the parser never sees the hyphens as operators. This is the only safe way to set custom headers with hyphenated keys.
+
+**Also correct (omit headers if defaults suffice):**
+
+HTTP nodes default to JSON content type. If you don't need custom headers, simply omit the `headers` field entirely.
 
 ---
 
@@ -2529,10 +2636,11 @@ Before running `bunx swirls doctor`, verify every item on this checklist. Each i
 **Parser safety (silent drops):**
 
 - [ ] Comments use ASCII only (no box-drawing, arrows, em dashes, or other Unicode)
-- [ ] No `headers` field with hyphenated keys on `http` nodes
+- [ ] No `headers` field using plain object literals with hyphenated keys (use a `@ts` block instead)
 - [ ] No literal `"` characters inside `@ts` blocks (use `String.fromCharCode(34)`)
 - [ ] No nested template literals inside `@ts` blocks (use concatenation)
 - [ ] No `$${...}` patterns in template literals (use concatenation)
+- [ ] No nested `@ts` or `@json` blocks inside other code blocks (use a single block that returns the full object)
 
 **Structure validation:**
 

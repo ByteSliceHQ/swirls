@@ -57,6 +57,8 @@ const email = context.nodes.root.input.email ?? ""
 return { email: email.toLowerCase() }
 ```
 
-The `@ts` prefix is used for: `code`, `prompt`, `router`, `from`, `to`, `subject`, `text`, `html`, `replyTo`, `url`, `body`, `input`, `path`, and persistence `condition` fields.
+The `@ts` prefix is used for: `code`, `prompt`, `router`, `from`, `to`, `subject`, `text`, `html`, `replyTo`, `url`, `body`, `headers`, `input`, `path`, and persistence `condition` fields.
+
+**No nesting:** `@ts` blocks cannot contain other `@ts` blocks. Each `@ts` block is a leaf that contains executable code. If a field needs to produce a compound value (e.g., a headers object with multiple keys), use a single `@ts` block that returns the entire object. See the ts-no-nested-code-blocks rule.
 
 Brace balancing: the lexer counts `{` and `}` depth to find the closing brace. Inner braces (objects, if-blocks, functions) are fine as long as they are balanced.

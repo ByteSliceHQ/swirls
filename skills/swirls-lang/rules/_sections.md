@@ -48,4 +48,4 @@
 ## 10. Parser Pitfalls (parser)
 
 **Impact:** CRITICAL
-**Description:** Known parser bugs that silently drop graphs. Unicode in comments, hyphenated headers, double-quotes in @ts, nested templates. Essential knowledge to avoid hours of debugging.
+**Description:** Known parser bugs that silently drop graphs. Unicode in comments, hyphenated headers (use @ts blocks), double-quotes in @ts, nested templates, nested code blocks. Essential knowledge to avoid hours of debugging.
