@@ -6,20 +6,17 @@ tags: context, secrets, environment, keys, declaration
 
 ## context.secrets - Accessing Secrets
 
-Secrets are accessed via `context.secrets.KEY_NAME` in `@ts` blocks. Custom secrets must be declared on the node with `secrets: [KEY_NAME]`. Some node types have inferred default secrets that do not need declaration.
+Secrets are accessed via `context.secrets.<secret_block_name>.<VAR_NAME>` in `@ts` blocks. Declare which vars from which top-level `secret` blocks the node may read using `secrets: { blockName: [VAR1, VAR2] }`. Some node types resolve vendor API keys internally (not via `context.secrets`).
 
-**Incorrect (declaring secrets as a string array):**
+**Incorrect (flat access without block):**
 
 ```swirls
-node process {
-  type: code
-  label: "Process"
-  secrets: ["MY_TOKEN"]
-  code: @ts { return { token: context.secrets.MY_TOKEN } }
+code: @ts {
+  const key = context.secrets.MY_TOKEN
 }
 ```
 
-Error: "Unexpected token: expected form, webhook, schedule, graph, or trigger"
+Use the block-qualified path that matches your `secrets:` map.
 
 **Incorrect (using process.env):**
 
@@ -31,28 +28,32 @@ code: @ts {
 
 Code nodes have no access to `process.env`.
 
-**Correct (declaring secrets as identifiers):**
+**Correct (secret block + map + nested access):**
 
 ```swirls
-root {
-  type: code
-  label: "Entry"
-  secrets: [MY_SERVICE_TOKEN, ANOTHER_KEY]
-  code: @ts {
-    const token = context.secrets.MY_SERVICE_TOKEN
-    return { hasToken: Boolean(token) }
+secret creds {
+  vars: [MY_SERVICE_TOKEN, ANOTHER_KEY]
+}
+
+graph g {
+  root {
+    type: code
+    label: "Entry"
+    secrets: {
+      creds: [MY_SERVICE_TOKEN, ANOTHER_KEY]
+    }
+    code: @ts {
+      const token = context.secrets.creds.MY_SERVICE_TOKEN
+      return { hasToken: Boolean(token) }
+    }
   }
 }
 ```
 
-Secret keys are unquoted identifiers, not strings. They must match `[a-zA-Z0-9_]+`.
+Var names in the `secret` block and in each node's `secrets:` map must match `[a-zA-Z0-9_]+`. The validator ensures block names exist and each listed var is declared in that block's `vars`.
 
-**Inferred secrets (no declaration needed):**
+**Inferred vendor keys (ai / resend / firecrawl):**
 
-| Node Type | Inferred Secret |
-|-----------|----------------|
-| `ai` | `OPENROUTER_API_KEY` |
-| `email` | `RESEND_API_KEY` |
-| `scrape` | `FIRECRAWL_API_KEY` |
+These are resolved by the runtime for those node types (e.g. `OPENROUTER_API_KEY` for `ai`). They are not exposed on `context.secrets` for user `@ts` code; declare your own keys in a `secret` block if you need them in code.
 
-Set secret values via `bunx swirls env set KEY_NAME` or the dashboard.
+Set secret values via `bunx swirls env set VAR_NAME` or the dashboard (vault keys remain flat by var name).

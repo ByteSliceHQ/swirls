@@ -72,6 +72,6 @@ node process {
 | Send email | `email` node |
 | Scrape web pages | `scrape` node |
 | Read persisted data | `stream` node |
-| Access secrets | `context.secrets.KEY_NAME` in @ts block |
+| Access secrets | `context.secrets.<block>.<VAR>` in @ts block |
 
 Code nodes are strictly for reshaping inputs, normalizing strings, computing derived values, and structuring outputs. Break your workflow into multiple nodes with the right types.

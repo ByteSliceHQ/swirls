@@ -35,6 +35,9 @@ Before running `bunx swirls doctor`, verify every item on this checklist. Each i
 - [ ] Every `http` node has a `url` field
 - [ ] Every `graph` node has `graph` and `input` fields
 - [ ] Every `bucket` node has an `operation` field
+- [ ] Every `postgres` node has a `postgres` field and exactly one of `select` or `insert`
+- [ ] Every `postgres` node with `insert` has a `params` field
+- [ ] Every `postgres` node references a `postgres` block defined in the same file
 
 **Trigger validation:**
 

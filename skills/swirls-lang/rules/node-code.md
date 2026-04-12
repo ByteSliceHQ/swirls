@@ -70,4 +70,4 @@ Code node fields:
 | `schema` | no | `@json` block (use `outputSchema` only on root nodes) |
 | `inputSchema` | no | `@json` block (usually only on root) |
 | `review` | no | Review config block |
-| `secrets` | no | Array of secret key identifiers |
+| `secrets` | no | Map of secret block names to var arrays: `{ block: [VAR] }` |

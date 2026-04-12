@@ -56,15 +56,19 @@ node call_api {
 When you need custom headers (including hyphenated keys like `Content-Type` or `x-api-key`), use a single `@ts` block that returns the entire headers object. Never nest `@ts` blocks inside other `@ts` blocks.
 
 ```swirls
+secret api_creds {
+  vars: [API_KEY]
+}
+
 node call_api {
   type: http
   label: "Call External API"
   method: "POST"
   url: "https://api.example.com/data"
-  secrets: [API_KEY]
+  secrets: { api_creds: [API_KEY] }
   headers: @ts {
     return {
-      "x-api-key": context.secrets.API_KEY,
+      "x-api-key": context.secrets.api_creds.API_KEY,
       "x-request-id": "abc123",
       "Content-Type": "application/json"
     }
@@ -76,6 +80,8 @@ node call_api {
   }
 }
 ```
+
+Declare the vars your node needs in a top-level `secret` block, then reference that block in the node's `secrets:` map. HTTP nodes also support an `auth:` field that references a top-level `auth` block for OAuth, API key, basic, or bearer authentication. See `resource-secrets` and `resource-auth` rules.
 
 **Note:** Do not use HTTP nodes to call AI/LLM APIs directly. Use `ai` nodes instead — they handle model routing, authentication, and response parsing automatically.
 
