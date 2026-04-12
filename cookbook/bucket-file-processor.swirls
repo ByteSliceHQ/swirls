@@ -1,0 +1,68 @@
+/**
+ * Demonstrates bucket nodes. Downloads a file, processes it,
+ * and uploads the result.
+ */
+
+webhook process_file {
+  label: "Process File"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["input_path"],
+      "properties": {
+        "input_path": { "type": "string" },
+        "output_path": { "type": "string" }
+      }
+    }
+  }
+}
+
+graph file_pipeline {
+  label: "File Processing Pipeline"
+
+  root {
+    type: code
+    label: "Extract paths"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node download {
+    type: bucket
+    label: "Download input file"
+    operation: "download"
+    path: @ts { return context.nodes.root.output.input_path }
+  }
+
+  node process {
+    type: code
+    label: "Process file content"
+    code: @ts {
+      const content = context.nodes.download.output
+      return {
+        processed: true,
+        original_path: context.nodes.root.output.input_path,
+        content: content
+      }
+    }
+  }
+
+  node upload {
+    type: bucket
+    label: "Upload result"
+    operation: "upload"
+    path: @ts {
+      return context.nodes.root.output.output_path || "processed/" + context.nodes.root.output.input_path
+    }
+  }
+
+  flow {
+    root -> download
+    download -> process
+    process -> upload
+  }
+}
+
+trigger on_file {
+  webhook:process_file -> file_pipeline
+  enabled: true
+}

@@ -1,0 +1,77 @@
+/**
+ * Demonstrates complex data transformation in code nodes.
+ * All logic stays inline in @ts blocks.
+ */
+
+form data_input {
+  label: "Data Input"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "title": "Items",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "value": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+graph process_data {
+  label: "Process Data"
+
+  root {
+    type: code
+    label: "Extract data"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node transform {
+    type: code
+    label: "Transform data"
+    code: @ts {
+      const items = context.nodes.root.output.items || []
+      const processed = items.map(function(item) {
+        return {
+          name: item.name ? item.name.toUpperCase() : "",
+          value: item.value || 0,
+          doubled: (item.value || 0) * 2
+        }
+      })
+      const total = processed.reduce(function(sum, item) { return sum + item.value }, 0)
+      return { items: processed, total: total }
+    }
+  }
+
+  node summarize {
+    type: code
+    label: "Summarize results"
+    code: @ts {
+      const result = context.nodes.transform.output
+      return {
+        item_count: result.items ? result.items.length : 0,
+        total: result.total || 0,
+        processed_at: new Date().toISOString()
+      }
+    }
+  }
+
+  flow {
+    root -> transform
+    transform -> summarize
+  }
+}
+
+trigger on_data {
+  form:data_input -> process_data
+  enabled: true
+}

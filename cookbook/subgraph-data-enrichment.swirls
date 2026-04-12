@@ -1,0 +1,113 @@
+/**
+ * Demonstrates the subgraph pattern. A helper graph enriches company data,
+ * and the main graph calls it as a node.
+ */
+
+webhook company_data {
+  label: "Company Data"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["company_name", "domain"],
+      "properties": {
+        "company_name": { "type": "string" },
+        "domain": { "type": "string" }
+      }
+    }
+  }
+}
+
+graph enrich_company {
+  label: "Enrich Company Data"
+
+  root {
+    type: code
+    label: "Receive company"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node scrape_site {
+    type: firecrawl
+    label: "Scrape company site"
+    url: @ts { return "https://" + context.nodes.root.output.domain }
+    onlyMainContent: true
+    formats: ["markdown"]
+  }
+
+  node extract_info {
+    type: ai
+    label: "Extract company info"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      return "Extract company information from this website content.\n\nCompany: " + context.nodes.root.output.company_name + "\n\n" + JSON.stringify(context.nodes.scrape_site.output)
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["description", "industry"],
+        "properties": {
+          "description": { "type": "string" },
+          "industry": { "type": "string" },
+          "employee_count_estimate": { "type": "string" },
+          "products": { "type": "array", "items": { "type": "string" } },
+          "technologies": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+
+  flow {
+    root -> scrape_site
+    scrape_site -> extract_info
+  }
+}
+
+graph process_company {
+  label: "Process Company"
+
+  root {
+    type: code
+    label: "Extract input"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node enrich {
+    type: graph
+    label: "Enrich company"
+    graph: enrich_company
+    input: @ts {
+      return {
+        company_name: context.nodes.root.output.company_name,
+        domain: context.nodes.root.output.domain
+      }
+    }
+  }
+
+  node combine {
+    type: code
+    label: "Combine results"
+    code: @ts {
+      const original = context.nodes.root.output
+      const enriched = context.nodes.enrich.output.extract_info
+      return {
+        company_name: original.company_name,
+        domain: original.domain,
+        description: enriched.description,
+        industry: enriched.industry,
+        products: enriched.products,
+        technologies: enriched.technologies
+      }
+    }
+  }
+
+  flow {
+    root -> enrich
+    enrich -> combine
+  }
+}
+
+trigger on_company {
+  webhook:company_data -> process_company
+  enabled: true
+}

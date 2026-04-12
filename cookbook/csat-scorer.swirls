@@ -1,0 +1,117 @@
+/**
+ * Scores customer satisfaction from support interactions
+ * and triggers follow-ups for unhappy customers.
+ */
+
+webhook support_interaction {
+  label: "Support Interaction"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["customer_email", "interaction_text", "channel"],
+      "properties": {
+        "customer_email": { "type": "string" },
+        "interaction_text": { "type": "string" },
+        "channel": { "type": "string", "enum": ["chat", "email", "phone"] },
+        "agent_name": { "type": "string" }
+      }
+    }
+  }
+}
+
+graph score_csat {
+  label: "Score CSAT"
+
+  persistence {
+    enabled: true
+    condition: @ts { return true }
+    name: "csat_scores"
+  }
+
+  root {
+    type: code
+    label: "Extract interaction"
+    code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "customer_email": { "type": "string" },
+          "interaction_text": { "type": "string" },
+          "channel": { "type": "string" },
+          "agent_name": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node score {
+    type: ai
+    label: "Score satisfaction"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      const interaction = context.nodes.root.output
+      return "Score the customer satisfaction of this " + interaction.channel + " support interaction from 1-5.\n\n" + interaction.interaction_text
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["score", "resolved"],
+        "properties": {
+          "score": { "type": "number", "minimum": 1, "maximum": 5 },
+          "resolved": { "type": "boolean" },
+          "customer_sentiment": { "type": "string", "enum": ["happy", "neutral", "frustrated", "angry"] },
+          "improvement_notes": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node route {
+    type: switch
+    label: "Route by score"
+    cases: ["needs_followup", "ok"]
+    router: @ts {
+      if (context.nodes.score.output.score <= 2) return "needs_followup"
+      return "ok"
+    }
+  }
+
+  node followup {
+    type: resend
+    label: "Send follow-up"
+    from: @ts { return "support@example.com" }
+    to: @ts { return context.nodes.root.output.customer_email }
+    subject: @ts { return "Following up on your support experience" }
+    text: @ts {
+      return "We noticed your recent support experience may not have met your expectations. We are committed to doing better. A senior support specialist will reach out within 24 hours to ensure your issue is fully resolved."
+    }
+  }
+
+  node store_result {
+    type: code
+    label: "Store score"
+    code: @ts {
+      return {
+        customer: context.nodes.root.output.customer_email,
+        channel: context.nodes.root.output.channel,
+        score: context.nodes.score.output.score,
+        resolved: context.nodes.score.output.resolved,
+        sentiment: context.nodes.score.output.customer_sentiment
+      }
+    }
+  }
+
+  flow {
+    root -> score
+    score -> route
+    route -["needs_followup"]-> followup
+    route -["ok"]-> store_result
+  }
+}
+
+trigger on_interaction {
+  webhook:support_interaction -> score_csat
+  enabled: true
+}

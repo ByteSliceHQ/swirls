@@ -57,7 +57,7 @@ These are the only value forms that can appear after a `:` in a field assignment
 - Object literal: `{ key: value }`
 - Array literal: `[item1, item2]`
 - TypeScript block: `@ts { ... }`
-- TypeScript file ref: `@ts "path.ts.swirls"`
+- TypeScript file ref: `@ts "path.ts.swirls"` (file must exist on disk; doctor validates this)
 - JSON block: `@json { ... }`
 - SQL block: `@sql { ... }`
 

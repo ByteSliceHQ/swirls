@@ -1,0 +1,97 @@
+/**
+ * Generates recipes based on available ingredients and dietary preferences.
+ */
+
+form recipe_request {
+  label: "Recipe Generator"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["ingredients"],
+      "properties": {
+        "ingredients": { "type": "string", "title": "Available Ingredients (comma-separated)" },
+        "dietary": {
+          "type": "string",
+          "title": "Dietary Preference",
+          "enum": ["none", "vegetarian", "vegan", "gluten_free", "keto", "paleo"]
+        },
+        "cuisine": { "type": "string", "title": "Preferred Cuisine" },
+        "max_time_minutes": { "type": "number", "title": "Max Cooking Time (minutes)" }
+      }
+    }
+  }
+}
+
+graph generate_recipe {
+  label: "Generate Recipe"
+
+  root {
+    type: code
+    label: "Extract request"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node create_recipe {
+    type: ai
+    label: "Create recipe"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      const req = context.nodes.root.output
+      return "Create a recipe using these ingredients: " + req.ingredients + "\n\nDietary preference: " + (req.dietary || "none") + "\nCuisine: " + (req.cuisine || "any") + "\nMax time: " + (req.max_time_minutes || "no limit") + " minutes"
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["name", "ingredients_list", "instructions", "prep_time", "cook_time"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "ingredients_list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": { "type": "string" },
+                "amount": { "type": "string" }
+              }
+            }
+          },
+          "instructions": { "type": "array", "items": { "type": "string" } },
+          "prep_time": { "type": "number" },
+          "cook_time": { "type": "number" },
+          "servings": { "type": "number" },
+          "difficulty": { "type": "string", "enum": ["easy", "medium", "hard"] }
+        }
+      }
+    }
+    temperature: 0.8
+  }
+
+  node format {
+    type: code
+    label: "Format recipe"
+    code: @ts {
+      const recipe = context.nodes.create_recipe.output
+      return {
+        name: recipe.name,
+        description: recipe.description || "",
+        total_time: recipe.prep_time + recipe.cook_time,
+        servings: recipe.servings || 4,
+        difficulty: recipe.difficulty || "medium",
+        ingredients: recipe.ingredients_list,
+        steps: recipe.instructions
+      }
+    }
+  }
+
+  flow {
+    root -> create_recipe
+    create_recipe -> format
+  }
+}
+
+trigger on_recipe_request {
+  form:recipe_request -> generate_recipe
+  enabled: true
+}

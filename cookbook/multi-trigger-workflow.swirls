@@ -1,0 +1,106 @@
+/**
+ * A single graph triggered by multiple sources:
+ * a form, a webhook, and a schedule.
+ */
+
+form manual_entry {
+  label: "Manual Entry"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["message"],
+      "properties": {
+        "message": { "type": "string", "title": "Message" }
+      }
+    }
+  }
+}
+
+webhook api_entry {
+  label: "API Entry"
+  schema: @json {
+    {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" }
+      }
+    }
+  }
+}
+
+schedule periodic_entry {
+  label: "Periodic Entry"
+  cron: "0 12 * * *"
+}
+
+graph process_message {
+  label: "Process Message"
+
+  root {
+    type: code
+    label: "Normalize input"
+    code: @ts {
+      const input = context.nodes.root.input
+      const triggerType = context.meta.triggerType
+      return {
+        message: input.message || "Scheduled run at " + new Date().toISOString(),
+        source: triggerType,
+        received_at: new Date().toISOString()
+      }
+    }
+  }
+
+  node process {
+    type: ai
+    label: "Process message"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      return "Analyze this message and extract key information.\n\nSource: " + context.nodes.root.output.source + "\nMessage: " + context.nodes.root.output.message
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["summary", "intent"],
+        "properties": {
+          "summary": { "type": "string" },
+          "intent": { "type": "string" },
+          "entities": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+
+  node result {
+    type: code
+    label: "Format result"
+    code: @ts {
+      return {
+        source: context.nodes.root.output.source,
+        message: context.nodes.root.output.message,
+        summary: context.nodes.process.output.summary,
+        intent: context.nodes.process.output.intent
+      }
+    }
+  }
+
+  flow {
+    root -> process
+    process -> result
+  }
+}
+
+trigger from_form {
+  form:manual_entry -> process_message
+  enabled: true
+}
+
+trigger from_webhook {
+  webhook:api_entry -> process_message
+  enabled: true
+}
+
+trigger from_schedule {
+  schedule:periodic_entry -> process_message
+  enabled: true
+}

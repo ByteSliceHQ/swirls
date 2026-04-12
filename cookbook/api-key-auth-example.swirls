@@ -1,0 +1,67 @@
+/**
+ * Demonstrates the auth block pattern for API key authentication.
+ */
+
+secret weather_creds {
+  label: "Weather API"
+  vars: [WEATHER_API_KEY]
+}
+
+auth weather_auth {
+  label: "Weather API Auth"
+  type: api_key
+  secrets: weather_creds
+  key: WEATHER_API_KEY
+  query_param: "appid"
+}
+
+schedule hourly_weather {
+  label: "Hourly Weather"
+  cron: "0 * * * *"
+}
+
+graph fetch_weather {
+  label: "Fetch Weather"
+
+  root {
+    type: code
+    label: "Prepare request"
+    code: @ts {
+      return { city: "San Francisco", units: "imperial" }
+    }
+  }
+
+  node get_weather {
+    type: http
+    label: "Call weather API"
+    url: @ts {
+      const params = context.nodes.root.output
+      return "https://api.openweathermap.org/data/2.5/weather?q=" + params.city + "&units=" + params.units
+    }
+    auth: weather_auth
+  }
+
+  node format {
+    type: code
+    label: "Format result"
+    code: @ts {
+      const data = context.nodes.get_weather.output
+      return {
+        city: data.name || "unknown",
+        temp: data.main ? data.main.temp : 0,
+        description: data.weather ? data.weather[0].description : "unknown",
+        humidity: data.main ? data.main.humidity : 0
+      }
+    }
+  }
+
+  flow {
+    root -> get_weather
+    get_weather -> format
+  }
+}
+
+trigger on_weather {
+  schedule:hourly_weather -> fetch_weather
+  enabled: true
+}

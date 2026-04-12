@@ -6,7 +6,7 @@ tags: parser, validation, checklist, doctor, preflight
 
 ## Pre-Flight Validation Checklist
 
-Before running `bunx swirls doctor`, verify every item on this checklist. Each item corresponds to a known parser bug or validation failure.
+Before running `swirls doctor`, verify every item on this checklist. Each item corresponds to a known parser bug or validation failure.
 
 **Parser safety (silent drops):**
 
@@ -27,7 +27,7 @@ Before running `bunx swirls doctor`, verify every item on this checklist. Each i
 
 **Node validation:**
 
-- [ ] Every `email` node has `from`, `to`, and `subject` fields
+- [ ] Every `resend` node has `from`, `to`, and `subject` fields
 - [ ] Every `ai` node has `kind`, `model`, and `prompt` fields
 - [ ] Every `ai` node with `kind: object` has a `schema`
 - [ ] Every `code` node has a `code` field
@@ -44,6 +44,10 @@ Before running `bunx swirls doctor`, verify every item on this checklist. Each i
 - [ ] All graphs referenced by `type: graph` nodes are in the same file
 - [ ] Trigger bindings reference resources and graphs defined in the same file
 - [ ] Secret keys use only `[a-zA-Z0-9_]` characters
+
+**File references:**
+
+- [ ] All `@ts "path.ts.swirls"` references point to files that exist on disk (doctor validates this)
 
 **Schema validation:**
 

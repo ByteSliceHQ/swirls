@@ -61,7 +61,7 @@ node normalize {
 }
 ```
 
-If you need network access, use an `http` node. If you need AI, use an `ai` node. If you need to send email, use an `email` node. Break your graph into multiple nodes with the right types.
+If you need network access, use an `http` node. If you need AI, use an `ai` node. If you need to send email, use a `resend` node. Break your graph into multiple nodes with the right types.
 
 Code node fields:
 | Field | Required | Type |

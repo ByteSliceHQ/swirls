@@ -1,0 +1,86 @@
+/**
+ * Generates social media posts from a topic and key points.
+ * Creates variants for different platforms.
+ */
+
+form social_post {
+  label: "Generate Social Post"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["topic", "key_points"],
+      "properties": {
+        "topic": { "type": "string", "title": "Topic" },
+        "key_points": { "type": "string", "title": "Key Points" },
+        "tone": {
+          "type": "string",
+          "title": "Tone",
+          "enum": ["professional", "casual", "witty", "inspirational"]
+        },
+        "platform": {
+          "type": "string",
+          "title": "Platform",
+          "enum": ["twitter", "linkedin", "both"]
+        }
+      }
+    }
+  }
+}
+
+graph generate_posts {
+  label: "Generate Social Posts"
+
+  root {
+    type: code
+    label: "Extract request"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node generate {
+    type: ai
+    label: "Generate post variants"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      const req = context.nodes.root.output
+      return "Generate social media posts about: " + req.topic + "\n\nKey points: " + req.key_points + "\nTone: " + (req.tone || "professional") + "\nPlatform: " + (req.platform || "both") + "\n\nGenerate a Twitter post (max 280 chars) and a LinkedIn post (2-3 paragraphs). Include relevant hashtags."
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["twitter", "linkedin"],
+        "properties": {
+          "twitter": { "type": "string" },
+          "linkedin": { "type": "string" },
+          "hashtags": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+    temperature: 0.8
+  }
+
+  node format {
+    type: code
+    label: "Format output"
+    code: @ts {
+      const posts = context.nodes.generate.output
+      return {
+        topic: context.nodes.root.output.topic,
+        twitter_post: posts.twitter,
+        twitter_length: posts.twitter.length,
+        linkedin_post: posts.linkedin,
+        hashtags: posts.hashtags
+      }
+    }
+  }
+
+  flow {
+    root -> generate
+    generate -> format
+  }
+}
+
+trigger on_social_request {
+  form:social_post -> generate_posts
+  enabled: true
+}

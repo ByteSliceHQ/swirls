@@ -1,0 +1,90 @@
+/**
+ * Contact form that classifies inquiries and sends a tailored autoresponse.
+ */
+
+form contact {
+  label: "Contact Us"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["name", "email", "message"],
+      "properties": {
+        "name": { "type": "string", "title": "Name" },
+        "email": { "type": "string", "format": "email", "title": "Email" },
+        "message": { "type": "string", "title": "Message" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+graph handle_contact {
+  label: "Handle Contact Form"
+
+  root {
+    type: code
+    label: "Extract submission"
+    code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node classify {
+    type: ai
+    label: "Classify inquiry"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      return "Classify this customer inquiry into one of: sales, support, partnership, other.\n\nName: " + context.nodes.root.output.name + "\nMessage: " + context.nodes.root.output.message
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["category", "summary"],
+        "properties": {
+          "category": { "type": "string", "enum": ["sales", "support", "partnership", "other"] },
+          "summary": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node draft_reply {
+    type: ai
+    label: "Draft reply"
+    kind: text
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      return "Write a short, friendly auto-reply for this " + context.nodes.classify.output.category + " inquiry from " + context.nodes.root.output.name + ". Summary: " + context.nodes.classify.output.summary + "\n\nKeep it under 3 sentences."
+    }
+    temperature: 0.7
+  }
+
+  node send_reply {
+    type: resend
+    label: "Send autoresponse"
+    from: @ts { return "hello@example.com" }
+    to: @ts { return context.nodes.root.output.email }
+    subject: @ts { return "Re: Your inquiry" }
+    text: @ts { return context.nodes.draft_reply.output }
+  }
+
+  flow {
+    root -> classify
+    classify -> draft_reply
+    draft_reply -> send_reply
+  }
+}
+
+trigger on_contact {
+  form:contact -> handle_contact
+  enabled: true
+}

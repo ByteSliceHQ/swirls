@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # Swirls Language
@@ -42,7 +42,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 
 ### 1. Language Spec (READ FIRST)
 - `spec-strict-syntax` - **Exhaustive list of every valid keyword, node type, config field, edge syntax, and value type. If something is not listed in this file, it does not exist in Swirls. Do not invent syntax.**
-- `spec-common-mistakes` - **The 14 most common incorrect patterns with corrections. Check your output against these before returning any .swirls code.**
+- `spec-common-mistakes` - **The 15 most common incorrect patterns with corrections. Check your output against these before returning any .swirls code.**
 
 ### 2. File Structure
 - `structure-top-level-declarations` - Valid top-level blocks: form, webhook, schedule, graph, trigger, secret, auth, postgres

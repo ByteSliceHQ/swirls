@@ -1,0 +1,77 @@
+/**
+ * Fetches top stories daily, summarizes them with AI,
+ * and emails a digest.
+ */
+
+schedule morning_digest {
+  label: "Morning Digest"
+  cron: "0 7 * * *"
+  timezone: "America/New_York"
+}
+
+secret email_creds {
+  vars: [DIGEST_RECIPIENT]
+}
+
+graph build_digest {
+  label: "Build Daily Digest"
+
+  root {
+    type: code
+    label: "Start"
+    code: @ts { return { timestamp: new Date().toISOString() } }
+  }
+
+  node fetch_tech {
+    type: http
+    label: "Fetch tech news"
+    url: @ts { return "https://hacker-news.firebaseio.com/v0/topstories.json?limitToFirst=10&orderBy=%22$key%22" }
+  }
+
+  node fetch_stories {
+    type: code
+    label: "Extract story IDs"
+    code: @ts {
+      const ids = context.nodes.fetch_tech.output
+      return { ids: Array.isArray(ids) ? ids.slice(0, 5) : [] }
+    }
+  }
+
+  node summarize {
+    type: ai
+    label: "Summarize headlines"
+    kind: text
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      return "Write a brief daily tech news digest intro paragraph based on today being " + context.nodes.root.output.timestamp + ". Keep it to 3-4 sentences highlighting that these are the top stories from Hacker News today."
+    }
+    temperature: 0.7
+  }
+
+  node send_digest {
+    type: resend
+    label: "Send digest email"
+    from: @ts { return "digest@example.com" }
+    to: @ts { return context.secrets.email_creds.DIGEST_RECIPIENT }
+    subject: @ts {
+      const d = new Date(context.nodes.root.output.timestamp)
+      return "Daily Tech Digest - " + d.toLocaleDateString()
+    }
+    text: @ts { return context.nodes.summarize.output }
+    secrets: {
+      email_creds: [DIGEST_RECIPIENT]
+    }
+  }
+
+  flow {
+    root -> fetch_tech
+    fetch_tech -> fetch_stories
+    fetch_stories -> summarize
+    summarize -> send_digest
+  }
+}
+
+trigger daily_trigger {
+  schedule:morning_digest -> build_digest
+  enabled: true
+}

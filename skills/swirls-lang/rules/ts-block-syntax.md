@@ -49,7 +49,7 @@ node process {
 }
 ```
 
-The external file contains a function body (not a module). Use `return` and `context` directly:
+The referenced `.ts.swirls` file must exist on disk. `swirls doctor` validates that the file is present and will report an error if it is missing. The file contains a function body (not a module) and exists in the same namespace with the same `context` object as inline blocks:
 
 ```typescript
 // handlers/process.ts.swirls

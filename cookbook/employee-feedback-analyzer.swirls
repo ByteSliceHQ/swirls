@@ -1,0 +1,98 @@
+/**
+ * Analyzes anonymous employee feedback for themes and action items.
+ * Persists results for trend tracking.
+ */
+
+form employee_feedback {
+  label: "Employee Feedback"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["feedback", "department"],
+      "properties": {
+        "feedback": { "type": "string", "title": "Your Feedback" },
+        "department": {
+          "type": "string",
+          "title": "Department",
+          "enum": ["engineering", "product", "design", "sales", "marketing", "operations", "hr"]
+        },
+        "satisfaction_score": { "type": "number", "minimum": 1, "maximum": 5, "title": "Satisfaction (1-5)" }
+      }
+    }
+  }
+}
+
+graph analyze_feedback {
+  label: "Analyze Feedback"
+
+  persistence {
+    enabled: true
+    condition: @ts { return true }
+    name: "employee_feedback"
+  }
+
+  root {
+    type: code
+    label: "Extract feedback"
+    code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "feedback": { "type": "string" },
+          "department": { "type": "string" },
+          "satisfaction_score": { "type": "number" }
+        }
+      }
+    }
+  }
+
+  node analyze {
+    type: ai
+    label: "Analyze themes"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      const fb = context.nodes.root.output
+      return "Analyze this anonymous employee feedback. Identify themes and suggest actions.\n\nDepartment: " + fb.department + "\nSatisfaction: " + (fb.satisfaction_score || "not provided") + "/5\n\nFeedback: " + fb.feedback
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["themes", "sentiment", "action_items"],
+        "properties": {
+          "themes": { "type": "array", "items": { "type": "string" } },
+          "sentiment": { "type": "string", "enum": ["positive", "neutral", "negative", "mixed"] },
+          "action_items": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "string", "enum": ["high", "medium", "low"] }
+        }
+      }
+    }
+  }
+
+  node result {
+    type: code
+    label: "Store result"
+    code: @ts {
+      const fb = context.nodes.root.output
+      const analysis = context.nodes.analyze.output
+      return {
+        department: fb.department,
+        satisfaction: fb.satisfaction_score || 0,
+        sentiment: analysis.sentiment,
+        themes: analysis.themes,
+        priority: analysis.priority
+      }
+    }
+  }
+
+  flow {
+    root -> analyze
+    analyze -> result
+  }
+}
+
+trigger on_feedback {
+  form:employee_feedback -> analyze_feedback
+  enabled: true
+}

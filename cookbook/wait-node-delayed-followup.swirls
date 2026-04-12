@@ -1,0 +1,68 @@
+/**
+ * Demonstrates the wait node. Sends a welcome email immediately,
+ * then waits 3 days before sending a check-in.
+ */
+
+webhook new_user {
+  label: "New User"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["email", "name"],
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    }
+  }
+}
+
+graph delayed_followup {
+  label: "Delayed Follow-up"
+
+  root {
+    type: code
+    label: "Extract user"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node send_welcome {
+    type: resend
+    label: "Send welcome"
+    from: @ts { return "hello@example.com" }
+    to: @ts { return context.nodes.root.output.email }
+    subject: @ts { return "Welcome, " + context.nodes.root.output.name + "!" }
+    text: @ts {
+      return "Hi " + context.nodes.root.output.name + ",\n\nWelcome aboard! We are excited to have you."
+    }
+  }
+
+  node wait_3_days {
+    type: wait
+    label: "Wait 3 days"
+    amount: 3
+    unit: "days"
+  }
+
+  node send_checkin {
+    type: resend
+    label: "Send check-in"
+    from: @ts { return "hello@example.com" }
+    to: @ts { return context.nodes.root.output.email }
+    subject: @ts { return "How is it going, " + context.nodes.root.output.name + "?" }
+    text: @ts {
+      return "Hi " + context.nodes.root.output.name + ",\n\nJust checking in. Is there anything we can help you with? Reply to this email anytime."
+    }
+  }
+
+  flow {
+    root -> send_welcome
+    send_welcome -> wait_3_days
+    wait_3_days -> send_checkin
+  }
+}
+
+trigger on_new_user {
+  webhook:new_user -> delayed_followup
+  enabled: true
+}

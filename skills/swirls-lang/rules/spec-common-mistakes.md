@@ -380,3 +380,33 @@ flow {
 ```
 
 One edge per line. No chaining.
+
+### 15. Referencing a .ts.swirls file that does not exist
+
+**Incorrect:**
+
+```swirls
+node process {
+  type: code
+  label: "Process"
+  code: @ts "./handlers/transform.ts.swirls"
+}
+```
+
+If `./handlers/transform.ts.swirls` does not exist on disk, `swirls doctor` will report: `@ts file not found: ./handlers/transform.ts.swirls`. The file must exist before you can reference it.
+
+**Correct:**
+
+Either create the `.ts.swirls` file first, or use an inline `@ts` block:
+
+```swirls
+node process {
+  type: code
+  label: "Process"
+  code: @ts {
+    const items = context.nodes.root.output.items || []
+    return { count: items.length }
+  }
+}
+```
+

@@ -1,0 +1,100 @@
+/**
+ * Summarizes sales call transcripts and extracts deal signals.
+ */
+
+webhook call_transcript {
+  label: "Call Transcript"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["rep_name", "prospect_company", "transcript"],
+      "properties": {
+        "rep_name": { "type": "string" },
+        "prospect_company": { "type": "string" },
+        "transcript": { "type": "string" },
+        "call_duration_minutes": { "type": "number" }
+      }
+    }
+  }
+}
+
+graph summarize_call {
+  label: "Summarize Sales Call"
+
+  persistence {
+    enabled: true
+    condition: @ts { return true }
+    name: "call_summaries"
+  }
+
+  root {
+    type: code
+    label: "Extract transcript"
+    code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "rep_name": { "type": "string" },
+          "prospect_company": { "type": "string" },
+          "transcript": { "type": "string" },
+          "call_duration_minutes": { "type": "number" }
+        }
+      }
+    }
+  }
+
+  node analyze {
+    type: ai
+    label: "Analyze call"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      const call = context.nodes.root.output
+      return "Analyze this sales call transcript.\n\nRep: " + call.rep_name + "\nProspect: " + call.prospect_company + "\nDuration: " + (call.call_duration_minutes || "unknown") + " minutes\n\nTranscript:\n" + call.transcript
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["summary", "deal_stage", "next_steps"],
+        "properties": {
+          "summary": { "type": "string" },
+          "deal_stage": { "type": "string", "enum": ["discovery", "demo", "proposal", "negotiation", "closed_won", "closed_lost"] },
+          "buying_signals": { "type": "array", "items": { "type": "string" } },
+          "objections": { "type": "array", "items": { "type": "string" } },
+          "next_steps": { "type": "array", "items": { "type": "string" } },
+          "sentiment": { "type": "string", "enum": ["positive", "neutral", "negative"] },
+          "deal_probability": { "type": "number", "minimum": 0, "maximum": 100 }
+        }
+      }
+    }
+  }
+
+  node result {
+    type: code
+    label: "Format result"
+    code: @ts {
+      const call = context.nodes.root.output
+      const analysis = context.nodes.analyze.output
+      return {
+        rep: call.rep_name,
+        company: call.prospect_company,
+        summary: analysis.summary,
+        stage: analysis.deal_stage,
+        probability: analysis.deal_probability,
+        sentiment: analysis.sentiment,
+        next_steps: analysis.next_steps
+      }
+    }
+  }
+
+  flow {
+    root -> analyze
+    analyze -> result
+  }
+}
+
+trigger on_transcript {
+  webhook:call_transcript -> summarize_call
+  enabled: true
+}

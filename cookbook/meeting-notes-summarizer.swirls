@@ -1,0 +1,91 @@
+/**
+ * Takes raw meeting notes and produces structured summaries
+ * with action items.
+ */
+
+form meeting_notes {
+  label: "Meeting Notes"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["title", "notes"],
+      "properties": {
+        "title": { "type": "string", "title": "Meeting Title" },
+        "attendees": { "type": "string", "title": "Attendees (comma-separated)" },
+        "notes": { "type": "string", "title": "Raw Notes" },
+        "date": { "type": "string", "title": "Meeting Date" }
+      }
+    }
+  }
+}
+
+graph summarize_meeting {
+  label: "Summarize Meeting"
+
+  root {
+    type: code
+    label: "Extract notes"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node summarize {
+    type: ai
+    label: "Generate summary"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      const notes = context.nodes.root.output
+      return "Summarize these meeting notes into a structured format.\n\nTitle: " + notes.title + "\nAttendees: " + (notes.attendees || "not specified") + "\nDate: " + (notes.date || "not specified") + "\n\nNotes:\n" + notes.notes
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["summary", "action_items", "decisions"],
+        "properties": {
+          "summary": { "type": "string" },
+          "action_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": { "type": "string" },
+                "owner": { "type": "string" },
+                "deadline": { "type": "string" }
+              }
+            }
+          },
+          "decisions": { "type": "array", "items": { "type": "string" } },
+          "follow_ups": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+
+  node format_output {
+    type: code
+    label: "Format final output"
+    code: @ts {
+      const notes = context.nodes.root.output
+      const result = context.nodes.summarize.output
+      return {
+        title: notes.title,
+        date: notes.date || "not specified",
+        attendees: notes.attendees || "not specified",
+        summary: result.summary,
+        action_items: result.action_items,
+        decisions: result.decisions,
+        follow_ups: result.follow_ups
+      }
+    }
+  }
+
+  flow {
+    root -> summarize
+    summarize -> format_output
+  }
+}
+
+trigger on_notes {
+  form:meeting_notes -> summarize_meeting
+  enabled: true
+}

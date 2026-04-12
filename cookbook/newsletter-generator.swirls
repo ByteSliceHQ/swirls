@@ -1,0 +1,107 @@
+/**
+ * Generates a weekly newsletter from scraped content and AI summarization.
+ */
+
+schedule weekly_newsletter {
+  label: "Weekly Newsletter"
+  cron: "0 8 * * 1"
+  timezone: "America/Los_Angeles"
+}
+
+graph generate_newsletter {
+  label: "Generate Newsletter"
+
+  root {
+    type: code
+    label: "Start"
+    code: @ts {
+      return { week_of: new Date().toISOString().split("T")[0] }
+    }
+  }
+
+  node scrape_blog {
+    type: firecrawl
+    label: "Scrape company blog"
+    url: @ts { return "https://blog.example.com" }
+    selector: ".post-list"
+    onlyMainContent: true
+    formats: ["markdown"]
+  }
+
+  node scrape_industry {
+    type: firecrawl
+    label: "Scrape industry news"
+    url: @ts { return "https://news.example.com/ai" }
+    selector: ".headlines"
+    onlyMainContent: true
+    formats: ["markdown"]
+  }
+
+  node compose {
+    type: ai
+    label: "Compose newsletter"
+    kind: object
+    model: "anthropic/claude-sonnet-4-20250514"
+    prompt: @ts {
+      const blog = context.nodes.scrape_blog.output
+      const news = context.nodes.scrape_industry.output
+      return "Write a weekly newsletter for the week of " + context.nodes.root.output.week_of + ".\n\nOur blog content:\n" + JSON.stringify(blog) + "\n\nIndustry news:\n" + JSON.stringify(news) + "\n\nFormat: intro paragraph, 3-5 highlights with brief summaries, closing note."
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["subject", "body_html"],
+        "properties": {
+          "subject": { "type": "string" },
+          "body_html": { "type": "string" },
+          "preview_text": { "type": "string" }
+        }
+      }
+    }
+    temperature: 0.8
+  }
+
+  node review_draft {
+    type: code
+    label: "Review draft"
+    code: @ts {
+      return {
+        subject: context.nodes.compose.output.subject,
+        preview: context.nodes.compose.output.preview_text || "",
+        body: context.nodes.compose.output.body_html
+      }
+    }
+    review: {
+      enabled: true
+      title: "Review newsletter draft"
+      description: "Approve or request changes to this week's newsletter."
+      actions: [
+        { id: "send", label: "Send", outcome: "approve" },
+        { id: "revise", label: "Needs Changes", outcome: "reject" }
+      ]
+    }
+  }
+
+  node send_newsletter {
+    type: resend
+    label: "Send newsletter"
+    from: @ts { return "newsletter@example.com" }
+    to: @ts { return "subscribers@example.com" }
+    subject: @ts { return context.nodes.compose.output.subject }
+    html: @ts { return context.nodes.compose.output.body_html }
+  }
+
+  flow {
+    root -> scrape_blog
+    root -> scrape_industry
+    scrape_blog -> compose
+    scrape_industry -> compose
+    compose -> review_draft
+    review_draft -> send_newsletter
+  }
+}
+
+trigger on_weekly {
+  schedule:weekly_newsletter -> generate_newsletter
+  enabled: true
+}

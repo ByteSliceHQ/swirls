@@ -1,0 +1,104 @@
+/**
+ * Event registration with confirmation email and waitlist handling.
+ */
+
+form event_registration {
+  label: "Event Registration"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["name", "email", "event_name"],
+      "properties": {
+        "name": { "type": "string", "title": "Full Name" },
+        "email": { "type": "string", "format": "email", "title": "Email" },
+        "event_name": { "type": "string", "title": "Event" },
+        "company": { "type": "string", "title": "Company" },
+        "dietary_restrictions": { "type": "string", "title": "Dietary Restrictions" }
+      }
+    }
+  }
+}
+
+graph register_attendee {
+  label: "Register Attendee"
+
+  persistence {
+    enabled: true
+    condition: @ts { return true }
+    name: "registrations"
+  }
+
+  root {
+    type: code
+    label: "Extract registration"
+    code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "event_name": { "type": "string" },
+          "company": { "type": "string" },
+          "dietary_restrictions": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node check_capacity {
+    type: stream
+    label: "Check current registrations"
+    stream: "registrations"
+    query: @sql {
+      SELECT COUNT(*) AS count
+      FROM {{table}}
+    }
+  }
+
+  node route {
+    type: switch
+    label: "Route by capacity"
+    cases: ["registered", "waitlisted"]
+    router: @ts {
+      const count = context.nodes.check_capacity.output[0]?.count || 0
+      if (count < 100) return "registered"
+      return "waitlisted"
+    }
+  }
+
+  node confirm_registration {
+    type: resend
+    label: "Send confirmation"
+    from: @ts { return "events@example.com" }
+    to: @ts { return context.nodes.root.output.email }
+    subject: @ts { return "Confirmed: " + context.nodes.root.output.event_name }
+    text: @ts {
+      const reg = context.nodes.root.output
+      return "Hi " + reg.name + ",\n\nYou are confirmed for " + reg.event_name + ". We look forward to seeing you there!"
+    }
+  }
+
+  node waitlist_notification {
+    type: resend
+    label: "Send waitlist notice"
+    from: @ts { return "events@example.com" }
+    to: @ts { return context.nodes.root.output.email }
+    subject: @ts { return "Waitlisted: " + context.nodes.root.output.event_name }
+    text: @ts {
+      return "Hi " + context.nodes.root.output.name + ",\n\nThe event is currently at capacity. You have been added to the waitlist. We will notify you if a spot opens up."
+    }
+  }
+
+  flow {
+    root -> check_capacity
+    check_capacity -> route
+    route -["registered"]-> confirm_registration
+    route -["waitlisted"]-> waitlist_notification
+  }
+}
+
+trigger on_register {
+  form:event_registration -> register_attendee
+  enabled: true
+}

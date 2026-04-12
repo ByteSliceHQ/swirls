@@ -1,0 +1,65 @@
+/**
+ * Forwards webhook events to a Slack channel with formatting.
+ */
+
+secret slack_config {
+  vars: [SLACK_WEBHOOK_URL]
+}
+
+webhook incoming_event {
+  label: "Incoming Event"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["event_type", "data"],
+      "properties": {
+        "event_type": { "type": "string" },
+        "data": { "type": "object" }
+      }
+    }
+  }
+}
+
+graph forward_to_slack {
+  label: "Forward to Slack"
+
+  root {
+    type: code
+    label: "Parse event"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node format_message {
+    type: code
+    label: "Format Slack message"
+    code: @ts {
+      const event = context.nodes.root.output
+      return {
+        text: "*Event:* " + event.event_type + "\n" + JSON.stringify(event.data, null, 2)
+      }
+    }
+  }
+
+  node send_slack {
+    type: http
+    label: "Post to Slack"
+    method: "POST"
+    url: @ts { return context.secrets.slack_config.SLACK_WEBHOOK_URL }
+    body: @ts {
+      return JSON.stringify(context.nodes.format_message.output)
+    }
+    secrets: {
+      slack_config: [SLACK_WEBHOOK_URL]
+    }
+  }
+
+  flow {
+    root -> format_message
+    format_message -> send_slack
+  }
+}
+
+trigger on_event {
+  webhook:incoming_event -> forward_to_slack
+  enabled: true
+}

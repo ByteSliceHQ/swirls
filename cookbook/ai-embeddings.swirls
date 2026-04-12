@@ -1,0 +1,58 @@
+/**
+ * Demonstrates the AI embed kind. Generates embeddings for text
+ * to enable semantic search.
+ */
+
+webhook embed_request {
+  label: "Embed Request"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string" },
+        "metadata": { "type": "object" }
+      }
+    }
+  }
+}
+
+graph generate_embedding {
+  label: "Generate Embedding"
+
+  root {
+    type: code
+    label: "Extract text"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node embed {
+    type: ai
+    label: "Generate embedding"
+    kind: embed
+    model: "openai/text-embedding-3-small"
+    prompt: @ts { return context.nodes.root.output.text }
+  }
+
+  node result {
+    type: code
+    label: "Format result"
+    code: @ts {
+      return {
+        text: context.nodes.root.output.text,
+        embedding: context.nodes.embed.output,
+        metadata: context.nodes.root.output.metadata || {}
+      }
+    }
+  }
+
+  flow {
+    root -> embed
+    embed -> result
+  }
+}
+
+trigger on_embed {
+  webhook:embed_request -> generate_embedding
+  enabled: true
+}
