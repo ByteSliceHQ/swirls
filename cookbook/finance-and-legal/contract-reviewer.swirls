@@ -1,0 +1,133 @@
+/**
+ * Reviews legal contracts for risks and key terms.
+ * Flags critical clauses for human legal review.
+ */
+
+form contract_review {
+  label: "Contract Review"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["contract_text", "contract_type"],
+      "properties": {
+        "contract_text": { "type": "string", "title": "Contract Text" },
+        "contract_type": {
+          "type": "string",
+          "title": "Contract Type",
+          "enum": ["nda", "saas_agreement", "employment", "vendor", "partnership"]
+        },
+        "our_role": {
+          "type": "string",
+          "title": "Our Role",
+          "enum": ["buyer", "seller", "partner"]
+        }
+      }
+    }
+  }
+}
+
+graph review_contract {
+  label: "Review Contract"
+
+  root {
+    type: code
+    label: "Extract contract"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node analyze {
+    type: ai
+    label: "Analyze contract"
+    kind: object
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const req = context.nodes.root.output
+      return "Review this " + req.contract_type + " contract from the perspective of the " + (req.our_role || "buyer") + ". Identify risks, unusual clauses, and key terms.\n\n" + req.contract_text
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["risk_level", "key_terms", "risks", "recommendations"],
+        "properties": {
+          "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "key_terms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "clause": { "type": "string" },
+                "summary": { "type": "string" },
+                "concern_level": { "type": "string" }
+              }
+            }
+          },
+          "risks": { "type": "array", "items": { "type": "string" } },
+          "missing_clauses": { "type": "array", "items": { "type": "string" } },
+          "recommendations": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+
+  node route_risk {
+    type: switch
+    label: "Route by risk"
+    cases: ["needs_legal", "low_risk"]
+    router: @ts {
+      const level = context.nodes.analyze.output.risk_level
+      if (level === "high" || level === "critical") return "needs_legal"
+      return "low_risk"
+    }
+  }
+
+  node legal_review {
+    type: code
+    label: "Queue for legal"
+    code: @ts {
+      const analysis = context.nodes.analyze.output
+      return {
+        status: "pending_legal_review",
+        risk_level: analysis.risk_level,
+        risks: analysis.risks,
+        key_terms: analysis.key_terms,
+        contract_type: context.nodes.root.output.contract_type
+      }
+    }
+    review: {
+      enabled: true
+      title: "Legal Review Required"
+      description: "This contract has been flagged as high risk."
+      actions: [
+        { id: "approve", label: "Approve with Notes", outcome: "approve" },
+        { id: "reject", label: "Do Not Sign", outcome: "reject" }
+      ]
+    }
+  }
+
+  node summary {
+    type: code
+    label: "Generate summary"
+    code: @ts {
+      const analysis = context.nodes.analyze.output
+      return {
+        status: "reviewed",
+        risk_level: analysis.risk_level,
+        term_count: analysis.key_terms.length,
+        risk_count: analysis.risks.length,
+        recommendations: analysis.recommendations
+      }
+    }
+  }
+
+  flow {
+    root -> analyze
+    analyze -> route_risk
+    route_risk -["needs_legal"]-> legal_review
+    route_risk -["low_risk"]-> summary
+  }
+}
+
+trigger on_contract {
+  form:contract_review -> review_contract
+  enabled: true
+}

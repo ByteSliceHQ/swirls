@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: swirls
+      POSTGRES_PASSWORD: swirls
+      POSTGRES_DB: swirls_test
+    volumes:
+      - ./fixtures/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swirls -d swirls_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 5

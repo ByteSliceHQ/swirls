@@ -1,0 +1,121 @@
+/**
+ * Scores incoming leads and persists results for reporting.
+ * High-scoring leads trigger an alert to the sales team.
+ */
+
+webhook new_lead {
+  label: "New Lead Webhook"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["email", "company", "source"],
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "company": { "type": "string" },
+        "source": { "type": "string" },
+        "job_title": { "type": "string" },
+        "company_size": { "type": "string" }
+      }
+    }
+  }
+}
+
+graph score_lead {
+  label: "Score Lead"
+
+  persistence {
+    enabled: true
+    condition: @ts { return true }
+    name: "scored_leads"
+  }
+
+  root {
+    type: code
+    label: "Extract lead"
+    code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "company": { "type": "string" },
+          "source": { "type": "string" },
+          "job_title": { "type": "string" },
+          "company_size": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node score {
+    type: ai
+    label: "Score the lead"
+    kind: object
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const lead = context.nodes.root.output
+      return "Score this B2B lead from 0-100 based on likelihood to convert.\n\nEmail: " + lead.email + "\nCompany: " + lead.company + "\nSource: " + lead.source + "\nJob title: " + (lead.job_title || "unknown") + "\nCompany size: " + (lead.company_size || "unknown")
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["score", "reasoning"],
+        "properties": {
+          "score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "reasoning": { "type": "string" },
+          "tier": { "type": "string", "enum": ["hot", "warm", "cold"] }
+        }
+      }
+    }
+  }
+
+  node route {
+    type: switch
+    label: "Route by score"
+    cases: ["hot", "other"]
+    router: @ts {
+      if (context.nodes.score.output.tier === "hot") return "hot"
+      return "other"
+    }
+  }
+
+  node alert_sales {
+    type: resend
+    label: "Alert sales team"
+    from: @ts { return "no-reply@transactional.byteslice.co" }
+    to: @ts { return "cj@swirls.ai" }
+    subject: @ts {
+      return "Hot lead: " + context.nodes.root.output.company + " (Score: " + context.nodes.score.output.score + ")"
+    }
+    text: @ts {
+      const lead = context.nodes.root.output
+      const result = context.nodes.score.output
+      return "New hot lead!\n\nCompany: " + lead.company + "\nEmail: " + lead.email + "\nScore: " + result.score + "\nReason: " + result.reasoning
+    }
+  }
+
+  node log_result {
+    type: code
+    label: "Log score"
+    code: @ts {
+      return {
+        email: context.nodes.root.output.email,
+        company: context.nodes.root.output.company,
+        score: context.nodes.score.output.score,
+        tier: context.nodes.score.output.tier
+      }
+    }
+  }
+
+  flow {
+    root -> score
+    score -> route
+    route -["hot"]-> alert_sales
+    route -["other"]-> log_result
+  }
+}
+
+trigger on_lead {
+  webhook:new_lead -> score_lead
+  enabled: true
+}

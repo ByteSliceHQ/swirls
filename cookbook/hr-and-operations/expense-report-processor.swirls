@@ -1,0 +1,137 @@
+/**
+ * Processes expense reports. Validates amounts, checks policy,
+ * and routes high-value expenses for manager approval.
+ */
+
+form expense_report {
+  label: "Expense Report"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["employee_email", "description", "amount", "category"],
+      "properties": {
+        "employee_email": { "type": "string", "format": "email", "title": "Your Email" },
+        "description": { "type": "string", "title": "Description" },
+        "amount": { "type": "number", "title": "Amount (USD)" },
+        "category": {
+          "type": "string",
+          "title": "Category",
+          "enum": ["travel", "meals", "software", "equipment", "other"]
+        },
+        "receipt_url": { "type": "string", "title": "Receipt URL" }
+      }
+    }
+  }
+}
+
+graph process_expense {
+  label: "Process Expense"
+
+  root {
+    type: code
+    label: "Extract expense"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node check_policy {
+    type: code
+    label: "Check policy limits"
+    code: @ts {
+      const expense = context.nodes.root.output
+      const limits = { travel: 500, meals: 100, software: 200, equipment: 1000, other: 250 }
+      const limit = limits[expense.category] || 250
+      const over_limit = expense.amount > limit
+      return {
+        amount: expense.amount,
+        category: expense.category,
+        limit: limit,
+        over_limit: over_limit,
+        needs_approval: expense.amount > 250
+      }
+    }
+  }
+
+  node route {
+    type: switch
+    label: "Route by amount"
+    cases: ["auto_approve", "needs_approval"]
+    router: @ts {
+      if (context.nodes.check_policy.output.needs_approval) return "needs_approval"
+      return "auto_approve"
+    }
+  }
+
+  node auto_approve {
+    type: code
+    label: "Auto-approve"
+    code: @ts {
+      return {
+        status: "approved",
+        employee: context.nodes.root.output.employee_email,
+        amount: context.nodes.root.output.amount,
+        category: context.nodes.root.output.category
+      }
+    }
+  }
+
+  node manager_review {
+    type: code
+    label: "Manager review"
+    code: @ts {
+      const expense = context.nodes.root.output
+      const policy = context.nodes.check_policy.output
+      return {
+        employee: expense.employee_email,
+        description: expense.description,
+        amount: expense.amount,
+        category: expense.category,
+        policy_limit: policy.limit,
+        over_limit: policy.over_limit,
+        receipt: expense.receipt_url || "not provided"
+      }
+    }
+    review: {
+      enabled: true
+      title: "Expense Approval Required"
+      description: "This expense exceeds the auto-approval threshold."
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["approved"],
+          "properties": {
+            "approved": { "type": "boolean", "title": "Approved" },
+            "notes": { "type": "string", "title": "Notes" }
+          }
+        }
+      }
+      actions: [
+        { id: "approve", label: "Approve", outcome: "approve" },
+        { id: "deny", label: "Deny", outcome: "reject" }
+      ]
+    }
+  }
+
+  node notify_employee {
+    type: resend
+    label: "Notify employee"
+    from: @ts { return "no-reply@transactional.byteslice.co" }
+    to: @ts { return "cj@swirls.ai" }
+    subject: @ts { return "Expense report update" }
+    text: @ts {
+      return "Your expense report for $" + context.nodes.root.output.amount + " (" + context.nodes.root.output.category + ") has been submitted for review."
+    }
+  }
+
+  flow {
+    root -> check_policy
+    check_policy -> route
+    route -["auto_approve"]-> auto_approve
+    route -["needs_approval"]-> manager_review
+    manager_review -> notify_employee
+  }
+}
+
+trigger on_expense {
+  form:expense_report -> process_expense
+  enabled: true
+}

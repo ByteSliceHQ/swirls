@@ -1,0 +1,105 @@
+/**
+ * Checks website health every 15 minutes and alerts on downtime.
+ */
+
+schedule health_check {
+  label: "Health Check"
+  cron: "*/15 * * * *"
+}
+
+secret monitor_config {
+  vars: [MONITOR_URL]
+}
+
+graph check_uptime {
+  label: "Check Uptime"
+
+  persistence {
+    enabled: true
+    condition: @ts { return true }
+    name: "uptime_checks"
+  }
+
+  root {
+    type: code
+    label: "Prepare check"
+    code: @ts {
+      return { timestamp: new Date().toISOString() }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "timestamp": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node ping {
+    type: http
+    label: "Ping website"
+    url: @ts { return context.secrets.monitor_config.MONITOR_URL }
+    secrets: {
+      monitor_config: [MONITOR_URL]
+    }
+  }
+
+  node evaluate {
+    type: code
+    label: "Evaluate response"
+    code: @ts {
+      var statusCode = context.nodes.ping.meta ? context.nodes.ping.meta.status : 0
+      var isUp = statusCode >= 200 && statusCode < 400
+      return {
+        status: isUp ? "up" : "down",
+        status_code: statusCode,
+        timestamp: context.nodes.root.output.timestamp
+      }
+    }
+  }
+
+  node route {
+    type: switch
+    label: "Route by status"
+    cases: ["up", "down"]
+    router: @ts {
+      return context.nodes.evaluate.output.status
+    }
+  }
+
+  node log_ok {
+    type: code
+    label: "Log healthy"
+    code: @ts {
+      return {
+        status: "up",
+        checked_at: context.nodes.evaluate.output.timestamp
+      }
+    }
+  }
+
+  node alert_down {
+    type: resend
+    label: "Send downtime alert"
+    from: @ts { return "no-reply@transactional.byteslice.co" }
+    to: @ts { return "cj@swirls.ai" }
+    subject: @ts { return "ALERT: Website is DOWN" }
+    text: @ts {
+      return "Website is unreachable.\nStatus code: " + context.nodes.evaluate.output.status_code + "\nChecked at: " + context.nodes.evaluate.output.timestamp
+    }
+  }
+
+  flow {
+    root -> ping
+    ping -> evaluate
+    evaluate -> route
+    route -["up"]-> log_ok
+    route -["down"]-> alert_down
+  }
+}
+
+trigger on_health_check {
+  schedule:health_check -> check_uptime
+  enabled: true
+}

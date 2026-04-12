@@ -1,0 +1,84 @@
+/**
+ * Generates product marketing images from text descriptions.
+ * Demonstrates the AI node with kind: image.
+ */
+
+form image_request {
+  label: "Generate Image"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string", "title": "Image Description" },
+        "style": {
+          "type": "string",
+          "title": "Style",
+          "enum": ["photorealistic", "illustration", "minimalist", "3d_render"]
+        },
+        "size": {
+          "type": "string",
+          "title": "Size",
+          "enum": ["1024x1024", "1792x1024", "1024x1792"]
+        }
+      }
+    }
+  }
+}
+
+graph generate_image {
+  label: "Generate Image"
+
+  root {
+    type: code
+    label: "Extract request"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node create_prompt {
+    type: ai
+    label: "Refine prompt"
+    kind: text
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const req = context.nodes.root.output
+      return "Rewrite this image description as an optimized prompt for an image generation model. Style: " + (req.style || "photorealistic") + "\n\nDescription: " + req.description + "\n\nReturn only the optimized prompt, nothing else."
+    }
+    temperature: 0.7
+  }
+
+  node generate {
+    type: ai
+    label: "Generate image"
+    kind: image
+    model: "openai/dall-e-3"
+    prompt: @ts { return context.nodes.create_prompt.output }
+    options: {
+      n: 1
+      size: "1024x1024"
+    }
+  }
+
+  node result {
+    type: code
+    label: "Format result"
+    code: @ts {
+      return {
+        original_description: context.nodes.root.output.description,
+        optimized_prompt: context.nodes.create_prompt.output,
+        image: context.nodes.generate.output
+      }
+    }
+  }
+
+  flow {
+    root -> create_prompt
+    create_prompt -> generate
+    generate -> result
+  }
+}
+
+trigger on_image_request {
+  form:image_request -> generate_image
+  enabled: true
+}

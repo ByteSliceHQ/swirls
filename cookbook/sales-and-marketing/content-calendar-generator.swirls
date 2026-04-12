@@ -1,0 +1,100 @@
+/**
+ * Generates a content calendar for the upcoming month based on themes and goals.
+ */
+
+form content_brief {
+  label: "Content Calendar Brief"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["themes", "goal", "frequency"],
+      "properties": {
+        "themes": { "type": "string", "title": "Content Themes (comma-separated)" },
+        "goal": { "type": "string", "title": "Primary Goal (e.g., brand awareness, lead gen)" },
+        "frequency": {
+          "type": "string",
+          "title": "Posting Frequency",
+          "enum": ["daily", "3x_week", "weekly"]
+        },
+        "audience": { "type": "string", "title": "Target Audience" },
+        "channels": { "type": "string", "title": "Channels (comma-separated)" }
+      }
+    }
+  }
+}
+
+graph generate_calendar {
+  label: "Generate Content Calendar"
+
+  root {
+    type: code
+    label: "Extract brief"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node plan {
+    type: ai
+    label: "Plan content calendar"
+    kind: object
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const brief = context.nodes.root.output
+      return "Create a 4-week content calendar.\n\nThemes: " + brief.themes + "\nGoal: " + brief.goal + "\nFrequency: " + brief.frequency + "\nAudience: " + (brief.audience || "general") + "\nChannels: " + (brief.channels || "blog, social")
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["weeks"],
+        "properties": {
+          "weeks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "week_number": { "type": "number" },
+                "theme": { "type": "string" },
+                "posts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "day": { "type": "string" },
+                      "channel": { "type": "string" },
+                      "topic": { "type": "string" },
+                      "format": { "type": "string" },
+                      "hook": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "total_posts": { "type": "number" }
+        }
+      }
+    }
+  }
+
+  node format_calendar {
+    type: code
+    label: "Format calendar"
+    code: @ts {
+      const cal = context.nodes.plan.output
+      return {
+        goal: context.nodes.root.output.goal,
+        total_posts: cal.total_posts,
+        weeks: cal.weeks
+      }
+    }
+  }
+
+  flow {
+    root -> plan
+    plan -> format_calendar
+  }
+}
+
+trigger on_brief {
+  form:content_brief -> generate_calendar
+  enabled: true
+}

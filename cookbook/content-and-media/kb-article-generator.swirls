@@ -1,0 +1,110 @@
+/**
+ * Generates knowledge base articles from support ticket patterns.
+ * Scrapes existing docs, identifies gaps, and drafts new articles.
+ */
+
+form kb_request {
+  label: "KB Article Request"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["topic", "common_questions"],
+      "properties": {
+        "topic": { "type": "string", "title": "Topic" },
+        "common_questions": { "type": "string", "title": "Common Questions (one per line)" },
+        "existing_doc_url": { "type": "string", "title": "Existing Doc URL (if updating)" },
+        "audience": {
+          "type": "string",
+          "title": "Audience",
+          "enum": ["beginner", "intermediate", "advanced"]
+        }
+      }
+    }
+  }
+}
+
+graph generate_kb_article {
+  label: "Generate KB Article"
+
+  root {
+    type: code
+    label: "Extract request"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node research {
+    type: ai
+    label: "Research and outline"
+    kind: object
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const req = context.nodes.root.output
+      return "Create a detailed outline for a knowledge base article.\n\nTopic: " + req.topic + "\nCommon questions:\n" + req.common_questions + "\nAudience level: " + (req.audience || "intermediate") + "\n\nInclude sections, key points, and suggested code examples."
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["title", "sections"],
+        "properties": {
+          "title": { "type": "string" },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "heading": { "type": "string" },
+                "key_points": { "type": "array", "items": { "type": "string" } },
+                "needs_code_example": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  node write_article {
+    type: ai
+    label: "Write full article"
+    kind: text
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const outline = context.nodes.research.output
+      return "Write a complete knowledge base article based on this outline. Use markdown formatting. Be clear and concise.\n\nTitle: " + outline.title + "\n\nOutline:\n" + JSON.stringify(outline.sections)
+    }
+    maxTokens: 2000
+    temperature: 0.5
+  }
+
+  node review_article {
+    type: code
+    label: "Review article"
+    code: @ts {
+      return {
+        title: context.nodes.research.output.title,
+        article: context.nodes.write_article.output,
+        section_count: context.nodes.research.output.sections.length
+      }
+    }
+    review: {
+      enabled: true
+      title: "Review KB Article"
+      description: "Review the generated article before publishing."
+      actions: [
+        { id: "publish", label: "Publish", outcome: "approve" },
+        { id: "edit", label: "Needs Editing", outcome: "reject" }
+      ]
+    }
+  }
+
+  flow {
+    root -> research
+    research -> write_article
+    write_article -> review_article
+  }
+}
+
+trigger on_kb_request {
+  form:kb_request -> generate_kb_article
+  enabled: true
+}

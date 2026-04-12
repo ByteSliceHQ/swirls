@@ -331,7 +331,7 @@ node handle_urgent {
   type: ai
   kind: text
   label: "Handle urgent"
-  model: "gpt-4o-mini"
+  model: "google/gemini-2.5-flash"
   prompt: @ts { return context.nodes.root.output.body }
 }
 
@@ -453,6 +453,8 @@ AI nodes call language models and other AI services. The `kind` field determines
 
 **Required fields:** `kind`, `model`, `prompt`
 
+**Default model:** Unless the user specifies a different model, always use `google/gemini-2.5-flash` for text and object kinds. Use specialized models only for image generation (e.g. `openai/dall-e-3`) and embeddings (e.g. `openai/text-embedding-3-small`).
+
 **Incorrect (object kind without schema):**
 
 ```swirls
@@ -460,7 +462,7 @@ node classify {
   type: ai
   label: "Classify"
   kind: object
-  model: "anthropic/claude-3.5-sonnet"
+  model: "google/gemini-2.5-flash"
   prompt: @ts { return "Classify this text" }
 }
 ```
@@ -474,7 +476,7 @@ node classify {
   type: ai
   label: "Classify"
   kind: object
-  model: "anthropic/claude-3.5-sonnet"
+  model: "google/gemini-2.5-flash"
   prompt: @ts {
     const msg = context.nodes.root.output.message
     return "Classify this message as spam or not:\n\n" + msg
@@ -499,7 +501,7 @@ node summarize {
   type: ai
   label: "Summarize"
   kind: text
-  model: "gpt-4o-mini"
+  model: "google/gemini-2.5-flash"
   temperature: 0.7
   maxTokens: 200
   prompt: @ts {
@@ -1063,7 +1065,7 @@ node handle_urgent {
   type: ai
   kind: text
   label: "Draft escalation"
-  model: "gpt-4o-mini"
+  model: "google/gemini-2.5-flash"
   prompt: @ts {
     return "Draft escalation for: " + context.nodes.root.output.subject
   }

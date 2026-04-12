@@ -1,0 +1,135 @@
+/**
+ * Screens job applications. AI evaluates fit, human reviews top candidates.
+ */
+
+form job_application {
+  label: "Job Application"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["name", "email", "role", "resume_text"],
+      "properties": {
+        "name": { "type": "string", "title": "Full Name" },
+        "email": { "type": "string", "format": "email", "title": "Email" },
+        "role": { "type": "string", "title": "Role Applied For" },
+        "resume_text": { "type": "string", "title": "Resume (paste text)" },
+        "linkedin_url": { "type": "string", "title": "LinkedIn URL" }
+      }
+    }
+  }
+}
+
+graph screen_application {
+  label: "Screen Application"
+
+  root {
+    type: code
+    label: "Extract application"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node evaluate {
+    type: ai
+    label: "Evaluate candidate"
+    kind: object
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const app = context.nodes.root.output
+      return "Evaluate this candidate for the " + app.role + " role. Score their fit.\n\nName: " + app.name + "\n\nResume:\n" + app.resume_text
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["score", "strengths", "concerns", "recommendation"],
+        "properties": {
+          "score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "strengths": { "type": "array", "items": { "type": "string" } },
+          "concerns": { "type": "array", "items": { "type": "string" } },
+          "recommendation": { "type": "string", "enum": ["advance", "maybe", "pass"] }
+        }
+      }
+    }
+  }
+
+  node route {
+    type: switch
+    label: "Route by recommendation"
+    cases: ["advance", "maybe", "pass"]
+    router: @ts {
+      return context.nodes.evaluate.output.recommendation
+    }
+  }
+
+  node prepare_review {
+    type: code
+    label: "Prepare for human review"
+    code: @ts {
+      const app = context.nodes.root.output
+      const eval_result = context.nodes.evaluate.output
+      return {
+        candidate: app.name,
+        role: app.role,
+        score: eval_result.score,
+        strengths: eval_result.strengths,
+        concerns: eval_result.concerns
+      }
+    }
+    review: {
+      enabled: true
+      title: "Review candidate"
+      description: "Decide whether to advance this candidate to interview."
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["decision"],
+          "properties": {
+            "decision": { "type": "string", "enum": ["interview", "reject"], "title": "Decision" },
+            "notes": { "type": "string", "title": "Notes" }
+          }
+        }
+      }
+      actions: [
+        { id: "interview", label: "Schedule Interview", outcome: "approve" },
+        { id: "reject", label: "Reject", outcome: "reject" }
+      ]
+    }
+  }
+
+  node send_rejection {
+    type: resend
+    label: "Send rejection"
+    from: @ts { return "no-reply@transactional.byteslice.co" }
+    to: @ts { return "cj@swirls.ai" }
+    subject: @ts { return "Update on your application for " + context.nodes.root.output.role }
+    text: @ts {
+      return "Hi " + context.nodes.root.output.name + ",\n\nThank you for applying. After careful review, we have decided to move forward with other candidates. We appreciate your interest and wish you the best."
+    }
+  }
+
+  node maybe_pool {
+    type: code
+    label: "Add to maybe pool"
+    code: @ts {
+      return {
+        status: "maybe_pool",
+        name: context.nodes.root.output.name,
+        email: context.nodes.root.output.email,
+        role: context.nodes.root.output.role,
+        score: context.nodes.evaluate.output.score
+      }
+    }
+  }
+
+  flow {
+    root -> evaluate
+    evaluate -> route
+    route -["advance"]-> prepare_review
+    route -["pass"]-> send_rejection
+    route -["maybe"]-> maybe_pool
+  }
+}
+
+trigger on_application {
+  form:job_application -> screen_application
+  enabled: true
+}

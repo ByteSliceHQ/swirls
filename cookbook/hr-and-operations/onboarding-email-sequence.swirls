@@ -1,0 +1,76 @@
+/**
+ * Sends a personalized onboarding email when a new customer signs up.
+ * Tailors content based on their plan and use case.
+ */
+
+webhook new_signup {
+  label: "New Signup"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["email", "name", "plan"],
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "plan": { "type": "string", "enum": ["starter", "pro", "enterprise"] },
+        "use_case": { "type": "string" }
+      }
+    }
+  }
+}
+
+graph onboard_customer {
+  label: "Onboard Customer"
+
+  root {
+    type: code
+    label: "Extract signup"
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node personalize {
+    type: ai
+    label: "Personalize welcome"
+    kind: object
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const user = context.nodes.root.output
+      return "Write a personalized onboarding email for " + user.name + " on the " + user.plan + " plan. Use case: " + (user.use_case || "general") + ". Include 3 specific next steps tailored to their plan. Keep it warm and actionable."
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["subject", "body", "next_steps"],
+        "properties": {
+          "subject": { "type": "string" },
+          "body": { "type": "string" },
+          "next_steps": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+    temperature: 0.7
+  }
+
+  node send_welcome {
+    type: resend
+    label: "Send welcome email"
+    from: @ts { return "no-reply@transactional.byteslice.co" }
+    to: @ts { return "cj@swirls.ai" }
+    subject: @ts { return context.nodes.personalize.output.subject }
+    text: @ts {
+      const content = context.nodes.personalize.output
+      const steps = content.next_steps.map(function(step, i) { return (i + 1) + ". " + step }).join("\n")
+      return content.body + "\n\nYour next steps:\n" + steps
+    }
+  }
+
+  flow {
+    root -> personalize
+    personalize -> send_welcome
+  }
+}
+
+trigger on_signup {
+  webhook:new_signup -> onboard_customer
+  enabled: true
+}

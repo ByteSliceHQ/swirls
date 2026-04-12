@@ -1,0 +1,96 @@
+/**
+ * Analyzes product review sentiment and persists results for dashboards.
+ */
+
+webhook product_review {
+  label: "Product Review"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["product_id", "review_text", "rating"],
+      "properties": {
+        "product_id": { "type": "string" },
+        "review_text": { "type": "string" },
+        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "reviewer_name": { "type": "string" }
+      }
+    }
+  }
+}
+
+graph analyze_review {
+  label: "Analyze Review Sentiment"
+
+  persistence {
+    enabled: true
+    condition: @ts { return true }
+    name: "review_sentiments"
+  }
+
+  root {
+    type: code
+    label: "Extract review"
+    code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "product_id": { "type": "string" },
+          "review_text": { "type": "string" },
+          "rating": { "type": "number" },
+          "reviewer_name": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node analyze {
+    type: ai
+    label: "Analyze sentiment"
+    kind: object
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const review = context.nodes.root.output
+      return "Analyze the sentiment of this product review.\n\nRating: " + review.rating + "/5\nReview: " + review.review_text
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["sentiment", "score", "themes"],
+        "properties": {
+          "sentiment": { "type": "string", "enum": ["positive", "neutral", "negative", "mixed"] },
+          "score": { "type": "number", "minimum": -1, "maximum": 1 },
+          "themes": { "type": "array", "items": { "type": "string" } },
+          "actionable_feedback": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node result {
+    type: code
+    label: "Combine results"
+    code: @ts {
+      const review = context.nodes.root.output
+      const analysis = context.nodes.analyze.output
+      return {
+        product_id: review.product_id,
+        rating: review.rating,
+        sentiment: analysis.sentiment,
+        score: analysis.score,
+        themes: analysis.themes,
+        actionable_feedback: analysis.actionable_feedback || ""
+      }
+    }
+  }
+
+  flow {
+    root -> analyze
+    analyze -> result
+  }
+}
+
+trigger on_review {
+  webhook:product_review -> analyze_review
+  enabled: true
+}

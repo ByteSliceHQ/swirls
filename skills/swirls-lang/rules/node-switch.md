@@ -56,7 +56,7 @@ node handle_urgent {
   type: ai
   kind: text
   label: "Draft escalation"
-  model: "gpt-4o-mini"
+  model: "google/gemini-2.5-flash"
   prompt: @ts {
     return "Draft escalation for: " + context.nodes.root.output.subject
   }
