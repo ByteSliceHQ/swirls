@@ -26,6 +26,18 @@ graph screen_application {
     type: code
     label: "Extract application"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string" },
+          "resume_text": { "type": "string" },
+          "linkedin_url": { "type": "string" }
+        }
+      }
+    }
   }
 
   node evaluate {

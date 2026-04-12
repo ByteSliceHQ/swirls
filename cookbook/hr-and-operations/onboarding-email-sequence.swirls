@@ -26,6 +26,17 @@ graph onboard_customer {
     type: code
     label: "Extract signup"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "name": { "type": "string" },
+          "plan": { "type": "string" },
+          "use_case": { "type": "string" }
+        }
+      }
+    }
   }
 
   node personalize {

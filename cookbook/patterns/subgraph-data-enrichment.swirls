@@ -24,6 +24,15 @@ graph enrich_company {
     type: code
     label: "Receive company"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "company_name": { "type": "string" },
+          "domain": { "type": "string" }
+        }
+      }
+    }
   }
 
   node scrape_site {
@@ -70,6 +79,15 @@ graph process_company {
     type: code
     label: "Extract input"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "company_name": { "type": "string" },
+          "domain": { "type": "string" }
+        }
+      }
+    }
   }
 
   node enrich {

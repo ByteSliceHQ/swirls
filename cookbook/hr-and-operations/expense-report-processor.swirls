@@ -31,6 +31,18 @@ graph process_expense {
     type: code
     label: "Extract expense"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "employee_email": { "type": "string" },
+          "description": { "type": "string" },
+          "amount": { "type": "number" },
+          "category": { "type": "string" },
+          "receipt_url": { "type": "string" }
+        }
+      }
+    }
   }
 
   node check_policy {

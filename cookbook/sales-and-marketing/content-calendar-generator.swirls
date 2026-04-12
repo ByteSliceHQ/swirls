@@ -30,6 +30,18 @@ graph generate_calendar {
     type: code
     label: "Extract brief"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "themes": { "type": "string" },
+          "goal": { "type": "string" },
+          "frequency": { "type": "string" },
+          "audience": { "type": "string" },
+          "channels": { "type": "string" }
+        }
+      }
+    }
   }
 
   node plan {

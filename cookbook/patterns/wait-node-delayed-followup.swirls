@@ -24,6 +24,15 @@ graph delayed_followup {
     type: code
     label: "Extract user"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "name": { "type": "string" }
+        }
+      }
+    }
   }
 
   node send_welcome {

@@ -33,6 +33,16 @@ graph generate_image {
     type: code
     label: "Extract request"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "style": { "type": "string" },
+          "size": { "type": "string" }
+        }
+      }
+    }
   }
 
   node create_prompt {

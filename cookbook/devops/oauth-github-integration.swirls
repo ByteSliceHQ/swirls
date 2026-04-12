@@ -32,6 +32,14 @@ graph fetch_repo_stats {
     code: @ts {
       return { repo: "owner/repo" }
     }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "repo": { "type": "string" }
+        }
+      }
+    }
   }
 
   node fetch_repo {

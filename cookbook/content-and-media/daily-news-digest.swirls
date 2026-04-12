@@ -16,6 +16,14 @@ graph build_digest {
     type: code
     label: "Start"
     code: @ts { return { timestamp: new Date().toISOString() } }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "timestamp": { "type": "string" }
+        }
+      }
+    }
   }
 
   node fetch_tech {

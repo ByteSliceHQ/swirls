@@ -52,6 +52,21 @@ graph notify_pr {
         changed_files: pr.changed_files || 0
       }
     }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string" },
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "author": { "type": "string" },
+          "url": { "type": "string" },
+          "additions": { "type": "number" },
+          "deletions": { "type": "number" },
+          "changed_files": { "type": "number" }
+        }
+      }
+    }
   }
 
   node route_action {

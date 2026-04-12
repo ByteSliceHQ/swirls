@@ -27,6 +27,15 @@ graph forward_to_slack {
     type: code
     label: "Parse event"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "event_type": { "type": "string" },
+          "data": { "type": "object" }
+        }
+      }
+    }
   }
 
   node format_message {

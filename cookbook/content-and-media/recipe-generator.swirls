@@ -29,6 +29,17 @@ graph generate_recipe {
     type: code
     label: "Extract request"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "ingredients": { "type": "string" },
+          "dietary": { "type": "string" },
+          "cuisine": { "type": "string" },
+          "max_time_minutes": { "type": "number" }
+        }
+      }
+    }
   }
 
   node create_recipe {

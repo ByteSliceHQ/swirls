@@ -24,6 +24,15 @@ graph generate_embedding {
     type: code
     label: "Extract text"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" },
+          "metadata": { "type": "object" }
+        }
+      }
+    }
   }
 
   node embed {

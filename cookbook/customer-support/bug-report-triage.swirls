@@ -31,6 +31,18 @@ graph triage_bug {
     type: code
     label: "Extract bug report"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "steps_to_reproduce": { "type": "string" },
+          "reporter_email": { "type": "string" },
+          "component": { "type": "string" }
+        }
+      }
+    }
   }
 
   node classify {

@@ -30,6 +30,17 @@ graph generate_kb_article {
     type: code
     label: "Extract request"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" },
+          "common_questions": { "type": "string" },
+          "existing_doc_url": { "type": "string" },
+          "audience": { "type": "string" }
+        }
+      }
+    }
   }
 
   node research {

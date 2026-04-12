@@ -26,6 +26,17 @@ graph summarize_meeting {
     type: code
     label: "Extract notes"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "attendees": { "type": "string" },
+          "notes": { "type": "string" },
+          "date": { "type": "string" }
+        }
+      }
+    }
   }
 
   node summarize {

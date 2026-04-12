@@ -57,6 +57,14 @@ graph generate_report {
     type: code
     label: "Start"
     code: @ts { return { date: new Date().toISOString().split("T")[0] } }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string" }
+        }
+      }
+    }
   }
 
   node recent_events {

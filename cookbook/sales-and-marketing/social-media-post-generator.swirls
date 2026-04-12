@@ -34,6 +34,17 @@ graph generate_posts {
     type: code
     label: "Extract request"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" },
+          "key_points": { "type": "string" },
+          "tone": { "type": "string" },
+          "platform": { "type": "string" }
+        }
+      }
+    }
   }
 
   node generate {

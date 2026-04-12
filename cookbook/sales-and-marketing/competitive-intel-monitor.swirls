@@ -17,6 +17,14 @@ graph scan_competitors {
     code: @ts {
       return { scanned_at: new Date().toISOString() }
     }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "scanned_at": { "type": "string" }
+        }
+      }
+    }
   }
 
   node scrape_homepage {

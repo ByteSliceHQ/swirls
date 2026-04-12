@@ -29,6 +29,16 @@ graph announce_release {
     type: code
     label: "Extract changelog"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string" },
+          "changes": { "type": "string" },
+          "breaking": { "type": "boolean" }
+        }
+      }
+    }
   }
 
   node generate_announcement {

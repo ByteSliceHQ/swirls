@@ -48,6 +48,16 @@ graph process_message {
         received_at: new Date().toISOString()
       }
     }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "source": { "type": "string" },
+          "received_at": { "type": "string" }
+        }
+      }
+    }
   }
 
   node process {

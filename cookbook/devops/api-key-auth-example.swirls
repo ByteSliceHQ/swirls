@@ -29,6 +29,15 @@ graph fetch_weather {
     code: @ts {
       return { city: "San Francisco", units: "imperial" }
     }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "city": { "type": "string" },
+          "units": { "type": "string" }
+        }
+      }
+    }
   }
 
   node get_weather {

@@ -24,6 +24,15 @@ graph file_pipeline {
     type: code
     label: "Extract paths"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "input_path": { "type": "string" },
+          "output_path": { "type": "string" }
+        }
+      }
+    }
   }
 
   node download {

@@ -25,6 +25,16 @@ graph process_article {
     type: code
     label: "Extract article"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "author": { "type": "string" }
+        }
+      }
+    }
   }
 
   node extract_keywords {

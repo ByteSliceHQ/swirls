@@ -29,6 +29,20 @@ graph approve_document {
     type: code
     label: "Extract document"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "author": { "type": "string" },
+          "doc_type": {
+            "type": "string",
+            "enum": ["policy", "procedure", "contract", "proposal"]
+          }
+        }
+      }
+    }
   }
 
   node quality_check {

@@ -25,6 +25,16 @@ graph moderate_post {
     type: code
     label: "Extract post"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "author_email": { "type": "string", "format": "email" }
+        }
+      }
+    }
   }
 
   node check_content {

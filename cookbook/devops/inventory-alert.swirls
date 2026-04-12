@@ -21,6 +21,14 @@ graph check_inventory {
     code: @ts {
       return { checked_at: new Date().toISOString() }
     }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "checked_at": { "type": "string" }
+        }
+      }
+    }
   }
 
   node fetch_levels {

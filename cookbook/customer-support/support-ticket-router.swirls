@@ -26,6 +26,17 @@ graph route_ticket {
     type: code
     label: "Parse ticket"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "subject": { "type": "string" },
+          "body": { "type": "string" },
+          "customer_email": { "type": "string" },
+          "plan": { "type": "string" }
+        }
+      }
+    }
   }
 
   node classify {

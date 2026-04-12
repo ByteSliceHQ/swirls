@@ -33,6 +33,16 @@ graph translate_content {
     type: code
     label: "Extract request"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "content": { "type": "string" },
+          "target_language": { "type": "string" },
+          "tone": { "type": "string" }
+        }
+      }
+    }
   }
 
   node translate {

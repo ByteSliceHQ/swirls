@@ -17,6 +17,14 @@ graph generate_newsletter {
     code: @ts {
       return { week_of: new Date().toISOString().split("T")[0] }
     }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "week_of": { "type": "string" }
+        }
+      }
+    }
   }
 
   node scrape_blog {

@@ -24,6 +24,16 @@ graph run_seo_audit {
     type: code
     label: "Extract request"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "target_keyword": { "type": "string" },
+          "competitors": { "type": "string" }
+        }
+      }
+    }
   }
 
   node scrape_page {

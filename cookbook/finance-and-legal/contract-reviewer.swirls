@@ -33,6 +33,22 @@ graph review_contract {
     type: code
     label: "Extract contract"
     code: @ts { return context.nodes.root.input }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "contract_text": { "type": "string" },
+          "contract_type": {
+            "type": "string",
+            "enum": ["nda", "saas_agreement", "employment", "vendor", "partnership"]
+          },
+          "our_role": {
+            "type": "string",
+            "enum": ["buyer", "seller", "partner"]
+          }
+        }
+      }
+    }
   }
 
   node analyze {
