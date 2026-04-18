@@ -1,35 +1,55 @@
 ---
-title: Stream Column Naming Convention
+title: Stream Filter Field Paths
 impact: MEDIUM
-tags: stream, sql, column, naming, node
+tags: stream, filter, fields, jsonb, column, naming
 ---
 
-## Stream Column Naming Convention
+## Stream Filter Field Paths
 
-Persisted stream data stores node outputs as columns. Column names follow the `"nodeName.field"` pattern. When referencing them in SQL, use double-quoted identifiers.
+Stream filters reference two kinds of fields uniformly: table-level columns and fields inside the persisted output JSON. The runtime decides which is which — you just use the key name.
 
-**Incorrect (unquoted dot notation):**
+### Table-level columns
 
-```sql
-SELECT root.score, root.message FROM {{table}}
-```
+These are the two first-class columns exposed on every stream row.
 
-This is interpreted as table alias `root` with column `score`, not the persisted column.
+| Name | Type | Meaning |
+|------|------|---------|
+| `created_at` | timestamp | When the row was persisted. |
+| `graph_execution_id` | string | Execution that produced the row. |
 
-**Correct (quoted column names with aliases):**
+Use them directly in the filter object:
 
 ```swirls
-query: @sql {
-  SELECT "root.score" AS score, "root.message" AS message
-  FROM {{table}}
-  ORDER BY created_at DESC
-  LIMIT 10
+filter: @ts {
+  return {
+    created_at: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() }
+  }
 }
 ```
 
-Column naming pattern:
-- `"root.field"` - Root node output fields
-- `"nodeName.field"` - Any node's output fields
-- `created_at` - Built-in timestamp (no quotes needed)
+### Output JSON fields
 
-Always alias quoted columns with `AS` for cleaner results.
+Every other key in the filter is looked up inside the persisted `output` JSON (the shape your `prepare:` returned in the stream block). Nested paths are not currently supported — filter on top-level keys of the prepared record.
+
+If your stream block's `prepare` returns `{ email, name, score }`, filter on `email`, `name`, `score`:
+
+```swirls
+filter: @ts {
+  return {
+    score: { gte: 80 },
+    email: { like: "%@example.com" }
+  }
+}
+```
+
+### Conventions
+
+- The shape of each persisted record is fully controlled by the stream block's `prepare` return value and described by the block's `schema`. Think of the filter as filtering the prepared record, not a graph's raw node outputs.
+- If you need to filter on multiple node outputs, combine them inside `prepare` so the persisted record exposes the fields you want.
+- `like` uses SQL `LIKE` semantics — `%` is the wildcard. No regex.
+
+### Legacy column names
+
+If you see older examples using `"root.field"` or other dotted column names in SQL strings, those apply to the removed SQL-query form of stream nodes. They do not apply to filters. Filter keys are flat top-level names only.
+
+See `node-stream` for the full filter API.

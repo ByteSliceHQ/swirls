@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "organization": "Swirls",
   "date": "April 2026",
-  "abstract": "Comprehensive authoring guide for the Swirls DSL. Covers file structure, graph declarations, all 12 node types, embedded TypeScript/JSON/SQL blocks, the context object, resources, triggers, persistence, reviews, and known parser pitfalls.",
+  "abstract": "Comprehensive authoring guide for the Swirls DSL. Covers file structure (nine top-level declarations including stream blocks), graph declarations, all 13 node types (ai, bucket, code, document, firecrawl, graph, http, parallel, postgres, resend, stream, switch, wait), embedded TypeScript/JSON/SQL blocks, the context object, resources, triggers, top-level stream blocks with condition/prepare, reviews, failure policies, and known parser pitfalls with an exhaustive validator-diagnostic cheatsheet.",
   "references": ["https://swirls.ai", "https://docs.swirls.ai"]
 }

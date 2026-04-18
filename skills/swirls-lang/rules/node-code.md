@@ -67,7 +67,8 @@ Code node fields:
 | Field | Required | Type |
 |-------|----------|------|
 | `code` | yes | `@ts` block or `@ts "file.ts.swirls"` |
-| `schema` | no | `@json` block (use `outputSchema` only on root nodes) |
-| `inputSchema` | no | `@json` block (usually only on root) |
-| `review` | no | Review config block |
-| `secrets` | no | Map of secret block names to var arrays: `{ block: [VAR] }` |
+| `schema` | no | `@json` block. Non-root nodes use `schema`; using `outputSchema` here is a parse error. |
+| `review` | no | Review config block (see `review-config`). |
+| `secrets` | no | Object literal: `{ blockName: [VAR1, VAR2] }`. |
+
+`inputSchema` is NOT valid on non-root code nodes. It is rejected by the parser with `inputSchema is only allowed in root { } blocks`, and the whole node is dropped.

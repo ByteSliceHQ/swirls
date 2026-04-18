@@ -1,28 +1,16 @@
 ---
-title: Persistence Block
-impact: MEDIUM
-tags: stream, persistence, condition, enabled
+title: Persistence Is Top-Level Stream, Not a Block
+impact: CRITICAL
+tags: stream, persistence, removed, migration, condition, prepare
 ---
 
-## Persistence Block
+## Persistence Is Top-Level Stream, Not a Block
 
-A `persistence { }` block inside a graph stores each execution's node outputs in a queryable stream. The `condition` determines whether a given execution is persisted.
+The old `persistence { }` block inside a graph has been **removed** from the language. Do not use it. The parser emits a hard error: `persistence { } blocks have been removed — use a top-level stream block instead`.
 
-**Incorrect (persistence without condition):**
+Replace persistence with a top-level `stream <name> { }` declaration that references the graph by name.
 
-```swirls
-graph my_graph {
-  label: "My Graph"
-  persistence {
-    enabled: true
-  }
-  root { ... }
-}
-```
-
-Error: "persistence block requires a non-empty condition (@ts { } or @ts '...')"
-
-**Correct (persistence with condition):**
+**Incorrect (uses the removed persistence block):**
 
 ```swirls
 graph submissions {
@@ -30,10 +18,23 @@ graph submissions {
 
   persistence {
     enabled: true
-    condition: @ts {
-      return true
-    }
+    condition: @ts { return true }
   }
+
+  root {
+    type: code
+    label: "Entry"
+    outputSchema: @json { { "type": "object" } }
+    code: @ts { return context.nodes.root.input }
+  }
+}
+```
+
+**Correct (top-level stream block):**
+
+```swirls
+graph submissions {
+  label: "Record submission"
 
   root {
     type: code
@@ -43,7 +44,7 @@ graph submissions {
         "type": "object",
         "required": ["score", "message"],
         "properties": {
-          "score": { "type": "number" },
+          "score":   { "type": "number" },
           "message": { "type": "string" }
         }
       }
@@ -53,28 +54,57 @@ graph submissions {
         "type": "object",
         "required": ["score", "message"],
         "properties": {
-          "score": { "type": "number" },
+          "score":   { "type": "number" },
           "message": { "type": "string" }
         }
       }
     }
     code: @ts {
       const { score, message } = context.nodes.root.input
-      return { score: Number(score) ?? 0, message: String(message ?? "").trim() }
+      return { score: Number(score) || 0, message: String(message ?? "").trim() }
     }
+  }
+}
+
+stream submission_log {
+  label: "Submission log"
+  graph: submissions
+
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["score", "message"],
+      "properties": {
+        "score":   { "type": "number" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+
+  condition: @ts {
+    return true
+  }
+
+  prepare: @ts {
+    const out = context.output.root!
+    return { score: out.score, message: out.message }
   }
 }
 ```
 
-Persistence fields:
-| Field | Required | Type |
-|-------|----------|------|
-| `enabled` | yes | Boolean |
-| `condition` | yes | `@ts` block (must return boolean) |
-| `name` | no | String (defaults to graph name) |
+### Key differences from the old persistence block
 
-Rules:
-- One graph = at most one stream
-- Stream name defaults to graph name unless `name:` is specified
-- Condition must be a non-empty `@ts` block returning `true` (persist) or `false` (skip)
-- `name` must match `[a-zA-Z_][a-zA-Z0-9_]*`
+| Old persistence | New top-level stream |
+|-----------------|----------------------|
+| Inside `graph { }` | Top-level block `stream <name> { }` |
+| Implicit shape | **Explicit `schema:` (recommended)** |
+| No mapping layer | **Required `prepare: @ts { ... }`** returns the shape |
+| `condition:` optional | `condition:` optional (must be non-empty if given) |
+| Stream name defaulted to graph name | Stream has its own `<name>`; multiple streams can reference one graph |
+| Context accessed via `context.nodes` | `prepare` / `condition` access `context.output.<leafNode>` plus `context.nodes` |
+
+### Why it changed
+
+The old model coupled "what to store" to the graph definition. The new model separates concerns: graphs produce outputs, and one or more top-level stream blocks each decide whether and how to persist those outputs. This lets you add, remove, or re-shape persistence without editing the graph, and lets multiple streams tap the same graph output with different schemas and conditions.
+
+See `resource-stream` for the full spec of top-level `stream { }` blocks and `node-stream` for reading persisted records.

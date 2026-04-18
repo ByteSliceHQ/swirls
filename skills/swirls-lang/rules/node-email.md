@@ -1,34 +1,36 @@
 ---
-title: Email Nodes
+title: Resend (Email) Nodes
 impact: HIGH
-tags: node, email, from, to, subject, resend
+tags: node, email, resend, from, to, subject
 ---
 
-## Email Nodes
+## Resend (Email) Nodes
 
-Email nodes send email via Resend. Every email node requires `from`, `to`, and `subject`.
+Email nodes send email via Resend. The type name is `resend`, not `email`. Every resend node requires `from`, `to`, and `subject`.
 
-**Required fields:** `from`, `to`, `subject`
+**Required fields:** `from`, `to`, `subject`.
 
-**Incorrect (missing from field):**
+**Vendor-managed output:** Do not set `schema:` on a resend node. The validator errors: `"resend" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
+
+### Incorrect (wrong type name)
 
 ```swirls
 node notify {
   type: email
   label: "Notify"
+  from: @ts { return "noreply@example.com" }
   to: @ts { return "team@example.com" }
   subject: @ts { return "Alert" }
-  text: @ts { return "Something happened" }
 }
 ```
 
-Error: "Node type 'email' requires 'from'"
+`email` is not a valid node type. The validator errors: `Invalid node type "email". Must be one of: ai, bucket, code, document, firecrawl, graph, http, parallel, postgres, resend, stream, switch, wait`.
 
-**Correct (complete email node):**
+### Correct (complete resend node)
 
 ```swirls
 node notify {
-  type: email
+  type: resend
   label: "Send notification"
   from: @ts { return "noreply@example.com" }
   to: @ts { return context.nodes.root.output.email }
@@ -40,11 +42,11 @@ node notify {
 }
 ```
 
-**Correct (with HTML body):**
+### Correct (HTML body)
 
 ```swirls
-node notify {
-  type: email
+node welcome {
+  type: resend
   label: "Send HTML email"
   from: @ts { return "noreply@example.com" }
   to: @ts { return context.nodes.root.output.email }
@@ -56,7 +58,8 @@ node notify {
 }
 ```
 
-Email node fields:
+### Fields
+
 | Field | Required | Type |
 |-------|----------|------|
 | `from` | yes | `@ts` block or string |
@@ -65,5 +68,8 @@ Email node fields:
 | `text` | no | `@ts` block or string |
 | `html` | no | `@ts` block or string |
 | `replyTo` | no | `@ts` block or string |
+| `schema` | **not allowed** | Vendor-managed; omit entirely. |
 
-Email nodes infer `RESEND_API_KEY` as a secret. You do not need to declare it.
+### API key
+
+`RESEND_API_KEY` is resolved by the runtime; do not declare it in a `secrets:` map.

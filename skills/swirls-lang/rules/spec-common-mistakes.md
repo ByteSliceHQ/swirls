@@ -102,9 +102,41 @@ node process {
 }
 ```
 
-Non-root nodes use `schema`, not `outputSchema`. The parser rejects `outputSchema` on non-root nodes.
+Non-root nodes use `schema`, not `outputSchema`. The parser rejects `outputSchema` on non-root nodes and drops the node.
 
-### 5. Inventing conditional edges
+### 5. Using `inputSchema` on a non-root node
+
+**Incorrect:**
+
+```swirls
+node enrich {
+  type: code
+  label: "Enrich"
+  inputSchema: @json { { "type": "object" } }
+  code: @ts { return {} }
+}
+```
+
+The parser errors: `inputSchema is only allowed in root { } blocks` and the entire node is silently dropped from the AST. Only root nodes have an `inputSchema` (the trigger payload shape). Non-root nodes' inputs are derived from upstream `schema` outputs.
+
+**Correct:**
+
+```swirls
+root {
+  type: code
+  label: "Entry"
+  inputSchema: @json { { "type": "object" } }
+  code: @ts { return context.nodes.root.input }
+}
+
+node enrich {
+  type: code
+  label: "Enrich"
+  code: @ts { return context.nodes.root.output }
+}
+```
+
+### 6. Inventing conditional edges
 
 **Incorrect:**
 
@@ -139,7 +171,7 @@ flow {
 
 Conditional routing requires a switch node with labeled edges.
 
-### 6. Using imports or require
+### 7. Using imports or require
 
 **Incorrect:**
 
@@ -171,7 +203,7 @@ graph my_graph {
 
 No imports exist. For reusable code, use `@ts "path.ts.swirls"` file references within individual node fields.
 
-### 7. Using variables or assignments at DSL level
+### 8. Using variables or assignments at DSL level
 
 **Incorrect:**
 
@@ -203,7 +235,7 @@ graph fetch {
 
 No variables or constants exist at the DSL level.
 
-### 8. Using `fetch` or `import` inside @ts blocks
+### 9. Using `fetch` or `import` inside @ts blocks
 
 **Incorrect:**
 
@@ -228,9 +260,9 @@ node call_api {
 }
 ```
 
-Code nodes are sandboxed. No `fetch`, `import`, `require`, `fs`, or `process.env`. Use `http` nodes for API calls, `ai` nodes for LLM calls, `resend` nodes for email.
+Code nodes are sandboxed. No `fetch`, `import`, `require`, `fs`, or `process.env`. Use `http` nodes for API calls, `ai` nodes for LLM calls, `resend` nodes for email, `firecrawl` for scraping, `parallel` for multi-query research.
 
-### 9. Using `process.env` instead of `context.secrets`
+### 10. Using `process.env` instead of `context.secrets`
 
 **Incorrect:**
 
@@ -261,7 +293,9 @@ node call_api {
 }
 ```
 
-### 10. Inventing node types
+The `secrets:` field on a node is an **object literal**, not an array. It maps secret block names to arrays of var names: `{ blockName: [VAR1, VAR2] }`.
+
+### 11. Inventing node types
 
 **Incorrect:**
 
@@ -285,11 +319,13 @@ node transform {
 }
 ```
 
-There are exactly 12 node types: `ai`, `bucket`, `code`, `document`, `resend`, `graph`, `http`, `postgres`, `firecrawl`, `stream`, `switch`, `wait`. Data transformation belongs in `code` nodes.
+There are exactly 13 node types: `ai`, `bucket`, `code`, `document`, `firecrawl`, `graph`, `http`, `parallel`, `postgres`, `resend`, `stream`, `switch`, `wait`. Data transformation belongs in `code` nodes.
 
-### 11. Missing label on graph or node
+### 12. Missing label on graph or node
 
-**Incorrect:**
+Labels default to the block name, so this parses, but best practice is to set an explicit one for readability. Graphs require `label:` for proper display in the Portal.
+
+**Sub-optimal:**
 
 ```swirls
 graph my_graph {
@@ -313,9 +349,7 @@ graph my_graph {
 }
 ```
 
-Every graph and every node requires a `label` field.
-
-### 12. Edges outside of flow block
+### 13. Edges outside of flow block
 
 **Incorrect:**
 
@@ -327,6 +361,8 @@ graph my_graph {
   root -> step
 }
 ```
+
+The parser emits: `Edge declarations must be inside a flow { } block`.
 
 **Correct:**
 
@@ -341,9 +377,7 @@ graph my_graph {
 }
 ```
 
-All edges must be inside a `flow { }` block.
-
-### 13. Using @yaml, @graphql, or other invented block types
+### 14. Using @yaml, @graphql, or other invented block types
 
 **Incorrect:**
 
@@ -355,11 +389,9 @@ node query {
 }
 ```
 
-**Correct:**
-
 Only `@ts`, `@json`, and `@sql` fenced blocks exist. Embed other formats as strings inside `@ts` blocks.
 
-### 14. Chaining edges on one line
+### 15. Chaining edges on one line
 
 **Incorrect:**
 
@@ -379,9 +411,9 @@ flow {
 }
 ```
 
-One edge per line. No chaining.
+One edge per line. No chaining. Parallel branches (multiple edges from the same source) are fine.
 
-### 15. Referencing a .ts.swirls file that does not exist
+### 16. Referencing a `.ts.swirls` file that does not exist
 
 **Incorrect:**
 
@@ -393,11 +425,11 @@ node process {
 }
 ```
 
-If `./handlers/transform.ts.swirls` does not exist on disk, `swirls doctor` will report: `@ts file not found: ./handlers/transform.ts.swirls`. The file must exist before you can reference it.
+If the referenced path does not exist on disk, `swirls doctor` will report: `@ts file not found: ./handlers/transform.ts.swirls`. The file must exist before you can reference it. The path must end with `.ts.swirls`, never `.ts`.
 
 **Correct:**
 
-Either create the `.ts.swirls` file first, or use an inline `@ts` block:
+Create the `.ts.swirls` file first, or use an inline `@ts` block:
 
 ```swirls
 node process {
@@ -410,3 +442,199 @@ node process {
 }
 ```
 
+### 17. Using `persistence { }` (removed)
+
+**Incorrect:**
+
+```swirls
+graph submissions {
+  label: "Submissions"
+  persistence {
+    enabled: true
+    condition: @ts { return true }
+  }
+  root {
+    type: code
+    label: "Entry"
+    code: @ts { return context.nodes.root.input }
+  }
+}
+```
+
+The parser errors: `persistence { } blocks have been removed — use a top-level stream block instead`.
+
+**Correct:**
+
+```swirls
+graph submissions {
+  label: "Submissions"
+  root {
+    type: code
+    label: "Entry"
+    outputSchema: @json { { "type": "object", "properties": { "message": { "type": "string" } } } }
+    code: @ts { return context.nodes.root.input }
+  }
+}
+
+stream submission_log {
+  label: "Submission log"
+  graph: submissions
+  schema: @json {
+    {
+      "type": "object",
+      "properties": { "message": { "type": "string" } }
+    }
+  }
+  condition: @ts { return true }
+  prepare: @ts {
+    return { message: context.output.root.message }
+  }
+}
+```
+
+### 18. Using `query` or `querySql` on a stream node
+
+**Incorrect:**
+
+```swirls
+node recent {
+  type: stream
+  stream: "submissions"
+  query: @sql { SELECT * FROM {{table}} LIMIT 10 }
+}
+```
+
+The validator errors: `querySql and query are no longer supported on stream nodes; use filter (@ts returning a filter object)`.
+
+**Correct:**
+
+```swirls
+node recent {
+  type: stream
+  label: "Recent submissions"
+  stream: submissions
+  filter: @ts {
+    return {
+      score: { gte: 50 }
+    }
+  }
+}
+```
+
+Stream nodes reference a stream block by bare identifier (not a string) and filter with an `@ts` block returning a `StreamFilter` object.
+
+### 19. Declaring `agent:` trigger
+
+**Incorrect:**
+
+```swirls
+trigger agent_trigger {
+  agent:my_agent -> my_graph
+}
+```
+
+There is no `agent` trigger type. Only `form`, `webhook`, and `schedule` are valid resource prefixes.
+
+**Correct:**
+
+```swirls
+trigger on_submission {
+  form:contact_form -> my_graph
+  enabled: true
+}
+```
+
+### 20. Trigger binding with separate fields
+
+**Incorrect:**
+
+```swirls
+trigger my_trigger {
+  resource: contact_form
+  resourceType: form
+  graph: my_graph
+}
+```
+
+**Correct:**
+
+```swirls
+trigger my_trigger {
+  form:contact_form -> my_graph
+  enabled: true
+}
+```
+
+The binding is a single syntactic line `<type>:<name> -> <graph>`. No separate fields.
+
+### 21. Using an array for `secrets:`
+
+**Incorrect:**
+
+```swirls
+node call_api {
+  type: http
+  url: @ts { return "https://api.example.com" }
+  secrets: [API_KEY]
+}
+```
+
+The parser errors: `Expected { after secrets:`.
+
+**Correct:**
+
+```swirls
+node call_api {
+  type: http
+  url: @ts { return "https://api.example.com" }
+  secrets: {
+    my_creds: [API_KEY]
+  }
+}
+```
+
+### 22. Referencing a graph or stream as a string on a node
+
+**Incorrect:**
+
+```swirls
+node call_helper {
+  type: graph
+  graph: "helper_graph"
+  input: @ts { return {} }
+}
+```
+
+**Correct:**
+
+```swirls
+node call_helper {
+  type: graph
+  graph: helper_graph
+  input: @ts { return {} }
+}
+```
+
+`graph:` on a graph node, `stream:` on a stream node, `postgres:` on a postgres node, and `auth:` on an http node all take **bare identifiers**, not quoted strings. (Bare identifiers are parsed as string values, so `"helper_graph"` also works, but convention is bare.)
+
+### 23. Hyphenated or non-alphanumeric resource name
+
+**Incorrect:**
+
+```swirls
+form contact-form {
+  label: "Contact"
+}
+```
+
+The validator errors: `Form name: Name must contain only letters, numbers, and underscores`.
+
+**Correct:**
+
+```swirls
+form contact_form {
+  label: "Contact"
+}
+```
+
+Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, graphs, streams, triggers, secrets, auths, postgres blocks, nodes, secret vars, switch cases, and review action ids.

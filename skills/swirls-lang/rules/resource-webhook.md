@@ -35,4 +35,15 @@ Webhook fields:
 | `enabled` | no | Boolean (default: true) |
 | `schema` | no | `@json` block |
 
-Webhooks use the same name rules as forms: `[a-zA-Z_][a-zA-Z0-9_]*`.
+Webhook names must match `^[a-zA-Z0-9_]+$` (letters, digits, underscores; can start with a digit). Hyphens, dots, and spaces are not allowed.
+
+### Binding
+
+A webhook on its own does not execute a graph. Declare a trigger:
+
+```swirls
+trigger on_inbound {
+  webhook:inbound -> handle_event
+  enabled: true
+}
+```

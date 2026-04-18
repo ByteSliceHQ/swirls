@@ -38,8 +38,17 @@ Schedule fields:
 | `timezone` | no | IANA timezone string |
 | `enabled` | no | Boolean (default: true) |
 
-Common cron expressions:
+Common cron expressions (standard 5-field form):
 - `"0 9 * * *"` - Daily at 9 AM
 - `"0 */6 * * *"` - Every 6 hours
 - `"0 9 * * 1"` - Every Monday at 9 AM
 - `"*/15 * * * *"` - Every 15 minutes
+
+Schedule names must match `^[a-zA-Z0-9_]+$` (letters, digits, underscores). Bind a schedule to a graph via a trigger:
+
+```swirls
+trigger daily_trigger {
+  schedule:daily -> morning_report
+  enabled: true
+}
+```

@@ -1,63 +1,71 @@
 ---
-title: SQL Queries with {{table}} Placeholder
+title: Stream Filters Replaced SQL Queries
 impact: MEDIUM
-tags: stream, sql, query, table, placeholder, select
+tags: stream, filter, query, removed, operators, migration
 ---
 
-## SQL Queries with {{table}} Placeholder
+## Stream Filters Replaced SQL Queries
 
-Stream nodes can include a `@sql { }` block to filter, aggregate, or sort persisted data. The `{{table}}` placeholder is resolved at runtime to the stream's actual table name.
+Older docs and examples mentioned `@sql { SELECT ... FROM {{table}} }` on stream nodes. That is gone. Stream nodes now use a `filter: @ts { ... }` that returns a plain `StreamFilter` object. The runtime — not you — composes the SQL.
 
-**Incorrect (hardcoded table name):**
-
-```swirls
-query: @sql {
-  SELECT * FROM submissions_table
-}
-```
-
-**Incorrect (non-SELECT query):**
-
-```swirls
-query: @sql {
-  DELETE FROM {{table}} WHERE created_at < NOW() - INTERVAL '30 days'
-}
-```
-
-Only SELECT queries are allowed.
-
-**Correct (SELECT with {{table}} placeholder):**
+**Incorrect (old SQL form):**
 
 ```swirls
 node recent {
   type: stream
-  label: "Recent submissions"
   stream: "submissions"
   query: @sql {
-    SELECT "root.score" AS score, "root.message" AS message
-    FROM {{table}}
-    WHERE created_at > NOW() - INTERVAL '7 days'
-    ORDER BY created_at DESC
-    LIMIT 10
+    SELECT * FROM {{table}} WHERE created_at > NOW() - INTERVAL '7 days'
   }
-  schema: @json {
-    {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["score", "message"],
-        "properties": {
-          "score": { "type": "number" },
-          "message": { "type": "string" }
-        }
-      }
+}
+```
+
+The validator errors: `querySql and query are no longer supported on stream nodes; use filter (@ts returning a filter object)`.
+
+**Correct (filter object):**
+
+```swirls
+node recent {
+  type: stream
+  label: "Recent high scorers"
+  stream: scored_leads
+  filter: @ts {
+    return {
+      score: { gte: 80 }
     }
   }
 }
 ```
 
-Rules:
-- Always use `{{table}}` as the table name placeholder
-- Only SELECT queries are allowed
-- Column names follow the `"nodeName.field"` pattern (see stream-column-naming rule)
-- Use aliases (`AS score`) for cleaner output
+### Operator reference
+
+| Operator | Meaning |
+|----------|---------|
+| `eq` | Equal to the given value |
+| `ne` | Not equal |
+| `gt` | Greater than |
+| `gte` | Greater than or equal |
+| `lt` | Less than |
+| `lte` | Less than or equal |
+| `like` | SQL `LIKE` pattern match (use `%` wildcards) |
+| `in` | Value is in the given array |
+
+Multiple top-level keys AND together; multiple operators under one key also AND:
+
+```ts
+return {
+  score: { gte: 50, lte: 100 },
+  category: { in: ["A", "B"] },
+  name: { like: "%@example.com" }
+}
+```
+
+### Sorting, limits, pagination
+
+Not configurable yet. Default: newest first (by `created_at DESC`), all matching rows. Do not try to add `sort:` or `limit:` fields — they are not parsed.
+
+### If you truly need raw SQL
+
+For arbitrary SQL against a user-managed database, use a `postgres` node with `select:` against a declared top-level `postgres` block. Stream storage is not user-addressable by raw SQL; it is filtered only.
+
+See `node-stream` for required fields and `resource-stream` for the write side.

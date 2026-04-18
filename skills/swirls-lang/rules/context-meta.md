@@ -27,4 +27,4 @@ root {
 
 Available fields:
 - `context.meta.triggerId` - String or null. The trigger that started this execution.
-- `context.meta.triggerType` - "form", "webhook", "schedule", "agent", or null.
+- `context.meta.triggerType` - `"form"`, `"webhook"`, `"schedule"`, or null. (There is no `"agent"` trigger type.)

@@ -6,28 +6,47 @@ tags: schema, inputSchema, outputSchema, root, typing
 
 ## inputSchema, outputSchema, and schema
 
-`inputSchema` defines the shape of data a node receives. `outputSchema` (on root nodes) and `schema` (on non-root nodes) define what a node produces. The LSP uses these to type `context.nodes.<name>.input` and `context.nodes.<name>.output` for autocomplete and validation. Using `outputSchema` on non-root nodes causes a parse error.
+The three schema keywords each have a specific placement. The parser enforces this strictly and **rejects misplaced schema keys**.
 
-**Key rule:** `inputSchema` is meaningful only on the root node. It defines the shape of the trigger payload. On non-root nodes, input is derived from upstream node outputs via the flow edges.
+| Keyword | Valid on | Purpose |
+|---------|----------|---------|
+| `inputSchema` | **root only** | Shape of the trigger payload. Drives `context.nodes.root.input` typing in the LSP. |
+| `outputSchema` | **root only** | Shape of what the root node returns. |
+| `schema` | **non-root nodes only** | Shape of what that node returns. Equivalent to outputSchema for non-root nodes. |
 
-**Incorrect (inputSchema on a non-root node for typing upstream):**
+### Strict parser rules
+
+- `inputSchema` on a non-root node → parser error: `inputSchema is only allowed in root { } blocks`. The entire node is dropped from the AST.
+- `outputSchema` on a non-root node → parser error: `Use "schema" instead of "outputSchema" in node blocks`. The entire node is dropped from the AST.
+- `schema` on root is technically accepted but redundant — use `outputSchema` on root.
+
+### Incorrect (inputSchema on non-root)
+
+```swirls
+node enrich {
+  type: code
+  label: "Enrich"
+  inputSchema: @json { { "type": "object" } }
+  code: @ts { return {} }
+}
+```
+
+The parser drops this node silently (after logging an error). Downstream references to `context.nodes.enrich.output` will fail at validation or runtime.
+
+### Incorrect (outputSchema on non-root)
 
 ```swirls
 node process {
   type: code
   label: "Process"
-  inputSchema: @json {
-    { "type": "object", "properties": { "email": { "type": "string" } } }
-  }
-  code: @ts {
-    return { email: context.nodes.root.output.email }
-  }
+  outputSchema: @json { { "type": "object" } }
+  code: @ts { return {} }
 }
 ```
 
-Defining `inputSchema` on non-root nodes is allowed but rarely useful. The LSP infers input types from upstream `schema` declarations.
+Same outcome — the node is dropped.
 
-**Correct (inputSchema on root, outputSchema on root, schema on non-root nodes):**
+### Correct (each kind in the right place)
 
 ```swirls
 root {
@@ -38,10 +57,9 @@ root {
       "type": "object",
       "required": ["name", "email"],
       "properties": {
-        "name": { "type": "string" },
+        "name":  { "type": "string" },
         "email": { "type": "string" }
-      },
-      "additionalProperties": false
+      }
     }
   }
   outputSchema: @json {
@@ -49,10 +67,9 @@ root {
       "type": "object",
       "required": ["name", "email"],
       "properties": {
-        "name": { "type": "string" },
+        "name":  { "type": "string" },
         "email": { "type": "string" }
-      },
-      "additionalProperties": false
+      }
     }
   }
   code: @ts {
@@ -77,4 +94,17 @@ node greet {
 }
 ```
 
-Best practice: define `outputSchema` on the root node and `schema` on every non-root node that produces data. This enables LSP autocomplete for all downstream `@ts` blocks. Using `outputSchema` on non-root nodes causes a parse error.
+### Best practice
+
+Define `outputSchema` on the root node and `schema` on every non-root node that produces data. This enables LSP autocomplete for all downstream `@ts` blocks. Without schemas, `context.nodes.<name>.output` is typed as `unknown` and the LSP cannot help.
+
+### Vendor-managed types
+
+Some node types have their output shape fixed by the vendor API. Do not set `schema:` on them — the validator errors: `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
+
+Vendor-managed types:
+- `firecrawl`
+- `parallel`
+- `resend`
+
+These types provide their own runtime type shape; the LSP uses it automatically.
