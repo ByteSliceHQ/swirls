@@ -32,24 +32,26 @@ node process {
 
 All executable code must be inside `@ts { }` blocks.
 
-### 2. Using `type: email` instead of `type: resend`
+### 2. Using `type: resend` instead of `type: email`
 
 **Incorrect:**
 
 ```swirls
 node notify {
-  type: email
+  type: resend
   from: @ts { return "noreply@example.com" }
   to: @ts { return "user@example.com" }
   subject: @ts { return "Hello" }
 }
 ```
 
+`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`.
+
 **Correct:**
 
 ```swirls
 node notify {
-  type: resend
+  type: email
   label: "Send notification"
   from: @ts { return "noreply@example.com" }
   to: @ts { return "user@example.com" }
@@ -57,22 +59,24 @@ node notify {
 }
 ```
 
-### 3. Using `type: scrape` instead of `type: firecrawl`
+### 3. Using `type: firecrawl` instead of `type: scrape`
 
 **Incorrect:**
 
 ```swirls
 node fetch_page {
-  type: scrape
+  type: firecrawl
   url: @ts { return "https://example.com" }
 }
 ```
+
+`firecrawl` is not a valid node type. Firecrawl is the underlying vendor; the DSL type name is `scrape`.
 
 **Correct:**
 
 ```swirls
 node fetch_page {
-  type: firecrawl
+  type: scrape
   label: "Fetch page"
   url: @ts { return "https://example.com" }
 }
@@ -260,7 +264,7 @@ node call_api {
 }
 ```
 
-Code nodes are sandboxed. No `fetch`, `import`, `require`, `fs`, or `process.env`. Use `http` nodes for API calls, `ai` nodes for LLM calls, `resend` nodes for email, `firecrawl` for scraping, `parallel` for multi-query research.
+Code nodes are sandboxed. No `fetch`, `import`, `require`, `fs`, or `process.env`. Use `http` nodes for API calls, `ai` nodes for LLM calls, `email` nodes for email, `scrape` for web scraping, `parallel` for multi-query research, `agent` for agentic loops with tools, `disk` for filesystem exec.
 
 ### 10. Using `process.env` instead of `context.secrets`
 
@@ -301,13 +305,13 @@ The `secrets:` field on a node is an **object literal**, not an array. It maps s
 
 ```swirls
 node transform {
-  type: map
+  type: each
   items: @ts { return context.nodes.root.output.list }
   fn: @ts { return (item) => item.name }
 }
 ```
 
-**Correct:**
+**Correct (transform stays in a code node):**
 
 ```swirls
 node transform {
@@ -319,7 +323,26 @@ node transform {
 }
 ```
 
-There are exactly 13 node types: `ai`, `bucket`, `code`, `document`, `firecrawl`, `graph`, `http`, `parallel`, `postgres`, `resend`, `stream`, `switch`, `wait`. Data transformation belongs in `code` nodes.
+**Correct (per-item iteration with subgraph uses `type: map`):**
+
+```swirls
+node per_item {
+  type: map
+  label: "Process each"
+  items: @ts { return context.nodes.root.output.list }
+  maxItems: 100
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: @json { { "type": "object", "properties": { "name": { "type": "string" } } } }
+      code: @ts { return { name: context.iteration.item.name.toUpperCase() } }
+    }
+  }
+}
+```
+
+There are exactly 16 node types: `ai`, `agent`, `bucket`, `code`, `disk`, `email`, `graph`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`. Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
 
 ### 12. Missing label on graph or node
 
@@ -637,4 +660,285 @@ form contact_form {
 }
 ```
 
-Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, graphs, streams, triggers, secrets, auths, postgres blocks, nodes, secret vars, switch cases, and review action ids.
+Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, graphs, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids.
+
+### 24. Setting `visibility` like a key:value pair on a form
+
+**Incorrect:**
+
+```swirls
+form contact {
+  label: "Contact"
+  visibility: "public"
+}
+```
+
+The parser errors: `Expected \`public\` or \`internal\` after \`visibility\``. `visibility` is a bare keyword, not a key:value pair — there is no colon and the value is an unquoted identifier (`public` or `internal`).
+
+**Correct:**
+
+```swirls
+form contact {
+  label: "Contact"
+  visibility public
+}
+```
+
+Default is `internal` when omitted. `public` exposes the form via Triggers; `internal` returns 404. See `resource-form`.
+
+### 25. Webhook with no auth (silently accepts any request)
+
+**Sub-optimal (warning):**
+
+```swirls
+webhook inbound {
+  label: "Inbound"
+}
+```
+
+The validator warns: `Webhook "inbound" has no "secret" or "header" set and will accept any POST without verification.`
+
+**Incorrect (only one of the pair set):**
+
+```swirls
+webhook inbound {
+  label: "Inbound"
+  secret: my_creds.SHARED
+}
+```
+
+The validator errors: `Webhook "inbound" has "secret" but is missing "header".` Both fields must be set together.
+
+**Correct:**
+
+```swirls
+secret my_creds {
+  vars: [SHARED_SECRET]
+}
+
+webhook inbound {
+  label: "Inbound"
+  secret: my_creds.SHARED_SECRET
+  header: "X-Webhook-Signature"
+}
+```
+
+`secret:` uses dot notation (no quotes). `header:` is a quoted custom header name. Reserved headers (`Cookie`, `Host`, `Content-Type`, `User-Agent`, `X-Forwarded-*`, etc.) are rejected. See `resource-webhook`.
+
+### 26. Using `subgraph:` with a colon
+
+**Incorrect:**
+
+```swirls
+node each_item {
+  type: map
+  items: @ts { return [{ x: 1 }] }
+  maxItems: 10
+
+  subgraph: {
+    root { type: code code: @ts { return {} } }
+  }
+}
+```
+
+`subgraph` is a bare block, not a key:value pair. There is no colon.
+
+**Correct:**
+
+```swirls
+node each_item {
+  type: map
+  items: @ts { return [{ x: 1 }] }
+  maxItems: 10
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: @json { { "type": "object", "properties": { "x": { "type": "number" } } } }
+      code: @ts { return { doubled: context.iteration.item.x * 2 } }
+    }
+  }
+}
+```
+
+See `graph-subgraph`.
+
+### 27. Map / while node with both `subgraph { }` and `graph:`
+
+**Incorrect:**
+
+```swirls
+node each_item {
+  type: map
+  items: @ts { return [] }
+  maxItems: 10
+  graph: helper_graph
+  subgraph {
+    root { type: code code: @ts { return {} } }
+  }
+}
+```
+
+The validator errors: `map node requires exactly one of subgraph { } or graph: <name>`. Pick one. Use `graph: <name>` to call an existing top-level graph; use `subgraph { }` to inline the iteration body.
+
+### 28. Map / while subgraph root without `inputSchema`
+
+**Incorrect:**
+
+```swirls
+node each_item {
+  type: map
+  items: @ts { return [{ x: 1 }] }
+  maxItems: 10
+
+  subgraph {
+    root {
+      type: code
+      code: @ts { return context.iteration.item }
+    }
+  }
+}
+```
+
+The validator errors: `map/while subgraph root must declare inputSchema for typed iteration`. The subgraph root needs `inputSchema` (inline @json, object literal, or bare schema name) so the iteration item is typed.
+
+**Correct:**
+
+```swirls
+schema item_shape {
+  label: "Item"
+  schema: @json {
+    { "type": "object", "required": ["x"], "properties": { "x": { "type": "number" } } }
+  }
+}
+
+node each_item {
+  type: map
+  items: @ts { return [{ x: 1 }] }
+  maxItems: 10
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: item_shape
+      code: @ts { return { doubled: context.iteration.item.x * 2 } }
+    }
+  }
+}
+```
+
+### 29. Forgetting `maxItems` / `maxIterations`
+
+**Incorrect (map without `maxItems`):**
+
+```swirls
+node per_item {
+  type: map
+  items: @ts { return [] }
+  subgraph { root { type: code code: @ts { return {} } } }
+}
+```
+
+The validator errors: `map node requires maxItems as a positive number` and `Node type "map" requires "maxItems"`. `maxItems` is mandatory and bounds the iteration.
+
+**Incorrect (while without `maxIterations`):**
+
+```swirls
+node refine {
+  type: while
+  input: @ts { return { count: 0 } }
+  condition: @ts { return context.iteration.input.count < 10 }
+  update: @ts { return { count: context.iteration.input.count + 1 } }
+  subgraph { root { type: code code: @ts { return {} } } }
+}
+```
+
+Errors: `while node requires maxIterations as a positive integer` and `Node type "while" requires "maxIterations"`. `maxIterations` is the safety cap that prevents runaway loops.
+
+### 30. Setting `schema:` on a vendor-managed node type
+
+**Incorrect:**
+
+```swirls
+node send_email {
+  type: email
+  from: @ts { return "from@example.com" }
+  to: @ts { return "to@example.com" }
+  subject: @ts { return "Hello" }
+  schema: @json { { "type": "object" } }
+}
+```
+
+The validator errors: `"email" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` This applies to `scrape`, `parallel`, and `email` — their output shape is fixed by the vendor.
+
+### 31. Using `kind: text` with a `schema:` on an AI node
+
+**Sub-optimal (warning):**
+
+```swirls
+node summarize {
+  type: ai
+  kind: text
+  prompt: @ts { return "Summarize: " + context.nodes.root.output.text }
+  schema: @json {
+    { "type": "object", "properties": { "summary": { "type": "string" } } }
+  }
+}
+```
+
+The validator warns: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` Either remove the schema (string output) or change to `kind: object` (structured JSON output).
+
+### 32. Ignoring a top-level `schema` block by inlining the same JSON repeatedly
+
+**Sub-optimal (duplication):**
+
+```swirls
+form contact {
+  label: "Contact"
+  schema: @json {
+    { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+  }
+}
+
+graph handle {
+  label: "Handle"
+  root {
+    type: code
+    inputSchema: @json {
+      { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+    }
+    outputSchema: @json {
+      { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+    }
+    code: @ts { return context.nodes.root.input }
+  }
+}
+```
+
+**Correct (factor out a top-level schema and reference it by name):**
+
+```swirls
+schema contact_payload {
+  label: "Contact payload"
+  schema: @json {
+    { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+  }
+}
+
+form contact {
+  label: "Contact"
+  schema: contact_payload
+}
+
+graph handle {
+  label: "Handle"
+  root {
+    type: code
+    inputSchema: contact_payload
+    outputSchema: contact_payload
+    code: @ts { return context.nodes.root.input }
+  }
+}
+```
+
+The bare identifier (`contact_payload`) references the top-level `schema` block. See `resource-schema`.

@@ -25,7 +25,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 ### Nodes (general)
 
-- `Invalid node type "<t>". Must be one of: ai, bucket, code, document, firecrawl, graph, http, parallel, postgres, resend, stream, switch, wait` — Unknown type name. Use one of the 13.
+- `Invalid node type "<t>". Must be one of: ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while` — Unknown type name. Use one of the 16.
 - `Node type "<t>" requires "<field>"` — Missing required field. See the node-type rule for the required set.
 
 ### Secrets map
@@ -75,7 +75,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 ### Vendor-managed schemas
 
-- `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` — You set `schema:` on `firecrawl`, `parallel`, or `resend`. Remove it.
+- `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` — You set `schema:` on `scrape`, `parallel`, or `email`. Remove it.
 
 ### AI nodes
 
@@ -86,6 +86,42 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 - `Graph node requires "graph"` — Add `graph: <name>`.
 - `Graph node references graph "<n>" which is not defined` — Fix the name or declare the child graph.
+
+### Map / while nodes
+
+- `Node type "map" requires "items" / "maxItems"` — Required field missing.
+- `Node type "while" requires "input" / "condition" / "update" / "maxIterations"` — Required field missing.
+- `map node requires maxItems as a positive number` — Add `maxItems: <n>` with `n > 0`.
+- `map node concurrency must be a positive integer when set` — Fix to a positive integer or remove `concurrency:`.
+- `while node requires maxIterations as a positive integer` — Add `maxIterations: <n>` with `n` an integer ≥ 1.
+- `map node requires exactly one of subgraph { } or graph: <name>` — You set both, or neither. Pick one.
+- `while node requires exactly one of subgraph { } or graph: <name>` — Same — pick one.
+- `Node references graph "<n>" which is not defined` — `graph: <n>` does not match a graph in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` (inline @json, object literal, or bare schema name) to the inline `subgraph { }` root or the referenced graph's root.
+- Parser error: `Expected { after subgraph` — Don't put a colon between `subgraph` and `{`.
+- Parser error: `label is not valid inside subgraph { }` / `description is not valid inside subgraph { }` — Subgraphs don't take their own label/description.
+
+### Forms
+
+- Parser error: `Expected \`public\` or \`internal\` after \`visibility\`` — `visibility` is a bare keyword (no colon, no quotes). Use `visibility public` or `visibility internal`.
+- Parser error: `Invalid visibility "<x>"; expected \`public\` or \`internal\`` — Only those two values are valid.
+
+### Webhooks (authentication)
+
+- Warning: `Webhook "<n>" has no "secret" or "header" set and will accept any POST without verification.` — Add `secret: <block>.<VAR>` and `header: "X-..."` to require verification, or accept the warning for an explicitly unauthenticated endpoint.
+- `Webhook "<n>" has "secret" but is missing "header"` / `Webhook "<n>" has "header" but is missing "secret"` — Both must be set together.
+- `Webhook "<n>" header name must not be empty` — Trim/non-blank required.
+- `Webhook "<n>" header "<name>" is reserved and cannot be used for authentication. Choose a custom header name.` — Pick a custom header (e.g. `X-Webhook-Signature`).
+- `Webhook "<n>" references undefined secret block "<block>"` — Declare the `secret <block> { vars: [...] }`.
+- `Webhook "<n>" references var "<VAR>" not declared in secret block "<block>"` — Add `VAR` to the block's `vars:`.
+- Parser error: `Expected secret block name (e.g. my_secret.VAR)` — `secret:` uses dot notation: `secret: my_secret.VAR`. No quotes.
+- Parser error: `Expected "." after secret block name` — Same — dot notation required.
+- Parser error: `Expected quoted header name` — `header:` value must be a `"quoted"` string.
+
+### Schema (top-level `schema` block)
+
+- `Schema name: Name must contain only letters, numbers, and underscores` — Rename to match `^[a-zA-Z0-9_]+$`.
+- Schema reference resolution errors come from `validateSchemaFieldRefs` — they fire when `inputSchema: <name>`, `outputSchema: <name>`, `schema: <name>` (on form/webhook/node), or `review: { schema: <name> }` references a name with no matching `schema <name> { }` block in the workspace.
 
 ### Postgres (top-level block)
 

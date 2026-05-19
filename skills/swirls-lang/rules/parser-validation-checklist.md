@@ -27,14 +27,17 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 
 **Node validation:**
 
-- [ ] Every `resend` node has `from`, `to`, and `subject` fields
+- [ ] Every `email` node has `from`, `to`, and `subject` fields
+- [ ] Every `scrape` node has a `url` field
 - [ ] Every `ai` node has `kind`, `model`, and `prompt` fields
 - [ ] Every `ai` node with `kind: object` has a `schema`
+- [ ] Every `agent` node has `agent` and `prompt` fields, and any `role:` matches a role in the bound agent block
 - [ ] Every `code` node has a `code` field
 - [ ] Every `switch` node has `cases` and `router` fields
 - [ ] Every `http` node has a `url` field
 - [ ] Every `graph` node has `graph` and `input` fields
 - [ ] Every `bucket` node has an `operation` field
+- [ ] Every `disk` node has `disk` and `command` fields
 - [ ] Every `postgres` node has a `postgres` field and exactly one of `select` or `insert`
 - [ ] Every `postgres` node with `insert` has a `params` field
 - [ ] Every `postgres` node references a `postgres` block defined in the same file

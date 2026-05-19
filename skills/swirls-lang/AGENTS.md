@@ -1,6 +1,11 @@
 # Swirls Language - Complete Reference
 
-> Comprehensive guide for authoring `.swirls` workflow files. Compiled from the individual rule files under `rules/`. If something is not documented here, it does not exist in the language.
+> Comprehensive guide for authoring `.swirls` workflow files. Compiled from the individual rule files under `rules/`.
+>
+> **Source of truth lives in `rules/`.** This file is regenerated from those rules by `scripts/regen-agents.ts`. When in doubt, defer to `rules/spec-strict-syntax.md` and `rules/spec-common-mistakes.md`.
+>
+> Current scope: **16 node types** (`ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while`), **12 top-level declarations** (`schema, form, webhook, schedule, graph, stream, trigger, secret, auth, postgres, disk, agent`), inline `subgraph { }` for map/while, form `visibility public | internal`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, and `context.iteration.*` (item/index/input/previous) for map/while subgraphs.
+
 
 # 1. Language Specification (READ FIRST)
 
@@ -13,9 +18,11 @@ The Swirls DSL is a declarative configuration language. It is not TypeScript, YA
 These are the only keywords recognized by the lexer (`packages/language/src/lexer.ts`). Any other word is parsed as an identifier or a quoted string.
 
 ```
-form, webhook, schedule, graph, trigger, secret, auth, postgres, stream,
-node, root, type, label, description, enabled, schema, cron, timezone,
-version, review, condition, name, flow, select, insert, params, table
+form, webhook, schedule, graph, trigger, secret, auth, postgres, stream, schema,
+disk, agent, role,
+node, root, type, label, description, enabled, cron, timezone, version, review,
+condition, name, flow, select, insert, params, table,
+subgraph, map, while, items, update, maxItems, maxIterations, concurrency
 ```
 
 Note: `persistence` is NOT a keyword. The old `persistence { }` block has been removed. Use a top-level `stream { }` block instead.
@@ -26,6 +33,7 @@ These are the only valid top-level blocks. Nothing else can appear at the top le
 
 ```
 version: <number>
+schema <name> { }
 form <name> { }
 webhook <name> { }
 schedule <name> { }
@@ -35,11 +43,15 @@ trigger <name> { }
 secret <name> { }
 auth <name> { }
 postgres <name> { }
+disk <name> { }
+agent <name> { }
 ```
+
+There are **12** top-level block kinds (plus the optional `version:` line). The newest are `disk <name> { }` (Archil-backed remote disk that `type: disk` nodes mount) and `agent <name> { }` (LLM agent definition with tools and roles that `type: agent` nodes bind to).
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, graphs, streams, triggers, secrets, auth, postgres, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, graphs, streams, triggers, secrets, auth, postgres, schemas, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -49,23 +61,28 @@ Names may start with a digit. Hyphens, dots, spaces, and other characters are no
 
 #### Complete node type list
 
-These are the only valid values for `type:` inside a node or root block. There are **13** node types. The canonical names come from `nodeTypeMap` in `packages/core/src/schemas.ts`.
+These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `packages/core/src/schemas.ts`.
 
 ```
-ai, bucket, code, document, firecrawl, graph, http,
-parallel, postgres, resend, stream, switch, wait
+ai, agent, bucket, code, disk, email, graph, http,
+map, parallel, postgres, scrape, stream, switch, wait, while
 ```
 
 Notes on aliases that do NOT exist:
-- `resend` is the type name, not `email`.
-- `firecrawl` is the type name, not `scrape`.
+- `email` is the type name, not `resend`, `mail`, or `mailer`. (The Resend vendor backs it; the DSL type is `email`.)
+- `scrape` is the type name, not `firecrawl`, `crawl`, or `fetch`. (Firecrawl is the vendor; the DSL type is `scrape`.)
+- `disk` is the type name, not `archil`, `volume`, `fs`, or `filesystem`. (Archil backs it; the DSL type is `disk`.)
+- `agent` is the type name, not `llm-agent`, `assistant`, or `react`. (`ai` is a one-shot LLM call; `agent` is an agentic harness with tools.)
 - `http` is the type name, not `api`, `request`, or `fetch`.
 - `wait` is the type name, not `delay` or `sleep`.
 - `ai` is the type name, not `llm`, `chat`, or `prompt`.
 - `graph` is the type name for subgraphs, not `subgraph`, `call`, or `child`.
 - `postgres` is the type name, not `db`, `database`, or `sql`.
 - `bucket` is the type name, not `storage`, `file`, or `s3`.
-- `parallel` is the type name, not `map`, `loop`, `fanout`, or `workers`.
+- `parallel` is the type name, not `fanout` or `workers`. Use `map` for per-item iteration.
+- `map` is the type name, not `for`, `each`, or `foreach`.
+- `while` is the type name, not `until`, `loop`, or `repeat`.
+- There is no `document` node type. Document workflows compose `bucket` (storage), `disk` (mounted exec), and `ai` / `code` nodes.
 
 #### Complete config value types
 
@@ -74,7 +91,7 @@ These are the only value forms that can appear after a `:` in a field assignment
 - String literal: `"value"`
 - Number: `42`, `3.14`
 - Boolean: `true`, `false`
-- Bare identifier: `my_name` (parsed as a string)
+- Bare identifier: `my_name` (parsed as a string; used to reference top-level blocks like `graph: helper_graph`, `stream: my_stream`, `schema: my_schema`)
 - Object literal: `{ key: value, key2: value2 }` (comma-separated)
 - Array literal: `[item1, item2]` (comma-separated)
 - TypeScript block: `@ts { ... }`
@@ -119,11 +136,58 @@ oauth, api_key, basic, bearer, cloud
 
 No other types exist. `jwt`, `mtls`, `session`, `cookie`, `saml`, `digest`, `ntlm` are not valid.
 
+#### Form visibility keyword
+
+`form <name> { }` accepts the special bare keyword `visibility` (no colon) with one of two values:
+
+```
+visibility public
+visibility internal
+```
+
+Default is `internal` when omitted. `public` exposes the form via the Triggers service at `/triggers/forms/:projectId/:formName`. `internal` returns 404 from Triggers (the dashboard can still read/edit the form). Quoted values like `visibility "public"` are a parser error. See `resource-form`.
+
+#### Webhook authentication fields
+
+`webhook <name> { }` accepts two paired fields for shared-secret verification:
+
+```
+secret: <secretBlockName>.<VAR>
+header: "Header-Name"
+```
+
+`secret:` uses dot notation between the secret block name and the variable name (no quotes). `header:` is a quoted string naming the inbound HTTP header. Both must be set together (or neither). Setting only one is a validator error. Setting neither emits a warning that the webhook accepts unverified requests. Reserved headers (e.g. `Cookie`, `Host`, `Content-Type`, `User-Agent`, `X-Forwarded-*`) are rejected. See `resource-webhook`.
+
+#### Inline `subgraph { }` block (map / while only)
+
+`map` and `while` nodes accept an inline `subgraph { ... }` block instead of a `graph: <name>` reference. The keyword takes **no colon**:
+
+```swirls
+node each_item {
+  type: map
+  items: @ts { return [{ x: 1 }] }
+  maxItems: 10
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: @json { ... }
+      code: @ts { return context.iteration.item.x + 1 }
+    }
+    flow { root -> next_node }
+  }
+}
+```
+
+`subgraph { }` body has the same shape as `graph { }` body (`root { }`, `node { }`, `flow { }`) but cannot have its own `label:` or `description:`. The subgraph root MUST declare `inputSchema` for typed iteration. A node uses **exactly one** of `subgraph { }` or `graph: <name>` — never both, never neither.
+
 #### Constructs that DO NOT exist
 
 The following constructs do not exist in the Swirls DSL. Do not use them.
 
-**No control flow at DSL level:** `if`, `else`, `while`, `for`, `do`, `switch` (as a keyword), `case`, `default`, `break`, `continue`, `return`, `match`.
+**No control flow at DSL level:** `if`, `else`, `do`, `switch` (as a keyword), `case`, `default`, `break`, `continue`, `return`, `match`. (`while` and `map` are node types, not control flow keywords.)
+
+**No `for` keyword.** Iteration is done via the `map` node (per-item) or `while` node (counter / condition).
 
 **No variables:** `const`, `let`, `var`, `declare`, `=` assignment, top-level constants.
 
@@ -145,15 +209,21 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `outputSchema` on non-root nodes.** Use `schema` instead. The parser rejects `outputSchema` on non-root nodes with: `Use "schema" instead of "outputSchema" in node blocks`.
 
-**No `inputSchema` on non-root nodes.** Only the root node accepts `inputSchema`. The parser emits: `inputSchema is only allowed in root { } blocks` and drops the entire node.
+**No `inputSchema` on non-root nodes (except a `subgraph { }` root).** Only the outer-graph root and a map/while subgraph root accept `inputSchema`. The parser emits: `inputSchema is only allowed in root { } blocks` and drops the entire node.
 
 **No conditional routing at the edge level.** Conditional routing requires a `switch` node with `cases` and `router`, plus labeled edges in the flow block.
 
 **No chaining of edges on one line.** `root -> a -> b` is invalid. Each edge is one line: `root -> a` then `a -> b`.
 
-**No `email` node type.** The correct type name is `resend`.
+**No `resend` node type.** The correct type name is `email`. (Resend is the underlying vendor; the DSL type name is `email`.)
 
-**No `scrape` node type.** The correct type name is `firecrawl`.
+**No `firecrawl` node type.** The correct type name is `scrape`. (Firecrawl is the underlying vendor; the DSL type name is `scrape`.)
+
+**No `document` node type.** There is no built-in document node. For document workflows use `bucket` (object storage), `disk` (mounted bash exec on Archil), `ai` (LLM extraction), and `code` (transforms) together.
+
+**No `archil`, `volume`, or `fs` node type.** The correct type name is `disk`. Archil is the vendor backing the remote disk.
+
+**No `llm-agent`, `assistant`, or `react` node type.** The correct type name is `agent`. `agent` binds to a top-level `agent <name> { }` block.
 
 **No `api`, `request`, or `fetch` node type.** The correct type name is `http`.
 
@@ -161,7 +231,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `llm`, `prompt`, or `chat` node type.** The correct type name is `ai`.
 
-**No `subgraph`, `child`, or `call` node type.** The correct type name is `graph`.
+**No `subgraph`, `child`, or `call` node type.** The correct type name is `graph`. (`subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
 
 **No `db`, `database`, or `sql` node type for external databases.** The correct type name is `postgres`.
 
@@ -169,7 +239,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `template` or `render` node type.** Generate text in `code` or `ai` nodes.
 
-**No `loop`, `retry`, or `map` node type.** The graph is a DAG. No cycles, no retries, no fork/join primitives. Parallel fan-out to multiple URLs / search queries uses the `parallel` node type (only for its specific operations: search, extract, findall).
+**No `loop`, `retry`, `for`, or generic `iter` node type.** Use `map` (per-item iteration) or `while` (counter / condition). The graph itself is a DAG and cannot have cycles.
 
 **No `webhook` or `form` or `schedule` as node types.** These are top-level resource declarations only. Nodes receive data through triggers via `context.nodes.root.input`.
 
@@ -177,7 +247,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 #### Valid fields per node type
 
-Only these fields have semantics for each node type. All types additionally accept `type`, `label`, `description`, `secrets`, `review`. Root nodes additionally accept `inputSchema` and `outputSchema`. Non-root nodes accept `schema` (not `outputSchema`).
+Only these fields have semantics for each node type. All types additionally accept `type`, `label`, `description`, `secrets`, `review`, `failurePolicy`. Root nodes additionally accept `inputSchema` and `outputSchema`. Non-root nodes accept `schema` (not `outputSchema`).
 
 **ai** — required: `kind`. Valid kinds: `text`, `object`, `image`, `video`, `embed`. Other fields: `model`, `prompt` (@ts), `temperature`, `maxTokens`, `options` (object; for image: `n`, `size`, `aspectRatio`), `schema` (required for `kind: object`; warning if set on `kind: text`).
 
@@ -187,25 +257,31 @@ Only these fields have semantics for each node type. All types additionally acce
 
 **http** — required: `url` (@ts or string). Other fields: `method` (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`), `headers` (@ts returning object), `body` (@ts), `auth` (bare identifier referencing an auth block; `auth` is only valid on http nodes).
 
-**firecrawl** — required: `url`. Other fields: `onlyMainContent`, `formats` (array), `maxAge`, `parsers` (array). No user `schema:` — vendor-managed output shape.
+**scrape** — required: `url`. Other fields: `onlyMainContent`, `formats` (array), `maxAge`, `parsers` (array). No user `schema:` — vendor-managed output shape. Backed by Firecrawl (`FIRECRAWL_API_KEY`).
 
-**resend** — required: `from`, `to`, `subject` (all @ts or string). Other fields: `text`, `html`, `replyTo`. No user `schema:` — vendor-managed output.
+**email** — required: `from`, `to`, `subject` (all @ts or string). Other fields: `text`, `html`, `replyTo`. No user `schema:` — vendor-managed output. Backed by Resend (`RESEND_API_KEY`).
 
 **parallel** — required: `operation` (`search`, `extract`, or `findall`), `objective`.
-- `operation: search` also requires `searchQueries` (@ts returning string[]). Optional: `mode`, `excerptsMaxCharsPerResult`, `excerptsMaxCharsTotal`.
+- `operation: search` also requires `searchQueries` (@ts returning string[]). Optional: `mode` (`one-shot` | `agentic` | `fast`), `excerptsMaxCharsPerResult`, `excerptsMaxCharsTotal`.
 - `operation: extract` also requires `urls` (@ts returning string[]). Optional: `excerpts`, `fullContent`.
-- `operation: findall` also requires `entityType`, `generator` (`base`/`core`/`pro`/`preview`), `matchConditions` (@ts), `matchLimit` (number). Optional: `excludeList`, `pollInterval`, `pollIntervalUnit` (`seconds`/`minutes`), `pollTimeout`, `pollTimeoutUnit`.
+- `operation: findall` also requires `entityType`, `generator` (`base`/`core`/`pro`/`preview`), `matchConditions` (@ts), `matchLimit` (number; API requires 5–1000). Optional: `excludeList`, `pollInterval`, `pollIntervalUnit` (`seconds`/`minutes`), `pollTimeout`, `pollTimeoutUnit`.
 No user `schema:` — vendor-managed output shape.
 
 **stream** (node, read side) — required: `stream` (bare identifier naming a top-level `stream <name> { }` block), `filter` (@ts returning a `StreamFilter` object of shape `{ field: { op: value } }` where op is `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`). `streamId`, `query`, `querySql` are removed; using them produces validator errors.
 
 **graph** — required: `graph` (bare identifier naming a graph in the same file), `input` (@ts returning the input object to pass to the subgraph).
 
+**map** — required: `items` (@ts returning array), `maxItems` (positive number), plus exactly one of `subgraph { ... }` (inline block, no colon) or `graph: <name>` (reference to a top-level graph). Optional: `concurrency` (positive integer). The subgraph/referenced-graph root must declare `inputSchema` (typed iteration). Iteration context: `context.iteration.item` is the current element. See `node-map` and `graph-subgraph`.
+
+**while** — required: `input` (@ts returning the initial loop state), `condition` (@ts returning boolean; loop continues while true), `update` (@ts returning the next iteration's input), `maxIterations` (positive integer), plus exactly one of `subgraph { ... }` or `graph: <name>`. The subgraph/referenced-graph root must declare `inputSchema`. Iteration context: `context.iteration.input` (initial), `context.iteration.index` (counter), `context.iteration.previous` (last iteration's leaf outputs). See `node-while`.
+
 **wait** — no required fields. Optional: `amount` (number), `unit` (`seconds`/`minutes`/`hours`/`days`), `secondsFromConfig`.
 
 **bucket** — required: `operation` (`download` or `upload`). Optional: `path`.
 
-**document** — no required fields. Optional: `documentId` (UUID string).
+**disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). No user `schema:`. See `node-disk` and `resource-disk`.
+
+**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `role` (bare identifier naming a role inside the agent block), `tools` (array of bare identifiers naming graphs to expose as LLM-callable tools), `system` (@ts; per-call system-prompt override). See `node-agent` and `resource-agent`.
 
 **postgres** (node) — required: `postgres` (bare identifier naming a top-level `postgres <name> { }` block) and exactly one of `select:` (@sql SELECT or WITH) or `insert:` (@sql INSERT, optionally with ON CONFLICT). Other fields: `params` (@ts returning an object whose keys match `{{key}}` placeholders in the SQL; required when SQL has placeholders, always required for `insert:`), `condition` (@ts returning boolean; only valid on `insert:` nodes), `schema` (recommended for `select:` to type the row output).
 
@@ -216,6 +292,16 @@ No user `schema:` — vendor-managed output shape.
 - `secrets` — object literal: `{ blockName: [VAR1, VAR2], otherBlock: [VAR3] }`. The block name must be a declared top-level `secret` block and each var must appear in that block's `vars` list. Accessed at runtime as `context.secrets.blockName.VAR1`.
 - `review` — either `review: true` or `review: { enabled, title, description, content, schema, actions, approvedOutput, rejectedOutput }`. See `review-config`.
 - `failurePolicy` (optional) — `{ strategy: "fail" | "retry" | "skip" | "fallback", maxRetries, backoffMs, fallbackValue }`.
+
+#### Schema reference syntax (bare identifier)
+
+`inputSchema:`, `outputSchema:`, `schema:` (on form/webhook/node), and `review: { schema: ... }` accept either:
+
+- An inline `@json { ... }` block.
+- An object literal: `{ "type": "object", ... }`.
+- A bare identifier naming a top-level `schema <name> { }` block: `inputSchema: contact_payload`.
+
+The bare-identifier form requires a matching `schema <name> { }` declaration somewhere in the workspace. See `resource-schema`.
 
 ---
 
@@ -247,24 +333,26 @@ node process {
 
 All executable code must be inside `@ts { }` blocks.
 
-#### 2. Using `type: email` instead of `type: resend`
+#### 2. Using `type: resend` instead of `type: email`
 
 **Incorrect:**
 
 ```swirls
 node notify {
-  type: email
+  type: resend
   from: @ts { return "noreply@example.com" }
   to: @ts { return "user@example.com" }
   subject: @ts { return "Hello" }
 }
 ```
 
+`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`.
+
 **Correct:**
 
 ```swirls
 node notify {
-  type: resend
+  type: email
   label: "Send notification"
   from: @ts { return "noreply@example.com" }
   to: @ts { return "user@example.com" }
@@ -272,22 +360,24 @@ node notify {
 }
 ```
 
-#### 3. Using `type: scrape` instead of `type: firecrawl`
+#### 3. Using `type: firecrawl` instead of `type: scrape`
 
 **Incorrect:**
 
 ```swirls
 node fetch_page {
-  type: scrape
+  type: firecrawl
   url: @ts { return "https://example.com" }
 }
 ```
+
+`firecrawl` is not a valid node type. Firecrawl is the underlying vendor; the DSL type name is `scrape`.
 
 **Correct:**
 
 ```swirls
 node fetch_page {
-  type: firecrawl
+  type: scrape
   label: "Fetch page"
   url: @ts { return "https://example.com" }
 }
@@ -475,7 +565,7 @@ node call_api {
 }
 ```
 
-Code nodes are sandboxed. No `fetch`, `import`, `require`, `fs`, or `process.env`. Use `http` nodes for API calls, `ai` nodes for LLM calls, `resend` nodes for email, `firecrawl` for scraping, `parallel` for multi-query research.
+Code nodes are sandboxed. No `fetch`, `import`, `require`, `fs`, or `process.env`. Use `http` nodes for API calls, `ai` nodes for LLM calls, `email` nodes for email, `scrape` for web scraping, `parallel` for multi-query research, `agent` for agentic loops with tools, `disk` for filesystem exec.
 
 #### 10. Using `process.env` instead of `context.secrets`
 
@@ -516,13 +606,13 @@ The `secrets:` field on a node is an **object literal**, not an array. It maps s
 
 ```swirls
 node transform {
-  type: map
+  type: each
   items: @ts { return context.nodes.root.output.list }
   fn: @ts { return (item) => item.name }
 }
 ```
 
-**Correct:**
+**Correct (transform stays in a code node):**
 
 ```swirls
 node transform {
@@ -534,7 +624,26 @@ node transform {
 }
 ```
 
-There are exactly 13 node types: `ai`, `bucket`, `code`, `document`, `firecrawl`, `graph`, `http`, `parallel`, `postgres`, `resend`, `stream`, `switch`, `wait`. Data transformation belongs in `code` nodes.
+**Correct (per-item iteration with subgraph uses `type: map`):**
+
+```swirls
+node per_item {
+  type: map
+  label: "Process each"
+  items: @ts { return context.nodes.root.output.list }
+  maxItems: 100
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: @json { { "type": "object", "properties": { "name": { "type": "string" } } } }
+      code: @ts { return { name: context.iteration.item.name.toUpperCase() } }
+    }
+  }
+}
+```
+
+There are exactly 16 node types: `ai`, `agent`, `bucket`, `code`, `disk`, `email`, `graph`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`. Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
 
 #### 12. Missing label on graph or node
 
@@ -852,16 +961,295 @@ form contact_form {
 }
 ```
 
-Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, graphs, streams, triggers, secrets, auths, postgres blocks, nodes, secret vars, switch cases, and review action ids.
+Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, graphs, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids.
 
----
+#### 24. Setting `visibility` like a key:value pair on a form
+
+**Incorrect:**
+
+```swirls
+form contact {
+  label: "Contact"
+  visibility: "public"
+}
+```
+
+The parser errors: `Expected \`public\` or \`internal\` after \`visibility\``. `visibility` is a bare keyword, not a key:value pair — there is no colon and the value is an unquoted identifier (`public` or `internal`).
+
+**Correct:**
+
+```swirls
+form contact {
+  label: "Contact"
+  visibility public
+}
+```
+
+Default is `internal` when omitted. `public` exposes the form via Triggers; `internal` returns 404. See `resource-form`.
+
+#### 25. Webhook with no auth (silently accepts any request)
+
+**Sub-optimal (warning):**
+
+```swirls
+webhook inbound {
+  label: "Inbound"
+}
+```
+
+The validator warns: `Webhook "inbound" has no "secret" or "header" set and will accept any POST without verification.`
+
+**Incorrect (only one of the pair set):**
+
+```swirls
+webhook inbound {
+  label: "Inbound"
+  secret: my_creds.SHARED
+}
+```
+
+The validator errors: `Webhook "inbound" has "secret" but is missing "header".` Both fields must be set together.
+
+**Correct:**
+
+```swirls
+secret my_creds {
+  vars: [SHARED_SECRET]
+}
+
+webhook inbound {
+  label: "Inbound"
+  secret: my_creds.SHARED_SECRET
+  header: "X-Webhook-Signature"
+}
+```
+
+`secret:` uses dot notation (no quotes). `header:` is a quoted custom header name. Reserved headers (`Cookie`, `Host`, `Content-Type`, `User-Agent`, `X-Forwarded-*`, etc.) are rejected. See `resource-webhook`.
+
+#### 26. Using `subgraph:` with a colon
+
+**Incorrect:**
+
+```swirls
+node each_item {
+  type: map
+  items: @ts { return [{ x: 1 }] }
+  maxItems: 10
+
+  subgraph: {
+    root { type: code code: @ts { return {} } }
+  }
+}
+```
+
+`subgraph` is a bare block, not a key:value pair. There is no colon.
+
+**Correct:**
+
+```swirls
+node each_item {
+  type: map
+  items: @ts { return [{ x: 1 }] }
+  maxItems: 10
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: @json { { "type": "object", "properties": { "x": { "type": "number" } } } }
+      code: @ts { return { doubled: context.iteration.item.x * 2 } }
+    }
+  }
+}
+```
+
+See `graph-subgraph`.
+
+#### 27. Map / while node with both `subgraph { }` and `graph:`
+
+**Incorrect:**
+
+```swirls
+node each_item {
+  type: map
+  items: @ts { return [] }
+  maxItems: 10
+  graph: helper_graph
+  subgraph {
+    root { type: code code: @ts { return {} } }
+  }
+}
+```
+
+The validator errors: `map node requires exactly one of subgraph { } or graph: <name>`. Pick one. Use `graph: <name>` to call an existing top-level graph; use `subgraph { }` to inline the iteration body.
+
+#### 28. Map / while subgraph root without `inputSchema`
+
+**Incorrect:**
+
+```swirls
+node each_item {
+  type: map
+  items: @ts { return [{ x: 1 }] }
+  maxItems: 10
+
+  subgraph {
+    root {
+      type: code
+      code: @ts { return context.iteration.item }
+    }
+  }
+}
+```
+
+The validator errors: `map/while subgraph root must declare inputSchema for typed iteration`. The subgraph root needs `inputSchema` (inline @json, object literal, or bare schema name) so the iteration item is typed.
+
+**Correct:**
+
+```swirls
+schema item_shape {
+  label: "Item"
+  schema: @json {
+    { "type": "object", "required": ["x"], "properties": { "x": { "type": "number" } } }
+  }
+}
+
+node each_item {
+  type: map
+  items: @ts { return [{ x: 1 }] }
+  maxItems: 10
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: item_shape
+      code: @ts { return { doubled: context.iteration.item.x * 2 } }
+    }
+  }
+}
+```
+
+#### 29. Forgetting `maxItems` / `maxIterations`
+
+**Incorrect (map without `maxItems`):**
+
+```swirls
+node per_item {
+  type: map
+  items: @ts { return [] }
+  subgraph { root { type: code code: @ts { return {} } } }
+}
+```
+
+The validator errors: `map node requires maxItems as a positive number` and `Node type "map" requires "maxItems"`. `maxItems` is mandatory and bounds the iteration.
+
+**Incorrect (while without `maxIterations`):**
+
+```swirls
+node refine {
+  type: while
+  input: @ts { return { count: 0 } }
+  condition: @ts { return context.iteration.input.count < 10 }
+  update: @ts { return { count: context.iteration.input.count + 1 } }
+  subgraph { root { type: code code: @ts { return {} } } }
+}
+```
+
+Errors: `while node requires maxIterations as a positive integer` and `Node type "while" requires "maxIterations"`. `maxIterations` is the safety cap that prevents runaway loops.
+
+#### 30. Setting `schema:` on a vendor-managed node type
+
+**Incorrect:**
+
+```swirls
+node send_email {
+  type: email
+  from: @ts { return "from@example.com" }
+  to: @ts { return "to@example.com" }
+  subject: @ts { return "Hello" }
+  schema: @json { { "type": "object" } }
+}
+```
+
+The validator errors: `"email" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` This applies to `scrape`, `parallel`, and `email` — their output shape is fixed by the vendor.
+
+#### 31. Using `kind: text` with a `schema:` on an AI node
+
+**Sub-optimal (warning):**
+
+```swirls
+node summarize {
+  type: ai
+  kind: text
+  prompt: @ts { return "Summarize: " + context.nodes.root.output.text }
+  schema: @json {
+    { "type": "object", "properties": { "summary": { "type": "string" } } }
+  }
+}
+```
+
+The validator warns: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` Either remove the schema (string output) or change to `kind: object` (structured JSON output).
+
+#### 32. Ignoring a top-level `schema` block by inlining the same JSON repeatedly
+
+**Sub-optimal (duplication):**
+
+```swirls
+form contact {
+  label: "Contact"
+  schema: @json {
+    { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+  }
+}
+
+graph handle {
+  label: "Handle"
+  root {
+    type: code
+    inputSchema: @json {
+      { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+    }
+    outputSchema: @json {
+      { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+    }
+    code: @ts { return context.nodes.root.input }
+  }
+}
+```
+
+**Correct (factor out a top-level schema and reference it by name):**
+
+```swirls
+schema contact_payload {
+  label: "Contact payload"
+  schema: @json {
+    { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+  }
+}
+
+form contact {
+  label: "Contact"
+  schema: contact_payload
+}
+
+graph handle {
+  label: "Handle"
+  root {
+    type: code
+    inputSchema: contact_payload
+    outputSchema: contact_payload
+    code: @ts { return context.nodes.root.input }
+  }
+}
+```
+
+The bare identifier (`contact_payload`) references the top-level `schema` block. See `resource-schema`.
 
 
 # 2. File Structure
 
 ### Top-Level Declarations
 
-A `.swirls` file contains nine kinds of top-level declarations, in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains twelve kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -873,22 +1261,32 @@ export graph my_graph {
 }
 ```
 
-The parser errors: `Unexpected token: expected form, webhook, schedule, graph, stream, trigger, secret, auth, or postgres`.
+The parser errors: `Unexpected token: expected schema, form, webhook, schedule, graph, stream, trigger, secret, auth, postgres, disk, or agent`.
 
 **Correct (all top-level declarations demonstrated):**
 
 ```swirls
 version: 1
 
+schema contact_payload {
+  label: "Contact payload"
+  schema: @json {
+    { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+  }
+}
+
 form contact {
   label: "Contact"
   enabled: true
-  schema: @json { { "type": "object", "properties": { "email": { "type": "string" } } } }
+  visibility public
+  schema: contact_payload
 }
 
 webhook inbound {
   label: "Inbound"
   enabled: true
+  secret: api_creds.SHARED_SECRET
+  header: "X-Webhook-Signature"
 }
 
 schedule daily {
@@ -901,6 +1299,7 @@ graph process {
   root {
     type: code
     label: "Entry"
+    inputSchema: contact_payload
     code: @ts { return {} }
   }
 }
@@ -913,7 +1312,7 @@ stream process_log {
 }
 
 secret api_creds {
-  vars: [API_KEY]
+  vars: [API_KEY, SHARED_SECRET]
 }
 
 auth my_auth {
@@ -938,8 +1337,9 @@ trigger on_contact {
 }
 ```
 
-#### The nine valid top-level blocks
+#### The twelve valid top-level blocks
 
+- `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
 - `webhook <name> { }` — HTTP endpoints for external payloads. See `resource-webhook`.
 - `schedule <name> { }` — Cron-based triggers. See `resource-schedule`.
@@ -949,6 +1349,8 @@ trigger on_contact {
 - `secret <name> { }` — Named groups of secret var identifiers. See `resource-secrets`.
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.
 - `postgres <name> { }` — External PostgreSQL connection and table schemas. See `resource-postgres`.
+- `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
+- `agent <name> { }` — LLM agent definition (provider, model, tools, roles); `type: agent` nodes bind to it. See `resource-agent`.
 
 #### Version line
 
@@ -1044,8 +1446,6 @@ root {
 ```
 
 Use only ASCII characters in comments: letters, digits, spaces, hyphens, underscores, periods, parentheses, and standard punctuation. Avoid box-drawing characters, arrows, em dashes, and other Unicode.
-
----
 
 
 # 3. Graph & Node Basics
@@ -1368,6 +1768,167 @@ Validation rules:
 
 ---
 
+### Inline `subgraph { }` Block
+
+`map` and `while` nodes can either reference a top-level graph by name (`graph: <name>`) or define the iteration body inline as a `subgraph { ... }` block. The inline form is keyword-only — **no colon, no quotes, no value**.
+
+#### Syntax
+
+```swirls
+node <name> {
+  type: map        // or while
+  // ... other map/while fields ...
+
+  subgraph {
+    root { ... }
+    node child1 { ... }
+    node child2 { ... }
+    flow {
+      root -> child1
+      child1 -> child2
+    }
+  }
+}
+```
+
+#### Body shape
+
+`subgraph { }` accepts the same inner body as `graph { }`:
+
+- Exactly one `root { }` block (entry node).
+- Zero or more `node <name> { }` blocks.
+- Optional `flow { }` block with edges.
+
+But it does **NOT** accept its own `label:` or `description:` at the top level. Both are parser errors:
+
+```
+label is not valid inside subgraph { }
+description is not valid inside subgraph { }
+```
+
+The subgraph runs in the parent graph's namespace; it does not have a separate name or display label.
+
+#### Required: `inputSchema` on the root
+
+The subgraph root **must** declare `inputSchema`. This is required so the iteration item (for `map`) or per-iteration input (for `while`) is typed. The validator emits:
+
+```
+map/while subgraph root must declare inputSchema for typed iteration
+```
+
+`inputSchema` accepts inline `@json { }`, an inline object literal, or a bare top-level schema name.
+
+#### Example (map): multi-node subgraph
+
+```swirls
+node per_ticket {
+  type: map
+  items: @ts { return context.nodes.root.output.tickets }
+  maxItems: 100
+  concurrency: 2
+
+  subgraph {
+    root {
+      type: code
+      label: "Normalize"
+      inputSchema: support_ticket_item
+      code: @ts {
+        const item = context.iteration.item
+        return { id: item.id, body: item.body.trim() }
+      }
+    }
+
+    node triage {
+      type: code
+      schema: @json { ... }
+      code: @ts { return { priority: 1 } }
+    }
+
+    node handoff {
+      type: code
+      schema: @json { ... }
+      code: @ts {
+        return {
+          ticketId: context.nodes.root.output.id,
+          priority: context.nodes.triage.output.priority,
+        }
+      }
+    }
+
+    flow {
+      root -> triage
+      triage -> handoff
+    }
+  }
+}
+```
+
+#### Example (while): two-node subgraph
+
+```swirls
+node refine_digest {
+  type: while
+  input: @ts { return { draft: context.nodes.merge.output.draft } }
+  condition: @ts { return context.iteration.index < 3 }
+  update: @ts {
+    return { draft: context.iteration.previous?.polish?.text ?? context.iteration.input.draft }
+  }
+  maxIterations: 5
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: digest_draft
+      code: @ts { return { blob: context.iteration.input.draft } }
+    }
+
+    node polish {
+      type: code
+      schema: @json { ... }
+      code: @ts { return { text: context.nodes.root.output.blob.trim() } }
+    }
+
+    flow { root -> polish }
+  }
+}
+```
+
+#### Inline subgraph vs. referenced graph
+
+Pick one based on reuse:
+
+- **Inline `subgraph { }`** — The iteration body is single-purpose and lives next to the loop. Easier to read top-to-bottom.
+- **`graph: <name>`** — The same body is used elsewhere too, or the body is large enough to want its own file/section. The referenced graph's root must still declare `inputSchema`.
+
+The validator rejects both-set and neither-set:
+
+```
+map node requires exactly one of subgraph { } or graph: <name>
+while node requires exactly one of subgraph { } or graph: <name>
+```
+
+#### DAG rules apply
+
+The subgraph is a DAG: exactly one root (the `root { }` block), no cycles, every edge target must be a declared node. The validator runs `dagValidation` on it just like any top-level graph.
+
+#### Edges live in `flow { }`
+
+Edges inside a subgraph go in a `flow { }` block, same as a top-level graph:
+
+```swirls
+subgraph {
+  root { ... }
+  node next { ... }
+  flow { root -> next }   // OK
+}
+```
+
+`root -> next` outside `flow { }` is a parser error: `Edge declarations must be inside a flow { } block`.
+
+#### Iteration context
+
+The subgraph (or referenced graph) sees `context.iteration.*` instead of just `context.nodes.root.input`. See `context-iteration`.
+
 
 # 4. Node Types
 
@@ -1428,7 +1989,7 @@ node normalize {
 }
 ```
 
-If you need network access, use an `http` node. If you need AI, use an `ai` node. If you need to send email, use a `resend` node. Break your graph into multiple nodes with the right types.
+If you need network access, use an `http` node. If you need AI, use an `ai` node. If you need to send email, use an `email` node. If you need to scrape a page, use a `scrape` node. If you need filesystem exec, use a `disk` node. Break your graph into multiple nodes with the right types.
 
 Code node fields:
 | Field | Required | Type |
@@ -1532,6 +2093,8 @@ node embed {
 
 AI kinds: `text`, `object`, `image`, `video`, `embed`
 
+**Validator warning** when `kind: text` and `schema:` are both set: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` Either drop the schema or change `kind` to `object`.
+
 AI node fields:
 | Field | Required | Type |
 |-------|----------|------|
@@ -1544,6 +2107,89 @@ AI node fields:
 | `options` | no | Object (kind-specific, e.g. n, size) |
 
 AI nodes infer `OPENROUTER_API_KEY` as a secret. You do not need to declare it.
+
+---
+
+### Agent Nodes
+
+Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, and the graphs exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, or overrides `system`.
+
+For a one-shot LLM call (no tools, no loop), use `ai` instead. `agent` is for multi-step harnesses with tool use.
+
+**Required fields:** `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (`@ts`).
+
+#### Incorrect (missing required fields)
+
+```swirls
+node ask {
+  type: agent
+  prompt: @ts { return "Hi" }
+}
+```
+
+The validator errors: `Node type "agent" requires "agent"`. The node must reference a declared `agent` block by name.
+
+#### Correct (minimal agent node)
+
+```swirls
+secret ai_creds {
+  vars: [OPENAI_API_KEY]
+}
+
+agent triage {
+  provider: openai
+  model: "gpt-4o"
+  secrets: ai_creds
+  maxSteps: 5
+  tools: [search_kb, escalate]
+}
+
+graph handle {
+  label: "Handle inbound"
+  root {
+    type: agent
+    label: "Triage"
+    agent: triage
+    prompt: @ts {
+      return "Triage this ticket: " + context.nodes.root.input.body
+    }
+  }
+}
+```
+
+#### Correct (role and narrowed tools)
+
+```swirls
+node ask {
+  type: agent
+  label: "Ask with role"
+  agent: triage
+  role: support
+  tools: [search_kb]
+  system: @ts {
+    return "You are a senior support engineer. Be concise."
+  }
+  prompt: @ts {
+    return context.nodes.root.input.question
+  }
+}
+```
+
+`role:` must name a `role <name> { }` declared inside the bound `agent` block. `tools:` (on the node) further narrows the tools exposed to this specific call; it must be a subset of the agent block's `tools:`. `system:` overrides the agent's default system prompt for this call only.
+
+#### Fields
+
+| Field | Required | Type | Notes |
+|-------|----------|------|-------|
+| `agent` | yes | Bare identifier | Names a top-level `agent <name> { }` block. |
+| `prompt` | yes | `@ts` block | User prompt for this turn. |
+| `role` | no | Bare identifier | Names a `role` declared inside the bound agent block. |
+| `tools` | no | Array of bare identifiers | Subset of the agent block's tool graphs. |
+| `system` | no | `@ts` block | Overrides the agent block's default `system:` for this call. |
+
+Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
+
+See `resource-agent` for the agent block declaration.
 
 ---
 
@@ -1727,19 +2373,19 @@ HTTP node fields:
 
 ---
 
-### Resend (Email) Nodes
+### Email Nodes
 
-Email nodes send email via Resend. The type name is `resend`, not `email`. Every resend node requires `from`, `to`, and `subject`.
+Email nodes send transactional email. The DSL type name is `email`. Resend is the underlying vendor (`RESEND_API_KEY`). Every email node requires `from`, `to`, and `subject`.
 
 **Required fields:** `from`, `to`, `subject`.
 
-**Vendor-managed output:** Do not set `schema:` on a resend node. The validator errors: `"resend" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
+**Vendor-managed output:** Do not set `schema:` on an email node. The validator errors: `"email" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
 
 #### Incorrect (wrong type name)
 
 ```swirls
 node notify {
-  type: email
+  type: resend
   label: "Notify"
   from: @ts { return "noreply@example.com" }
   to: @ts { return "team@example.com" }
@@ -1747,13 +2393,13 @@ node notify {
 }
 ```
 
-`email` is not a valid node type. The validator errors: `Invalid node type "email". Must be one of: ai, bucket, code, document, firecrawl, graph, http, parallel, postgres, resend, stream, switch, wait`.
+`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`. The validator errors: `Invalid node type "resend". Must be one of: ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while`.
 
-#### Correct (complete resend node)
+#### Correct (complete email node)
 
 ```swirls
 node notify {
-  type: resend
+  type: email
   label: "Send notification"
   from: @ts { return "noreply@example.com" }
   to: @ts { return context.nodes.root.output.email }
@@ -1769,7 +2415,7 @@ node notify {
 
 ```swirls
 node welcome {
-  type: resend
+  type: email
   label: "Send HTML email"
   from: @ts { return "noreply@example.com" }
   to: @ts { return context.nodes.root.output.email }
@@ -1799,30 +2445,30 @@ node welcome {
 
 ---
 
-### Firecrawl (Scrape) Nodes
+### Scrape Nodes
 
-Firecrawl nodes fetch and extract content from web pages. The type name is `firecrawl`, not `scrape`.
+Scrape nodes fetch and extract content from web pages. The DSL type name is `scrape`. Firecrawl is the underlying vendor (`FIRECRAWL_API_KEY`).
 
 **Required fields:** `url`.
 
-**Vendor-managed output:** Do not set `schema:` on a firecrawl node. The validator errors: `"firecrawl" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
+**Vendor-managed output:** Do not set `schema:` on a scrape node. The validator errors: `"scrape" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
 
 #### Incorrect (wrong type name)
 
 ```swirls
 node fetch {
-  type: scrape
+  type: firecrawl
   url: @ts { return "https://example.com" }
 }
 ```
 
-`scrape` is not a valid node type. Use `firecrawl`.
+`firecrawl` is not a valid node type. Firecrawl is the underlying vendor; the DSL type name is `scrape`. Use `scrape`.
 
 #### Correct (basic scrape)
 
 ```swirls
 node scrape_page {
-  type: firecrawl
+  type: scrape
   label: "Scrape webpage"
   url: @ts { return context.nodes.root.input.url }
 }
@@ -1832,7 +2478,7 @@ node scrape_page {
 
 ```swirls
 node scrape_article {
-  type: firecrawl
+  type: scrape
   label: "Scrape article"
   url: @ts { return context.nodes.root.output.url }
   onlyMainContent: true
@@ -2208,8 +2854,273 @@ Subgraph output is accessed as `context.nodes.<graphNodeName>.output.<leafNodeNa
 Graph node fields:
 | Field | Required | Type |
 |-------|----------|------|
-| `graph` | yes | Graph name (must be defined in same file) |
+| `graph` | yes | Graph name (resolved across the workspace) |
 | `input` | yes | `@ts` block |
+
+#### Related: map / while inline subgraphs
+
+`type: graph` runs the child graph **once**. For per-item iteration over a list, use `type: map` (each item runs the child once). For repeated execution until a condition is false, use `type: while`. Both accept either `graph: <name>` (the same kind of reference shown above) or an inline `subgraph { ... }` block (no colon) — see `node-map`, `node-while`, and `graph-subgraph`.
+
+---
+
+### Map Nodes
+
+A `map` node iterates over an array and runs a child graph (inline `subgraph { }` or referenced `graph: <name>`) once per element. Output is an array of the child graph's leaf-node outputs in the same order as `items`.
+
+#### Required fields
+
+- `items` — `@ts` block returning an array. Each element becomes the iteration item.
+- `maxItems` — positive number. Hard cap; the validator rejects unbounded loops.
+- Exactly one of:
+  - `subgraph { ... }` — inline child graph (no colon). The inline form's root must declare `inputSchema`.
+  - `graph: <name>` — bare identifier referencing a top-level graph in the workspace. That graph's root must declare `inputSchema`.
+
+#### Optional fields
+
+- `concurrency` — positive integer. How many iterations run in parallel. Defaults to a runtime-chosen value when omitted.
+- `label`, `description`, `secrets`, `failurePolicy` — same as any other node.
+
+#### Inline subgraph (typical)
+
+```swirls
+node per_ticket {
+  type: map
+  label: "Process each ticket"
+  items: @ts { return context.nodes.root.output.tickets }
+  maxItems: 100
+  concurrency: 2
+
+  subgraph {
+    root {
+      type: code
+      label: "Normalize"
+      inputSchema: @json {
+        {
+          "type": "object",
+          "required": ["id", "body"],
+          "properties": {
+            "id":   { "type": "string" },
+            "body": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+      code: @ts {
+        const item = context.iteration.item
+        return { id: item.id, body: item.body.trim() }
+      }
+    }
+
+    node triage {
+      type: code
+      label: "Triage"
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["priority"],
+          "properties": { "priority": { "type": "number" } }
+        }
+      }
+      code: @ts {
+        const urgent = /urgent|outage/i.test(context.nodes.root.output.body)
+        return { priority: urgent ? 3 : 1 }
+      }
+    }
+
+    flow { root -> triage }
+  }
+}
+```
+
+#### Referenced graph
+
+```swirls
+graph normalize_ticket {
+  label: "Normalize ticket"
+  root {
+    type: code
+    inputSchema: @json {
+      { "type": "object", "required": ["id", "body"], "properties": { "id": { "type": "string" }, "body": { "type": "string" } } }
+    }
+    code: @ts {
+      const item = context.iteration.item
+      return { id: item.id, body: item.body.trim() }
+    }
+  }
+}
+
+node per_ticket {
+  type: map
+  label: "Process each"
+  items: @ts { return context.nodes.root.output.tickets }
+  maxItems: 100
+  graph: normalize_ticket
+}
+```
+
+#### `context.iteration.item`
+
+Inside the subgraph (or referenced graph), each iteration sees its element on `context.iteration.item`. The shape is whatever the subgraph root's `inputSchema` declares. See `context-iteration`.
+
+#### Output shape
+
+The map node's output is an array of objects keyed by leaf-node name in the child graph:
+
+```ts
+context.nodes.per_ticket.output[i].<leafName>
+```
+
+If the child has a single leaf called `triage`:
+
+```swirls
+node merge {
+  type: code
+  code: @ts {
+    const rows = context.nodes.per_ticket.output
+    return { count: rows.filter(r => r.triage?.priority >= 3).length }
+  }
+}
+```
+
+#### Validator errors
+
+- `Node type "map" requires "items"` — Add `items: @ts { return [...] }`.
+- `Node type "map" requires "maxItems"` — Add `maxItems: <number>`.
+- `map node requires maxItems as a positive number` — `maxItems` was missing or not positive.
+- `map node concurrency must be a positive integer when set` — `concurrency` was zero, negative, or non-integer.
+- `map node requires exactly one of subgraph { } or graph: <name>` — You set both, or neither.
+- `Node references graph "<n>" which is not defined` — `graph: <n>` does not match any graph in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — The inline root (or the referenced graph's root) is missing `inputSchema`.
+
+#### Common mistakes
+
+- **`subgraph: { ... }`** — `subgraph` is a bare block, not a key:value pair. No colon.
+- **Both `subgraph { }` and `graph: <name>`** — Pick one. The validator rejects both-set and neither-set.
+- **No `maxItems`** — Unbounded loops are rejected. Pick a real cap.
+- **Subgraph root has no `inputSchema`** — Required for typed iteration.
+- **Treating output as a flat list of leaf values** — Output is `[{ leafName: leafOutput }, ...]`, not `[leafOutput, ...]`. Index by leaf name.
+
+---
+
+### While Nodes
+
+A `while` node runs a child graph (inline `subgraph { }` or referenced `graph: <name>`) repeatedly until `condition` returns false or `maxIterations` is reached. Each iteration receives the previous iteration's output via `update`.
+
+#### Required fields
+
+- `input` — `@ts` block returning the initial loop state object passed into iteration 0.
+- `condition` — `@ts` block returning a boolean. Loop continues **while** this is true.
+- `update` — `@ts` block returning the next iteration's input. Has access to the previous iteration's output.
+- `maxIterations` — positive integer. Hard cap to prevent runaway loops.
+- Exactly one of:
+  - `subgraph { ... }` — inline child graph (no colon). The inline form's root must declare `inputSchema`.
+  - `graph: <name>` — bare identifier referencing a top-level graph in the workspace. That graph's root must declare `inputSchema`.
+
+#### Inline subgraph
+
+```swirls
+node refine_digest {
+  type: while
+  label: "Iteratively tighten digest"
+
+  input: @ts {
+    return { draft: context.nodes.merge_digest.output.draft }
+  }
+
+  condition: @ts {
+    return context.iteration.index < 2
+  }
+
+  update: @ts {
+    const nextDraft =
+      context.iteration.previous?.polish?.text ??
+      context.iteration.input.draft
+    return { draft: nextDraft }
+  }
+
+  maxIterations: 5
+
+  subgraph {
+    root {
+      type: code
+      label: "Expand"
+      inputSchema: @json {
+        { "type": "object", "required": ["draft"], "properties": { "draft": { "type": "string" } } }
+      }
+      code: @ts {
+        return { blob: `pass ${context.iteration.index}: ${context.iteration.input.draft}` }
+      }
+    }
+
+    node polish {
+      type: code
+      label: "Polish text"
+      schema: @json {
+        { "type": "object", "required": ["text"], "properties": { "text": { "type": "string" } } }
+      }
+      code: @ts {
+        return { text: context.nodes.root.output.blob.trim() }
+      }
+    }
+
+    flow { root -> polish }
+  }
+}
+```
+
+#### Iteration context
+
+Inside the subgraph:
+
+- `context.iteration.input` — the input object for **this** iteration (returned by `update` from the previous iteration, or by the outer `input` field on iteration 0).
+- `context.iteration.index` — zero-based iteration counter.
+- `context.iteration.previous` — the **previous** iteration's leaf outputs (`{ leafName: leafOutput }` shape). `undefined` on iteration 0.
+
+`update` runs **between** iterations and uses the same context to compute the next input. See `context-iteration`.
+
+#### Output shape
+
+The while node's output is an object with `lastOutput`, keyed by the child graph's leaf-node names:
+
+```ts
+context.nodes.refine_digest.output.lastOutput.<leafName>
+```
+
+For the example above:
+
+```swirls
+node done {
+  type: code
+  code: @ts {
+    return {
+      summary: context.nodes.refine_digest.output.lastOutput.polish?.text ?? ""
+    }
+  }
+}
+```
+
+#### Loop semantics
+
+1. **Iteration 0**: `input` runs; result becomes `context.iteration.input`. Subgraph runs.
+2. After each iteration: `update` runs; result becomes the next `context.iteration.input`. Then `condition` runs; if false, the loop stops.
+3. **maxIterations**: even if `condition` keeps returning true, the loop stops at this count. The last iteration's leaf outputs become `output.lastOutput`.
+4. If `condition` returns false on iteration 0 (after `input`), the loop runs zero times and `lastOutput` is undefined.
+
+#### Validator errors
+
+- `Node type "while" requires "input" / "condition" / "update" / "maxIterations"` — Required field missing.
+- `while node requires maxIterations as a positive integer` — Must be ≥ 1 and integer.
+- `while node requires exactly one of subgraph { } or graph: <name>` — Pick one.
+- `Node references graph "<n>" which is not defined` — `graph: <n>` is unknown in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` to the inline root or the referenced graph's root.
+
+#### Common mistakes
+
+- **Missing `update`** — Without `update`, the next iteration would receive the same input. The validator requires it.
+- **Returning the wrong shape from `update`** — `update` must return an object matching the subgraph root's `inputSchema`. Otherwise iteration N+1 fails to type-check.
+- **Forgetting `maxIterations`** — Required. Defends against logic errors that would loop forever.
+- **Using `context.iteration.previous` on iteration 0** — `previous` is `undefined` on the first iteration. Use `?.` or guard with `context.iteration.index > 0`.
+- **Treating `output.lastOutput` as a list** — While runs sequentially; output is the **single** last iteration's leaves, not an array.
 
 ---
 
@@ -2271,24 +3182,74 @@ node load_file {
 
 ---
 
-### Document Nodes
+### Disk Nodes
 
-Document nodes handle document processing tasks.
+Disk nodes execute bash commands on a remote disk mounted via a top-level `disk` block. Archil is the underlying vendor (`ARCHIL_API_KEY`). Every disk node binds to a `disk` block by bare identifier and runs one shell command.
 
-**Correct (basic document node):**
+**Required fields:** `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (string literal or `@ts` returning a shell command).
+
+#### Incorrect (missing required fields)
 
 ```swirls
-node process_doc {
-  type: document
-  label: "Process document"
-  documentId: "uuid-here"
+node run_ls {
+  type: disk
 }
 ```
 
-Document node fields:
-| Field | Required | Type |
-|-------|----------|------|
-| `documentId` | no | String (UUID) |
+The validator errors: `Node type "disk" requires "disk"` and `Node type "disk" requires "command"`.
+
+#### Correct (literal command)
+
+```swirls
+secret disk_creds {
+  vars: [ARCHIL_API_KEY]
+}
+
+disk proj {
+  label: "Project disk"
+  id: "dsk-0123456789abcdef"
+  region: "aws-us-east-1"
+  secrets: disk_creds
+}
+
+graph audit {
+  label: "Audit disk contents"
+  root {
+    type: disk
+    label: "List mount"
+    disk: proj
+    command: "ls -la /mnt/proj"
+  }
+}
+```
+
+#### Correct (dynamic command via @ts)
+
+```swirls
+node fetch_report {
+  type: disk
+  label: "Cat report"
+  disk: proj
+  command: @ts {
+    const id = context.nodes.root.output.reportId
+    return "cat /mnt/proj/reports/" + id + ".md"
+  }
+}
+```
+
+#### Fields
+
+| Field | Required | Type | Notes |
+|-------|----------|------|-------|
+| `disk` | yes | Bare identifier | Names a top-level `disk <name> { }` block. |
+| `command` | yes | String or `@ts` block | Single shell command to execute on the disk. |
+| `schema` | **not allowed** | Vendor-managed; omit entirely. |
+
+Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
+
+#### API key
+
+`ARCHIL_API_KEY` is resolved by the runtime via the referenced `disk` block's `secrets:` reference. See `resource-disk`.
 
 ---
 
@@ -2545,8 +3506,6 @@ node optional_step {
 - The policy lives alongside other config fields on a node; it is not a separate block.
 - Downstream nodes still see `context.nodes.<name>.output` for skipped/fallback cases; `skip` sets it to `undefined` (or absent), `fallback` sets it to `fallbackValue`.
 - `failurePolicy` is optional and can be omitted on any node.
-
----
 
 
 # 5. TypeScript Blocks
@@ -2927,8 +3886,6 @@ node call_api {
 
 Rule: a code block (`@ts`, `@json`, `@sql`) is always a leaf — it contains executable code, never other code blocks. If you need to build a structured value, write one `@ts` block that constructs and returns the whole object.
 
----
-
 
 # 6. Schema & Typing
 
@@ -2997,15 +3954,40 @@ The three schema keywords each have a specific placement. The parser enforces th
 
 | Keyword | Valid on | Purpose |
 |---------|----------|---------|
-| `inputSchema` | **root only** | Shape of the trigger payload. Drives `context.nodes.root.input` typing in the LSP. |
+| `inputSchema` | **root only** (and map/while subgraph root) | Shape of the incoming payload (trigger or iteration item). Drives `context.nodes.root.input` (or `context.iteration.item` / `context.iteration.input`) typing in the LSP. |
 | `outputSchema` | **root only** | Shape of what the root node returns. |
-| `schema` | **non-root nodes only** | Shape of what that node returns. Equivalent to outputSchema for non-root nodes. |
+| `schema` | **non-root nodes** (and form / webhook / postgres table / review / top-level `schema` block) | Shape of what that node returns. Equivalent to `outputSchema` for non-root nodes. |
 
 #### Strict parser rules
 
-- `inputSchema` on a non-root node → parser error: `inputSchema is only allowed in root { } blocks`. The entire node is dropped from the AST.
+- `inputSchema` on a non-root node → parser error: `inputSchema is only allowed in root { } blocks`. The entire node is dropped from the AST. (A map/while `subgraph { }` root counts as a root for this rule.)
 - `outputSchema` on a non-root node → parser error: `Use "schema" instead of "outputSchema" in node blocks`. The entire node is dropped from the AST.
 - `schema` on root is technically accepted but redundant — use `outputSchema` on root.
+
+#### Three forms of schema value
+
+Every schema field accepts three value forms:
+
+1. **Inline `@json { ... }` block:**
+   ```swirls
+   inputSchema: @json {
+     { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+   }
+   ```
+2. **Inline object literal** (no `@json` keyword):
+   ```swirls
+   inputSchema: {
+     "type": "object",
+     "required": ["email"],
+     "properties": { "email": { "type": "string" } }
+   }
+   ```
+3. **Bare identifier** referencing a top-level `schema <name> { }` block:
+   ```swirls
+   inputSchema: contact_payload
+   ```
+
+The bare-identifier form requires a matching `schema <name> { }` declaration in the workspace. See `resource-schema`.
 
 #### Incorrect (inputSchema on non-root)
 
@@ -3036,65 +4018,69 @@ Same outcome — the node is dropped.
 #### Correct (each kind in the right place)
 
 ```swirls
-root {
-  type: code
-  label: "Entry"
-  inputSchema: @json {
-    {
-      "type": "object",
-      "required": ["name", "email"],
-      "properties": {
-        "name":  { "type": "string" },
-        "email": { "type": "string" }
-      }
-    }
-  }
-  outputSchema: @json {
-    {
-      "type": "object",
-      "required": ["name", "email"],
-      "properties": {
-        "name":  { "type": "string" },
-        "email": { "type": "string" }
-      }
-    }
-  }
-  code: @ts {
-    const { name, email } = context.nodes.root.input
-    return { name: name.trim(), email: email.trim().toLowerCase() }
+schema contact_payload {
+  label: "Contact payload"
+  schema: @json {
+    { "type": "object", "required": ["name", "email"], "properties": { "name": { "type": "string" }, "email": { "type": "string" } } }
   }
 }
 
-node greet {
-  type: code
-  label: "Greet"
-  schema: @json {
-    {
-      "type": "object",
-      "required": ["greeting"],
-      "properties": { "greeting": { "type": "string" } }
+graph handle {
+  label: "Handle"
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: contact_payload
+    outputSchema: contact_payload
+    code: @ts {
+      const { name, email } = context.nodes.root.input
+      return { name: name.trim(), email: email.trim().toLowerCase() }
     }
   }
-  code: @ts {
-    return { greeting: "Hello, " + context.nodes.root.output.name + "!" }
+
+  node greet {
+    type: code
+    label: "Greet"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["greeting"],
+        "properties": { "greeting": { "type": "string" } }
+      }
+    }
+    code: @ts {
+      return { greeting: "Hello, " + context.nodes.root.output.name + "!" }
+    }
   }
+
+  flow { root -> greet }
 }
 ```
 
+#### Map / while subgraph root
+
+Inside a `subgraph { }` block on a `map` or `while` node, the root **must** declare `inputSchema`. The validator emits: `map/while subgraph root must declare inputSchema for typed iteration`. This types `context.iteration.item` (map) or `context.iteration.input` (while). See `graph-subgraph`.
+
 #### Best practice
 
-Define `outputSchema` on the root node and `schema` on every non-root node that produces data. This enables LSP autocomplete for all downstream `@ts` blocks. Without schemas, `context.nodes.<name>.output` is typed as `unknown` and the LSP cannot help.
+Define `outputSchema` (root) and `schema` (every non-root node that produces data) — or factor them into a top-level `schema <name> { }` block and reference by name. This enables LSP autocomplete for all downstream `@ts` blocks. Without schemas, `context.nodes.<name>.output` is typed as `unknown` and the LSP cannot help.
 
 #### Vendor-managed types
 
 Some node types have their output shape fixed by the vendor API. Do not set `schema:` on them — the validator errors: `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
 
 Vendor-managed types:
-- `firecrawl`
+- `scrape`
 - `parallel`
-- `resend`
+- `email`
+- `disk`
 
 These types provide their own runtime type shape; the LSP uses it automatically.
+
+#### AI text + schema warning
+
+`type: ai` with `kind: text` produces a plain string output. Setting `schema:` on it is a warning: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` Either drop the schema or change `kind` to `object` for structured JSON output.
 
 ---
 
@@ -3139,8 +4125,6 @@ inputSchema: {
 The inline syntax uses the DSL's own object format: keys are unquoted, commas are optional, and string values are double-quoted.
 
 Both produce the same AST. Use whichever style is more readable for your case. `@json` is more common and maps directly to JSON Schema documentation.
-
----
 
 
 # 7. Context Object
@@ -3225,6 +4209,144 @@ Pattern summary:
 
 ---
 
+### context.iteration - Map / While Iteration Data
+
+Inside a `map` or `while` node's child graph (inline `subgraph { }` or referenced `graph: <name>`), `context.iteration` carries the per-iteration state. The fields available depend on the node type.
+
+#### `map` nodes
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `context.iteration.item` | The current element from `items: @ts { return [...] }`. Typed by the subgraph root's `inputSchema`. | Available on every iteration. |
+| `context.iteration.index` | Number | Zero-based iteration counter. |
+
+`map` runs all iterations in parallel up to `concurrency`. Each iteration's `context.iteration.item` is independent.
+
+```swirls
+node per_ticket {
+  type: map
+  items: @ts { return context.nodes.root.output.tickets }
+  maxItems: 100
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: ticket_item_schema
+      code: @ts {
+        const item = context.iteration.item
+        return { id: item.id, body: item.body.trim() }
+      }
+    }
+  }
+}
+```
+
+#### `while` nodes
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `context.iteration.input` | object | The input for **this** iteration. Iteration 0 receives the value from the outer `input:` field; later iterations receive what `update:` returned. Typed by the subgraph root's `inputSchema`. |
+| `context.iteration.index` | Number | Zero-based iteration counter. |
+| `context.iteration.previous` | `{ leafName: leafOutput }` or `undefined` | The previous iteration's leaf-node outputs. `undefined` on iteration 0. |
+
+```swirls
+node refine_digest {
+  type: while
+  input: @ts { return { draft: context.nodes.merge.output.draft } }
+
+  condition: @ts {
+    return context.iteration.index < 3
+  }
+
+  update: @ts {
+    const nextDraft =
+      context.iteration.previous?.polish?.text ??
+      context.iteration.input.draft
+    return { draft: nextDraft }
+  }
+
+  maxIterations: 5
+
+  subgraph {
+    root {
+      type: code
+      inputSchema: digest_draft_schema
+      code: @ts {
+        return { blob: context.iteration.input.draft + " (pass " + context.iteration.index + ")" }
+      }
+    }
+
+    node polish {
+      type: code
+      schema: @json { ... }
+      code: @ts { return { text: context.nodes.root.output.blob.trim() } }
+    }
+
+    flow { root -> polish }
+  }
+}
+```
+
+#### Handling iteration 0 in `update`
+
+`update` runs **between** iterations and uses `context.iteration.previous` to compute the next input. On the very first call from iteration 0 to iteration 1, `previous` is the iteration-0 output. Use optional chaining or guard explicitly:
+
+```swirls
+update: @ts {
+  return {
+    draft: context.iteration.previous?.polish?.text ?? context.iteration.input.draft
+  }
+}
+```
+
+#### Reading map output downstream
+
+A map node's output is an array of leaf-keyed objects in the original `items` order:
+
+```ts
+context.nodes.<map_node>.output  // Array<{ <leafName>: <leafOutput> }>
+```
+
+```swirls
+node merge {
+  type: code
+  code: @ts {
+    const rows = context.nodes.per_ticket.output
+    const total = rows.length
+    const urgent = rows.filter(r => r.triage?.priority >= 3).length
+    return { total, urgent }
+  }
+}
+```
+
+#### Reading while output downstream
+
+A while node's output is the **last** iteration's leaf outputs under `lastOutput`:
+
+```ts
+context.nodes.<while_node>.output.lastOutput.<leafName>
+```
+
+```swirls
+node done {
+  type: code
+  code: @ts {
+    const final = context.nodes.refine_digest.output.lastOutput
+    return { summary: final?.polish?.text ?? "" }
+  }
+}
+```
+
+#### Common mistakes
+
+- **Treating map output as a flat list** — Each entry is `{ leafName: leafOutput }`, not the leaf output directly. Index by leaf name.
+- **Treating while output as an array** — While runs sequentially; output is `output.lastOutput` (single object), not an array of iterations.
+- **Reading `context.iteration.previous` on iteration 0** — It's `undefined`. Use `?.` or `if (context.iteration.index > 0) { ... }`.
+- **Using `context.nodes.root.input` inside a subgraph** — That's the parent graph's root input. Use `context.iteration.item` (map) or `context.iteration.input` (while) inside the subgraph.
+- **Mutating `context.iteration.input`** — Treat it as read-only. Return a new object from `update` to advance state.
+
+---
+
 ### context.secrets - Accessing Secrets
 
 Secrets are accessed via `context.secrets.<secret_block_name>.<VAR_NAME>` in `@ts` blocks. Declare which vars from which top-level `secret` blocks the node may read using `secrets: { blockName: [VAR1, VAR2] }`. Some node types resolve vendor API keys internally (not via `context.secrets`).
@@ -3273,9 +4395,9 @@ graph g {
 
 Var names in the `secret` block and in each node's `secrets:` map must match `[a-zA-Z0-9_]+`. The validator ensures block names exist and each listed var is declared in that block's `vars`.
 
-**Inferred vendor keys (ai / resend / firecrawl):**
+**Inferred vendor keys (ai / agent / email / scrape / parallel / disk):**
 
-These are resolved by the runtime for those node types (e.g. `OPENROUTER_API_KEY` for `ai`). They are not exposed on `context.secrets` for user `@ts` code; declare your own keys in a `secret` block if you need them in code.
+These are resolved by the runtime for those node types (e.g. `OPENROUTER_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` for `ai` and `agent`, `RESEND_API_KEY` for `email`, `FIRECRAWL_API_KEY` for `scrape`, `PARALLEL_API_KEY` for `parallel`, `ARCHIL_API_KEY` for `disk`). They are not exposed on `context.secrets` for user `@ts` code; declare your own keys in a `secret` block if you need them in code.
 
 Set secret values via `bunx swirls env set VAR_NAME` or the dashboard (vault keys remain flat by var name).
 
@@ -3359,20 +4481,19 @@ Available fields:
 - `context.meta.triggerId` - String or null. The trigger that started this execution.
 - `context.meta.triggerType` - `"form"`, `"webhook"`, `"schedule"`, or null. (There is no `"agent"` trigger type.)
 
----
-
 
 # 8. Resources & Triggers
 
 ### Form Declarations
 
-Forms generate a UI in the Portal and an API endpoint. The schema defines the form fields.
+Forms generate a UI in the Portal and an API endpoint. The schema defines the form fields. The `visibility` keyword controls whether the form is reachable through the Triggers service.
 
 ```swirls
 form contact_form {
   label: "Contact Form"
   description: "Public contact form: name, email, and message."
   enabled: true
+  visibility public
   schema: @json {
     {
       "type": "object",
@@ -3392,10 +4513,40 @@ form contact_form {
 
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
-| `label` | yes | String | Display name in the Portal. |
+| `label` | recommended | String | Display name in the Portal. Defaults to empty when omitted. |
 | `description` | no | String | Longer description. |
 | `enabled` | no | Boolean | Default: enabled. Set to `false` to keep the declaration but pause submissions. |
-| `schema` | no | `@json` block | JSON Schema for the form payload. The LSP types `context.nodes.root.input` from this schema when a trigger references the form. |
+| `visibility` | no | bare keyword (no colon) | `public` or `internal`. Default: `internal`. |
+| `schema` | no | `@json` block, object literal, or bare schema name | JSON Schema for the form payload. The LSP types `context.nodes.root.input` from this schema when a trigger references the form. |
+
+#### `visibility` keyword
+
+`visibility` is a bare keyword (no colon) with one of two values:
+
+- **`visibility public`** — The form is served by Triggers at `/triggers/forms/:projectId/:formName`. External users can fetch the schema and submit payloads.
+- **`visibility internal`** (default) — Triggers refuses to render or accept submissions and returns 404 with the same body as form-not-found (no existence leak). The web/cloud dashboard can still read and edit the form. The trigger binding still fires when the dashboard submits.
+
+The default is `internal` (secure default). Specify `visibility public` only on forms intended for external traffic.
+
+**Incorrect (colon and quoted string):**
+
+```swirls
+form contact {
+  label: "Contact"
+  visibility: "public"
+}
+```
+
+The parser errors: `Expected \`public\` or \`internal\` after \`visibility\``.
+
+**Correct:**
+
+```swirls
+form contact {
+  label: "Contact"
+  visibility public
+}
+```
 
 #### Name pattern
 
@@ -3416,6 +4567,26 @@ The validator errors: `Form name: Name must contain only letters, numbers, and u
 - The same JSON Schema also validates incoming API submissions.
 - If you omit `schema:`, the form still works but inputs are untyped and the LSP cannot help.
 
+#### Schema reference (bare identifier)
+
+You can declare a top-level `schema <name> { }` block once and reference it from the form by bare identifier. The same name can also be used as `inputSchema:` on the graph root the trigger fires.
+
+```swirls
+schema contact_payload {
+  label: "Contact payload"
+  schema: @json {
+    { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" } } }
+  }
+}
+
+form contact {
+  label: "Contact"
+  schema: contact_payload
+}
+```
+
+See `resource-schema`.
+
 #### Binding a form to a graph
 
 Forms don't execute on their own. Declare a `trigger` to send submissions to a graph:
@@ -3435,34 +4606,111 @@ See `resource-trigger-binding`.
 
 Webhooks create HTTP endpoints for receiving external payloads. They accept any HTTP POST and deliver the body to the connected graph.
 
-**Correct (webhook with schema):**
+Use `secret:` + `header:` to require shared-secret verification on every inbound request. Both fields must be set together (or neither). The validator warns when both are missing because the endpoint will accept any POST without verification.
 
 ```swirls
-webhook inbound {
-  label: "Inbound Webhook"
+secret stripe_creds {
+  vars: [STRIPE_WEBHOOK_SECRET]
+}
+
+webhook stripe_events {
+  label: "Stripe Events"
+  description: "Stripe sends payment lifecycle events here."
   enabled: true
+
   schema: @json {
     {
       "type": "object",
       "properties": {
-        "event": { "type": "string" },
-        "payload": { "type": "object" }
+        "id":   { "type": "string" },
+        "type": { "type": "string" },
+        "data": { "type": "object" }
       },
       "additionalProperties": true
     }
   }
+
+  secret: stripe_creds.STRIPE_WEBHOOK_SECRET
+  header: "Stripe-Signature"
 }
 ```
 
-Webhook fields:
-| Field | Required | Type |
-|-------|----------|------|
-| `label` | yes | String |
-| `description` | no | String |
-| `enabled` | no | Boolean (default: true) |
-| `schema` | no | `@json` block |
+#### Fields
+
+| Field | Required | Type | Notes |
+|-------|----------|------|-------|
+| `label` | recommended | String | Display name in the Portal. |
+| `description` | no | String | Longer description. |
+| `enabled` | no | Boolean | Default: enabled. |
+| `schema` | no | `@json` block, object literal, or bare schema name | Shape of the webhook body. Drives `context.nodes.root.input` typing. |
+| `secret` | paired with `header` | `<secretBlockName>.<VAR>` | Bare dotted reference to a top-level `secret` block var. The runtime compares the incoming header value against this secret. |
+| `header` | paired with `secret` | Quoted string | Inbound HTTP header that carries the shared-secret value. Custom names only — reserved headers are rejected. |
+
+#### `secret:` syntax
+
+`secret:` uses dot notation between the secret block name and the variable name. **No quotes.** No object literal.
+
+```swirls
+secret: stripe_creds.STRIPE_WEBHOOK_SECRET
+```
+
+The validator errors:
+
+- `Webhook "<name>" references undefined secret block "<block>"` if the secret block does not exist.
+- `Webhook "<name>" references var "<VAR>" not declared in secret block "<block>"` if `VAR` is not in that block's `vars:` list.
+
+#### `header:` syntax
+
+`header:` is a quoted string naming the inbound HTTP header that carries the secret value.
+
+```swirls
+header: "X-Webhook-Signature"
+```
+
+Reserved headers are rejected at validation time. The hard-deny list (case-insensitive) covers RFC 7230 hop-by-hop headers, security/protocol headers, ingress-managed headers, and headers clients set automatically:
+
+```
+connection, keep-alive, proxy-authenticate, proxy-authorization, te,
+trailers, transfer-encoding, upgrade, cookie, set-cookie, host,
+content-length, x-forwarded-for, x-forwarded-proto, x-forwarded-host,
+x-forwarded-port, x-real-ip, x-request-id, user-agent, accept,
+content-type, origin, referer, from
+```
+
+Use a custom name like `X-Stripe-Signature`, `X-Webhook-Signature`, `X-Hub-Signature-256`, etc.
+
+#### Both required, or neither
+
+| `secret:` | `header:` | Result |
+|-----------|-----------|--------|
+| set | set | Verified webhook (correct). |
+| set | missing | Validator error: `Webhook "<n>" has "secret" but is missing "header".` |
+| missing | set | Validator error: `Webhook "<n>" has "header" but is missing "secret".` |
+| missing | missing | Validator warning: `Webhook "<n>" has no "secret" or "header" set and will accept any POST without verification.` |
+
+The "neither" path is a warning, not an error, so explicitly unauthenticated webhooks remain possible — but the validator surfaces them so you can audit the choice.
+
+#### Name pattern
 
 Webhook names must match `^[a-zA-Z0-9_]+$` (letters, digits, underscores; can start with a digit). Hyphens, dots, and spaces are not allowed.
+
+#### Schema reference (bare identifier)
+
+```swirls
+schema event_payload {
+  label: "Event payload"
+  schema: @json {
+    { "type": "object", "properties": { "type": { "type": "string" } } }
+  }
+}
+
+webhook inbound {
+  label: "Inbound"
+  schema: event_payload
+}
+```
+
+See `resource-schema`.
 
 #### Binding
 
@@ -3693,6 +4941,114 @@ Inside a graph body, `stream:` at graph scope (outside a node) errors the same w
 
 ---
 
+### Top-Level `schema` Blocks
+
+A top-level `schema <name> { }` block declares a reusable JSON Schema that can be referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema` (or `outputSchema` on root). Same shape, declared once.
+
+#### Syntax
+
+```swirls
+schema <name> {
+  label: "<optional label>"
+  description: "<optional>"
+
+  schema: @json {
+    { ... JSON Schema ... }
+  }
+}
+```
+
+#### Fields
+
+| Field | Required | Type | Notes |
+|-------|----------|------|-------|
+| `label` | recommended | String | Display name. |
+| `description` | no | String | Longer description. |
+| `schema` | yes | `@json { }` block, or object literal, or bare name | The JSON Schema body. Bare-name form (`schema: other_name`) chains another schema block. |
+
+#### Example: declare once, reference everywhere
+
+```swirls
+schema contact_payload {
+  label: "Contact payload"
+  description: "Shared JSON Schema for the contact form and process_form graph"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["name", "email"],
+      "properties": {
+        "name":  { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+form contact {
+  label: "Contact"
+  schema: contact_payload
+}
+
+graph handle_contact {
+  label: "Handle contact"
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: contact_payload
+    outputSchema: contact_payload
+    code: @ts {
+      const { name, email } = context.nodes.root.input
+      return { name: name.trim(), email: email.trim().toLowerCase() }
+    }
+  }
+
+  node summarize {
+    type: code
+    label: "Summarize"
+    schema: contact_payload
+    code: @ts { return context.nodes.root.output }
+  }
+
+  flow { root -> summarize }
+}
+
+trigger on_contact {
+  form:contact -> handle_contact
+  enabled: true
+}
+```
+
+#### Where bare schema names work
+
+Any of these fields accept a bare schema identifier (no quotes, no `@json`):
+
+- Form / webhook `schema:` — `schema: contact_payload`
+- Root `inputSchema:` — `inputSchema: contact_payload`
+- Root `outputSchema:` — `outputSchema: contact_payload`
+- Non-root node `schema:` — `schema: contact_payload`
+- Review block `schema:` — `review: { schema: contact_payload, ... }`
+- Top-level `schema` block `schema:` (chaining) — `schema: contact_payload`
+
+Inline `@json { }` and inline object literals still work. Use the bare name to avoid duplicating the same schema across multiple sites.
+
+#### Name pattern
+
+Schema names must match `^[a-zA-Z0-9_]+$`. Hyphens, dots, and spaces are not allowed.
+
+#### Workspace resolution
+
+Schema names resolve across all `.swirls` files in the workspace, the same way graphs and streams do. `swirls doctor` and deploy bundle the union of all schema declarations under the scanned working directory. The LSP single-file open may report a missing schema until the workspace is considered.
+
+#### Validation rules
+
+- The validator runs `validateSchemaFieldRefs` over the AST. Each bare-identifier reference (`inputSchema: <name>`, `outputSchema: <name>`, `schema: <name>` on form/webhook/node, `review: { schema: <name> }`) must resolve to a top-level `schema` block in the workspace.
+- Duplicate `schema` block names in one file are errors.
+- A `schema` block whose body is an empty object literal is allowed but unhelpful — fill in `type`/`properties`/etc.
+
+---
+
 ### Trigger Bindings
 
 Triggers connect a resource (form, webhook, or schedule) to a graph. When the resource fires, the graph executes with the resource's payload available as `context.nodes.root.input`.
@@ -3855,10 +5211,12 @@ Vault keys are flat by var name; the block is a logical grouping for reference a
 
 Some node types auto-resolve their API keys without appearing in `secrets:`:
 
-- `ai` → `OPENROUTER_API_KEY`
-- `resend` → `RESEND_API_KEY`
-- `firecrawl` → `FIRECRAWL_API_KEY`
+- `ai` → `OPENROUTER_API_KEY` (default) or `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` per `provider:`
+- `agent` → same set as `ai`, resolved per the bound `agent` block's `provider:`
+- `email` → `RESEND_API_KEY`
+- `scrape` → `FIRECRAWL_API_KEY`
 - `parallel` → `PARALLEL_API_KEY`
+- `disk` → `ARCHIL_API_KEY` (resolved via the bound `disk` block's `secrets:` reference)
 
 Do not list these in a `secret` block unless you also want them accessible from `@ts` code.
 
@@ -4041,6 +5399,211 @@ postgres my_db {
 - Table names in node SQL must match a declared table in the referenced postgres block.
 
 ---
+
+### Disk Block Declaration
+
+Top-level `disk <name> { }` blocks declare an Archil-backed remote disk that `type: disk` nodes mount and exec on. Each block carries the provider disk id, an optional region, and a reference to a `secret` block holding `ARCHIL_API_KEY`.
+
+**There is no `type:` field on a disk block** — the keyword `disk` identifies the block.
+
+#### Syntax
+
+```swirls
+disk <name> {
+  label: "<optional label>"
+  region: "<optional region>"
+  id: "dsk-..."             // required; Archil disk id
+  secrets: <secret_block>   // optional reference to a top-level secret block
+}
+```
+
+#### Required vs optional fields
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `id` | yes | Quoted string literal. Archil-issued disk identifier (typically `dsk-` + hex). |
+| `secrets` | no | Bare identifier naming a top-level `secret` block (e.g. one declaring `ARCHIL_API_KEY`). |
+| `label` | no | Display string. Defaults to the disk's name. |
+| `region` | no | Quoted string (e.g. `"aws-us-east-1"`). |
+
+#### Complete example
+
+```swirls
+secret disk_creds {
+  vars: [ARCHIL_API_KEY]
+}
+
+disk proj {
+  label: "Project disk"
+  id: "dsk-0123456789abcdef"
+  region: "aws-us-east-1"
+  secrets: disk_creds
+}
+
+graph backup {
+  label: "Backup logs"
+  root {
+    type: disk
+    label: "Tar logs"
+    disk: proj
+    command: @ts {
+      const date = new Date().toISOString().slice(0, 10)
+      return "tar czf /mnt/proj/backups/logs-" + date + ".tar.gz /mnt/proj/logs"
+    }
+  }
+}
+```
+
+#### Validation rules
+
+- Disk names must match `^[a-zA-Z0-9_]+$`. Duplicate names error.
+- `id:` must be a non-empty quoted string.
+- `secrets:` (if present) must reference an existing top-level `secret` block.
+- The `disk` node's `disk:` field must match a declared disk block by bare identifier.
+
+See `node-disk` for the read/exec side.
+
+---
+
+### Agent Block Declaration
+
+Top-level `agent <name> { }` blocks declare an LLM agentic harness: which provider and model to use, which secret block holds the API key, a default system prompt, runtime knobs, the tools (subgraphs) the model may call, and zero or more named `role <name> { }` sub-blocks. `type: agent` nodes bind to an agent block by bare identifier.
+
+**There is no `type:` field on an agent block** — the keyword `agent` identifies the block.
+
+#### Syntax
+
+```swirls
+agent <name> {
+  label: "<optional>"
+  description: "<optional>"
+
+  provider: openrouter | anthropic | openai | google
+  model: "<string>"
+  secrets: <secret_block>             // optional
+
+  system: @ts {                       // optional default system prompt
+    return "..."
+  }
+
+  temperature: <number>               // optional
+  maxTokens: <number>                 // optional
+  maxSteps: <number>                  // optional
+
+  tools: [graph_a, graph_b]           // optional; graphs exposed as LLM-callable tools
+
+  role <role_name> {                  // zero or more roles
+    description: "<optional>"
+    tools: [graph_a]                  // optional; subset of agent.tools
+    system: @ts { return "..." }      // optional override
+  }
+}
+```
+
+#### Required vs optional fields
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `provider` | yes | Bare identifier: `openrouter`, `anthropic`, `openai`, or `google`. |
+| `model` | yes | Quoted string. |
+| `secrets` | no | Bare identifier naming a top-level `secret` block. |
+| `system` | no | `@ts` block returning the default system prompt. |
+| `temperature` | no | Number. |
+| `maxTokens` | no | Number. |
+| `maxSteps` | no | Number. Caps how many tool-call turns the agent may take. |
+| `tools` | no | Array of bare identifiers naming graphs in the same workspace. |
+| `role <name> { }` | no | Zero or more named roles. Each may override `system` and narrow `tools`. |
+| `label` | no | Display string. |
+| `description` | no | Free-form description. |
+
+#### Complete example
+
+```swirls
+secret ai_creds {
+  vars: [OPENAI_API_KEY]
+}
+
+graph search_kb {
+  label: "Search KB"
+  root {
+    type: code
+    label: "Search"
+    inputSchema: @json {
+      { "type": "object", "required": ["q"], "properties": { "q": { "type": "string" } } }
+    }
+    outputSchema: @json {
+      { "type": "object", "required": ["hits"], "properties": { "hits": { "type": "array" } } }
+    }
+    code: @ts { return { hits: [] } }
+  }
+}
+
+graph escalate {
+  label: "Escalate"
+  root {
+    type: code
+    label: "Escalate"
+    inputSchema: @json {
+      { "type": "object", "required": ["reason"], "properties": { "reason": { "type": "string" } } }
+    }
+    outputSchema: @json {
+      { "type": "object", "required": ["ticketId"], "properties": { "ticketId": { "type": "string" } } }
+    }
+    code: @ts { return { ticketId: "T-1" } }
+  }
+}
+
+agent triage {
+  label: "Support triage agent"
+  provider: openai
+  model: "gpt-4o"
+  secrets: ai_creds
+  maxSteps: 5
+  temperature: 0.2
+  tools: [search_kb, escalate]
+
+  system: @ts {
+    return "You are a support triage agent. Use tools to resolve tickets."
+  }
+
+  role support {
+    description: "Frontline support agent"
+    tools: [search_kb]
+  }
+
+  role escalations {
+    description: "Senior agent who can escalate"
+    tools: [search_kb, escalate]
+    system: @ts {
+      return "You are a senior agent. Escalate only when necessary."
+    }
+  }
+}
+
+graph handle_ticket {
+  label: "Handle ticket"
+  root {
+    type: agent
+    label: "Triage"
+    agent: triage
+    role: support
+    prompt: @ts {
+      return "Ticket: " + context.nodes.root.input.body
+    }
+  }
+}
+```
+
+#### Validation rules
+
+- Agent names must match `^[a-zA-Z0-9_]+$`. Duplicate names error.
+- `provider` must be one of the four allowed values.
+- `model` must be a non-empty quoted string.
+- Every entry in `tools:` must name a graph defined in the workspace.
+- Every `role <name> { }` must have a unique name within the agent block. Each role's `tools:` must be a subset of the agent's top-level `tools:`.
+- `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `role:`, it must name a declared role in that block.
+
+See `node-agent` for the binding side.
 
 
 # 9. Streams
@@ -4270,8 +5833,6 @@ If you see older examples using `"root.field"` or other dotted column names in S
 
 See `node-stream` for the full filter API.
 
----
-
 
 # 10. Reviews
 
@@ -4421,8 +5982,6 @@ flow {
 ```
 
 The review schema determines the shape of `context.reviews.<nodeName>`. The LSP provides autocomplete based on the review schema fields.
-
----
 
 
 # 11. Parser Pitfalls & Validator Diagnostics
@@ -4699,14 +6258,17 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 
 **Node validation:**
 
-- [ ] Every `resend` node has `from`, `to`, and `subject` fields
+- [ ] Every `email` node has `from`, `to`, and `subject` fields
+- [ ] Every `scrape` node has a `url` field
 - [ ] Every `ai` node has `kind`, `model`, and `prompt` fields
 - [ ] Every `ai` node with `kind: object` has a `schema`
+- [ ] Every `agent` node has `agent` and `prompt` fields, and any `role:` matches a role in the bound agent block
 - [ ] Every `code` node has a `code` field
 - [ ] Every `switch` node has `cases` and `router` fields
 - [ ] Every `http` node has a `url` field
 - [ ] Every `graph` node has `graph` and `input` fields
 - [ ] Every `bucket` node has an `operation` field
+- [ ] Every `disk` node has `disk` and `command` fields
 - [ ] Every `postgres` node has a `postgres` field and exactly one of `select` or `insert`
 - [ ] Every `postgres` node with `insert` has a `params` field
 - [ ] Every `postgres` node references a `postgres` block defined in the same file
@@ -4754,7 +6316,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 #### Nodes (general)
 
-- `Invalid node type "<t>". Must be one of: ai, bucket, code, document, firecrawl, graph, http, parallel, postgres, resend, stream, switch, wait` — Unknown type name. Use one of the 13.
+- `Invalid node type "<t>". Must be one of: ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while` — Unknown type name. Use one of the 16.
 - `Node type "<t>" requires "<field>"` — Missing required field. See the node-type rule for the required set.
 
 #### Secrets map
@@ -4804,7 +6366,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 #### Vendor-managed schemas
 
-- `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` — You set `schema:` on `firecrawl`, `parallel`, or `resend`. Remove it.
+- `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` — You set `schema:` on `scrape`, `parallel`, or `email`. Remove it.
 
 #### AI nodes
 
@@ -4815,6 +6377,42 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 - `Graph node requires "graph"` — Add `graph: <name>`.
 - `Graph node references graph "<n>" which is not defined` — Fix the name or declare the child graph.
+
+#### Map / while nodes
+
+- `Node type "map" requires "items" / "maxItems"` — Required field missing.
+- `Node type "while" requires "input" / "condition" / "update" / "maxIterations"` — Required field missing.
+- `map node requires maxItems as a positive number` — Add `maxItems: <n>` with `n > 0`.
+- `map node concurrency must be a positive integer when set` — Fix to a positive integer or remove `concurrency:`.
+- `while node requires maxIterations as a positive integer` — Add `maxIterations: <n>` with `n` an integer ≥ 1.
+- `map node requires exactly one of subgraph { } or graph: <name>` — You set both, or neither. Pick one.
+- `while node requires exactly one of subgraph { } or graph: <name>` — Same — pick one.
+- `Node references graph "<n>" which is not defined` — `graph: <n>` does not match a graph in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` (inline @json, object literal, or bare schema name) to the inline `subgraph { }` root or the referenced graph's root.
+- Parser error: `Expected { after subgraph` — Don't put a colon between `subgraph` and `{`.
+- Parser error: `label is not valid inside subgraph { }` / `description is not valid inside subgraph { }` — Subgraphs don't take their own label/description.
+
+#### Forms
+
+- Parser error: `Expected \`public\` or \`internal\` after \`visibility\`` — `visibility` is a bare keyword (no colon, no quotes). Use `visibility public` or `visibility internal`.
+- Parser error: `Invalid visibility "<x>"; expected \`public\` or \`internal\`` — Only those two values are valid.
+
+#### Webhooks (authentication)
+
+- Warning: `Webhook "<n>" has no "secret" or "header" set and will accept any POST without verification.` — Add `secret: <block>.<VAR>` and `header: "X-..."` to require verification, or accept the warning for an explicitly unauthenticated endpoint.
+- `Webhook "<n>" has "secret" but is missing "header"` / `Webhook "<n>" has "header" but is missing "secret"` — Both must be set together.
+- `Webhook "<n>" header name must not be empty` — Trim/non-blank required.
+- `Webhook "<n>" header "<name>" is reserved and cannot be used for authentication. Choose a custom header name.` — Pick a custom header (e.g. `X-Webhook-Signature`).
+- `Webhook "<n>" references undefined secret block "<block>"` — Declare the `secret <block> { vars: [...] }`.
+- `Webhook "<n>" references var "<VAR>" not declared in secret block "<block>"` — Add `VAR` to the block's `vars:`.
+- Parser error: `Expected secret block name (e.g. my_secret.VAR)` — `secret:` uses dot notation: `secret: my_secret.VAR`. No quotes.
+- Parser error: `Expected "." after secret block name` — Same — dot notation required.
+- Parser error: `Expected quoted header name` — `header:` value must be a `"quoted"` string.
+
+#### Schema (top-level `schema` block)
+
+- `Schema name: Name must contain only letters, numbers, and underscores` — Rename to match `^[a-zA-Z0-9_]+$`.
+- Schema reference resolution errors come from `validateSchemaFieldRefs` — they fire when `inputSchema: <name>`, `outputSchema: <name>`, `schema: <name>` (on form/webhook/node), or `review: { schema: <name> }` references a name with no matching `schema <name> { }` block in the workspace.
 
 #### Postgres (top-level block)
 
@@ -4846,4 +6444,3 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 - `review: <path> — <message>` — The review block didn't match the schema (e.g. bad action outcome, missing required field). Fix per the message.
 
----

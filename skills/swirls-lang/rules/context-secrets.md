@@ -52,8 +52,8 @@ graph g {
 
 Var names in the `secret` block and in each node's `secrets:` map must match `[a-zA-Z0-9_]+`. The validator ensures block names exist and each listed var is declared in that block's `vars`.
 
-**Inferred vendor keys (ai / resend / firecrawl):**
+**Inferred vendor keys (ai / agent / email / scrape / parallel / disk):**
 
-These are resolved by the runtime for those node types (e.g. `OPENROUTER_API_KEY` for `ai`). They are not exposed on `context.secrets` for user `@ts` code; declare your own keys in a `secret` block if you need them in code.
+These are resolved by the runtime for those node types (e.g. `OPENROUTER_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` for `ai` and `agent`, `RESEND_API_KEY` for `email`, `FIRECRAWL_API_KEY` for `scrape`, `PARALLEL_API_KEY` for `parallel`, `ARCHIL_API_KEY` for `disk`). They are not exposed on `context.secrets` for user `@ts` code; declare your own keys in a `secret` block if you need them in code.
 
 Set secret values via `bunx swirls env set VAR_NAME` or the dashboard (vault keys remain flat by var name).

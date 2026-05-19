@@ -18,7 +18,7 @@
 ## 4. Node Types (node)
 
 **Impact:** CRITICAL
-**Description:** All 13 node types (ai, bucket, code, document, firecrawl, graph, http, parallel, postgres, resend, stream, switch, wait) with required and optional fields. Also covers shared fields: `secrets:` map, `failurePolicy:`, review.
+**Description:** All 16 node types (ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while) with required and optional fields. `map` and `while` accept either an inline `subgraph { }` block or a `graph: <name>` reference. Also covers shared fields: `secrets:` map, `failurePolicy:`, review.
 
 ## 5. TypeScript Blocks (ts)
 
@@ -28,7 +28,7 @@
 ## 6. Schema & Typing (schema)
 
 **Impact:** HIGH
-**Description:** JSON Schema definitions for inputs, outputs, forms, and webhooks. Inline vs @json syntax. `inputSchema` is root-only; `outputSchema` is root-only; non-root nodes use `schema`. The parser rejects misplaced schema keys.
+**Description:** JSON Schema definitions for inputs, outputs, forms, and webhooks. Inline `@json` blocks, inline object literals, and bare-identifier references to top-level `schema <name> { }` blocks all work. `inputSchema` is root-only (and required on map/while subgraph roots); `outputSchema` is root-only; non-root nodes use `schema`. The parser rejects misplaced schema keys.
 
 ## 7. Context Object (context)
 
@@ -38,7 +38,7 @@
 ## 8. Resources & Triggers (resource)
 
 **Impact:** HIGH
-**Description:** Declaring forms, webhooks, schedules, streams, secrets, auth, and postgres blocks, then binding sources to graphs with triggers. Only three trigger resource types exist: form, webhook, schedule.
+**Description:** Declaring forms (with `visibility public/internal`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, secrets, auth, postgres, disk, agent, and reusable top-level `schema` blocks, then binding sources to graphs with triggers. Only three trigger resource types exist: form, webhook, schedule.
 
 ## 9. Streams (stream)
 

@@ -4,21 +4,23 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "2.0.0"
+  version: "4.0.0"
 ---
 
 # Swirls Language
 
-Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, graph declarations, all 13 node types, TypeScript / JSON / SQL embedded blocks, the context object, resources, triggers, top-level stream blocks, reviews, failure policies, and known parser pitfalls.
+Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, graph declarations, all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / schema / disk / agent blocks, reviews, failure policies, and known parser pitfalls.
 
 ## When to Apply
 
 - Writing new `.swirls` files from scratch.
-- Adding nodes, graphs, streams, or triggers to existing `.swirls` files.
+- Adding nodes, graphs, streams, schemas, or triggers to existing `.swirls` files.
 - Debugging parse errors or validation failures from `swirls doctor`.
 - Writing `@ts` blocks (TypeScript code in nodes).
-- Defining JSON Schemas for inputs, outputs, forms, and webhooks.
+- Defining JSON Schemas for inputs, outputs, forms, and webhooks (inline or via top-level `schema` blocks referenced by name).
 - Connecting graphs to forms, webhooks, or schedules via triggers.
+- Configuring form `visibility` (`public` / `internal`) and webhook shared-secret auth (`secret:` + `header:`).
+- Building per-item iteration with `map` nodes or counter/condition loops with `while` nodes (inline `subgraph { }` or referenced `graph: <name>`).
 - Persisting graph output with top-level `stream { }` blocks and reading it with `type: stream` nodes.
 - Configuring human-in-the-loop review blocks.
 - Declaring external Postgres databases and writing parameterized SQL nodes.
@@ -29,12 +31,12 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 |---|----------|--------|--------|-------|
 | 1 | **Language Spec** | **CRITICAL** | `spec-` | **READ FIRST. Exhaustive list of valid syntax, keywords, node types, fields. If it is not listed here, it does not exist.** |
 | 2 | File Structure | HIGH | `structure-` | Top-level declarations, file discovery, comment restrictions |
-| 3 | Graph & Node Basics | CRITICAL | `graph-` | Root node, flow block, edges, DAG rules |
-| 4 | Node Types | CRITICAL | `node-` | All 13 node types, required/optional fields, secrets map, failure policy |
+| 3 | Graph & Node Basics | CRITICAL | `graph-` | Root node, flow block, edges, DAG rules, inline `subgraph { }` for map/while |
+| 4 | Node Types | CRITICAL | `node-` | All 16 node types, required/optional fields, secrets map, failure policy |
 | 5 | TypeScript Blocks | CRITICAL | `ts-` | @ts patterns, sandbox limits, safe code |
-| 6 | Schema & Typing | HIGH | `schema-` | JSON Schema, inputSchema/outputSchema/schema placement |
-| 7 | Context Object | HIGH | `context-` | context.nodes, context.reviews, context.secrets, context.meta |
-| 8 | Resources & Triggers | HIGH | `resource-` | Forms, webhooks, schedules, secrets, auth blocks, postgres blocks, top-level stream blocks, trigger bindings |
+| 6 | Schema & Typing | HIGH | `schema-` | JSON Schema, inputSchema/outputSchema/schema placement, bare-identifier refs to top-level `schema` blocks |
+| 7 | Context Object | HIGH | `context-` | context.nodes, context.reviews, context.secrets, context.meta, context.iteration |
+| 8 | Resources & Triggers | HIGH | `resource-` | Forms (incl. `visibility`), webhooks (incl. `secret:`/`header:`), schedules, secrets, auth blocks, postgres blocks, top-level stream and schema blocks, trigger bindings |
 | 9 | Streams | MEDIUM | `stream-` | Filter operators, field paths, migration from persistence |
 | 10 | Reviews | MEDIUM | `review-` | Human-in-the-loop review config |
 | 11 | Parser Pitfalls | CRITICAL | `parser-` | Known parser bugs, silent drops, validator diagnostics |
@@ -43,10 +45,10 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 
 ### 1. Language Spec (READ FIRST)
 - `spec-strict-syntax` - **Exhaustive list of every valid keyword, node type, config field, edge syntax, and value type. If something is not listed here, it does not exist. Do not invent syntax.**
-- `spec-common-mistakes` - **The 23 most common incorrect patterns with corrections. Check your output against these before returning any .swirls code.**
+- `spec-common-mistakes` - **The most common incorrect patterns with corrections. Check your output against these before returning any .swirls code.**
 
 ### 2. File Structure
-- `structure-top-level-declarations` - The nine valid top-level blocks: form, webhook, schedule, graph, stream, trigger, secret, auth, postgres
+- `structure-top-level-declarations` - The twelve valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, graph, stream, trigger, secret, auth, postgres, disk, agent
 - `structure-file-discovery` - File extensions, discovery rules, `.ts.swirls` files
 - `structure-comments` - Comment syntax and ASCII-only restriction
 
@@ -55,20 +57,24 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `graph-root-node` - Every graph needs exactly one `root { }` block
 - `graph-flow-block` - Connecting nodes with edges and labeled edges
 - `graph-dag-rules` - No cycles, one root, edge validation
+- `graph-subgraph` - Inline `subgraph { }` block (no colon) inside `map`/`while` nodes; same body as a graph but no own label/description; subgraph root must declare `inputSchema`
 
-### 4. Node Types (13 total)
+### 4. Node Types (16 total)
 - `node-code` - Code nodes: sandboxed TypeScript execution
 - `node-ai` - AI nodes: text, object, image, video, embed kinds
+- `node-agent` - Agent nodes: bind to a top-level `agent` block; tools, roles, prompt
 - `node-switch` - Switch nodes: conditional routing with cases
 - `node-http` - HTTP nodes: making API requests
-- `node-email` - Resend nodes (`type: resend`): sending email via Resend
-- `node-scrape` - Firecrawl nodes (`type: firecrawl`): web scraping
+- `node-email` - Email nodes (`type: email`): sending email via Resend
+- `node-scrape` - Scrape nodes (`type: scrape`): web scraping via Firecrawl
 - `node-parallel` - Parallel nodes: search / extract / findall operations
 - `node-stream` - Stream nodes: reading persisted stream data with filters
-- `node-graph` - Graph nodes: calling subgraphs
+- `node-graph` - Graph nodes: calling subgraphs (one-shot)
+- `node-map` - Map nodes: per-item iteration with inline `subgraph { }` or `graph: <name>`; required `items`, `maxItems`; optional `concurrency`
+- `node-while` - While nodes: counter/condition loops with `input`, `condition`, `update`, `maxIterations` plus `subgraph { }` or `graph: <name>`
 - `node-wait` - Wait nodes: pausing execution
 - `node-bucket` - Bucket nodes: object storage upload/download
-- `node-document` - Document nodes: document processing
+- `node-disk` - Disk nodes: bash exec on a top-level `disk` block (Archil-backed)
 - `node-postgres` - Postgres nodes: parameterized SELECT and INSERT against external databases
 - `node-secrets-map` - `secrets: { block: [VAR] }` object-literal syntax (shared across types)
 - `node-failure-policy` - Optional `failurePolicy:` for retry / skip / fallback behavior
@@ -84,7 +90,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 
 ### 6. Schema & Typing
 - `schema-json-schema` - JSON Schema format in `@json` blocks
-- `schema-input-output` - `inputSchema` (root only), `outputSchema` (root only), `schema` (non-root); strict parser enforcement
+- `schema-input-output` - `inputSchema` (root and map/while subgraph root only), `outputSchema` (root only), `schema` (non-root); strict parser enforcement; bare-identifier refs to top-level `schema` blocks
 - `schema-inline-syntax` - Inline object literal schema syntax (no `@json`)
 
 ### 7. Context Object
@@ -92,16 +98,20 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `context-secrets` - Declaring and accessing secrets
 - `context-reviews` - Accessing review form responses
 - `context-meta` - Execution metadata (triggerId, triggerType)
+- `context-iteration` - `context.iteration.item` (map), `context.iteration.input` / `index` / `previous` (while); per-iteration data inside subgraphs
 
 ### 8. Resources & Triggers
-- `resource-form` - Form declarations with label, schema, enabled
-- `resource-webhook` - Webhook declarations
+- `resource-form` - Form declarations with label, schema, enabled, `visibility public | internal` (default internal)
+- `resource-webhook` - Webhook declarations with shared-secret `secret: <block>.<VAR>` + `header: "X-..."` verification (paired); reserved-headers list
 - `resource-schedule` - Schedule declarations with cron and timezone
 - `resource-stream` - Top-level `stream { }` blocks: graph, schema, condition, prepare
+- `resource-schema` - Top-level `schema <name> { }` blocks: reusable JSON Schemas referenced by bare identifier from forms / webhooks / root inputSchema / root outputSchema / non-root schema / review schema
 - `resource-trigger-binding` - Trigger syntax: `resourceType:name -> graphName` (form / webhook / schedule only)
 - `resource-secrets` - Top-level `secret { vars: [...] }` blocks
 - `resource-auth` - Top-level `auth` blocks (oauth, api_key, basic, bearer, cloud) and http-node `auth:` references
 - `resource-postgres` - Top-level `postgres` blocks: connection, table schemas, secret references
+- `resource-disk` - Top-level `disk` blocks: Archil-backed remote disks (`id: "dsk-..."`, secrets)
+- `resource-agent` - Top-level `agent` blocks: provider, model, tools, optional `role` sub-blocks
 
 ### 9. Streams
 - `stream-persistence-block` - Migration note: `persistence { }` removed; use top-level `stream { }`
@@ -127,4 +137,4 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 
 Individual rules live in `rules/`. Each file covers one concept with incorrect / correct examples.
 
-For a single compiled document with all rules, see `AGENTS.md`.
+For a single compiled document with all rules, see `AGENTS.md` (regenerated from the rules directory; may lag the rule files between updates).

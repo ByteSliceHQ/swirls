@@ -1,33 +1,33 @@
 ---
-title: Firecrawl (Scrape) Nodes
+title: Scrape Nodes
 impact: MEDIUM
 tags: node, scrape, web, firecrawl, formats, content
 ---
 
-## Firecrawl (Scrape) Nodes
+## Scrape Nodes
 
-Firecrawl nodes fetch and extract content from web pages. The type name is `firecrawl`, not `scrape`.
+Scrape nodes fetch and extract content from web pages. The DSL type name is `scrape`. Firecrawl is the underlying vendor (`FIRECRAWL_API_KEY`).
 
 **Required fields:** `url`.
 
-**Vendor-managed output:** Do not set `schema:` on a firecrawl node. The validator errors: `"firecrawl" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
+**Vendor-managed output:** Do not set `schema:` on a scrape node. The validator errors: `"scrape" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
 
 ### Incorrect (wrong type name)
 
 ```swirls
 node fetch {
-  type: scrape
+  type: firecrawl
   url: @ts { return "https://example.com" }
 }
 ```
 
-`scrape` is not a valid node type. Use `firecrawl`.
+`firecrawl` is not a valid node type. Firecrawl is the underlying vendor; the DSL type name is `scrape`. Use `scrape`.
 
 ### Correct (basic scrape)
 
 ```swirls
 node scrape_page {
-  type: firecrawl
+  type: scrape
   label: "Scrape webpage"
   url: @ts { return context.nodes.root.input.url }
 }
@@ -37,7 +37,7 @@ node scrape_page {
 
 ```swirls
 node scrape_article {
-  type: firecrawl
+  type: scrape
   label: "Scrape article"
   url: @ts { return context.nodes.root.output.url }
   onlyMainContent: true

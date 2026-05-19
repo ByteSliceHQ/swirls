@@ -85,9 +85,11 @@ Vault keys are flat by var name; the block is a logical grouping for reference a
 
 Some node types auto-resolve their API keys without appearing in `secrets:`:
 
-- `ai` → `OPENROUTER_API_KEY`
-- `resend` → `RESEND_API_KEY`
-- `firecrawl` → `FIRECRAWL_API_KEY`
+- `ai` → `OPENROUTER_API_KEY` (default) or `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` per `provider:`
+- `agent` → same set as `ai`, resolved per the bound `agent` block's `provider:`
+- `email` → `RESEND_API_KEY`
+- `scrape` → `FIRECRAWL_API_KEY`
 - `parallel` → `PARALLEL_API_KEY`
+- `disk` → `ARCHIL_API_KEY` (resolved via the bound `disk` block's `secrets:` reference)
 
 Do not list these in a `secret` block unless you also want them accessible from `@ts` code.

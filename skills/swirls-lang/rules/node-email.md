@@ -1,22 +1,22 @@
 ---
-title: Resend (Email) Nodes
+title: Email Nodes
 impact: HIGH
 tags: node, email, resend, from, to, subject
 ---
 
-## Resend (Email) Nodes
+## Email Nodes
 
-Email nodes send email via Resend. The type name is `resend`, not `email`. Every resend node requires `from`, `to`, and `subject`.
+Email nodes send transactional email. The DSL type name is `email`. Resend is the underlying vendor (`RESEND_API_KEY`). Every email node requires `from`, `to`, and `subject`.
 
 **Required fields:** `from`, `to`, `subject`.
 
-**Vendor-managed output:** Do not set `schema:` on a resend node. The validator errors: `"resend" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
+**Vendor-managed output:** Do not set `schema:` on an email node. The validator errors: `"email" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
 
 ### Incorrect (wrong type name)
 
 ```swirls
 node notify {
-  type: email
+  type: resend
   label: "Notify"
   from: @ts { return "noreply@example.com" }
   to: @ts { return "team@example.com" }
@@ -24,13 +24,13 @@ node notify {
 }
 ```
 
-`email` is not a valid node type. The validator errors: `Invalid node type "email". Must be one of: ai, bucket, code, document, firecrawl, graph, http, parallel, postgres, resend, stream, switch, wait`.
+`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`. The validator errors: `Invalid node type "resend". Must be one of: ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while`.
 
-### Correct (complete resend node)
+### Correct (complete email node)
 
 ```swirls
 node notify {
-  type: resend
+  type: email
   label: "Send notification"
   from: @ts { return "noreply@example.com" }
   to: @ts { return context.nodes.root.output.email }
@@ -46,7 +46,7 @@ node notify {
 
 ```swirls
 node welcome {
-  type: resend
+  type: email
   label: "Send HTML email"
   from: @ts { return "noreply@example.com" }
   to: @ts { return context.nodes.root.output.email }

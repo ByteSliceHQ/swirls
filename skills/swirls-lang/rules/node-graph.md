@@ -99,5 +99,9 @@ Subgraph output is accessed as `context.nodes.<graphNodeName>.output.<leafNodeNa
 Graph node fields:
 | Field | Required | Type |
 |-------|----------|------|
-| `graph` | yes | Graph name (must be defined in same file) |
+| `graph` | yes | Graph name (resolved across the workspace) |
 | `input` | yes | `@ts` block |
+
+### Related: map / while inline subgraphs
+
+`type: graph` runs the child graph **once**. For per-item iteration over a list, use `type: map` (each item runs the child once). For repeated execution until a condition is false, use `type: while`. Both accept either `graph: <name>` (the same kind of reference shown above) or an inline `subgraph { ... }` block (no colon) — see `node-map`, `node-while`, and `graph-subgraph`.

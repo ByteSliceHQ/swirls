@@ -94,6 +94,8 @@ node embed {
 
 AI kinds: `text`, `object`, `image`, `video`, `embed`
 
+**Validator warning** when `kind: text` and `schema:` are both set: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` Either drop the schema or change `kind` to `object`.
+
 AI node fields:
 | Field | Required | Type |
 |-------|----------|------|
