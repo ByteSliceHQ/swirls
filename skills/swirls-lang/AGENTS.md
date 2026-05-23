@@ -205,7 +205,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No inline TypeScript outside of `@ts` blocks.** You cannot write `code: return {}`. It must be `code: @ts { return {} }`.
 
-**No `persistence { }` blocks.** They have been removed. The parser emits: `persistence { } blocks have been removed — use a top-level stream block instead`. Use `stream <name> { graph: g, schema, condition, prepare }` at the top level.
+**No `persistence { }` blocks.** They have been removed. The parser emits: `persistence { } blocks have been removed — use a top-level stream block instead`. Use `stream <name> { graph: g, version: v1, versions: { v1 { schema, condition?, prepare } } }` at the top level. `schema`, `condition`, and `prepare` live inside a `versions:` entry, never at the top level of the block.
 
 **No `outputSchema` on non-root nodes.** Use `schema` instead. The parser rejects `outputSchema` on non-root nodes with: `Use "schema" instead of "outputSchema" in node blocks`.
 
@@ -267,7 +267,7 @@ Only these fields have semantics for each node type. All types additionally acce
 - `operation: findall` also requires `entityType`, `generator` (`base`/`core`/`pro`/`preview`), `matchConditions` (@ts), `matchLimit` (number; API requires 5–1000). Optional: `excludeList`, `pollInterval`, `pollIntervalUnit` (`seconds`/`minutes`), `pollTimeout`, `pollTimeoutUnit`.
 No user `schema:` — vendor-managed output shape.
 
-**stream** (node, read side) — required: `stream` (bare identifier naming a top-level `stream <name> { }` block), `filter` (@ts returning a `StreamFilter` object of shape `{ field: { op: value } }` where op is `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`). `streamId`, `query`, `querySql` are removed; using them produces validator errors.
+**stream** (node, read side) — required: `stream` (bare identifier naming a top-level `stream <name> { }` block), `version` (the `versions:` key to read, e.g. `v1`), `filter` (@ts returning a `StreamFilter` object of shape `{ field: { op: value } }` where op is `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`). `streamId`, `query`, `querySql` are removed; using them produces validator errors.
 
 **graph** — required: `graph` (bare identifier naming a graph in the same file), `input` (@ts returning the input object to pass to the subgraph).
 
@@ -803,18 +803,25 @@ graph submissions {
 stream submission_log {
   label: "Submission log"
   graph: submissions
-  schema: @json {
-    {
-      "type": "object",
-      "properties": { "message": { "type": "string" } }
+  version: v1
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "properties": { "message": { "type": "string" } }
+        }
+      }
+      condition: @ts { return true }
+      prepare: @ts {
+        return { message: context.output.root.message }
+      }
     }
-  }
-  condition: @ts { return true }
-  prepare: @ts {
-    return { message: context.output.root.message }
   }
 }
 ```
+
+`schema`, `condition`, and `prepare` go **inside a `versions:` entry**, not at the top level. Placing them at the top level errors: `top-level "schema" is invalid on stream blocks — use versions { v1 { schema, condition?, prepare } }`.
 
 #### 18. Using `query` or `querySql` on a stream node
 
@@ -837,6 +844,7 @@ node recent {
   type: stream
   label: "Recent submissions"
   stream: submissions
+  version: v1
   filter: @ts {
     return {
       score: { gte: 50 }
@@ -845,7 +853,7 @@ node recent {
 }
 ```
 
-Stream nodes reference a stream block by bare identifier (not a string) and filter with an `@ts` block returning a `StreamFilter` object.
+Stream nodes reference a stream block by bare identifier (not a string), pin a `version:` (a `versions:` key on that stream), and filter with an `@ts` block returning a `StreamFilter` object.
 
 #### 19. Declaring `agent:` trigger
 
@@ -1307,8 +1315,13 @@ graph process {
 stream process_log {
   label: "Process log"
   graph: process
-  schema: @json { { "type": "object" } }
-  prepare: @ts { return {} }
+  version: v1
+  versions: {
+    v1 {
+      schema: @json { { "type": "object" } }
+      prepare: @ts { return {} }
+    }
+  }
 }
 
 secret api_creds {
@@ -1534,8 +1547,13 @@ graph my_graph { ... }
 
 stream my_graph_log {
   graph: my_graph
-  schema: @json { ... }
-  prepare: @ts { return { ... } }
+  version: v1
+  versions: {
+    v1 {
+      schema: @json { ... }
+      prepare: @ts { return { ... } }
+    }
+  }
 }
 ```
 
@@ -2634,9 +2652,9 @@ node discover_posts {
 
 ### Stream Nodes
 
-A `type: stream` node **reads** from a top-level `stream { }` block. It is the read side of Swirls' graph-to-graph communication. The node's output is an array of previously persisted records matching the filter.
+A `type: stream` node **reads** from a top-level `stream { }` block. It is the read side of Swirls' graph-to-graph communication. The node's output is an array of previously persisted records matching the filter, read from one **pinned version** of the stream.
 
-**Required fields:** `stream` (bare identifier naming a top-level stream block in the same project) and `filter` (@ts returning a `StreamFilter` object).
+**Required fields:** `stream` (bare identifier naming a top-level stream block in the same project), `version` (the `versions:` key to read, e.g. `v1`), and `filter` (@ts returning a `StreamFilter` object).
 
 **Not valid (removed from schema):** `streamId`, `query`, `querySql`. Using any of them produces a validator error.
 
@@ -2646,6 +2664,7 @@ A `type: stream` node **reads** from a top-level `stream { }` block. It is the r
 <node_name> {
   type: stream
   stream: <stream_block_name>
+  version: <version_id>
   filter: @ts {
     return {
       <field>: { <op>: <value> },
@@ -2655,6 +2674,8 @@ A `type: stream` node **reads** from a top-level `stream { }` block. It is the r
 }
 ```
 
+`<version_id>` matches `^v[1-9][0-9]*$` (`v1`, `v2`, …) and MUST name a `versions:` entry declared on the referenced stream block.
+
 #### Example
 
 ```swirls
@@ -2662,6 +2683,7 @@ node recent_high_scorers {
   type: stream
   label: "Recent high-scoring leads"
   stream: scored_leads
+  version: v1
   filter: @ts {
     return {
       score: { gte: 80 },
@@ -2695,16 +2717,16 @@ Multiple top-level keys AND together. Multiple operators on the same key also AN
 
 Filters address two field kinds uniformly:
 
-- **Table-level columns:** `created_at`, `graph_execution_id` — mapped to direct SQL column comparisons.
-- **Output JSON fields:** anything else — mapped to jsonb field extraction (Postgres) or `json_extract` (SQLite).
+- **System columns:** `id`, `created_at`, `deployment_id`, `graph_execution_id` — mapped to direct column comparisons on the version table.
+- **Payload fields:** anything else — the fields your `prepare` returned for this version, mapped to the matching column.
 
 You do not need to distinguish; the runtime infers it.
 
 #### Node output
 
-The node's output is `SchemaShape[]` — an array of records matching the referenced stream block's `schema`. Zero matches is not an error. Downstream nodes see it as `context.nodes.<stream_node>.output`.
+The node's output is `SchemaShape[]` — an array of records matching the **pinned version's** `schema`. Zero matches is not an error. Downstream nodes see it as `context.nodes.<stream_node>.output`.
 
-When the stream block has a `schema:`, the LSP types `context.nodes.<stream_node>.output` as the matching TypeScript array. If the stream block has no schema or the reference is missing, the LSP types it as `unknown[]`.
+When `versions[<version>].schema` resolves, the LSP types `context.nodes.<stream_node>.output` as the matching TypeScript array. If the version has no schema or the reference is missing, the LSP types it as `unknown[]`.
 
 #### Pagination and sorting
 
@@ -2715,6 +2737,7 @@ Not implemented yet. All queries return all matching rows ordered by `created_at
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
 | `stream` | yes | bare identifier | Must match a top-level `stream <name> { }` block. |
+| `version` | yes | `v1`, `v2`, … | Must name a `versions:` entry on the referenced stream block. |
 | `filter` | yes | `@ts { }` or `@ts "file.ts.swirls"` | Must be non-empty; must return a `StreamFilter` object. |
 
 #### Common mistakes
@@ -2731,17 +2754,43 @@ node recent {
 
 Error: `querySql and query are no longer supported on stream nodes; use filter (@ts returning a filter object)`.
 
+**Incorrect (missing `version`):**
+
+```swirls
+node recent {
+  type: stream
+  stream: scored_leads
+  filter: @ts { return {} }
+}
+```
+
+`version` is required on every `type: stream` node — there is no implicit default. Pin it: `version: v1`.
+
 **Incorrect (referencing an undefined stream block):**
 
 ```swirls
 node recent {
   type: stream
   stream: undefined_stream
+  version: v1
   filter: @ts { return {} }
 }
 ```
 
 Error: `Stream node references stream block "undefined_stream" which is not defined`.
+
+**Incorrect (pinning a version the stream does not declare):**
+
+```swirls
+node recent {
+  type: stream
+  stream: scored_leads
+  version: v9
+  filter: @ts { return {} }
+}
+```
+
+Error: `Stream node pins version "v9" but stream "scored_leads" does not declare that version under versions { }`. An invalid id (e.g. `version: latest`) errors with `Stream node "version" must be a valid stream version id (e.g. v1), got "latest"`.
 
 **Incorrect (empty filter):**
 
@@ -2749,6 +2798,7 @@ Error: `Stream node references stream block "undefined_stream" which is not defi
 node recent {
   type: stream
   stream: scored_leads
+  version: v1
   filter: @ts { }
 }
 ```
@@ -4778,9 +4828,11 @@ trigger daily_trigger {
 
 ### Stream Block Declaration
 
-Top-level `stream <name> { }` blocks persist one graph's output into a named, schema-typed record. They replace the removed `persistence { }` block. A `type: stream` node in another graph can read from the same stream by name to achieve graph-to-graph communication.
+Top-level `stream <name> { }` blocks persist one graph's output into a named, schema-typed record. They replace the removed `persistence { }` block. A `type: stream` node in another graph can read from the same stream (at a pinned version) to achieve graph-to-graph communication.
 
 **There is no `type:` field on a stream block** — the keyword `stream` identifies the block.
+
+Each stream declares one or more **versions** under a `versions:` map. Every version carries its own `schema`, optional `condition`, and required `prepare`. The block's top-level `version:` pointer names which version the writer persists into. `schema`, `condition`, and `prepare` live **only inside a `versions:` entry** — never at the top level of the block.
 
 #### Syntax
 
@@ -4790,31 +4842,47 @@ stream <name> {
   description: "<optional string>"
   enabled: <boolean>                  // optional; default treated as true
   graph: <graph_name>                 // required; graph declared in this file
-  schema: @json {                     // recommended; warning if omitted
-    { ... JSON Schema for one persisted record ... }
-  }
-  condition: @ts {                    // optional; return true to persist
-    return <boolean expression>
-  }
-  prepare: @ts {                      // required; return the object to persist
-    return { ... }
+  version: <version_id>               // required; active writer version, must exist in versions:
+
+  versions: {
+    <version_id> {                    // version_id matches ^v[1-9][0-9]*$ (v1, v2, …)
+      schema: @json {                 // required per version
+        { ... JSON Schema for one persisted record ... }
+      }
+      condition: @ts {                // optional; return true to persist
+        return <boolean expression>
+      }
+      prepare: @ts {                  // required; return the object to persist
+        return { ... }
+      }
+    }
+    ...
   }
 }
 ```
 
-`condition` and `prepare` may also be `@ts "path.ts.swirls"` file references.
+`condition` and `prepare` may also be `@ts "path.ts.swirls"` file references. `schema` may instead be a bare-identifier reference to a top-level `schema` block: `schema: my_record_schema`.
 
 #### Required vs optional fields
 
+Block-level:
+
 | Field | Required | Notes |
 |-------|----------|-------|
-| `graph` | yes | Bare identifier naming a graph in the same file. |
-| `prepare` | yes | Non-empty `@ts { }` or `@ts "…"` reference. Must return the record object. |
-| `schema` | recommended | Warning if omitted. JSON Schema for one persisted record. |
-| `condition` | no | `@ts` returning boolean; if false, skip persist. If present and empty, the validator errors. |
+| `graph` | yes | Bare identifier naming a graph in the same file (or merged workspace). |
+| `version` | yes | Active writer `version_id` (`v1`, …). Must match a key in `versions:`. |
+| `versions` | yes | Non-empty map of `version_id` → `{ schema, condition?, prepare }`. |
 | `label` | no | Defaults to the stream's name. |
 | `description` | no | Free-form description. |
 | `enabled` | no | When false, runtime skips persistence but the stream stays in the AST and deployment. |
+
+Per-version (inside `versions:`):
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `schema` | yes | `@json { }` literal or `schema: <name>` reference. Defines one record's shape for that version. |
+| `prepare` | yes | Non-empty `@ts { }` or `@ts "…"` reference. Must return the record object. |
+| `condition` | no | `@ts` returning boolean; if false, skip persist. If present and empty, the validator errors. |
 
 #### Context shape inside `condition` and `prepare`
 
@@ -4871,29 +4939,34 @@ stream scored_leads {
   label: "Scored leads"
   description: "Persists lead scoring output from process_leads"
   graph: process_leads
+  version: v1
 
-  schema: @json {
-    {
-      "type": "object",
-      "required": ["email", "name", "score"],
-      "properties": {
-        "email": { "type": "string" },
-        "name":  { "type": "string" },
-        "score": { "type": "number" }
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["email", "name", "score"],
+          "properties": {
+            "email": { "type": "string" },
+            "name":  { "type": "string" },
+            "score": { "type": "number" }
+          }
+        }
       }
-    }
-  }
 
-  condition: @ts {
-    return (context.output.root?.score ?? 0) > 50
-  }
+      condition: @ts {
+        return (context.output.root?.score ?? 0) > 50
+      }
 
-  prepare: @ts {
-    const lead = context.output.root!
-    return {
-      email: lead.email,
-      name: lead.name,
-      score: lead.score
+      prepare: @ts {
+        const lead = context.output.root!
+        return {
+          email: lead.email,
+          name: lead.name,
+          score: lead.score
+        }
+      }
     }
   }
 }
@@ -4901,7 +4974,7 @@ stream scored_leads {
 
 #### Reading a stream — the read side
 
-A `type: stream` node in another graph reads the persisted data:
+A `type: stream` node in another graph reads the persisted data at a pinned version:
 
 ```swirls
 graph enrich_leads {
@@ -4911,6 +4984,7 @@ graph enrich_leads {
     type: stream
     label: "Read scored leads"
     stream: scored_leads
+    version: v1
     filter: @ts {
       return {
         score: { gte: 80 }
@@ -4922,13 +4996,21 @@ graph enrich_leads {
 
 See `node-stream` for the full filter operator list.
 
+#### Provisioning and versioning
+
+- Deploy provisions **one Postgres table per `(stream, version)`** — for example `project_<uuid>.stream_scored_leads_v1`.
+- Graph completion writes only to the deployment's active `version` (the block-level `version:` pointer).
+- Re-deploying with a **changed `schema` for an existing version id** fails with a drift error. To evolve a record shape, add a **new** `versions:` entry (`v2`, …) and move the `version:` pointer; existing readers stay pinned to the old version until you migrate them.
+- The local CLI worker does not write or read stream data — exercise streams in a deployed project.
+
 #### Validation rules
 
-- Stream names must match `^[a-zA-Z0-9_]+$`. Duplicate names error.
-- `graph` must reference a declared graph in the same file.
-- `prepare` is required; must be a non-empty `@ts` block or file reference.
-- If `condition` is provided, it must be non-empty.
-- `schema` is recommended (warning if omitted).
+- Stream names must match `^[a-zA-Z0-9_]+$`. Duplicate names error with `Duplicate stream name "X"`.
+- `graph` is required (`Stream block requires "graph" (graph name)`) and must reference a declared graph (`Stream references graph "X" which is not defined`).
+- `version` is required (`Stream "X" requires "version" (active writer)`), must be a valid `version_id` (`… version pointer "X" is invalid — use v1, v2, …`), and must be declared under `versions:` (`… version "X" is not declared under versions { }`).
+- `versions:` must be non-empty (`Stream "X" requires a non-empty versions { } block`). Duplicate keys error (`… declares duplicate version key "X"`).
+- Each version requires a `schema` (`… version "vN" has no schema; add schema: @json { … } or schema: <name>`) and a non-empty `prepare` (`… version "vN" requires "prepare"`). A present-but-empty `condition` errors too.
+- Placing `schema` / `condition` / `prepare` at the **top level** of the block is a parse error: `top-level "<key>" is invalid on stream blocks — use versions { v1 { schema, condition?, prepare } }`. Any key other than `schema`, `condition`, `prepare` inside a version entry errors: `Unexpected key "<key>" in stream versions block — only schema, condition, and prepare are allowed`.
 
 #### Top-level vs node keyword — disambiguation
 
@@ -5673,25 +5755,30 @@ graph submissions {
 stream submission_log {
   label: "Submission log"
   graph: submissions
+  version: v1
 
-  schema: @json {
-    {
-      "type": "object",
-      "required": ["score", "message"],
-      "properties": {
-        "score":   { "type": "number" },
-        "message": { "type": "string" }
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["score", "message"],
+          "properties": {
+            "score":   { "type": "number" },
+            "message": { "type": "string" }
+          }
+        }
+      }
+
+      condition: @ts {
+        return true
+      }
+
+      prepare: @ts {
+        const out = context.output.root!
+        return { score: out.score, message: out.message }
       }
     }
-  }
-
-  condition: @ts {
-    return true
-  }
-
-  prepare: @ts {
-    const out = context.output.root!
-    return { score: out.score, message: out.message }
   }
 }
 ```
@@ -5701,9 +5788,10 @@ stream submission_log {
 | Old persistence | New top-level stream |
 |-----------------|----------------------|
 | Inside `graph { }` | Top-level block `stream <name> { }` |
-| Implicit shape | **Explicit `schema:` (recommended)** |
-| No mapping layer | **Required `prepare: @ts { ... }`** returns the shape |
-| `condition:` optional | `condition:` optional (must be non-empty if given) |
+| Single implicit shape | **One or more `versions:`**, each with an explicit, required `schema` |
+| No version pointer | **Required `version:`** names the active writer version |
+| No mapping layer | **Required `prepare: @ts { ... }` per version** returns the shape |
+| `condition:` optional | `condition:` optional per version (must be non-empty if given) |
 | Stream name defaulted to graph name | Stream has its own `<name>`; multiple streams can reference one graph |
 | Context accessed via `context.nodes` | `prepare` / `condition` access `context.output.<leafNode>` plus `context.nodes` |
 
@@ -5740,6 +5828,7 @@ node recent {
   type: stream
   label: "Recent high scorers"
   stream: scored_leads
+  version: v1
   filter: @ts {
     return {
       score: { gte: 80 }
@@ -5747,6 +5836,8 @@ node recent {
   }
 }
 ```
+
+A `type: stream` node also requires a `version:` pin (the `versions:` key on the stream block). See `node-stream`.
 
 #### Operator reference
 
@@ -5785,15 +5876,17 @@ See `node-stream` for required fields and `resource-stream` for the write side.
 
 ### Stream Filter Field Paths
 
-Stream filters reference two kinds of fields uniformly: table-level columns and fields inside the persisted output JSON. The runtime decides which is which — you just use the key name.
+Stream filters reference two kinds of fields uniformly: system columns and the payload fields of the persisted record. The runtime decides which is which — you just use the key name. (Filter fragments below live inside a `type: stream` node, which also needs `stream:` and `version:` — see `node-stream`.)
 
-#### Table-level columns
+#### System columns
 
-These are the two first-class columns exposed on every stream row.
+These are the first-class columns exposed on every stream row.
 
 | Name | Type | Meaning |
 |------|------|---------|
+| `id` | identifier | Row id. |
 | `created_at` | timestamp | When the row was persisted. |
+| `deployment_id` | string | Deployment that wrote the row. |
 | `graph_execution_id` | string | Execution that produced the row. |
 
 Use them directly in the filter object:
@@ -5806,11 +5899,13 @@ filter: @ts {
 }
 ```
 
-#### Output JSON fields
+System columns are filterable but are **stripped from the returned rows** — a queried row contains only your payload fields.
 
-Every other key in the filter is looked up inside the persisted `output` JSON (the shape your `prepare:` returned in the stream block). Nested paths are not currently supported — filter on top-level keys of the prepared record.
+#### Payload fields
 
-If your stream block's `prepare` returns `{ email, name, score }`, filter on `email`, `name`, `score`:
+Every other key in the filter is a field of the persisted record — the shape your version's `prepare:` returned (and described by that version's `schema`). Filter on the same top-level key names your `prepare` produced; the runtime maps them to the matching column (camelCase keys are matched case-insensitively against their snake_case column).
+
+If your version's `prepare` returns `{ email, name, score }`, filter on `email`, `name`, `score`:
 
 ```swirls
 filter: @ts {
@@ -5823,7 +5918,8 @@ filter: @ts {
 
 #### Conventions
 
-- The shape of each persisted record is fully controlled by the stream block's `prepare` return value and described by the block's `schema`. Think of the filter as filtering the prepared record, not a graph's raw node outputs.
+- The shape of each persisted record is fully controlled by the version's `prepare` return value and described by that version's `schema`. Think of the filter as filtering the prepared record, not a graph's raw node outputs.
+- Reads are pinned to one `version`, so filter fields must exist in **that version's** schema/prepared shape. Different versions can expose different fields.
 - If you need to filter on multiple node outputs, combine them inside `prepare` so the persisted record exposes the fields you want.
 - `like` uses SQL `LIKE` semantics — `%` is the wildcard. No regex.
 
@@ -5831,7 +5927,7 @@ filter: @ts {
 
 If you see older examples using `"root.field"` or other dotted column names in SQL strings, those apply to the removed SQL-query form of stream nodes. They do not apply to filters. Filter keys are flat top-level names only.
 
-See `node-stream` for the full filter API.
+See `node-stream` for the full filter API and `resource-stream` for declaring versions.
 
 
 # 10. Reviews
@@ -6342,22 +6438,37 @@ Every error and warning the validator can emit, grouped by category. Use this as
 - `HTTP node references undefined auth block "<b>"` — Node's `auth:` value is not a declared auth block.
 - `"auth" is only valid on http nodes` — You put `auth:` on a non-http node (code, ai, etc.). Remove it.
 
-#### Stream nodes
+#### Stream nodes (read side)
+
+Required keys: `stream`, `version`, `filter`.
 
 - `streamId is no longer supported on stream nodes; use stream (stream block name)` — Rename `streamId:` to `stream:` with a bare identifier.
 - `querySql and query are no longer supported on stream nodes; use filter (@ts returning a filter object)` — Replace with `filter: @ts { return { ... } }`.
-- `Stream node references stream block "<n>" which is not defined` — `stream:` names a block that does not exist in the file.
+- `Stream node references stream block "<n>" which is not defined` — `stream:` names a block that does not exist in the file or workspace.
+- `Stream node "version" must be a valid stream version id (e.g. v1), got "<v>"` — `version:` must match `^v[1-9][0-9]*$`.
+- `Stream node pins version "<v>" but stream "<n>" does not declare that version under versions { }` — Pin a `version:` that the stream block actually declares.
 - `Stream node filter must be a non-empty @ts block` — `filter: @ts { }` is empty. Return at least `{}`.
 - `Stream node "filter" must be an @ts block or @ts "file.ts.swirls" reference` — You used a plain value for `filter:`.
 
-#### Stream top-level block
+#### Stream top-level block (write side)
 
-- `Stream "<n>": "graph" must reference a declared graph in this file` — Fix the graph name.
-- `Stream "<n>": "prepare" is required` — Add a non-empty `prepare: @ts { ... }`.
-- `Stream "<n>": "prepare" must be an @ts block or @ts "file.ts.swirls" reference` — Use `@ts`.
-- `Stream "<n>": "prepare" @ts block must not be empty` — Add a return.
-- `Stream "<n>": "condition" @ts block must not be empty` — Remove `condition:` or give it a body.
-- Warning: `Stream "<n>" has no schema; consider adding one`.
+`schema`, `condition`, and `prepare` live **inside a `versions:` entry**, never at the top level.
+
+- `Duplicate stream name "<n>"` — Two stream blocks share a name.
+- `Stream block requires "graph" (graph name)` — Add `graph: <graph_name>`.
+- `Stream references graph "<n>" which is not defined` — Fix the graph name (file or workspace).
+- `Stream "<n>" requires "version" (active writer)` — Add the block-level `version:` pointer.
+- `Stream "<n>" version pointer "<v>" is invalid — use v1, v2, …` — Pointer must match `^v[1-9][0-9]*$`.
+- `Stream "<n>" requires a non-empty versions { } block` — Declare at least one `versions: { v1 { … } }` entry.
+- `Stream "<n>" version "<v>" is not declared under versions { }` — The `version:` pointer must name a declared version key.
+- `Stream "<n>" declares duplicate version key "<v>"` — Each version key must be unique.
+- `Stream "<n>" version key "<v>" is invalid — use v1, v2, …` — Version keys match `^v[1-9][0-9]*$`.
+- `Stream "<n>" version "<v>" has no schema; add schema: @json { … } or schema: <name>` — Each version requires a schema (error, not a warning).
+- `Stream "<n>" version "<v>" requires "prepare" (@ts { } or @ts "…")` — Add a `prepare` to that version.
+- `Stream "<n>" version "<v>": prepare requires a non-empty @ts block or @ts "path.ts.swirls"` — Give `prepare` a body.
+- `Stream "<n>" version "<v>": condition requires a non-empty @ts block or @ts "path.ts.swirls"` — Remove `condition:` or give it a body.
+- Parser: `top-level "<key>" is invalid on stream blocks — use versions { v1 { schema, condition?, prepare } }` — You put `schema` / `condition` / `prepare` at the top level. Move them inside a version entry.
+- Parser: `Unexpected key "<key>" in stream versions block — only schema, condition, and prepare are allowed` — Remove the stray key from the version entry.
 
 #### Parallel nodes
 

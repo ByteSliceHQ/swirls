@@ -51,22 +51,37 @@ Every error and warning the validator can emit, grouped by category. Use this as
 - `HTTP node references undefined auth block "<b>"` — Node's `auth:` value is not a declared auth block.
 - `"auth" is only valid on http nodes` — You put `auth:` on a non-http node (code, ai, etc.). Remove it.
 
-### Stream nodes
+### Stream nodes (read side)
+
+Required keys: `stream`, `version`, `filter`.
 
 - `streamId is no longer supported on stream nodes; use stream (stream block name)` — Rename `streamId:` to `stream:` with a bare identifier.
 - `querySql and query are no longer supported on stream nodes; use filter (@ts returning a filter object)` — Replace with `filter: @ts { return { ... } }`.
-- `Stream node references stream block "<n>" which is not defined` — `stream:` names a block that does not exist in the file.
+- `Stream node references stream block "<n>" which is not defined` — `stream:` names a block that does not exist in the file or workspace.
+- `Stream node "version" must be a valid stream version id (e.g. v1), got "<v>"` — `version:` must match `^v[1-9][0-9]*$`.
+- `Stream node pins version "<v>" but stream "<n>" does not declare that version under versions { }` — Pin a `version:` that the stream block actually declares.
 - `Stream node filter must be a non-empty @ts block` — `filter: @ts { }` is empty. Return at least `{}`.
 - `Stream node "filter" must be an @ts block or @ts "file.ts.swirls" reference` — You used a plain value for `filter:`.
 
-### Stream top-level block
+### Stream top-level block (write side)
 
-- `Stream "<n>": "graph" must reference a declared graph in this file` — Fix the graph name.
-- `Stream "<n>": "prepare" is required` — Add a non-empty `prepare: @ts { ... }`.
-- `Stream "<n>": "prepare" must be an @ts block or @ts "file.ts.swirls" reference` — Use `@ts`.
-- `Stream "<n>": "prepare" @ts block must not be empty` — Add a return.
-- `Stream "<n>": "condition" @ts block must not be empty` — Remove `condition:` or give it a body.
-- Warning: `Stream "<n>" has no schema; consider adding one`.
+`schema`, `condition`, and `prepare` live **inside a `versions:` entry**, never at the top level.
+
+- `Duplicate stream name "<n>"` — Two stream blocks share a name.
+- `Stream block requires "graph" (graph name)` — Add `graph: <graph_name>`.
+- `Stream references graph "<n>" which is not defined` — Fix the graph name (file or workspace).
+- `Stream "<n>" requires "version" (active writer)` — Add the block-level `version:` pointer.
+- `Stream "<n>" version pointer "<v>" is invalid — use v1, v2, …` — Pointer must match `^v[1-9][0-9]*$`.
+- `Stream "<n>" requires a non-empty versions { } block` — Declare at least one `versions: { v1 { … } }` entry.
+- `Stream "<n>" version "<v>" is not declared under versions { }` — The `version:` pointer must name a declared version key.
+- `Stream "<n>" declares duplicate version key "<v>"` — Each version key must be unique.
+- `Stream "<n>" version key "<v>" is invalid — use v1, v2, …` — Version keys match `^v[1-9][0-9]*$`.
+- `Stream "<n>" version "<v>" has no schema; add schema: @json { … } or schema: <name>` — Each version requires a schema (error, not a warning).
+- `Stream "<n>" version "<v>" requires "prepare" (@ts { } or @ts "…")` — Add a `prepare` to that version.
+- `Stream "<n>" version "<v>": prepare requires a non-empty @ts block or @ts "path.ts.swirls"` — Give `prepare` a body.
+- `Stream "<n>" version "<v>": condition requires a non-empty @ts block or @ts "path.ts.swirls"` — Remove `condition:` or give it a body.
+- Parser: `top-level "<key>" is invalid on stream blocks — use versions { v1 { schema, condition?, prepare } }` — You put `schema` / `condition` / `prepare` at the top level. Move them inside a version entry.
+- Parser: `Unexpected key "<key>" in stream versions block — only schema, condition, and prepare are allowed` — Remove the stray key from the version entry.
 
 ### Parallel nodes
 

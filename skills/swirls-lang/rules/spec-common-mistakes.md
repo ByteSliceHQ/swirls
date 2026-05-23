@@ -502,18 +502,25 @@ graph submissions {
 stream submission_log {
   label: "Submission log"
   graph: submissions
-  schema: @json {
-    {
-      "type": "object",
-      "properties": { "message": { "type": "string" } }
+  version: v1
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "properties": { "message": { "type": "string" } }
+        }
+      }
+      condition: @ts { return true }
+      prepare: @ts {
+        return { message: context.output.root.message }
+      }
     }
-  }
-  condition: @ts { return true }
-  prepare: @ts {
-    return { message: context.output.root.message }
   }
 }
 ```
+
+`schema`, `condition`, and `prepare` go **inside a `versions:` entry**, not at the top level. Placing them at the top level errors: `top-level "schema" is invalid on stream blocks — use versions { v1 { schema, condition?, prepare } }`.
 
 ### 18. Using `query` or `querySql` on a stream node
 
@@ -536,6 +543,7 @@ node recent {
   type: stream
   label: "Recent submissions"
   stream: submissions
+  version: v1
   filter: @ts {
     return {
       score: { gte: 50 }
@@ -544,7 +552,7 @@ node recent {
 }
 ```
 
-Stream nodes reference a stream block by bare identifier (not a string) and filter with an `@ts` block returning a `StreamFilter` object.
+Stream nodes reference a stream block by bare identifier (not a string), pin a `version:` (a `versions:` key on that stream), and filter with an `@ts` block returning a `StreamFilter` object.
 
 ### 19. Declaring `agent:` trigger
 

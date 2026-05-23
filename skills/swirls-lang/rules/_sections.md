@@ -43,7 +43,7 @@
 ## 9. Streams (stream)
 
 **Impact:** MEDIUM
-**Description:** Persisting graph output via top-level `stream { }` blocks and reading it with `type: stream` nodes using `filter: @ts` returning a StreamFilter. Covers migration from the removed `persistence { }` block.
+**Description:** Persisting graph output via versioned top-level `stream { }` blocks (a `version` pointer plus a `versions:` map) and reading it with version-pinned `type: stream` nodes using `filter: @ts` returning a StreamFilter. Covers migration from the removed `persistence { }` block.
 
 ## 10. Reviews (review)
 

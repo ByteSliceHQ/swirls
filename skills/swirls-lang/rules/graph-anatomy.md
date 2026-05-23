@@ -88,7 +88,12 @@ graph my_graph { ... }
 
 stream my_graph_log {
   graph: my_graph
-  schema: @json { ... }
-  prepare: @ts { return { ... } }
+  version: v1
+  versions: {
+    v1 {
+      schema: @json { ... }
+      prepare: @ts { return { ... } }
+    }
+  }
 }
 ```

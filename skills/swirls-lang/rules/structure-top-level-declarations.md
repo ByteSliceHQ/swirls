@@ -64,8 +64,13 @@ graph process {
 stream process_log {
   label: "Process log"
   graph: process
-  schema: @json { { "type": "object" } }
-  prepare: @ts { return {} }
+  version: v1
+  versions: {
+    v1 {
+      schema: @json { { "type": "object" } }
+      prepare: @ts { return {} }
+    }
+  }
 }
 
 secret api_creds {

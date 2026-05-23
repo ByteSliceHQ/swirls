@@ -21,7 +21,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - Connecting graphs to forms, webhooks, or schedules via triggers.
 - Configuring form `visibility` (`public` / `internal`) and webhook shared-secret auth (`secret:` + `header:`).
 - Building per-item iteration with `map` nodes or counter/condition loops with `while` nodes (inline `subgraph { }` or referenced `graph: <name>`).
-- Persisting graph output with top-level `stream { }` blocks and reading it with `type: stream` nodes.
+- Persisting graph output with versioned top-level `stream { }` blocks and reading it with version-pinned `type: stream` nodes.
 - Configuring human-in-the-loop review blocks.
 - Declaring external Postgres databases and writing parameterized SQL nodes.
 
@@ -68,7 +68,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `node-email` - Email nodes (`type: email`): sending email via Resend
 - `node-scrape` - Scrape nodes (`type: scrape`): web scraping via Firecrawl
 - `node-parallel` - Parallel nodes: search / extract / findall operations
-- `node-stream` - Stream nodes: reading persisted stream data with filters
+- `node-stream` - Stream nodes: reading persisted stream data at a pinned `version` with filters
 - `node-graph` - Graph nodes: calling subgraphs (one-shot)
 - `node-map` - Map nodes: per-item iteration with inline `subgraph { }` or `graph: <name>`; required `items`, `maxItems`; optional `concurrency`
 - `node-while` - While nodes: counter/condition loops with `input`, `condition`, `update`, `maxIterations` plus `subgraph { }` or `graph: <name>`
@@ -104,7 +104,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `resource-form` - Form declarations with label, schema, enabled, `visibility public | internal` (default internal)
 - `resource-webhook` - Webhook declarations with shared-secret `secret: <block>.<VAR>` + `header: "X-..."` verification (paired); reserved-headers list
 - `resource-schedule` - Schedule declarations with cron and timezone
-- `resource-stream` - Top-level `stream { }` blocks: graph, schema, condition, prepare
+- `resource-stream` - Top-level `stream { }` blocks: graph, `version` pointer, and a `versions:` map with per-version schema/condition/prepare
 - `resource-schema` - Top-level `schema <name> { }` blocks: reusable JSON Schemas referenced by bare identifier from forms / webhooks / root inputSchema / root outputSchema / non-root schema / review schema
 - `resource-trigger-binding` - Trigger syntax: `resourceType:name -> graphName` (form / webhook / schedule only)
 - `resource-secrets` - Top-level `secret { vars: [...] }` blocks

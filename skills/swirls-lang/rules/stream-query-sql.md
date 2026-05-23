@@ -29,6 +29,7 @@ node recent {
   type: stream
   label: "Recent high scorers"
   stream: scored_leads
+  version: v1
   filter: @ts {
     return {
       score: { gte: 80 }
@@ -36,6 +37,8 @@ node recent {
   }
 }
 ```
+
+A `type: stream` node also requires a `version:` pin (the `versions:` key on the stream block). See `node-stream`.
 
 ### Operator reference
 

@@ -69,25 +69,30 @@ graph submissions {
 stream submission_log {
   label: "Submission log"
   graph: submissions
+  version: v1
 
-  schema: @json {
-    {
-      "type": "object",
-      "required": ["score", "message"],
-      "properties": {
-        "score":   { "type": "number" },
-        "message": { "type": "string" }
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["score", "message"],
+          "properties": {
+            "score":   { "type": "number" },
+            "message": { "type": "string" }
+          }
+        }
+      }
+
+      condition: @ts {
+        return true
+      }
+
+      prepare: @ts {
+        const out = context.output.root!
+        return { score: out.score, message: out.message }
       }
     }
-  }
-
-  condition: @ts {
-    return true
-  }
-
-  prepare: @ts {
-    const out = context.output.root!
-    return { score: out.score, message: out.message }
   }
 }
 ```
@@ -97,9 +102,10 @@ stream submission_log {
 | Old persistence | New top-level stream |
 |-----------------|----------------------|
 | Inside `graph { }` | Top-level block `stream <name> { }` |
-| Implicit shape | **Explicit `schema:` (recommended)** |
-| No mapping layer | **Required `prepare: @ts { ... }`** returns the shape |
-| `condition:` optional | `condition:` optional (must be non-empty if given) |
+| Single implicit shape | **One or more `versions:`**, each with an explicit, required `schema` |
+| No version pointer | **Required `version:`** names the active writer version |
+| No mapping layer | **Required `prepare: @ts { ... }` per version** returns the shape |
+| `condition:` optional | `condition:` optional per version (must be non-empty if given) |
 | Stream name defaulted to graph name | Stream has its own `<name>`; multiple streams can reference one graph |
 | Context accessed via `context.nodes` | `prepare` / `condition` access `context.output.<leafNode>` plus `context.nodes` |
 
