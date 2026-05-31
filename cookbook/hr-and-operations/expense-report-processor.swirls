@@ -24,7 +24,7 @@ form expense_report {
   }
 }
 
-graph process_expense {
+workflow process_expense {
   label: "Process Expense"
 
   root {

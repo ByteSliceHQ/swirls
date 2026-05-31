@@ -33,7 +33,7 @@ schedule periodic_entry {
   cron: "0 12 * * *"
 }
 
-graph process_message {
+workflow process_message {
   label: "Process Message"
 
   root {

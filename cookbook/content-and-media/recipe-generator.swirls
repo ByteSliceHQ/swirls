@@ -22,7 +22,7 @@ form recipe_request {
   }
 }
 
-graph generate_recipe {
+workflow generate_recipe {
   label: "Generate Recipe"
 
   root {

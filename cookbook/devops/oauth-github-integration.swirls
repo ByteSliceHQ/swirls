@@ -23,7 +23,7 @@ schedule daily_stats {
   cron: "0 9 * * *"
 }
 
-graph fetch_repo_stats {
+workflow fetch_repo_stats {
   label: "Fetch Repo Stats"
 
   root {

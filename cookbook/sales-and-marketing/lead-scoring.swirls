@@ -20,7 +20,7 @@ webhook new_lead {
   }
 }
 
-graph score_lead {
+workflow score_lead {
   label: "Score Lead"
 
   root {
@@ -111,7 +111,7 @@ graph score_lead {
 
 stream scored_leads {
   label: "Scored leads"
-  graph: score_lead
+  workflow: score_lead
   version: v1
 
   versions: {

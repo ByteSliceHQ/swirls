@@ -431,7 +431,7 @@
           "slug": "stream-reporting-dashboard",
           "title": "Stream Reporting Dashboard",
           "file": "patterns/stream-reporting-dashboard.swirls",
-          "description": "One graph logs events with persistence, another queries the stream and emails a report.",
+          "description": "One workflow logs events with persistence, another queries the stream and emails a report.",
           "nodes": ["stream", "resend"],
           "trigger": "webhook",
           "tags": ["pattern", "persistence"]

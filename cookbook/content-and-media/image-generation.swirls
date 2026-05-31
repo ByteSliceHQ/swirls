@@ -26,7 +26,7 @@ form image_request {
   }
 }
 
-graph generate_image {
+workflow generate_image {
   label: "Generate Image"
 
   root {

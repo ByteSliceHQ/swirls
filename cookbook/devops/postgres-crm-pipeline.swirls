@@ -50,7 +50,7 @@ schedule daily_scoring {
   timezone: "America/New_York"
 }
 
-graph score_leads {
+workflow score_leads {
   label: "Score Leads from DB"
 
   root {

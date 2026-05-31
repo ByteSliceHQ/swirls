@@ -17,7 +17,7 @@ webhook process_file {
   }
 }
 
-graph file_pipeline {
+workflow file_pipeline {
   label: "File Processing Pipeline"
 
   root {

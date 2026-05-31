@@ -23,7 +23,7 @@ form kb_request {
   }
 }
 
-graph generate_kb_article {
+workflow generate_kb_article {
   label: "Generate KB Article"
 
   root {

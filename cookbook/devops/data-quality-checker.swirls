@@ -17,7 +17,7 @@ webhook data_record {
   }
 }
 
-graph check_quality {
+workflow check_quality {
   label: "Check Data Quality"
 
   root {
@@ -110,7 +110,7 @@ graph check_quality {
 
 stream quality_log {
   label: "Quality log"
-  graph: check_quality
+  workflow: check_quality
   version: v1
 
   versions: {

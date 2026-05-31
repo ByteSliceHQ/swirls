@@ -8,7 +8,7 @@ schedule weekly_intel {
   timezone: "America/New_York"
 }
 
-graph scan_competitors {
+workflow scan_competitors {
   label: "Scan Competitors"
 
   root {

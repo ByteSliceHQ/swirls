@@ -22,7 +22,7 @@ form document_submission {
   }
 }
 
-graph approve_document {
+workflow approve_document {
   label: "Document Approval"
 
   root {

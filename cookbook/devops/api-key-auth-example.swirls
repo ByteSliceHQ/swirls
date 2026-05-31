@@ -20,7 +20,7 @@ schedule hourly_weather {
   cron: "0 * * * *"
 }
 
-graph fetch_weather {
+workflow fetch_weather {
   label: "Fetch Weather"
 
   root {

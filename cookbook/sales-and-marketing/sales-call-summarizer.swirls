@@ -18,7 +18,7 @@ webhook call_transcript {
   }
 }
 
-graph summarize_call {
+workflow summarize_call {
   label: "Summarize Sales Call"
 
   root {
@@ -90,7 +90,7 @@ graph summarize_call {
 
 stream call_summaries {
   label: "Call summaries"
-  graph: summarize_call
+  workflow: summarize_call
   version: v1
 
   versions: {

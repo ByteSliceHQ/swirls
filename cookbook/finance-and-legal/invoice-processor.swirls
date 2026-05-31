@@ -19,7 +19,7 @@ webhook invoice_received {
   }
 }
 
-graph process_invoice {
+workflow process_invoice {
   label: "Process Invoice"
 
   root {
@@ -117,7 +117,7 @@ graph process_invoice {
 
 stream invoices {
   label: "Invoices"
-  graph: process_invoice
+  workflow: process_invoice
   version: v1
 
   versions: {

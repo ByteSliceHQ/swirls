@@ -18,7 +18,7 @@ webhook product_review {
   }
 }
 
-graph analyze_review {
+workflow analyze_review {
   label: "Analyze Review Sentiment"
 
   root {
@@ -86,7 +86,7 @@ graph analyze_review {
 
 stream review_sentiments {
   label: "Review sentiments"
-  graph: analyze_review
+  workflow: analyze_review
   version: v1
 
   versions: {

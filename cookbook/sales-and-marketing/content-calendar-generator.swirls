@@ -23,7 +23,7 @@ form content_brief {
   }
 }
 
-graph generate_calendar {
+workflow generate_calendar {
   label: "Generate Content Calendar"
 
   root {

@@ -27,7 +27,7 @@ form social_post {
   }
 }
 
-graph generate_posts {
+workflow generate_posts {
   label: "Generate Social Posts"
 
   root {

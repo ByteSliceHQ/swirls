@@ -19,7 +19,7 @@ webhook support_interaction {
   }
 }
 
-graph score_csat {
+workflow score_csat {
   label: "Score CSAT"
 
   root {
@@ -107,7 +107,7 @@ graph score_csat {
 
 stream csat_scores {
   label: "CSAT scores"
-  graph: score_csat
+  workflow: score_csat
   version: v1
 
   versions: {

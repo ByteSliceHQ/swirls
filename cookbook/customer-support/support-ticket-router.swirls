@@ -19,7 +19,7 @@ webhook support_ticket {
   }
 }
 
-graph route_ticket {
+workflow route_ticket {
   label: "Route Support Ticket"
 
   root {

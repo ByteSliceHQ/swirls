@@ -142,7 +142,7 @@ cd cookbook
 swirls doctor
 
 # Run a single workflow with test input
-swirls graph execute score_leads --input '{"company": "Acme", "email": "j@acme.co", "source": "demo"}'
+swirls workflow execute score_leads --input '{"company": "Acme", "email": "j@acme.co", "source": "demo"}'
 ```
 
 ### Environment variables
@@ -192,5 +192,5 @@ bun run tests/cookbook.test.ts
 | `postgres` | Read from or write to a PostgreSQL database |
 | `bucket` | Download or upload files to cloud storage |
 | `stream` | Query persisted event streams |
-| `graph` | Call another graph as a subgraph |
+| `workflow` | Call another workflow as a subgraph |
 | `wait` | Pause execution for a duration before continuing |

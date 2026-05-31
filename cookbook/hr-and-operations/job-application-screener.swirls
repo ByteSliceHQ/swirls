@@ -19,7 +19,7 @@ form job_application {
   }
 }
 
-graph screen_application {
+workflow screen_application {
   label: "Screen Application"
 
   root {

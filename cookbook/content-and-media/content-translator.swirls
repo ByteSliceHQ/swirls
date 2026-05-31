@@ -26,7 +26,7 @@ form translate_form {
   }
 }
 
-graph translate_content {
+workflow translate_content {
   label: "Translate Content"
 
   root {

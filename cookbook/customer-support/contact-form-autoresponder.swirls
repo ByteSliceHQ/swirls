@@ -18,7 +18,7 @@ form contact {
   }
 }
 
-graph handle_contact {
+workflow handle_contact {
   label: "Handle Contact Form"
 
   root {

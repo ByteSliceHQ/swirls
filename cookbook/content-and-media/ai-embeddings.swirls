@@ -17,7 +17,7 @@ webhook embed_request {
   }
 }
 
-graph generate_embedding {
+workflow generate_embedding {
   label: "Generate Embedding"
 
   root {

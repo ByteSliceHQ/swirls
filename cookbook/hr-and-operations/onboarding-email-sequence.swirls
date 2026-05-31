@@ -19,7 +19,7 @@ webhook new_signup {
   }
 }
 
-graph onboard_customer {
+workflow onboard_customer {
   label: "Onboard Customer"
 
   root {

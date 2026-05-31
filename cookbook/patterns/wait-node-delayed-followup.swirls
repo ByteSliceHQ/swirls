@@ -17,7 +17,7 @@ webhook new_user {
   }
 }
 
-graph delayed_followup {
+workflow delayed_followup {
   label: "Delayed Follow-up"
 
   root {

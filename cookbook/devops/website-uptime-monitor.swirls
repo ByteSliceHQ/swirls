@@ -11,7 +11,7 @@ secret monitor_config {
   vars: [MONITOR_URL]
 }
 
-graph check_uptime {
+workflow check_uptime {
   label: "Check Uptime"
 
   root {
@@ -95,7 +95,7 @@ graph check_uptime {
 
 stream uptime_checks {
   label: "Uptime checks"
-  graph: check_uptime
+  workflow: check_uptime
   version: v1
 
   versions: {

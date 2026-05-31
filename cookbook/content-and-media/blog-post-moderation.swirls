@@ -18,7 +18,7 @@ form blog_submission {
   }
 }
 
-graph moderate_post {
+workflow moderate_post {
   label: "Moderate Blog Post"
 
   root {

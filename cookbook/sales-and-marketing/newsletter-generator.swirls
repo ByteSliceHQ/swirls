@@ -8,7 +8,7 @@ schedule weekly_newsletter {
   timezone: "America/Los_Angeles"
 }
 
-graph generate_newsletter {
+workflow generate_newsletter {
   label: "Generate Newsletter"
 
   root {

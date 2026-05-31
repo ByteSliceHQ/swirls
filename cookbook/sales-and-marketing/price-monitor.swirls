@@ -8,7 +8,7 @@ schedule check_prices {
   timezone: "America/New_York"
 }
 
-graph monitor_prices {
+workflow monitor_prices {
   label: "Monitor Competitor Prices"
 
   root {
@@ -97,7 +97,7 @@ graph monitor_prices {
 
 stream price_history {
   label: "Price history"
-  graph: monitor_prices
+  workflow: monitor_prices
   version: v1
 
   versions: {

@@ -19,7 +19,7 @@ form meeting_notes {
   }
 }
 
-graph summarize_meeting {
+workflow summarize_meeting {
   label: "Summarize Meeting"
 
   root {

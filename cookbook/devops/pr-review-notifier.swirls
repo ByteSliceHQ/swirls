@@ -32,7 +32,7 @@ webhook github_pr {
   }
 }
 
-graph notify_pr {
+workflow notify_pr {
   label: "Notify PR"
 
   root {

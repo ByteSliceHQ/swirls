@@ -24,7 +24,7 @@ schedule daily_report {
   timezone: "UTC"
 }
 
-graph record_event {
+workflow record_event {
   label: "Record Event"
 
   root {
@@ -44,7 +44,7 @@ graph record_event {
   }
 }
 
-graph generate_report {
+workflow generate_report {
   label: "Generate Daily Report"
 
   root {
@@ -112,7 +112,7 @@ graph generate_report {
 
 stream events {
   label: "Events"
-  graph: record_event
+  workflow: record_event
   version: v1
 
   versions: {

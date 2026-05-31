@@ -114,7 +114,7 @@ async function executeWorkflow(workflow: WorkflowTestInfo): Promise<RunResult> {
   const inputJson = JSON.stringify(workflow.input)
 
   const proc = Bun.spawn(
-    ["swirls", "graph", "execute", workflow.name, "--input", inputJson],
+    ["swirls", "workflow", "execute", workflow.name, "--input", inputJson],
     { cwd: cookbookDir, stdout: "pipe", stderr: "pipe" },
   )
 

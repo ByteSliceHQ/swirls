@@ -22,7 +22,7 @@ secret announce_config {
   vars: [SLACK_WEBHOOK_URL]
 }
 
-graph announce_release {
+workflow announce_release {
   label: "Announce Release"
 
   root {

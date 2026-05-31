@@ -19,7 +19,7 @@ form event_registration {
   }
 }
 
-graph register_attendee {
+workflow register_attendee {
   label: "Register Attendee"
 
   root {
@@ -95,7 +95,7 @@ graph register_attendee {
 
 stream registrations {
   label: "Event registrations"
-  graph: register_attendee
+  workflow: register_attendee
   version: v1
 
   versions: {

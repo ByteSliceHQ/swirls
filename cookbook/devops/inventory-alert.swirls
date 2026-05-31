@@ -12,7 +12,7 @@ secret inventory_config {
   vars: [INVENTORY_API_URL, INVENTORY_API_KEY]
 }
 
-graph check_inventory {
+workflow check_inventory {
   label: "Check Inventory"
 
   root {

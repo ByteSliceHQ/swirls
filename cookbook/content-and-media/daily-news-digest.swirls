@@ -9,7 +9,7 @@ schedule morning_digest {
   timezone: "America/New_York"
 }
 
-graph build_digest {
+workflow build_digest {
   label: "Build Daily Digest"
 
   root {

@@ -17,7 +17,7 @@ form seo_audit {
   }
 }
 
-graph run_seo_audit {
+workflow run_seo_audit {
   label: "Run SEO Audit"
 
   root {

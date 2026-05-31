@@ -20,7 +20,7 @@ webhook incoming_event {
   }
 }
 
-graph forward_to_slack {
+workflow forward_to_slack {
   label: "Forward to Slack"
 
   root {

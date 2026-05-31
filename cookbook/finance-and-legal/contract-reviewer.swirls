@@ -26,7 +26,7 @@ form contract_review {
   }
 }
 
-graph review_contract {
+workflow review_contract {
   label: "Review Contract"
 
   root {

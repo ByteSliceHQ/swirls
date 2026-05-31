@@ -18,7 +18,7 @@ webhook nps_response {
   }
 }
 
-graph process_nps {
+workflow process_nps {
   label: "Process NPS Response"
 
   root {
@@ -111,7 +111,7 @@ graph process_nps {
 
 stream nps_scores {
   label: "NPS scores"
-  graph: process_nps
+  workflow: process_nps
   version: v1
 
   versions: {
