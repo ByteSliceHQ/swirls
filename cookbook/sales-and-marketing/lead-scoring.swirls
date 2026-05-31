@@ -23,12 +23,6 @@ webhook new_lead {
 graph score_lead {
   label: "Score Lead"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "scored_leads"
-  }
-
   root {
     type: code
     label: "Extract lead"
@@ -80,7 +74,7 @@ graph score_lead {
   }
 
   node alert_sales {
-    type: resend
+    type: email
     label: "Alert sales team"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }
@@ -112,6 +106,42 @@ graph score_lead {
     score -> route
     route -["hot"]-> alert_sales
     route -["other"]-> log_result
+  }
+}
+
+stream scored_leads {
+  label: "Scored leads"
+  graph: score_lead
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["email", "company", "score", "tier"],
+          "properties": {
+            "email": { "type": "string" },
+            "company": { "type": "string" },
+            "score": { "type": "number" },
+            "tier": { "type": "string" }
+          }
+        }
+      }
+
+      condition: @ts { return true }
+
+      prepare: @ts {
+        const logged = context.output.log_result
+        if (logged) return logged
+        return {
+          email: context.nodes.root.output.email,
+          company: context.nodes.root.output.company,
+          score: context.nodes.score.output.score,
+          tier: context.nodes.score.output.tier
+        }
+      }
+    }
   }
 }
 

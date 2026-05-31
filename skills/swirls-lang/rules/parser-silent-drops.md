@@ -1,14 +1,14 @@
 ---
-title: Parser Silently Drops Graphs
+title: Parser Silently Drops Workflows
 impact: CRITICAL
-tags: parser, silent, drop, graphs, doctor, count
+tags: parser, silent, drop, workflows, doctor, count
 ---
 
-## Parser Silently Drops Graphs
+## Parser Silently Drops Workflows
 
-The Swirls parser has several bugs where invalid or unsupported syntax causes it to silently stop parsing the rest of the file. `swirls doctor` reports success but with fewer graphs/forms/triggers than expected. No error is emitted.
+The Swirls parser has several bugs where invalid or unsupported syntax causes it to silently stop parsing the rest of the file. `swirls doctor` reports success but with fewer workflows/forms/triggers than expected. No error is emitted.
 
-**How to detect:** Always compare the doctor summary counts against what you defined. If doctor reports 2 graphs but you wrote 4, the parser silently dropped 2.
+**How to detect:** Always compare the doctor summary counts against what you defined. If doctor reports 2 workflows but you wrote 4, the parser silently dropped 2.
 
 **Common causes of silent drops (in order of likelihood):**
 
@@ -25,9 +25,9 @@ The Swirls parser has several bugs where invalid or unsupported syntax causes it
 **Debugging steps:**
 
 1. Run `bunx swirls doctor` and note the counts
-2. Count the forms, graphs, and triggers you defined
+2. Count the forms, workflows, and triggers you defined
 3. If counts don't match, binary-search by commenting out halves of the file
-4. Check the section above the first missing graph for parser-breaking patterns
+4. Check the section above the first missing workflow for parser-breaking patterns
 5. Fix the pattern and re-run doctor
 
 The issue is always in or before the first missing item, never after it.

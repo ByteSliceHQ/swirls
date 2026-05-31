@@ -25,12 +25,6 @@ form employee_feedback {
 graph analyze_feedback {
   label: "Analyze Feedback"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "employee_feedback"
-  }
-
   root {
     type: code
     label: "Extract feedback"
@@ -89,6 +83,34 @@ graph analyze_feedback {
   flow {
     root -> analyze
     analyze -> result
+  }
+}
+
+stream employee_feedback {
+  label: "Employee feedback"
+  graph: analyze_feedback
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["department", "sentiment", "themes", "priority"],
+          "properties": {
+            "department": { "type": "string" },
+            "satisfaction": { "type": "number" },
+            "sentiment": { "type": "string" },
+            "themes": { "type": "array", "items": { "type": "string" } },
+            "priority": { "type": "string" }
+          }
+        }
+      }
+
+      condition: @ts { return context.output.result != null }
+
+      prepare: @ts { return context.output.result }
+    }
   }
 }
 

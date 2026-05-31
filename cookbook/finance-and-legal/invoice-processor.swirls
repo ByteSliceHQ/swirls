@@ -22,12 +22,6 @@ webhook invoice_received {
 graph process_invoice {
   label: "Process Invoice"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "invoices"
-  }
-
   root {
     type: code
     label: "Extract invoice"
@@ -118,6 +112,38 @@ graph process_invoice {
     extract_details -> check_anomaly
     check_anomaly -["ok"]-> approve
     check_anomaly -["flagged"]-> flag
+  }
+}
+
+stream invoices {
+  label: "Invoices"
+  graph: process_invoice
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["status", "vendor", "amount"],
+          "properties": {
+            "status": { "type": "string" },
+            "vendor": { "type": "string" },
+            "amount": { "type": "number" },
+            "line_items": { "type": "number" },
+            "note": { "type": "string" }
+          }
+        }
+      }
+
+      condition: @ts { return true }
+
+      prepare: @ts {
+        const approved = context.output.approve
+        if (approved) return approved
+        return context.output.flag
+      }
+    }
   }
 }
 

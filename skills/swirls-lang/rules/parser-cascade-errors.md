@@ -6,7 +6,7 @@ tags: parser, error, cascade, line, number, debugging
 
 ## Parse Errors Cascade Past the Actual Problem
 
-A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "expected form, webhook, schedule, graph, or trigger", look above the reported line.
+A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "expected form, webhook, schedule, workflow, or trigger", look above the reported line.
 
 **Common causes of cascading errors:**
 

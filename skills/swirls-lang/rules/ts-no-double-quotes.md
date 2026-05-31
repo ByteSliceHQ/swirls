@@ -6,7 +6,7 @@ tags: ts, parser, double-quote, string, fromCharCode
 
 ## No Double-Quote Characters in @ts Blocks
 
-Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block appears to parse correctly, but all subsequent graphs in the file are silently dropped. `swirls doctor` reports fewer graphs than expected with no error.
+Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block appears to parse correctly, but all subsequent workflows in the file are silently dropped. `swirls doctor` reports fewer workflows than expected with no error.
 
 **Incorrect (regex with double-quote):**
 
@@ -43,4 +43,4 @@ code: @ts {
 }
 ```
 
-This is one of the most common causes of "missing graphs" with no error message.
+This is one of the most common causes of "missing workflows" with no error message.

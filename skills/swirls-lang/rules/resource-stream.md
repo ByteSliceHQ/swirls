@@ -1,12 +1,12 @@
 ---
 title: Stream Block Declaration
 impact: HIGH
-tags: resource, stream, top-level, persistence, graph, version, versions, schema, condition, prepare
+tags: resource, stream, top-level, persistence, workflow, version, versions, schema, condition, prepare
 ---
 
 ## Stream Block Declaration
 
-Top-level `stream <name> { }` blocks persist one graph's output into a named, schema-typed record. They replace the removed `persistence { }` block. A `type: stream` node in another graph can read from the same stream (at a pinned version) to achieve graph-to-graph communication.
+Top-level `stream <name> { }` blocks persist one workflow's output into a named, schema-typed record. They replace the removed `persistence { }` block. A `type: stream` node in another workflow can read from the same stream (at a pinned version) to achieve workflow-to-workflow communication.
 
 **There is no `type:` field on a stream block** — the keyword `stream` identifies the block.
 
@@ -19,7 +19,7 @@ stream <name> {
   label: "<optional label>"          // defaults to <name>
   description: "<optional string>"
   enabled: <boolean>                  // optional; default treated as true
-  graph: <graph_name>                 // required; graph declared in this file
+  workflow: <workflow_name>                 // required; graph declared in this file
   version: <version_id>               // required; active writer version, must exist in versions:
 
   versions: {
@@ -47,7 +47,7 @@ Block-level:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `graph` | yes | Bare identifier naming a graph in the same file (or merged workspace). |
+| `graph` | yes | Bare identifier naming a workflow in the same file (or merged workspace). |
 | `version` | yes | Active writer `version_id` (`v1`, …). Must match a key in `versions:`. |
 | `versions` | yes | Non-empty map of `version_id` → `{ schema, condition?, prepare }`. |
 | `label` | no | Defaults to the stream's name. |
@@ -68,7 +68,7 @@ These `@ts` blocks get a specialized `context`:
 
 - `context.output.<leafNodeName>` — output of each DSL leaf node (node with no outgoing edges). Only leaves that actually executed appear. For a single-node graph, `context.output.root` holds the root output.
 - `context.nodes.<name>.input` / `.output` — per-node access for every executed node.
-- `context.nodes.root.input` — the graph's trigger input.
+- `context.nodes.root.input` — the workflow's trigger input.
 - `context.reviews`, `context.secrets`, `context.meta` — as in normal nodes (may be empty on CLI).
 
 Because `context.output` is keyed by leaf, and because `switch` routing means only one branch's leaves run, every leaf key is typed as independently optional by the LSP. Narrowing one case does not narrow sibling cases. Use `'leafName' in context.output`, optional chaining (`?.`), non-null assertion (`!`), or explicit runtime checks on the fallback branch.
@@ -76,7 +76,7 @@ Because `context.output` is keyed by leaf, and because `switch` routing means on
 ### Complete example — write side
 
 ```swirls
-graph process_leads {
+workflow process_leads {
   label: "Process incoming leads"
 
   root {
@@ -116,7 +116,7 @@ graph process_leads {
 stream scored_leads {
   label: "Scored leads"
   description: "Persists lead scoring output from process_leads"
-  graph: process_leads
+  workflow: process_leads
   version: v1
 
   versions: {
@@ -152,10 +152,10 @@ stream scored_leads {
 
 ### Reading a stream — the read side
 
-A `type: stream` node in another graph reads the persisted data at a pinned version:
+A `type: stream` node in another workflow reads the persisted data at a pinned version:
 
 ```swirls
-graph enrich_leads {
+workflow enrich_leads {
   label: "Enrich high-scoring leads"
 
   root {
@@ -177,14 +177,14 @@ See `node-stream` for the full filter operator list.
 ### Provisioning and versioning
 
 - Deploy provisions **one Postgres table per `(stream, version)`** — for example `project_<uuid>.stream_scored_leads_v1`.
-- Graph completion writes only to the deployment's active `version` (the block-level `version:` pointer).
+- Workflow completion writes only to the deployment's active `version` (the block-level `version:` pointer).
 - Re-deploying with a **changed `schema` for an existing version id** fails with a drift error. To evolve a record shape, add a **new** `versions:` entry (`v2`, …) and move the `version:` pointer; existing readers stay pinned to the old version until you migrate them.
 - The local CLI worker does not write or read stream data — exercise streams in a deployed project.
 
 ### Validation rules
 
 - Stream names must match `^[a-zA-Z0-9_]+$`. Duplicate names error with `Duplicate stream name "X"`.
-- `graph` is required (`Stream block requires "graph" (graph name)`) and must reference a declared graph (`Stream references graph "X" which is not defined`).
+- `graph` is required (`Stream block requires "workflow" (workflow name)`) and must reference a declared graph (`Stream references workflow "X" which is not defined`).
 - `version` is required (`Stream "X" requires "version" (active writer)`), must be a valid `version_id` (`… version pointer "X" is invalid — use v1, v2, …`), and must be declared under `versions:` (`… version "X" is not declared under versions { }`).
 - `versions:` must be non-empty (`Stream "X" requires a non-empty versions { } block`). Duplicate keys error (`… declares duplicate version key "X"`).
 - Each version requires a `schema` (`… version "vN" has no schema; add schema: @json { … } or schema: <name>`) and a non-empty `prepare` (`… version "vN" requires "prepare"`). A present-but-empty `condition` errors too.
@@ -197,4 +197,4 @@ The lexer treats `stream` as a keyword. At the top level:
 - `stream <name> { … }` — declare a stream block.
 - `stream:` at top-level is invalid and errors with: `"stream:" is only valid inside a node { } block (did you forget to close a brace?)`.
 
-Inside a graph body, `stream:` at graph scope (outside a node) errors the same way. Inside a `node { }` body, `stream:` is a normal config field (used by `type: stream` nodes as the stream reference).
+Inside a workflow body, `stream:` at workflow scope (outside a node) errors the same way. Inside a `node { }` body, `stream:` is a normal config field (used by `type: stream` nodes as the stream reference).

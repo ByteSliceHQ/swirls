@@ -6,7 +6,7 @@ tags: node, stream, filter, version, persisted, query, read
 
 ## Stream Nodes
 
-A `type: stream` node **reads** from a top-level `stream { }` block. It is the read side of Swirls' graph-to-graph communication. The node's output is an array of previously persisted records matching the filter, read from one **pinned version** of the stream.
+A `type: stream` node **reads** from a top-level `stream { }` block. It is the read side of Swirls' workflow-to-workflow communication. The node's output is an array of previously persisted records matching the filter, read from one **pinned version** of the stream.
 
 **Required fields:** `stream` (bare identifier naming a top-level stream block in the same project), `version` (the `versions:` key to read, e.g. `v1`), and `filter` (@ts returning a `StreamFilter` object).
 

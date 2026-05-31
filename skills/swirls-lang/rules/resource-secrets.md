@@ -55,7 +55,7 @@ secret creds {
   vars: [MY_TOKEN, ANOTHER_KEY]
 }
 
-graph g {
+workflow g {
   root {
     type: code
     label: "Entry"

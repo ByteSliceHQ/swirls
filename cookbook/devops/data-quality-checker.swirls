@@ -20,12 +20,6 @@ webhook data_record {
 graph check_quality {
   label: "Check Data Quality"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "quality_log"
-  }
-
   root {
     type: code
     label: "Extract record"
@@ -111,6 +105,37 @@ graph check_quality {
     validate -> route
     route -["valid"]-> accept
     route -["invalid"]-> quarantine
+  }
+}
+
+stream quality_log {
+  label: "Quality log"
+  graph: check_quality
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["status", "source"],
+          "properties": {
+            "status": { "type": "string" },
+            "source": { "type": "string" },
+            "fields": { "type": "number" },
+            "issues": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+
+      condition: @ts { return true }
+
+      prepare: @ts {
+        const accepted = context.output.accept
+        if (accepted) return accepted
+        return context.output.quarantine
+      }
+    }
   }
 }
 

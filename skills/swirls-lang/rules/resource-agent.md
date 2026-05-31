@@ -29,7 +29,7 @@ agent <name> {
   maxTokens: <number>                 // optional
   maxSteps: <number>                  // optional
 
-  tools: [graph_a, graph_b]           // optional; graphs exposed as LLM-callable tools
+  tools: [graph_a, graph_b]           // optional; workflows exposed as LLM-callable tools
 
   role <role_name> {                  // zero or more roles
     description: "<optional>"
@@ -50,7 +50,7 @@ agent <name> {
 | `temperature` | no | Number. |
 | `maxTokens` | no | Number. |
 | `maxSteps` | no | Number. Caps how many tool-call turns the agent may take. |
-| `tools` | no | Array of bare identifiers naming graphs in the same workspace. |
+| `tools` | no | Array of bare identifiers naming workflows in the same workspace. |
 | `role <name> { }` | no | Zero or more named roles. Each may override `system` and narrow `tools`. |
 | `label` | no | Display string. |
 | `description` | no | Free-form description. |
@@ -62,7 +62,7 @@ secret ai_creds {
   vars: [OPENAI_API_KEY]
 }
 
-graph search_kb {
+workflow search_kb {
   label: "Search KB"
   root {
     type: code
@@ -77,7 +77,7 @@ graph search_kb {
   }
 }
 
-graph escalate {
+workflow escalate {
   label: "Escalate"
   root {
     type: code
@@ -119,7 +119,7 @@ agent triage {
   }
 }
 
-graph handle_ticket {
+workflow handle_ticket {
   label: "Handle ticket"
   root {
     type: agent
@@ -138,7 +138,7 @@ graph handle_ticket {
 - Agent names must match `^[a-zA-Z0-9_]+$`. Duplicate names error.
 - `provider` must be one of the four allowed values.
 - `model` must be a non-empty quoted string.
-- Every entry in `tools:` must name a graph defined in the workspace.
+- Every entry in `tools:` must name a workflow defined in the workspace.
 - Every `role <name> { }` must have a unique name within the agent block. Each role's `tools:` must be a subset of the agent's top-level `tools:`.
 - `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `role:`, it must name a declared role in that block.
 

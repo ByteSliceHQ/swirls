@@ -63,7 +63,7 @@ graph onboard_customer {
   }
 
   node send_welcome {
-    type: resend
+    type: email
     label: "Send welcome email"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

@@ -1,6 +1,6 @@
 # The Swirls Cookbook
 
-Copy-paste recipes for real workflows. Each `.swirls` file is a complete, runnable graph you can drop into your project, tweak to taste, and deploy.
+Copy-paste recipes for real workflows. Each `.swirls` file is a complete, runnable workflow you can drop into your project, tweak to taste, and deploy.
 
 Browse by what you're trying to do, not what technology you need.
 
@@ -120,10 +120,10 @@ These aren't use-case recipes -- they demonstrate specific Swirls language featu
 | Pattern | What it demonstrates |
 |---------|---------------------|
 | [parallel-branches](patterns/parallel-branches.swirls) | Fan-out: root splits into multiple independent nodes that run concurrently |
-| [multi-trigger-workflow](patterns/multi-trigger-workflow.swirls) | One graph, three trigger sources (form, webhook, schedule) |
-| [subgraph-data-enrichment](patterns/subgraph-data-enrichment.swirls) | Calling one graph from another as a subgraph node |
+| [multi-trigger-workflow](patterns/multi-trigger-workflow.swirls) | One workflow, three trigger sources (form, webhook, schedule) |
+| [subgraph-data-enrichment](patterns/subgraph-data-enrichment.swirls) | Calling one workflow from another as a subgraph node |
 | [wait-node-delayed-followup](patterns/wait-node-delayed-followup.swirls) | Wait node: sends email immediately, then waits 3 days before a follow-up |
-| [stream-reporting-dashboard](patterns/stream-reporting-dashboard.swirls) | Persistence and stream queries: one graph logs events, another queries and reports |
+| [stream-reporting-dashboard](patterns/stream-reporting-dashboard.swirls) | Persistence and stream queries: one workflow logs events, another queries and reports |
 | [external-ts-file-pattern](patterns/external-ts-file-pattern.swirls) | Complex data transformations entirely in inline @ts blocks |
 
 ---
@@ -141,7 +141,7 @@ cd cookbook
 # Validate everything parses correctly
 swirls doctor
 
-# Run a single graph with test input
+# Run a single workflow with test input
 swirls graph execute score_leads --input '{"company": "Acme", "email": "j@acme.co", "source": "demo"}'
 ```
 
@@ -169,7 +169,7 @@ swirls env set FIRECRAWL_API_KEY=fc-...
 
 ### Running the test suite
 
-The cookbook has an integration test suite that runs every graph against a local mock server:
+The cookbook has an integration test suite that runs every workflow against a local mock server:
 
 ```bash
 # Start the test postgres (optional, for postgres recipes)

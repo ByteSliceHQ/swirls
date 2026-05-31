@@ -71,7 +71,7 @@ graph check_inventory {
   }
 
   node send_alert {
-    type: resend
+    type: email
     label: "Send low stock alert"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

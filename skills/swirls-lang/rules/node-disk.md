@@ -34,7 +34,7 @@ disk proj {
   secrets: disk_creds
 }
 
-graph audit {
+workflow audit {
   label: "Audit disk contents"
   root {
     type: disk

@@ -6,7 +6,7 @@ tags: resource, webhook, http, endpoint, external, secret, header, authenticatio
 
 ## Webhook Declarations
 
-Webhooks create HTTP endpoints for receiving external payloads. They accept any HTTP POST and deliver the body to the connected graph.
+Webhooks create HTTP endpoints for receiving external payloads. They accept any HTTP POST and deliver the body to the connected workflow.
 
 Use `secret:` + `header:` to require shared-secret verification on every inbound request. Both fields must be set together (or neither). The validator warns when both are missing because the endpoint will accept any POST without verification.
 
@@ -116,7 +116,7 @@ See `resource-schema`.
 
 ### Binding
 
-A webhook on its own does not execute a graph. Declare a trigger:
+A webhook on its own does not execute a workflow. Declare a trigger:
 
 ```swirls
 trigger on_inbound {

@@ -124,7 +124,7 @@ graph process_expense {
   }
 
   node notify_employee {
-    type: resend
+    type: email
     label: "Notify employee"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

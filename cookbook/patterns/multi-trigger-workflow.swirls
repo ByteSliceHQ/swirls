@@ -1,5 +1,5 @@
 /**
- * A single graph triggered by multiple sources:
+ * A single workflow triggered by multiple sources:
  * a form, a webhook, and a schedule.
  */
 

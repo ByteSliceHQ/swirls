@@ -14,12 +14,6 @@ secret monitor_config {
 graph check_uptime {
   label: "Check Uptime"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "uptime_checks"
-  }
-
   root {
     type: code
     label: "Prepare check"
@@ -80,7 +74,7 @@ graph check_uptime {
   }
 
   node alert_down {
-    type: resend
+    type: email
     label: "Send downtime alert"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }
@@ -96,6 +90,40 @@ graph check_uptime {
     evaluate -> route
     route -["up"]-> log_ok
     route -["down"]-> alert_down
+  }
+}
+
+stream uptime_checks {
+  label: "Uptime checks"
+  graph: check_uptime
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": { "type": "string" },
+            "checked_at": { "type": "string" },
+            "status_code": { "type": "number" }
+          }
+        }
+      }
+
+      condition: @ts { return true }
+
+      prepare: @ts {
+        const ok = context.output.log_ok
+        if (ok) return ok
+        return {
+          status: "down",
+          checked_at: context.nodes.evaluate.output.timestamp,
+          status_code: context.nodes.evaluate.output.status_code
+        }
+      }
+    }
   }
 }
 

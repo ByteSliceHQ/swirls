@@ -1,6 +1,6 @@
 {
   "title": "The Swirls Cookbook",
-  "description": "Copy-paste recipes for real workflows. Each .swirls file is a complete, runnable graph you can drop into your project, tweak to taste, and deploy.",
+  "description": "Copy-paste recipes for real workflows. Each .swirls file is a complete, runnable workflow you can drop into your project, tweak to taste, and deploy.",
   "updated_at": "2026-04-12T00:00:00Z",
   "categories": [
     {
@@ -404,7 +404,7 @@
           "slug": "multi-trigger-workflow",
           "title": "Multi-Trigger Workflow",
           "file": "patterns/multi-trigger-workflow.swirls",
-          "description": "One graph, three trigger sources (form, webhook, schedule).",
+          "description": "One workflow, three trigger sources (form, webhook, schedule).",
           "nodes": ["ai"],
           "trigger": "form",
           "tags": ["pattern"]
@@ -413,8 +413,8 @@
           "slug": "subgraph-data-enrichment",
           "title": "Subgraph Data Enrichment",
           "file": "patterns/subgraph-data-enrichment.swirls",
-          "description": "Calling one graph from another as a subgraph node.",
-          "nodes": ["firecrawl", "ai", "graph"],
+          "description": "Calling one workflow from another as a subgraph node.",
+          "nodes": ["firecrawl", "ai", "workflow"],
           "trigger": "webhook",
           "tags": ["pattern", "subgraph"]
         },
@@ -513,7 +513,7 @@
       "description": "Download or upload files to cloud storage"
     },
     { "type": "stream", "description": "Query persisted event streams" },
-    { "type": "graph", "description": "Call another graph as a subgraph" },
+    { "type": "workflow", "description": "Call another workflow as a subgraph" },
     {
       "type": "wait",
       "description": "Pause execution for a duration before continuing"

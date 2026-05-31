@@ -10,15 +10,15 @@
 **Impact:** HIGH
 **Description:** Top-level declarations, file discovery, and comment syntax. The foundation for every .swirls file.
 
-## 3. Graph & Node Basics (graph)
+## 3. Workflow & Node Basics (workflow)
 
 **Impact:** CRITICAL
-**Description:** Graph anatomy, root node requirements, flow block syntax, edge rules, and DAG constraints. Every workflow starts here. `persistence { }` has been removed; use top-level `stream` blocks instead.
+**Description:** Workflow anatomy, root node requirements, flow block syntax, edge rules, and DAG constraints. Every workflow starts here. `persistence { }` has been removed; use top-level `stream` blocks instead.
 
 ## 4. Node Types (node)
 
 **Impact:** CRITICAL
-**Description:** All 16 node types (ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while) with required and optional fields. `map` and `while` accept either an inline `subgraph { }` block or a `graph: <name>` reference. Also covers shared fields: `secrets:` map, `failurePolicy:`, review.
+**Description:** All 16 node types (ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while) with required and optional fields. `map` and `while` accept either an inline `subgraph { }` block or a `workflow: <name>` reference. Also covers shared fields: `secrets:` map, `failurePolicy:`, review.
 
 ## 5. TypeScript Blocks (ts)
 
@@ -38,12 +38,12 @@
 ## 8. Resources & Triggers (resource)
 
 **Impact:** HIGH
-**Description:** Declaring forms (with `visibility public/internal`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, secrets, auth, postgres, disk, agent, and reusable top-level `schema` blocks, then binding sources to graphs with triggers. Only three trigger resource types exist: form, webhook, schedule.
+**Description:** Declaring forms (with `visibility public/internal`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, secrets, auth, postgres, disk, agent, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
 
 ## 9. Streams (stream)
 
 **Impact:** MEDIUM
-**Description:** Persisting graph output via versioned top-level `stream { }` blocks (a `version` pointer plus a `versions:` map) and reading it with version-pinned `type: stream` nodes using `filter: @ts` returning a StreamFilter. Covers migration from the removed `persistence { }` block.
+**Description:** Persisting workflow output via versioned top-level `stream { }` blocks (a `version` pointer plus a `versions:` map) and reading it with version-pinned `type: stream` nodes using `filter: @ts` returning a StreamFilter. Covers migration from the removed `persistence { }` block.
 
 ## 10. Reviews (review)
 
@@ -53,4 +53,4 @@
 ## 11. Parser Pitfalls (parser)
 
 **Impact:** CRITICAL
-**Description:** Known parser bugs that silently drop graphs, plus an exhaustive cheatsheet of validator diagnostics. Unicode in comments, hyphenated headers (use @ts blocks), double-quotes in @ts, nested templates, nested code blocks. Essential knowledge to avoid hours of debugging.
+**Description:** Known parser bugs that silently drop workflows, plus an exhaustive cheatsheet of validator diagnostics. Unicode in comments, hyphenated headers (use @ts blocks), double-quotes in @ts, nested templates, nested code blocks. Essential knowledge to avoid hours of debugging.

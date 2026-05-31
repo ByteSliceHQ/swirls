@@ -1,18 +1,18 @@
 ---
 title: Root Node Requirements
 impact: CRITICAL
-tags: graph, root, entry, inputSchema
+tags: workflow, root, entry, inputSchema
 ---
 
 ## Root Node Requirements
 
-Every graph must have exactly one `root { }` block. The root is the entry point. It receives the trigger payload via `context.nodes.root.input`. It is the only node that should use `inputSchema`.
+Every workflow must have exactly one `root { }` block. The root is the entry point. It receives the trigger payload via `context.nodes.root.input`. It is the only node that should use `inputSchema`.
 
 **Incorrect (using node instead of root for entry):**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_workflow {
+  label: "My Workflow"
 
   node entry {
     type: code
@@ -22,13 +22,13 @@ graph my_graph {
 }
 ```
 
-This fails validation: "Graph must declare root { } as the entry node."
+This fails validation: "Workflow must declare root { } as the entry node."
 
 **Incorrect (multiple root blocks):**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_workflow {
+  label: "My Workflow"
 
   root {
     type: code
@@ -47,8 +47,8 @@ graph my_graph {
 **Correct (single root block with inputSchema):**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_workflow {
+  label: "My Workflow"
 
   root {
     type: code
@@ -83,7 +83,7 @@ graph my_graph {
 
 Root node rules:
 - Declared with `root { }` syntax (not `node root { }`)
-- Exactly one per graph
+- Exactly one per workflow
 - Must have no incoming edges in the flow block
 - Only node where `inputSchema` is meaningful (defines trigger payload shape)
 - Can be any node type (code, ai, switch, etc.)

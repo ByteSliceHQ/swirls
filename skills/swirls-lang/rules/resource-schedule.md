@@ -6,7 +6,7 @@ tags: resource, schedule, cron, timezone, recurring
 
 ## Schedule Declarations
 
-Schedules trigger graphs on a cron schedule. The payload is an empty object `{}`.
+Schedules trigger workflows on a cron schedule. The payload is an empty object `{}`.
 
 **Incorrect (missing cron):**
 
@@ -44,7 +44,7 @@ Common cron expressions (standard 5-field form):
 - `"0 9 * * 1"` - Every Monday at 9 AM
 - `"*/15 * * * *"` - Every 15 minutes
 
-Schedule names must match `^[a-zA-Z0-9_]+$` (letters, digits, underscores). Bind a schedule to a graph via a trigger:
+Schedule names must match `^[a-zA-Z0-9_]+$` (letters, digits, underscores). Bind a schedule to a workflow via a trigger:
 
 ```swirls
 trigger daily_trigger {

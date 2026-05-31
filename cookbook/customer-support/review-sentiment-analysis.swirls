@@ -21,12 +21,6 @@ webhook product_review {
 graph analyze_review {
   label: "Analyze Review Sentiment"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "review_sentiments"
-  }
-
   root {
     type: code
     label: "Extract review"
@@ -87,6 +81,35 @@ graph analyze_review {
   flow {
     root -> analyze
     analyze -> result
+  }
+}
+
+stream review_sentiments {
+  label: "Review sentiments"
+  graph: analyze_review
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["product_id", "rating", "sentiment", "score"],
+          "properties": {
+            "product_id": { "type": "string" },
+            "rating": { "type": "number" },
+            "sentiment": { "type": "string" },
+            "score": { "type": "number" },
+            "themes": { "type": "array", "items": { "type": "string" } },
+            "actionable_feedback": { "type": "string" }
+          }
+        }
+      }
+
+      condition: @ts { return context.output.result != null }
+
+      prepare: @ts { return context.output.result }
+    }
   }
 }
 

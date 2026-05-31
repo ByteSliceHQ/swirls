@@ -1,7 +1,7 @@
 ---
 title: Top-Level Declarations
 impact: HIGH
-tags: file, structure, declarations, schema, form, webhook, schedule, graph, stream, trigger, secret, auth, postgres, disk, agent
+tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent
 ---
 
 ## Top-Level Declarations
@@ -13,12 +13,12 @@ A `.swirls` file contains twelve kinds of top-level declarations (plus the optio
 ```swirls
 import { helper } from "./utils.swirls"
 
-export graph my_graph {
+export workflow my_graph {
   // ...
 }
 ```
 
-The parser errors: `Unexpected token: expected schema, form, webhook, schedule, graph, stream, trigger, secret, auth, postgres, disk, or agent`.
+The parser errors: `Unexpected token: expected schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, or agent`.
 
 **Correct (all top-level declarations demonstrated):**
 
@@ -51,7 +51,7 @@ schedule daily {
   cron: "0 9 * * *"
 }
 
-graph process {
+workflow process {
   label: "Process"
   root {
     type: code
@@ -63,7 +63,7 @@ graph process {
 
 stream process_log {
   label: "Process log"
-  graph: process
+  workflow: process
   version: v1
   versions: {
     v1 {
@@ -105,9 +105,9 @@ trigger on_contact {
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
 - `webhook <name> { }` — HTTP endpoints for external payloads. See `resource-webhook`.
 - `schedule <name> { }` — Cron-based triggers. See `resource-schedule`.
-- `graph <name> { }` — Workflow DAGs. See `graph-anatomy`.
-- `stream <name> { }` — Persist a graph's output as typed records. See `resource-stream`.
-- `trigger <name> { }` — Binds resources to graphs. See `resource-trigger-binding`.
+- `workflow <name> { }` — Workflow DAGs. See `workflow-anatomy`.
+- `stream <name> { }` — Persist a workflow's output as typed records. See `resource-stream`.
+- `trigger <name> { }` — Binds resources to workflows. See `resource-trigger-binding`.
 - `secret <name> { }` — Named groups of secret var identifiers. See `resource-secrets`.
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.
 - `postgres <name> { }` — External PostgreSQL connection and table schemas. See `resource-postgres`.

@@ -37,7 +37,7 @@ graph run_seo_audit {
   }
 
   node scrape_page {
-    type: firecrawl
+    type: scrape
     label: "Scrape target page"
     url: @ts { return context.nodes.root.output.url }
     onlyMainContent: false

@@ -6,15 +6,15 @@ tags: node, map, iteration, items, subgraph, concurrency, maxItems, loop, fanout
 
 ## Map Nodes
 
-A `map` node iterates over an array and runs a child graph (inline `subgraph { }` or referenced `graph: <name>`) once per element. Output is an array of the child graph's leaf-node outputs in the same order as `items`.
+A `map` node iterates over an array and runs a child workflow (inline `subgraph { }` or referenced `workflow: <name>`) once per element. Output is an array of the child workflow's leaf-node outputs in the same order as `items`.
 
 ### Required fields
 
 - `items` — `@ts` block returning an array. Each element becomes the iteration item.
 - `maxItems` — positive number. Hard cap; the validator rejects unbounded loops.
 - Exactly one of:
-  - `subgraph { ... }` — inline child graph (no colon). The inline form's root must declare `inputSchema`.
-  - `graph: <name>` — bare identifier referencing a top-level graph in the workspace. That graph's root must declare `inputSchema`.
+  - `subgraph { ... }` — inline child workflow (no colon). The inline form's root must declare `inputSchema`.
+  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That graph's root must declare `inputSchema`.
 
 ### Optional fields
 
@@ -76,7 +76,7 @@ node per_ticket {
 ### Referenced graph
 
 ```swirls
-graph normalize_ticket {
+workflow normalize_ticket {
   label: "Normalize ticket"
   root {
     type: code
@@ -95,17 +95,17 @@ node per_ticket {
   label: "Process each"
   items: @ts { return context.nodes.root.output.tickets }
   maxItems: 100
-  graph: normalize_ticket
+  workflow: normalize_ticket
 }
 ```
 
 ### `context.iteration.item`
 
-Inside the subgraph (or referenced graph), each iteration sees its element on `context.iteration.item`. The shape is whatever the subgraph root's `inputSchema` declares. See `context-iteration`.
+Inside the subgraph (or referenced workflow), each iteration sees its element on `context.iteration.item`. The shape is whatever the subgraph root's `inputSchema` declares. See `context-iteration`.
 
 ### Output shape
 
-The map node's output is an array of objects keyed by leaf-node name in the child graph:
+The map node's output is an array of objects keyed by leaf-node name in the child workflow:
 
 ```ts
 context.nodes.per_ticket.output[i].<leafName>
@@ -129,14 +129,14 @@ node merge {
 - `Node type "map" requires "maxItems"` — Add `maxItems: <number>`.
 - `map node requires maxItems as a positive number` — `maxItems` was missing or not positive.
 - `map node concurrency must be a positive integer when set` — `concurrency` was zero, negative, or non-integer.
-- `map node requires exactly one of subgraph { } or graph: <name>` — You set both, or neither.
-- `Node references graph "<n>" which is not defined` — `graph: <n>` does not match any graph in the workspace.
-- `map/while subgraph root must declare inputSchema for typed iteration` — The inline root (or the referenced graph's root) is missing `inputSchema`.
+- `map node requires exactly one of subgraph { } or workflow: <name>` — You set both, or neither.
+- `Node references workflow "<n>" which is not defined` — `workflow: <n>` does not match any workflow in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — The inline root (or the referenced workflow's root) is missing `inputSchema`.
 
 ### Common mistakes
 
 - **`subgraph: { ... }`** — `subgraph` is a bare block, not a key:value pair. No colon.
-- **Both `subgraph { }` and `graph: <name>`** — Pick one. The validator rejects both-set and neither-set.
+- **Both `subgraph { }` and `workflow: <name>`** — Pick one. The validator rejects both-set and neither-set.
 - **No `maxItems`** — Unbounded loops are rejected. Pick a real cap.
 - **Subgraph root has no `inputSchema`** — Required for typed iteration.
 - **Treating output as a flat list of leaf values** — Output is `[{ leafName: leafOutput }, ...]`, not `[leafOutput, ...]`. Index by leaf name.

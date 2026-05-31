@@ -6,7 +6,7 @@ tags: resource, trigger, binding, form, webhook, schedule
 
 ## Trigger Bindings
 
-Triggers connect a resource (form, webhook, or schedule) to a graph. When the resource fires, the graph executes with the resource's payload available as `context.nodes.root.input`.
+Triggers connect a resource (form, webhook, or schedule) to a workflow. When the resource fires, the workflow executes with the resource's payload available as `context.nodes.root.input`.
 
 **Only three resource types are valid in triggers:** `form`, `webhook`, `schedule`. There is no `agent:`, `stream:`, or `trigger:` type.
 
@@ -14,33 +14,33 @@ Triggers connect a resource (form, webhook, or schedule) to a graph. When the re
 
 ```swirls
 trigger <name> {
-  form:<form_name> -> <graph_name>
+  form:<form_name> -> <workflow_name>
   enabled: <boolean>
 }
 
 trigger <name> {
-  webhook:<webhook_name> -> <graph_name>
+  webhook:<webhook_name> -> <workflow_name>
   enabled: <boolean>
 }
 
 trigger <name> {
-  schedule:<schedule_name> -> <graph_name>
+  schedule:<schedule_name> -> <workflow_name>
   enabled: <boolean>
 }
 ```
 
-The binding is a single syntactic line `<type>:<name> -> <graph>`. There are no separate `resource:` / `graph:` fields. `enabled:` is the only other field; everything else is ignored.
+The binding is a single syntactic line `<type>:<name> -> <workflowName>`. There are no separate `resource:` / `graph:` fields. `enabled:` is the only other field; everything else is ignored.
 
 ### Incorrect (wrong syntax)
 
 ```swirls
 trigger my_trigger {
   form: contact_form
-  graph: process_form
+  workflow: process_form
 }
 ```
 
-Missing the `-> graphName` arrow. The trigger silently parses with empty `resourceName` and `graphName`, and the validator then complains about undefined references.
+Missing the `-> workflowName` arrow. The trigger silently parses with empty `resourceName` and `workflowName`, and the validator then complains about undefined references.
 
 ### Incorrect (agent type)
 
@@ -71,13 +71,13 @@ trigger daily_schedule {
 }
 ```
 
-Multiple triggers can target the same graph from different sources.
+Multiple triggers can target the same workflow from different sources.
 
 ### Validation rules
 
 - Trigger names must match `^[a-zA-Z0-9_]+$` and be unique in the file.
 - The referenced `form` / `webhook` / `schedule` must be declared in the same file, else: `Trigger references <type> "<name>" which is not defined`.
-- The referenced graph must be declared in the same file, else: `Trigger references graph "<name>" which is not defined`.
+- The referenced workflow must be declared in the same file, else: `Trigger references workflow "<name>" which is not defined`.
 
 ### `enabled`
 

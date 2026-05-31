@@ -28,7 +28,7 @@ graph generate_newsletter {
   }
 
   node scrape_blog {
-    type: firecrawl
+    type: scrape
     label: "Scrape company blog"
     url: @ts { return "https://byteslice.co/blog" }
     selector: ".post-list"
@@ -37,7 +37,7 @@ graph generate_newsletter {
   }
 
   node scrape_industry {
-    type: firecrawl
+    type: scrape
     label: "Scrape industry news"
     url: @ts { return "https://news.ycombinator.com" }
     selector: ".headlines"
@@ -91,7 +91,7 @@ graph generate_newsletter {
   }
 
   node send_newsletter {
-    type: resend
+    type: email
     label: "Send newsletter"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

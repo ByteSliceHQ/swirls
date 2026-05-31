@@ -44,7 +44,7 @@ disk proj {
   secrets: disk_creds
 }
 
-graph backup {
+workflow backup {
   label: "Backup logs"
   root {
     type: disk

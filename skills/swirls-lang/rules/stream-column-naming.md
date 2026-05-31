@@ -48,7 +48,7 @@ filter: @ts {
 
 ### Conventions
 
-- The shape of each persisted record is fully controlled by the version's `prepare` return value and described by that version's `schema`. Think of the filter as filtering the prepared record, not a graph's raw node outputs.
+- The shape of each persisted record is fully controlled by the version's `prepare` return value and described by that version's `schema`. Think of the filter as filtering the prepared record, not a workflow's raw node outputs.
 - Reads are pinned to one `version`, so filter fields must exist in **that version's** schema/prepared shape. Different versions can expose different fields.
 - If you need to filter on multiple node outputs, combine them inside `prepare` so the persisted record exposes the fields you want.
 - `like` uses SQL `LIKE` semantics — `%` is the wildcard. No regex.

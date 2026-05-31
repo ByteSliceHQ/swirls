@@ -36,7 +36,7 @@ graph delayed_followup {
   }
 
   node send_welcome {
-    type: resend
+    type: email
     label: "Send welcome"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }
@@ -54,7 +54,7 @@ graph delayed_followup {
   }
 
   node send_checkin {
-    type: resend
+    type: email
     label: "Send check-in"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

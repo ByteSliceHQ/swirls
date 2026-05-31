@@ -62,14 +62,14 @@ node result {
 
 **Accessing subgraph output:**
 
-When using a `type: graph` node, the output is keyed by the child graph's leaf node names:
+When using a `type: workflow` node, the output is keyed by the child workflow's leaf node names:
 
 ```swirls
 node result {
   type: code
   label: "Result"
   code: @ts {
-    // run_helper is a graph node calling helper_graph
+    // run_helper is a workflow node calling helper_graph
     // helper_graph's root is its leaf node
     const out = context.nodes.run_helper.output.root
     return { doubled: out.value }

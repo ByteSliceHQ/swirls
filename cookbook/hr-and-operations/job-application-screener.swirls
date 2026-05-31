@@ -108,7 +108,7 @@ graph screen_application {
   }
 
   node send_rejection {
-    type: resend
+    type: email
     label: "Send rejection"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

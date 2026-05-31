@@ -11,12 +11,6 @@ schedule check_prices {
 graph monitor_prices {
   label: "Monitor Competitor Prices"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "price_history"
-  }
-
   root {
     type: code
     label: "Start"
@@ -34,10 +28,9 @@ graph monitor_prices {
   }
 
   node scrape_competitor {
-    type: firecrawl
+    type: scrape
     label: "Scrape pricing page"
     url: @ts { return "https://competitor.example.com/pricing" }
-    selector: ".pricing-table"
     onlyMainContent: true
     formats: ["markdown"]
   }
@@ -75,12 +68,10 @@ graph monitor_prices {
   node check_history {
     type: stream
     label: "Get previous prices"
-    stream: "price_history"
-    query: @sql {
-      SELECT "root.checked_at" AS checked_at
-      FROM {{table}}
-      ORDER BY created_at DESC
-      LIMIT 1
+    stream: price_history
+    version: v1
+    filter: @ts {
+      return {}
     }
   }
 
@@ -101,6 +92,32 @@ graph monitor_prices {
     scrape_competitor -> extract_prices
     root -> check_history
     extract_prices -> store_result
+  }
+}
+
+stream price_history {
+  label: "Price history"
+  graph: monitor_prices
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["checked_at", "tier_count"],
+          "properties": {
+            "checked_at": { "type": "string" },
+            "tiers": { "type": "array" },
+            "tier_count": { "type": "number" }
+          }
+        }
+      }
+
+      condition: @ts { return context.output.store_result != null }
+
+      prepare: @ts { return context.output.store_result }
+    }
   }
 }
 

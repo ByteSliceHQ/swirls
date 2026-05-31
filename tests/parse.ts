@@ -1,8 +1,8 @@
 /**
  * Parses .swirls files via `swirls export` (AST JSON output).
- * Extracts graph metadata, secret declarations, trigger mappings, and input
+ * Extracts workflow metadata, secret declarations, trigger mappings, and input
  * schemas — enough to programmatically generate test inputs and determine
- * required environment variables per graph.
+ * required environment variables per workflow.
  */
 
 import { readdirSync, statSync } from 'node:fs'
@@ -20,7 +20,7 @@ interface ASTNode {
   configFields?: Record<string, { kind: string; value?: string }>
 }
 
-interface ASTGraph {
+interface ASTWorkflow {
   name: string
   label?: string
   nodes: ASTNode[]
@@ -32,7 +32,8 @@ interface ASTTrigger {
   name: string
   resourceType: string
   resourceName: string
-  graphName: string
+  workflowName?: string
+  graphName?: string
   enabled?: boolean
 }
 
@@ -67,7 +68,8 @@ interface ASTFile {
   forms: ASTForm[]
   webhooks: ASTWebhook[]
   schedules: { name: string }[]
-  graphs: ASTGraph[]
+  workflows?: ASTWorkflow[]
+  graphs?: ASTWorkflow[]
   triggers: ASTTrigger[]
   secrets: ASTSecret[]
   auths: ASTAuth[]
@@ -100,7 +102,7 @@ function exportFile(filePath: string): ASTFile | null {
 // Types
 // ---------------------------------------------------------------------------
 
-export interface GraphInfo {
+export interface WorkflowInfo {
   name: string
   file: string
   nodeTypes: Set<string>
@@ -117,12 +119,12 @@ export interface TriggerInfo {
   name: string
   sourceType: 'webhook' | 'form' | 'schedule'
   sourceName: string
-  graphName: string
+  workflowName: string
 }
 
 export interface ParsedFile {
   file: string
-  graphs: GraphInfo[]
+  workflows: WorkflowInfo[]
   triggers: TriggerInfo[]
   secrets: { name: string; vars: string[] }[]
   auths: { name: string; secretRef: string | null }[]
@@ -135,7 +137,8 @@ export interface ParsedFile {
 // ---------------------------------------------------------------------------
 
 function astToParsedFile(ast: ASTFile, filename: string): ParsedFile {
-  const graphs: GraphInfo[] = ast.graphs.map((g) => {
+  const workflowsSource = ast.workflows ?? ast.graphs ?? []
+  const workflows: WorkflowInfo[] = workflowsSource.map((g) => {
     const nodeTypes = new Set(g.nodes.map((n) => n.type))
 
     const aiKinds = new Set<string>()
@@ -145,14 +148,8 @@ function astToParsedFile(ast: ASTFile, filename: string): ParsedFile {
       }
     }
 
-    // Secret refs from nodes that declare secrets in configFields
     const secretRefs = new Set<string>()
     for (const n of g.nodes) {
-      if (n.configFields?.secrets) {
-        // The secrets field value may contain refs — parse from raw
-        // For now, we check the code blocks for context.secrets.<name>
-      }
-      // Scan all ts_block code for context.secrets.<name>
       for (const [, field] of Object.entries(n.configFields ?? {})) {
         if (
           field.kind === 'ts_block' &&
@@ -167,7 +164,6 @@ function astToParsedFile(ast: ASTFile, filename: string): ParsedFile {
       }
     }
 
-    // Auth refs from nodes
     const authRefs = new Set<string>()
     for (const n of g.nodes) {
       if (n.configFields?.auth?.value) {
@@ -175,7 +171,6 @@ function astToParsedFile(ast: ASTFile, filename: string): ParsedFile {
       }
     }
 
-    // Postgres refs from nodes
     const postgresRefs = new Set<string>()
     for (const n of g.nodes) {
       if (n.configFields?.postgres?.value) {
@@ -183,11 +178,12 @@ function astToParsedFile(ast: ASTFile, filename: string): ParsedFile {
       }
     }
 
-    // Subgraph refs from graph-type nodes
     const subgraphRefs = new Set<string>()
     for (const n of g.nodes) {
-      if (n.type === 'graph' && n.configFields?.graph?.value) {
-        subgraphRefs.add(n.configFields.graph.value)
+      if (n.type === 'workflow' || n.type === 'graph') {
+        const ref =
+          n.configFields?.workflow?.value ?? n.configFields?.graph?.value
+        if (ref) subgraphRefs.add(ref)
       }
     }
 
@@ -209,7 +205,7 @@ function astToParsedFile(ast: ASTFile, filename: string): ParsedFile {
     name: t.name,
     sourceType: t.resourceType as TriggerInfo['sourceType'],
     sourceName: t.resourceName,
-    graphName: t.graphName,
+    workflowName: t.workflowName ?? t.graphName ?? '',
   }))
 
   const secrets = (ast.secrets ?? []).map((s) => ({
@@ -239,7 +235,7 @@ function astToParsedFile(ast: ASTFile, filename: string): ParsedFile {
 
   return {
     file: filename,
-    graphs,
+    workflows,
     triggers,
     secrets,
     auths,
@@ -317,26 +313,25 @@ export function scanCookbookSync(cookbookDir: string): ParsedFile[] {
 }
 
 // ---------------------------------------------------------------------------
-// Build per-graph test info
+// Build per-workflow test info
 // ---------------------------------------------------------------------------
 
-/** Node types that implicitly require env vars (not declared via secret blocks). */
 const IMPLICIT_ENV_VARS: Record<string, string[]> = {
   ai: ['OPENROUTER_API_KEY'],
   resend: ['RESEND_API_KEY'],
   firecrawl: ['FIRECRAWL_API_KEY'],
+  email: ['RESEND_API_KEY'],
+  scrape: ['FIRECRAWL_API_KEY'],
 }
 
-/** AI node kinds that require additional env vars beyond OPENROUTER_API_KEY. */
 const AI_KIND_ENV_VARS: Record<string, string[]> = {
   embed: ['EMBEDDING_MODEL'],
   image: ['IMAGE_MODEL'],
 }
 
-/** Node types that require cloud execution and cannot run locally. */
 const CLOUD_ONLY_NODE_TYPES = new Set(['bucket', 'stream'])
 
-export interface GraphTestInfo {
+export interface WorkflowTestInfo {
   name: string
   file: string
   input: any
@@ -349,52 +344,50 @@ export interface GraphTestInfo {
   triggerType: 'webhook' | 'form' | 'schedule' | null
 }
 
-export function buildGraphTestInfos(
+export function buildWorkflowTestInfos(
   parsedFiles: ParsedFile[],
-): GraphTestInfo[] {
-  // Lookup maps across all files
+): WorkflowTestInfo[] {
   const allSecrets = new Map<string, string[]>()
   const allAuths = new Map<string, string | null>()
   const allPostgres = new Map<string, string | null>()
   const allSchemas = new Map<string, object>()
-  const graphTriggers = new Map<string, TriggerInfo>()
-  const graphMap = new Map<string, GraphInfo>()
+  const workflowTriggers = new Map<string, TriggerInfo>()
+  const workflowMap = new Map<string, WorkflowInfo>()
 
   for (const pf of parsedFiles) {
     for (const s of pf.secrets) allSecrets.set(s.name, s.vars)
     for (const a of pf.auths) allAuths.set(a.name, a.secretRef)
     for (const p of pf.postgresDefs) allPostgres.set(p.name, p.secretRef)
     for (const s of pf.inputSchemas) allSchemas.set(s.name, s.schema)
-    for (const t of pf.triggers) graphTriggers.set(t.graphName, t)
-    for (const g of pf.graphs) graphMap.set(g.name, g)
+    for (const t of pf.triggers) workflowTriggers.set(t.workflowName, t)
+    for (const g of pf.workflows) workflowMap.set(g.name, g)
   }
 
-  /** Resolve all env vars a graph requires, including through auth/postgres/subgraph refs. */
   function resolveEnvVars(
-    graph: GraphInfo,
+    workflow: WorkflowInfo,
     visited = new Set<string>(),
   ): Set<string> {
-    if (visited.has(graph.name)) return new Set()
-    visited.add(graph.name)
+    if (visited.has(workflow.name)) return new Set()
+    visited.add(workflow.name)
 
     const vars = new Set<string>()
 
-    for (const nt of graph.nodeTypes) {
+    for (const nt of workflow.nodeTypes) {
       const implicit = IMPLICIT_ENV_VARS[nt]
       if (implicit) implicit.forEach((v) => vars.add(v))
     }
 
-    for (const kind of graph.aiKinds) {
+    for (const kind of workflow.aiKinds) {
       const extra = AI_KIND_ENV_VARS[kind]
       if (extra) extra.forEach((v) => vars.add(v))
     }
 
-    for (const ref of graph.secretRefs) {
+    for (const ref of workflow.secretRefs) {
       const sv = allSecrets.get(ref)
       if (sv) sv.forEach((v) => vars.add(v))
     }
 
-    for (const ref of graph.authRefs) {
+    for (const ref of workflow.authRefs) {
       const secretRef = allAuths.get(ref)
       if (secretRef) {
         const sv = allSecrets.get(secretRef)
@@ -402,7 +395,7 @@ export function buildGraphTestInfos(
       }
     }
 
-    for (const ref of graph.postgresRefs) {
+    for (const ref of workflow.postgresRefs) {
       const secretRef = allPostgres.get(ref)
       if (secretRef) {
         const sv = allSecrets.get(secretRef)
@@ -410,8 +403,8 @@ export function buildGraphTestInfos(
       }
     }
 
-    for (const ref of graph.subgraphRefs) {
-      const sub = graphMap.get(ref)
+    for (const ref of workflow.subgraphRefs) {
+      const sub = workflowMap.get(ref)
       if (sub) {
         for (const v of resolveEnvVars(sub, visited)) vars.add(v)
       }
@@ -420,14 +413,14 @@ export function buildGraphTestInfos(
     return vars
   }
 
-  const results: GraphTestInfo[] = []
+  const results: WorkflowTestInfo[] = []
 
   for (const pf of parsedFiles) {
-    for (const graph of pf.graphs) {
-      const trigger = graphTriggers.get(graph.name)
+    for (const workflow of pf.workflows) {
+      const trigger = workflowTriggers.get(workflow.name)
 
       let input: any = {}
-      let triggerType: GraphTestInfo['triggerType'] = null
+      let triggerType: WorkflowTestInfo['triggerType'] = null
 
       if (trigger) {
         triggerType = trigger.sourceType
@@ -438,15 +431,15 @@ export function buildGraphTestInfos(
       }
 
       results.push({
-        name: graph.name,
-        file: graph.file,
+        name: workflow.name,
+        file: workflow.file,
         input,
-        requiredEnvVars: resolveEnvVars(graph),
-        nodeTypes: graph.nodeTypes,
-        aiKinds: graph.aiKinds,
-        hasWaitNode: graph.hasWaitNode,
-        hasPersistence: graph.hasPersistence,
-        cloudOnly: [...graph.nodeTypes].some((t) =>
+        requiredEnvVars: resolveEnvVars(workflow),
+        nodeTypes: workflow.nodeTypes,
+        aiKinds: workflow.aiKinds,
+        hasWaitNode: workflow.hasWaitNode,
+        hasPersistence: workflow.hasPersistence,
+        cloudOnly: [...workflow.nodeTypes].some((t) =>
           CLOUD_ONLY_NODE_TYPES.has(t),
         ),
         triggerType,
@@ -457,16 +450,15 @@ export function buildGraphTestInfos(
   return results
 }
 
-// ---------------------------------------------------------------------------
-// Read currently-set env vars from `swirls env list`
-// ---------------------------------------------------------------------------
+/** @deprecated Use buildWorkflowTestInfos */
+export const buildGraphTestInfos = buildWorkflowTestInfos
+export type GraphTestInfo = WorkflowTestInfo
+export type GraphInfo = WorkflowInfo
 
 export function getAvailableEnvVars(cwd: string): Set<string> {
   const result = Bun.spawnSync(['swirls', 'env', 'list'], { cwd })
   const output = result.stdout.toString()
   const vars = new Set<string>()
-  // Output contains Unicode box-drawing chars (│) before each line,
-  // so match KEY= anywhere on a line rather than at line start.
   for (const m of output.matchAll(/([A-Z][A-Z0-9_]*)=/g)) vars.add(m[1])
   return vars
 }

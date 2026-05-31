@@ -6,7 +6,7 @@ tags: node, agent, llm, tools, role, prompt, harness
 
 ## Agent Nodes
 
-Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, and the graphs exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, or overrides `system`.
+Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, or overrides `system`.
 
 For a one-shot LLM call (no tools, no loop), use `ai` instead. `agent` is for multi-step harnesses with tool use.
 
@@ -38,7 +38,7 @@ agent triage {
   tools: [search_kb, escalate]
 }
 
-graph handle {
+workflow handle {
   label: "Handle inbound"
   root {
     type: agent
@@ -78,7 +78,7 @@ node ask {
 | `agent` | yes | Bare identifier | Names a top-level `agent <name> { }` block. |
 | `prompt` | yes | `@ts` block | User prompt for this turn. |
 | `role` | no | Bare identifier | Names a `role` declared inside the bound agent block. |
-| `tools` | no | Array of bare identifiers | Subset of the agent block's tool graphs. |
+| `tools` | no | Array of bare identifiers | Subset of the agent block's tool workflows. |
 | `system` | no | `@ts` block | Overrides the agent block's default `system:` for this call. |
 
 Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.

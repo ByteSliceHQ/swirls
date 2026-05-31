@@ -1,7 +1,7 @@
 ---
 title: Flow Block and Edges
 impact: CRITICAL
-tags: graph, flow, edges, labeled, switch
+tags: workflow, flow, edges, labeled, switch
 ---
 
 ## Flow Block and Edges
@@ -46,7 +46,7 @@ node handle_urgent {
   type: ai
   kind: text
   label: "Handle urgent"
-  model: "google/gemini-2.5-flash"
+  model: "gpt-4o-mini"
   prompt: @ts { return context.nodes.root.output.body }
 }
 

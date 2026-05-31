@@ -4,7 +4,7 @@
 >
 > **Source of truth lives in `rules/`.** This file is regenerated from those rules by `scripts/regen-agents.ts`. When in doubt, defer to `rules/spec-strict-syntax.md` and `rules/spec-common-mistakes.md`.
 >
-> Current scope: **16 node types** (`ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while`), **12 top-level declarations** (`schema, form, webhook, schedule, graph, stream, trigger, secret, auth, postgres, disk, agent`), inline `subgraph { }` for map/while, form `visibility public | internal`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, and `context.iteration.*` (item/index/input/previous) for map/while subgraphs.
+> Current scope: **16 node types** (`ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while`), **12 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent`), inline `subgraph { }` for map/while, form `visibility public | internal`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, and `context.iteration.*` (item/index/input/previous) for map/while subgraphs.
 
 
 # 1. Language Specification (READ FIRST)
@@ -18,7 +18,7 @@ The Swirls DSL is a declarative configuration language. It is not TypeScript, YA
 These are the only keywords recognized by the lexer (`packages/language/src/lexer.ts`). Any other word is parsed as an identifier or a quoted string.
 
 ```
-form, webhook, schedule, graph, trigger, secret, auth, postgres, stream, schema,
+form, webhook, schedule, workflow, trigger, secret, auth, postgres, stream, schema,
 disk, agent, role,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
@@ -26,6 +26,8 @@ subgraph, map, while, items, update, maxItems, maxIterations, concurrency
 ```
 
 Note: `persistence` is NOT a keyword. The old `persistence { }` block has been removed. Use a top-level `stream { }` block instead.
+
+Note: `graph` is a legacy alias for `workflow` (top-level declarations, `type: graph`, and config field `graph:`). Prefer `workflow` in new code; the serializer canonicalizes to `workflow`.
 
 #### Complete top-level declaration list
 
@@ -37,7 +39,7 @@ schema <name> { }
 form <name> { }
 webhook <name> { }
 schedule <name> { }
-graph <name> { }
+workflow <name> { }
 stream <name> { }
 trigger <name> { }
 secret <name> { }
@@ -51,7 +53,7 @@ There are **12** top-level block kinds (plus the optional `version:` line). The 
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, graphs, streams, triggers, secrets, auth, postgres, schemas, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -64,7 +66,7 @@ Names may start with a digit. Hyphens, dots, spaces, and other characters are no
 These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `packages/core/src/schemas.ts`.
 
 ```
-ai, agent, bucket, code, disk, email, graph, http,
+ai, agent, bucket, code, disk, email, workflow, http,
 map, parallel, postgres, scrape, stream, switch, wait, while
 ```
 
@@ -76,7 +78,7 @@ Notes on aliases that do NOT exist:
 - `http` is the type name, not `api`, `request`, or `fetch`.
 - `wait` is the type name, not `delay` or `sleep`.
 - `ai` is the type name, not `llm`, `chat`, or `prompt`.
-- `graph` is the type name for subgraphs, not `subgraph`, `call`, or `child`.
+- `workflow` is the type name for subgraphs, not `subgraph`, `call`, or `child`. (`type: graph` and `graph:` are legacy aliases.)
 - `postgres` is the type name, not `db`, `database`, or `sql`.
 - `bucket` is the type name, not `storage`, `file`, or `s3`.
 - `parallel` is the type name, not `fanout` or `workers`. Use `map` for per-item iteration.
@@ -91,7 +93,7 @@ These are the only value forms that can appear after a `:` in a field assignment
 - String literal: `"value"`
 - Number: `42`, `3.14`
 - Boolean: `true`, `false`
-- Bare identifier: `my_name` (parsed as a string; used to reference top-level blocks like `graph: helper_graph`, `stream: my_stream`, `schema: my_schema`)
+- Bare identifier: `my_name` (parsed as a string; used to reference top-level blocks like `workflow: helper_graph`, `stream: my_stream`, `schema: my_schema`)
 - Object literal: `{ key: value, key2: value2 }` (comma-separated)
 - Array literal: `[item1, item2]` (comma-separated)
 - TypeScript block: `@ts { ... }`
@@ -119,9 +121,9 @@ No other edge syntax exists. No conditional edges, no weighted edges, no `=>`, n
 Inside a `trigger <name> { }` block, exactly one binding line:
 
 ```
-form:<formName> -> <graphName>
-webhook:<webhookName> -> <graphName>
-schedule:<scheduleName> -> <graphName>
+form:<formName> -> <workflowName>
+webhook:<webhookName> -> <workflowName>
+schedule:<scheduleName> -> <workflowName>
 ```
 
 Only three resource types are valid in triggers: `form`, `webhook`, `schedule`. There is no `agent:`, `stream:`, `trigger:`, `http:`, or any other prefix.
@@ -160,7 +162,7 @@ header: "Header-Name"
 
 #### Inline `subgraph { }` block (map / while only)
 
-`map` and `while` nodes accept an inline `subgraph { ... }` block instead of a `graph: <name>` reference. The keyword takes **no colon**:
+`map` and `while` nodes accept an inline `subgraph { ... }` block instead of a `workflow: <name>` reference. The keyword takes **no colon**:
 
 ```swirls
 node each_item {
@@ -179,7 +181,7 @@ node each_item {
 }
 ```
 
-`subgraph { }` body has the same shape as `graph { }` body (`root { }`, `node { }`, `flow { }`) but cannot have its own `label:` or `description:`. The subgraph root MUST declare `inputSchema` for typed iteration. A node uses **exactly one** of `subgraph { }` or `graph: <name>` — never both, never neither.
+`subgraph { }` body has the same shape as `workflow { }` body (`root { }`, `node { }`, `flow { }`) but cannot have its own `label:` or `description:`. The subgraph root MUST declare `inputSchema` for typed iteration. A node uses **exactly one** of `subgraph { }` or `workflow: <name>` — never both, never neither.
 
 #### Constructs that DO NOT exist
 
@@ -205,11 +207,11 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No inline TypeScript outside of `@ts` blocks.** You cannot write `code: return {}`. It must be `code: @ts { return {} }`.
 
-**No `persistence { }` blocks.** They have been removed. The parser emits: `persistence { } blocks have been removed — use a top-level stream block instead`. Use `stream <name> { graph: g, version: v1, versions: { v1 { schema, condition?, prepare } } }` at the top level. `schema`, `condition`, and `prepare` live inside a `versions:` entry, never at the top level of the block.
+**No `persistence { }` blocks.** They have been removed. The parser emits: `persistence { } blocks have been removed — use a top-level stream block instead`. Use `stream <name> { workflow: g, version: v1, versions: { v1 { schema, condition?, prepare } } }` at the top level. `schema`, `condition`, and `prepare` live inside a `versions:` entry, never at the top level of the block.
 
 **No `outputSchema` on non-root nodes.** Use `schema` instead. The parser rejects `outputSchema` on non-root nodes with: `Use "schema" instead of "outputSchema" in node blocks`.
 
-**No `inputSchema` on non-root nodes (except a `subgraph { }` root).** Only the outer-graph root and a map/while subgraph root accept `inputSchema`. The parser emits: `inputSchema is only allowed in root { } blocks` and drops the entire node.
+**No `inputSchema` on non-root nodes (except a `subgraph { }` root).** Only the outer-workflow root and a map/while subgraph root accept `inputSchema`. The parser emits: `inputSchema is only allowed in root { } blocks` and drops the entire node.
 
 **No conditional routing at the edge level.** Conditional routing requires a `switch` node with `cases` and `router`, plus labeled edges in the flow block.
 
@@ -231,7 +233,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `llm`, `prompt`, or `chat` node type.** The correct type name is `ai`.
 
-**No `subgraph`, `child`, or `call` node type.** The correct type name is `graph`. (`subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
+**No `subgraph`, `child`, or `call` node type.** The correct type name is `workflow`. (`subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
 
 **No `db`, `database`, or `sql` node type for external databases.** The correct type name is `postgres`.
 
@@ -239,11 +241,11 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `template` or `render` node type.** Generate text in `code` or `ai` nodes.
 
-**No `loop`, `retry`, `for`, or generic `iter` node type.** Use `map` (per-item iteration) or `while` (counter / condition). The graph itself is a DAG and cannot have cycles.
+**No `loop`, `retry`, `for`, or generic `iter` node type.** Use `map` (per-item iteration) or `while` (counter / condition). The workflow itself is a DAG and cannot have cycles.
 
 **No `webhook` or `form` or `schedule` as node types.** These are top-level resource declarations only. Nodes receive data through triggers via `context.nodes.root.input`.
 
-**No `trigger` node type.** Triggers are top-level declarations that bind resources to graphs.
+**No `trigger` node type.** Triggers are top-level declarations that bind resources to workflows.
 
 #### Valid fields per node type
 
@@ -269,11 +271,11 @@ No user `schema:` — vendor-managed output shape.
 
 **stream** (node, read side) — required: `stream` (bare identifier naming a top-level `stream <name> { }` block), `version` (the `versions:` key to read, e.g. `v1`), `filter` (@ts returning a `StreamFilter` object of shape `{ field: { op: value } }` where op is `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`). `streamId`, `query`, `querySql` are removed; using them produces validator errors.
 
-**graph** — required: `graph` (bare identifier naming a graph in the same file), `input` (@ts returning the input object to pass to the subgraph).
+**workflow** — required: `workflow` (bare identifier naming a workflow in the same file), `input` (@ts returning the input object to pass to the subgraph).
 
-**map** — required: `items` (@ts returning array), `maxItems` (positive number), plus exactly one of `subgraph { ... }` (inline block, no colon) or `graph: <name>` (reference to a top-level graph). Optional: `concurrency` (positive integer). The subgraph/referenced-graph root must declare `inputSchema` (typed iteration). Iteration context: `context.iteration.item` is the current element. See `node-map` and `graph-subgraph`.
+**map** — required: `items` (@ts returning array), `maxItems` (positive number), plus exactly one of `subgraph { ... }` (inline block, no colon) or `workflow: <name>` (reference to a top-level workflow). Optional: `concurrency` (positive integer). The subgraph/referenced-workflow root must declare `inputSchema` (typed iteration). Iteration context: `context.iteration.item` is the current element. See `node-map` and `workflow-subgraph`.
 
-**while** — required: `input` (@ts returning the initial loop state), `condition` (@ts returning boolean; loop continues while true), `update` (@ts returning the next iteration's input), `maxIterations` (positive integer), plus exactly one of `subgraph { ... }` or `graph: <name>`. The subgraph/referenced-graph root must declare `inputSchema`. Iteration context: `context.iteration.input` (initial), `context.iteration.index` (counter), `context.iteration.previous` (last iteration's leaf outputs). See `node-while`.
+**while** — required: `input` (@ts returning the initial loop state), `condition` (@ts returning boolean; loop continues while true), `update` (@ts returning the next iteration's input), `maxIterations` (positive integer), plus exactly one of `subgraph { ... }` or `workflow: <name>`. The subgraph/referenced-workflow root must declare `inputSchema`. Iteration context: `context.iteration.input` (initial), `context.iteration.index` (counter), `context.iteration.previous` (last iteration's leaf outputs). See `node-while`.
 
 **wait** — no required fields. Optional: `amount` (number), `unit` (`seconds`/`minutes`/`hours`/`days`), `secondsFromConfig`.
 
@@ -281,7 +283,7 @@ No user `schema:` — vendor-managed output shape.
 
 **disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). No user `schema:`. See `node-disk` and `resource-disk`.
 
-**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `role` (bare identifier naming a role inside the agent block), `tools` (array of bare identifiers naming graphs to expose as LLM-callable tools), `system` (@ts; per-call system-prompt override). See `node-agent` and `resource-agent`.
+**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `role` (bare identifier naming a role inside the agent block), `tools` (array of bare identifiers naming workflows to expose as LLM-callable tools), `system` (@ts; per-call system-prompt override). See `node-agent` and `resource-agent`.
 
 **postgres** (node) — required: `postgres` (bare identifier naming a top-level `postgres <name> { }` block) and exactly one of `select:` (@sql SELECT or WITH) or `insert:` (@sql INSERT, optionally with ON CONFLICT). Other fields: `params` (@ts returning an object whose keys match `{{key}}` placeholders in the SQL; required when SQL has placeholders, always required for `insert:`), `condition` (@ts returning boolean; only valid on `insert:` nodes), `schema` (recommended for `select:` to type the row output).
 
@@ -483,8 +485,8 @@ Conditional routing requires a switch node with labeled edges.
 ```swirls
 import { utils } from "./helpers"
 
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root {
     type: code
     label: "Entry"
@@ -496,8 +498,8 @@ graph my_graph {
 **Correct:**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root {
     type: code
     label: "Entry"
@@ -515,7 +517,7 @@ No imports exist. For reusable code, use `@ts "path.ts.swirls"` file references 
 ```swirls
 const API_URL = "https://api.example.com"
 
-graph fetch {
+workflow fetch {
   label: "Fetch"
   root {
     type: http
@@ -528,7 +530,7 @@ graph fetch {
 **Correct:**
 
 ```swirls
-graph fetch {
+workflow fetch {
   label: "Fetch"
   root {
     type: http
@@ -645,14 +647,14 @@ node per_item {
 
 There are exactly 16 node types: `ai`, `agent`, `bucket`, `code`, `disk`, `email`, `graph`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`. Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
 
-#### 12. Missing label on graph or node
+#### 12. Missing label on workflow or node
 
-Labels default to the block name, so this parses, but best practice is to set an explicit one for readability. Graphs require `label:` for proper display in the Portal.
+Labels default to the block name, so this parses, but best practice is to set an explicit one for readability. Workflows require `label:` for proper display in the Portal.
 
 **Sub-optimal:**
 
 ```swirls
-graph my_graph {
+workflow my_graph {
   root {
     type: code
     code: @ts { return {} }
@@ -663,8 +665,8 @@ graph my_graph {
 **Correct:**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root {
     type: code
     label: "Entry"
@@ -678,8 +680,8 @@ graph my_graph {
 **Incorrect:**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root { type: code label: "Entry" code: @ts { return {} } }
   node step { type: code label: "Step" code: @ts { return {} } }
   root -> step
@@ -691,8 +693,8 @@ The parser emits: `Edge declarations must be inside a flow { } block`.
 **Correct:**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root { type: code label: "Entry" code: @ts { return {} } }
   node step { type: code label: "Step" code: @ts { return {} } }
   flow {
@@ -771,7 +773,7 @@ node process {
 **Incorrect:**
 
 ```swirls
-graph submissions {
+workflow submissions {
   label: "Submissions"
   persistence {
     enabled: true
@@ -790,7 +792,7 @@ The parser errors: `persistence { } blocks have been removed — use a top-level
 **Correct:**
 
 ```swirls
-graph submissions {
+workflow submissions {
   label: "Submissions"
   root {
     type: code
@@ -802,7 +804,7 @@ graph submissions {
 
 stream submission_log {
   label: "Submission log"
-  graph: submissions
+  workflow: submissions
   version: v1
   versions: {
     v1 {
@@ -884,7 +886,7 @@ trigger on_submission {
 trigger my_trigger {
   resource: contact_form
   resourceType: form
-  graph: my_graph
+  workflow: my_graph
 }
 ```
 
@@ -897,7 +899,7 @@ trigger my_trigger {
 }
 ```
 
-The binding is a single syntactic line `<type>:<name> -> <graph>`. No separate fields.
+The binding is a single syntactic line `<type>:<name> -> <workflowName>`. No separate fields.
 
 #### 21. Using an array for `secrets:`
 
@@ -925,14 +927,14 @@ node call_api {
 }
 ```
 
-#### 22. Referencing a graph or stream as a string on a node
+#### 22. Referencing a workflow or stream as a string on a node
 
 **Incorrect:**
 
 ```swirls
 node call_helper {
-  type: graph
-  graph: "helper_graph"
+  type: workflow
+  workflow: "helper_graph"
   input: @ts { return {} }
 }
 ```
@@ -941,13 +943,13 @@ node call_helper {
 
 ```swirls
 node call_helper {
-  type: graph
-  graph: helper_graph
+  type: workflow
+  workflow: helper_graph
   input: @ts { return {} }
 }
 ```
 
-`graph:` on a graph node, `stream:` on a stream node, `postgres:` on a postgres node, and `auth:` on an http node all take **bare identifiers**, not quoted strings. (Bare identifiers are parsed as string values, so `"helper_graph"` also works, but convention is bare.)
+`workflow:` on a workflow node, `stream:` on a stream node, `postgres:` on a postgres node, and `auth:` on an http node all take **bare identifiers**, not quoted strings. (Bare identifiers are parsed as string values, so `"helper_graph"` also works, but convention is bare.)
 
 #### 23. Hyphenated or non-alphanumeric resource name
 
@@ -969,7 +971,7 @@ form contact_form {
 }
 ```
 
-Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, graphs, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids.
+Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, workflows, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids.
 
 #### 24. Setting `visibility` like a key:value pair on a form
 
@@ -1070,9 +1072,9 @@ node each_item {
 }
 ```
 
-See `graph-subgraph`.
+See `workflow-subgraph`.
 
-#### 27. Map / while node with both `subgraph { }` and `graph:`
+#### 27. Map / while node with both `subgraph { }` `and `workflow:`
 
 **Incorrect:**
 
@@ -1081,14 +1083,14 @@ node each_item {
   type: map
   items: @ts { return [] }
   maxItems: 10
-  graph: helper_graph
+  workflow: helper_graph
   subgraph {
     root { type: code code: @ts { return {} } }
   }
 }
 ```
 
-The validator errors: `map node requires exactly one of subgraph { } or graph: <name>`. Pick one. Use `graph: <name>` to call an existing top-level graph; use `subgraph { }` to inline the iteration body.
+The validator errors: `map node requires exactly one of subgraph { } or workflow: <name>`. Pick one. Use `workflow: <name>` to call an existing top-level workflow; use `subgraph { }` to inline the iteration body.
 
 #### 28. Map / while subgraph root without `inputSchema`
 
@@ -1209,7 +1211,7 @@ form contact {
   }
 }
 
-graph handle {
+workflow handle {
   label: "Handle"
   root {
     type: code
@@ -1239,7 +1241,7 @@ form contact {
   schema: contact_payload
 }
 
-graph handle {
+workflow handle {
   label: "Handle"
   root {
     type: code
@@ -1264,12 +1266,12 @@ A `.swirls` file contains twelve kinds of top-level declarations (plus the optio
 ```swirls
 import { helper } from "./utils.swirls"
 
-export graph my_graph {
+export workflow my_graph {
   // ...
 }
 ```
 
-The parser errors: `Unexpected token: expected schema, form, webhook, schedule, graph, stream, trigger, secret, auth, postgres, disk, or agent`.
+The parser errors: `Unexpected token: expected schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, or agent`.
 
 **Correct (all top-level declarations demonstrated):**
 
@@ -1302,7 +1304,7 @@ schedule daily {
   cron: "0 9 * * *"
 }
 
-graph process {
+workflow process {
   label: "Process"
   root {
     type: code
@@ -1314,7 +1316,7 @@ graph process {
 
 stream process_log {
   label: "Process log"
-  graph: process
+  workflow: process
   version: v1
   versions: {
     v1 {
@@ -1356,9 +1358,9 @@ trigger on_contact {
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
 - `webhook <name> { }` — HTTP endpoints for external payloads. See `resource-webhook`.
 - `schedule <name> { }` — Cron-based triggers. See `resource-schedule`.
-- `graph <name> { }` — Workflow DAGs. See `graph-anatomy`.
-- `stream <name> { }` — Persist a graph's output as typed records. See `resource-stream`.
-- `trigger <name> { }` — Binds resources to graphs. See `resource-trigger-binding`.
+- `workflow <name> { }` — Workflow DAGs. See `workflow-anatomy`.
+- `stream <name> { }` — Persist a workflow's output as typed records. See `resource-stream`.
+- `trigger <name> { }` — Binds resources to workflows. See `resource-trigger-binding`.
 - `secret <name> { }` — Named groups of secret var identifiers. See `resource-secrets`.
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.
 - `postgres <name> { }` — External PostgreSQL connection and table schemas. See `resource-postgres`.
@@ -1423,16 +1425,16 @@ root {
 
 Swirls supports single-line (`//`) and multi-line (`/* */`) comments. Doc comments (`/* */`) placed before a declaration are shown on hover in the LSP.
 
-Unicode characters in comments break the parser's line counting and cause graphs after the comment to be silently dropped.
+Unicode characters in comments break the parser's line counting and cause workflows after the comment to be silently dropped.
 
 **Incorrect (Unicode in comments):**
 
 ```swirls
 // ──────────────────────────────
-// Graph: get_token → fetch OAuth
+// Workflow: get_token → fetch OAuth
 // ──────────────────────────────
-graph get_token {
-  // This graph may be silently dropped
+workflow get_token {
+  // This workflow may be silently dropped
 }
 ```
 
@@ -1440,10 +1442,10 @@ graph get_token {
 
 ```swirls
 // -------------------------------------------
-// Graph: get_token - fetch OAuth
+// Workflow: get_token - fetch OAuth
 // -------------------------------------------
-graph get_token {
-  // This graph is parsed correctly
+workflow get_token {
+  // This workflow is parsed correctly
 }
 ```
 
@@ -1461,17 +1463,16 @@ root {
 Use only ASCII characters in comments: letters, digits, spaces, hyphens, underscores, periods, parentheses, and standard punctuation. Avoid box-drawing characters, arrows, em dashes, and other Unicode.
 
 
-# 3. Graph & Node Basics
+# 3. Workflow & Node Basics
 
-### Graph Anatomy
+### Workflow Anatomy
 
-A graph is a directed acyclic graph (DAG) of nodes connected by edges. It contains a label, optional description, exactly one root node, zero or more additional nodes, and an optional `flow { }` block.
+A workflow is a directed acyclic graph (DAG) of nodes connected by edges. It contains a label, optional description, exactly one root node, zero or more additional nodes, and a flow block.
 
-**Incorrect (missing root):**
+**Incorrect (missing required parts):**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_workflow {
   node step1 {
     type: code
     label: "Step"
@@ -1480,13 +1481,13 @@ graph my_graph {
 }
 ```
 
-Every graph must declare exactly one `root { }` block.
+This fails because there is no `label` and no `root { }` block.
 
-**Correct (complete graph structure):**
+**Correct (complete workflow structure):**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_workflow {
+  label: "My Workflow"
   description: "Optional description"
 
   root {
@@ -1506,9 +1507,6 @@ graph my_graph {
   node process {
     type: code
     label: "Process"
-    schema: @json {
-      { "type": "object", "properties": { "result": { "type": "string" } } }
-    }
     code: @ts {
       const x = context.nodes.root.output.x
       return { result: x }
@@ -1521,53 +1519,24 @@ graph my_graph {
 }
 ```
 
-#### Valid top-level keys inside `graph { }`
-
-| Key | Required | Notes |
-|-----|----------|-------|
-| `label:` | implicit required | Display string. Defaults to the graph name if omitted. |
-| `description:` | no | Free-form. |
-| `root { }` | yes | Exactly one; the entry node. Uses `root { }` syntax, not `node root { }`. |
-| `node <name> { }` | no | Zero or more additional nodes. |
-| `flow { }` | no (required if there are edges) | Contains edge declarations. |
-
-#### Constructs that are NOT valid inside `graph { }`
-
-- `persistence { }` — removed. The parser errors with a migration message. Use a top-level `stream { }` block instead. See `stream-persistence-block` and `resource-stream`.
-- Edge lines at graph scope (`root -> foo` outside `flow { }`) — parser error: `Edge declarations must be inside a flow { } block`.
-- `stream:` at graph scope (outside a node) — parser error: `"stream:" is only valid inside a node { } block`.
-- Bare `type:`, `schema:`, `prompt:` at graph scope — these only belong inside `root { }` or `node { }` bodies.
-
-#### Persistence
-
-To persist a graph's output, add a **top-level** `stream <name> { }` block that names the graph. Do not put persistence inside the graph. See `resource-stream`.
-
-```swirls
-graph my_graph { ... }
-
-stream my_graph_log {
-  graph: my_graph
-  version: v1
-  versions: {
-    v1 {
-      schema: @json { ... }
-      prepare: @ts { return { ... } }
-    }
-  }
-}
-```
+Workflow fields:
+- `label` - Required display name
+- `description` - Optional description
+- `root { }` - Required entry node (exactly one)
+- `node <name> { }` - Additional nodes (zero or more)
+- `flow { }` - Edge declarations connecting nodes
 
 ---
 
 ### Root Node Requirements
 
-Every graph must have exactly one `root { }` block. The root is the entry point. It receives the trigger payload via `context.nodes.root.input`. It is the only node that should use `inputSchema`.
+Every workflow must have exactly one `root { }` block. The root is the entry point. It receives the trigger payload via `context.nodes.root.input`. It is the only node that should use `inputSchema`.
 
 **Incorrect (using node instead of root for entry):**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_workflow {
+  label: "My Workflow"
 
   node entry {
     type: code
@@ -1577,13 +1546,13 @@ graph my_graph {
 }
 ```
 
-This fails validation: "Graph must declare root { } as the entry node."
+This fails validation: "Workflow must declare root { } as the entry node."
 
 **Incorrect (multiple root blocks):**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_workflow {
+  label: "My Workflow"
 
   root {
     type: code
@@ -1602,8 +1571,8 @@ graph my_graph {
 **Correct (single root block with inputSchema):**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_workflow {
+  label: "My Workflow"
 
   root {
     type: code
@@ -1638,7 +1607,7 @@ graph my_graph {
 
 Root node rules:
 - Declared with `root { }` syntax (not `node root { }`)
-- Exactly one per graph
+- Exactly one per workflow
 - Must have no incoming edges in the flow block
 - Only node where `inputSchema` is meaningful (defines trigger payload shape)
 - Can be any node type (code, ai, switch, etc.)
@@ -1687,7 +1656,7 @@ node handle_urgent {
   type: ai
   kind: text
   label: "Handle urgent"
-  model: "google/gemini-2.5-flash"
+  model: "gpt-4o-mini"
   prompt: @ts { return context.nodes.root.output.body }
 }
 
@@ -1717,7 +1686,7 @@ Edge rules:
 
 ### DAG Constraints
 
-Graphs must be directed acyclic graphs (DAGs). The validator enforces no cycles, exactly one root, and valid edge references.
+Workflows must be directed acyclic workflows (DAGs). The validator enforces no cycles, exactly one root, and valid edge references.
 
 **Incorrect (cycle in edges):**
 
@@ -1729,7 +1698,7 @@ flow {
 }
 ```
 
-Error: "Graph contains a cycle - DAG workflows cannot have cycles"
+Error: "Workflow contains a cycle - DAG workflows cannot have cycles"
 
 **Incorrect (edge references non-existent node):**
 
@@ -1755,7 +1724,7 @@ Error: "Edge cannot connect a node to itself"
 **Correct (valid DAG with parallel and sequential branches):**
 
 ```swirls
-graph pipeline {
+workflow pipeline {
   label: "Pipeline"
 
   root {
@@ -1788,7 +1757,7 @@ Validation rules:
 
 ### Inline `subgraph { }` Block
 
-`map` and `while` nodes can either reference a top-level graph by name (`graph: <name>`) or define the iteration body inline as a `subgraph { ... }` block. The inline form is keyword-only — **no colon, no quotes, no value**.
+`map` and `while` nodes can either reference a top-level workflow by name (`workflow: <name>`) or define the iteration body inline as a `subgraph { ... }` block. The inline form is keyword-only — **no colon, no quotes, no value**.
 
 #### Syntax
 
@@ -1811,7 +1780,7 @@ node <name> {
 
 #### Body shape
 
-`subgraph { }` accepts the same inner body as `graph { }`:
+`subgraph { }` accepts the same inner body as `workflow { }`:
 
 - Exactly one `root { }` block (entry node).
 - Zero or more `node <name> { }` blocks.
@@ -1824,7 +1793,7 @@ label is not valid inside subgraph { }
 description is not valid inside subgraph { }
 ```
 
-The subgraph runs in the parent graph's namespace; it does not have a separate name or display label.
+The subgraph runs in the parent workflow's namespace; it does not have a separate name or display label.
 
 #### Required: `inputSchema` on the root
 
@@ -1911,27 +1880,27 @@ node refine_digest {
 }
 ```
 
-#### Inline subgraph vs. referenced graph
+#### Inline subgraph vs. referenced workflow
 
 Pick one based on reuse:
 
 - **Inline `subgraph { }`** — The iteration body is single-purpose and lives next to the loop. Easier to read top-to-bottom.
-- **`graph: <name>`** — The same body is used elsewhere too, or the body is large enough to want its own file/section. The referenced graph's root must still declare `inputSchema`.
+- **`workflow: <name>`** — The same body is used elsewhere too, or the body is large enough to want its own file/section. The referenced workflow's root must still declare `inputSchema`.
 
 The validator rejects both-set and neither-set:
 
 ```
-map node requires exactly one of subgraph { } or graph: <name>
-while node requires exactly one of subgraph { } or graph: <name>
+map node requires exactly one of subgraph { } or workflow: <name>
+while node requires exactly one of subgraph { } or workflow: <name>
 ```
 
 #### DAG rules apply
 
-The subgraph is a DAG: exactly one root (the `root { }` block), no cycles, every edge target must be a declared node. The validator runs `dagValidation` on it just like any top-level graph.
+The subgraph is a DAG: exactly one root (the `root { }` block), no cycles, every edge target must be a declared node. The validator runs `dagValidation` on it just like any top-level workflow.
 
 #### Edges live in `flow { }`
 
-Edges inside a subgraph go in a `flow { }` block, same as a top-level graph:
+Edges inside a subgraph go in a `flow { }` block, same as a top-level workflow:
 
 ```swirls
 subgraph {
@@ -1945,7 +1914,7 @@ subgraph {
 
 #### Iteration context
 
-The subgraph (or referenced graph) sees `context.iteration.*` instead of just `context.nodes.root.input`. See `context-iteration`.
+The subgraph (or referenced workflow) sees `context.iteration.*` instead of just `context.nodes.root.input`. See `context-iteration`.
 
 
 # 4. Node Types
@@ -2007,7 +1976,7 @@ node normalize {
 }
 ```
 
-If you need network access, use an `http` node. If you need AI, use an `ai` node. If you need to send email, use an `email` node. If you need to scrape a page, use a `scrape` node. If you need filesystem exec, use a `disk` node. Break your graph into multiple nodes with the right types.
+If you need network access, use an `http` node. If you need AI, use an `ai` node. If you need to send email, use an `email` node. If you need to scrape a page, use a `scrape` node. If you need filesystem exec, use a `disk` node. Break your workflow into multiple nodes with the right types.
 
 Code node fields:
 | Field | Required | Type |
@@ -2130,7 +2099,7 @@ AI nodes infer `OPENROUTER_API_KEY` as a secret. You do not need to declare it.
 
 ### Agent Nodes
 
-Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, and the graphs exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, or overrides `system`.
+Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, or overrides `system`.
 
 For a one-shot LLM call (no tools, no loop), use `ai` instead. `agent` is for multi-step harnesses with tool use.
 
@@ -2162,7 +2131,7 @@ agent triage {
   tools: [search_kb, escalate]
 }
 
-graph handle {
+workflow handle {
   label: "Handle inbound"
   root {
     type: agent
@@ -2202,7 +2171,7 @@ node ask {
 | `agent` | yes | Bare identifier | Names a top-level `agent <name> { }` block. |
 | `prompt` | yes | `@ts` block | User prompt for this turn. |
 | `role` | no | Bare identifier | Names a `role` declared inside the bound agent block. |
-| `tools` | no | Array of bare identifiers | Subset of the agent block's tool graphs. |
+| `tools` | no | Array of bare identifiers | Subset of the agent block's tool workflows. |
 | `system` | no | `@ts` block | Overrides the agent block's default `system:` for this call. |
 
 Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
@@ -2411,7 +2380,7 @@ node notify {
 }
 ```
 
-`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`. The validator errors: `Invalid node type "resend". Must be one of: ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while`.
+`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`. The validator errors: `Invalid node type "resend". Must be one of: ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while`.
 
 #### Correct (complete email node)
 
@@ -2652,7 +2621,7 @@ node discover_posts {
 
 ### Stream Nodes
 
-A `type: stream` node **reads** from a top-level `stream { }` block. It is the read side of Swirls' graph-to-graph communication. The node's output is an array of previously persisted records matching the filter, read from one **pinned version** of the stream.
+A `type: stream` node **reads** from a top-level `stream { }` block. It is the read side of Swirls' workflow-to-workflow communication. The node's output is an array of previously persisted records matching the filter, read from one **pinned version** of the stream.
 
 **Required fields:** `stream` (bare identifier naming a top-level stream block in the same project), `version` (the `versions:` key to read, e.g. `v1`), and `filter` (@ts returning a `StreamFilter` object).
 
@@ -2809,43 +2778,30 @@ See `resource-stream` for the write side (top-level `stream { }` block declarati
 
 ---
 
-### Graph Nodes (Subgraphs)
+### Workflow Nodes (Subgraphs)
 
-Graph nodes call another graph as a subgraph. The child graph runs independently with the provided input, and its leaf node outputs become available to downstream nodes.
+Workflow nodes call another workflow as a subgraph. The child workflow runs independently with the provided input, and its leaf node outputs become available to downstream nodes.
 
-**Required fields:** `graph`, `input`
+**Required fields:** `workflow`, `input`
 
 **Incorrect (missing input):**
 
 ```swirls
 node run_helper {
-  type: graph
+  type: workflow
   label: "Run helper"
-  graph: helper_graph
+  workflow: helper_workflow
 }
 ```
 
-Error: "Node type 'graph' requires 'input'"
+Error: "Node type 'workflow' requires 'input'"
 
-**Incorrect (referencing graph in another file):**
+**Cross-file workflow refs:** `workflow:` may name a `workflow` declared in **another** `.swirls` file. `swirls doctor` builds a workspace index and resolves the name across the tree (single-file / LSP validation still requires the workflow in that file).
 
-```swirls
-// helper.swirls defines helper_graph
-// main.swirls references it
-node run_helper {
-  type: graph
-  label: "Run helper"
-  graph: helper_graph
-  input: @ts { return context.nodes.root.input }
-}
-```
-
-Warning: `swirls doctor` does not resolve cross-file references. It reports "Graph node references graph 'helper_graph' which is not defined." Keep related graphs in the same file.
-
-**Correct (subgraph in same file):**
+**Example (helper workflow in the same file—simplest layout):**
 
 ```swirls
-graph helper_graph {
+workflow helper_workflow {
   label: "Helper"
   root {
     type: code
@@ -2862,7 +2818,7 @@ graph helper_graph {
   }
 }
 
-graph main_graph {
+workflow main_workflow {
   label: "Main"
 
   root {
@@ -2875,9 +2831,9 @@ graph main_graph {
   }
 
   node run_helper {
-    type: graph
+    type: workflow
     label: "Run helper"
-    graph: helper_graph
+    workflow: helper_workflow
     input: @ts {
       return context.nodes.root.input
     }
@@ -2899,31 +2855,27 @@ graph main_graph {
 }
 ```
 
-Subgraph output is accessed as `context.nodes.<graphNodeName>.output.<leafNodeName>`. The leaf node names come from the child graph.
+Subgraph output is accessed as `context.nodes.<workflowNodeName>.output.<leafNodeName>`. The leaf node names come from the child workflow.
 
-Graph node fields:
+Workflow node fields:
 | Field | Required | Type |
 |-------|----------|------|
-| `graph` | yes | Graph name (resolved across the workspace) |
+| `workflow` | yes | Workflow name (workspace-resolvable across `.swirls` files under `swirls doctor`) |
 | `input` | yes | `@ts` block |
-
-#### Related: map / while inline subgraphs
-
-`type: graph` runs the child graph **once**. For per-item iteration over a list, use `type: map` (each item runs the child once). For repeated execution until a condition is false, use `type: while`. Both accept either `graph: <name>` (the same kind of reference shown above) or an inline `subgraph { ... }` block (no colon) — see `node-map`, `node-while`, and `graph-subgraph`.
 
 ---
 
 ### Map Nodes
 
-A `map` node iterates over an array and runs a child graph (inline `subgraph { }` or referenced `graph: <name>`) once per element. Output is an array of the child graph's leaf-node outputs in the same order as `items`.
+A `map` node iterates over an array and runs a child workflow (inline `subgraph { }` or referenced `workflow: <name>`) once per element. Output is an array of the child workflow's leaf-node outputs in the same order as `items`.
 
 #### Required fields
 
 - `items` — `@ts` block returning an array. Each element becomes the iteration item.
 - `maxItems` — positive number. Hard cap; the validator rejects unbounded loops.
 - Exactly one of:
-  - `subgraph { ... }` — inline child graph (no colon). The inline form's root must declare `inputSchema`.
-  - `graph: <name>` — bare identifier referencing a top-level graph in the workspace. That graph's root must declare `inputSchema`.
+  - `subgraph { ... }` — inline child workflow (no colon). The inline form's root must declare `inputSchema`.
+  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That graph's root must declare `inputSchema`.
 
 #### Optional fields
 
@@ -2985,7 +2937,7 @@ node per_ticket {
 #### Referenced graph
 
 ```swirls
-graph normalize_ticket {
+workflow normalize_ticket {
   label: "Normalize ticket"
   root {
     type: code
@@ -3004,17 +2956,17 @@ node per_ticket {
   label: "Process each"
   items: @ts { return context.nodes.root.output.tickets }
   maxItems: 100
-  graph: normalize_ticket
+  workflow: normalize_ticket
 }
 ```
 
 #### `context.iteration.item`
 
-Inside the subgraph (or referenced graph), each iteration sees its element on `context.iteration.item`. The shape is whatever the subgraph root's `inputSchema` declares. See `context-iteration`.
+Inside the subgraph (or referenced workflow), each iteration sees its element on `context.iteration.item`. The shape is whatever the subgraph root's `inputSchema` declares. See `context-iteration`.
 
 #### Output shape
 
-The map node's output is an array of objects keyed by leaf-node name in the child graph:
+The map node's output is an array of objects keyed by leaf-node name in the child workflow:
 
 ```ts
 context.nodes.per_ticket.output[i].<leafName>
@@ -3038,14 +2990,14 @@ node merge {
 - `Node type "map" requires "maxItems"` — Add `maxItems: <number>`.
 - `map node requires maxItems as a positive number` — `maxItems` was missing or not positive.
 - `map node concurrency must be a positive integer when set` — `concurrency` was zero, negative, or non-integer.
-- `map node requires exactly one of subgraph { } or graph: <name>` — You set both, or neither.
-- `Node references graph "<n>" which is not defined` — `graph: <n>` does not match any graph in the workspace.
-- `map/while subgraph root must declare inputSchema for typed iteration` — The inline root (or the referenced graph's root) is missing `inputSchema`.
+- `map node requires exactly one of subgraph { } or workflow: <name>` — You set both, or neither.
+- `Node references workflow "<n>" which is not defined` — `workflow: <n>` does not match any workflow in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — The inline root (or the referenced workflow's root) is missing `inputSchema`.
 
 #### Common mistakes
 
 - **`subgraph: { ... }`** — `subgraph` is a bare block, not a key:value pair. No colon.
-- **Both `subgraph { }` and `graph: <name>`** — Pick one. The validator rejects both-set and neither-set.
+- **Both `subgraph { }` and `workflow: <name>`** — Pick one. The validator rejects both-set and neither-set.
 - **No `maxItems`** — Unbounded loops are rejected. Pick a real cap.
 - **Subgraph root has no `inputSchema`** — Required for typed iteration.
 - **Treating output as a flat list of leaf values** — Output is `[{ leafName: leafOutput }, ...]`, not `[leafOutput, ...]`. Index by leaf name.
@@ -3054,7 +3006,7 @@ node merge {
 
 ### While Nodes
 
-A `while` node runs a child graph (inline `subgraph { }` or referenced `graph: <name>`) repeatedly until `condition` returns false or `maxIterations` is reached. Each iteration receives the previous iteration's output via `update`.
+A `while` node runs a child workflow (inline `subgraph { }` or referenced `workflow: <name>`) repeatedly until `condition` returns false or `maxIterations` is reached. Each iteration receives the previous iteration's output via `update`.
 
 #### Required fields
 
@@ -3063,8 +3015,8 @@ A `while` node runs a child graph (inline `subgraph { }` or referenced `graph: <
 - `update` — `@ts` block returning the next iteration's input. Has access to the previous iteration's output.
 - `maxIterations` — positive integer. Hard cap to prevent runaway loops.
 - Exactly one of:
-  - `subgraph { ... }` — inline child graph (no colon). The inline form's root must declare `inputSchema`.
-  - `graph: <name>` — bare identifier referencing a top-level graph in the workspace. That graph's root must declare `inputSchema`.
+  - `subgraph { ... }` — inline child workflow (no colon). The inline form's root must declare `inputSchema`.
+  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That graph's root must declare `inputSchema`.
 
 #### Inline subgraph
 
@@ -3130,7 +3082,7 @@ Inside the subgraph:
 
 #### Output shape
 
-The while node's output is an object with `lastOutput`, keyed by the child graph's leaf-node names:
+The while node's output is an object with `lastOutput`, keyed by the child workflow's leaf-node names:
 
 ```ts
 context.nodes.refine_digest.output.lastOutput.<leafName>
@@ -3160,9 +3112,9 @@ node done {
 
 - `Node type "while" requires "input" / "condition" / "update" / "maxIterations"` — Required field missing.
 - `while node requires maxIterations as a positive integer` — Must be ≥ 1 and integer.
-- `while node requires exactly one of subgraph { } or graph: <name>` — Pick one.
-- `Node references graph "<n>" which is not defined` — `graph: <n>` is unknown in the workspace.
-- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` to the inline root or the referenced graph's root.
+- `while node requires exactly one of subgraph { } or workflow: <name>` — Pick one.
+- `Node references workflow "<n>" which is not defined` — `workflow: <n>` is unknown in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` to the inline root or the referenced workflow's root.
 
 #### Common mistakes
 
@@ -3176,7 +3128,7 @@ node done {
 
 ### Wait Nodes
 
-Wait nodes pause graph execution for a specified duration.
+Wait nodes pause workflow execution for a specified duration.
 
 **Correct (static wait):**
 
@@ -3262,7 +3214,7 @@ disk proj {
   secrets: disk_creds
 }
 
-graph audit {
+workflow audit {
   label: "Audit disk contents"
   root {
     type: disk
@@ -3498,7 +3450,7 @@ Top-level `auth { secrets: <block_name> }` and `postgres { secrets: <block_name>
 
 ### Node Failure Policy
 
-Any node can declare a `failurePolicy:` to control what the durable DAG engine does when that node's execution throws. Without a policy, the default is `fail` (the whole graph execution errors).
+Any node can declare a `failurePolicy:` to control what the durable DAG engine does when that node's execution throws. Without a policy, the default is `fail` (the whole workflow execution errors).
 
 #### Shape
 
@@ -3515,8 +3467,8 @@ failurePolicy: {
 
 | Strategy | Meaning |
 |----------|---------|
-| `fail` | Node failure errors the whole graph execution (default). |
-| `retry` | Re-run the node up to `maxRetries` times, with `backoffMs` between attempts. If still failing, the graph errors. |
+| `fail` | Node failure errors the whole workflow execution (default). |
+| `retry` | Re-run the node up to `maxRetries` times, with `backoffMs` between attempts. If still failing, the workflow errors. |
 | `skip` | Mark the node as skipped and continue; downstream nodes run without this node's output. |
 | `fallback` | Replace the node's output with `fallbackValue` and continue. |
 
@@ -3750,7 +3702,7 @@ When in doubt, use string concatenation instead of template literals, and `Strin
 
 ### No Double-Quote Characters in @ts Blocks
 
-Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block appears to parse correctly, but all subsequent graphs in the file are silently dropped. `swirls doctor` reports fewer graphs than expected with no error.
+Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block appears to parse correctly, but all subsequent workflows in the file are silently dropped. `swirls doctor` reports fewer workflows than expected with no error.
 
 **Incorrect (regex with double-quote):**
 
@@ -3787,7 +3739,7 @@ code: @ts {
 }
 ```
 
-This is one of the most common causes of "missing graphs" with no error message.
+This is one of the most common causes of "missing workflows" with no error message.
 
 ---
 
@@ -4075,7 +4027,7 @@ schema contact_payload {
   }
 }
 
-graph handle {
+workflow handle {
   label: "Handle"
 
   root {
@@ -4110,7 +4062,7 @@ graph handle {
 
 #### Map / while subgraph root
 
-Inside a `subgraph { }` block on a `map` or `while` node, the root **must** declare `inputSchema`. The validator emits: `map/while subgraph root must declare inputSchema for typed iteration`. This types `context.iteration.item` (map) or `context.iteration.input` (while). See `graph-subgraph`.
+Inside a `subgraph { }` block on a `map` or `while` node, the root **must** declare `inputSchema`. The validator emits: `map/while subgraph root must declare inputSchema for typed iteration`. This types `context.iteration.item` (map) or `context.iteration.input` (while). See `workflow-subgraph`.
 
 #### Best practice
 
@@ -4237,14 +4189,14 @@ node result {
 
 **Accessing subgraph output:**
 
-When using a `type: graph` node, the output is keyed by the child graph's leaf node names:
+When using a `type: workflow` node, the output is keyed by the child workflow's leaf node names:
 
 ```swirls
 node result {
   type: code
   label: "Result"
   code: @ts {
-    // run_helper is a graph node calling helper_graph
+    // run_helper is a workflow node calling helper_graph
     // helper_graph's root is its leaf node
     const out = context.nodes.run_helper.output.root
     return { doubled: out.value }
@@ -4261,7 +4213,7 @@ Pattern summary:
 
 ### context.iteration - Map / While Iteration Data
 
-Inside a `map` or `while` node's child graph (inline `subgraph { }` or referenced `graph: <name>`), `context.iteration` carries the per-iteration state. The fields available depend on the node type.
+Inside a `map` or `while` node's child workflow (inline `subgraph { }` or referenced `workflow: <name>`), `context.iteration` carries the per-iteration state. The fields available depend on the node type.
 
 #### `map` nodes
 
@@ -4392,7 +4344,7 @@ node done {
 - **Treating map output as a flat list** — Each entry is `{ leafName: leafOutput }`, not the leaf output directly. Index by leaf name.
 - **Treating while output as an array** — While runs sequentially; output is `output.lastOutput` (single object), not an array of iterations.
 - **Reading `context.iteration.previous` on iteration 0** — It's `undefined`. Use `?.` or `if (context.iteration.index > 0) { ... }`.
-- **Using `context.nodes.root.input` inside a subgraph** — That's the parent graph's root input. Use `context.iteration.item` (map) or `context.iteration.input` (while) inside the subgraph.
+- **Using `context.nodes.root.input` inside a subgraph** — That's the parent workflow's root input. Use `context.iteration.item` (map) or `context.iteration.input` (while) inside the subgraph.
 - **Mutating `context.iteration.input`** — Treat it as read-only. Return a new object from `update` to advance state.
 
 ---
@@ -4428,7 +4380,7 @@ secret creds {
   vars: [MY_SERVICE_TOKEN, ANOTHER_KEY]
 }
 
-graph g {
+workflow g {
   root {
     type: code
     label: "Entry"
@@ -4619,7 +4571,7 @@ The validator errors: `Form name: Name must contain only letters, numbers, and u
 
 #### Schema reference (bare identifier)
 
-You can declare a top-level `schema <name> { }` block once and reference it from the form by bare identifier. The same name can also be used as `inputSchema:` on the graph root the trigger fires.
+You can declare a top-level `schema <name> { }` block once and reference it from the form by bare identifier. The same name can also be used as `inputSchema:` on the workflow root the trigger fires.
 
 ```swirls
 schema contact_payload {
@@ -4637,9 +4589,9 @@ form contact {
 
 See `resource-schema`.
 
-#### Binding a form to a graph
+#### Binding a form to a workflow
 
-Forms don't execute on their own. Declare a `trigger` to send submissions to a graph:
+Forms don't execute on their own. Declare a `trigger` to send submissions to a workflow:
 
 ```swirls
 trigger on_contact {
@@ -4654,7 +4606,7 @@ See `resource-trigger-binding`.
 
 ### Webhook Declarations
 
-Webhooks create HTTP endpoints for receiving external payloads. They accept any HTTP POST and deliver the body to the connected graph.
+Webhooks create HTTP endpoints for receiving external payloads. They accept any HTTP POST and deliver the body to the connected workflow.
 
 Use `secret:` + `header:` to require shared-secret verification on every inbound request. Both fields must be set together (or neither). The validator warns when both are missing because the endpoint will accept any POST without verification.
 
@@ -4764,7 +4716,7 @@ See `resource-schema`.
 
 #### Binding
 
-A webhook on its own does not execute a graph. Declare a trigger:
+A webhook on its own does not execute a workflow. Declare a trigger:
 
 ```swirls
 trigger on_inbound {
@@ -4777,7 +4729,7 @@ trigger on_inbound {
 
 ### Schedule Declarations
 
-Schedules trigger graphs on a cron schedule. The payload is an empty object `{}`.
+Schedules trigger workflows on a cron schedule. The payload is an empty object `{}`.
 
 **Incorrect (missing cron):**
 
@@ -4815,7 +4767,7 @@ Common cron expressions (standard 5-field form):
 - `"0 9 * * 1"` - Every Monday at 9 AM
 - `"*/15 * * * *"` - Every 15 minutes
 
-Schedule names must match `^[a-zA-Z0-9_]+$` (letters, digits, underscores). Bind a schedule to a graph via a trigger:
+Schedule names must match `^[a-zA-Z0-9_]+$` (letters, digits, underscores). Bind a schedule to a workflow via a trigger:
 
 ```swirls
 trigger daily_trigger {
@@ -4828,7 +4780,7 @@ trigger daily_trigger {
 
 ### Stream Block Declaration
 
-Top-level `stream <name> { }` blocks persist one graph's output into a named, schema-typed record. They replace the removed `persistence { }` block. A `type: stream` node in another graph can read from the same stream (at a pinned version) to achieve graph-to-graph communication.
+Top-level `stream <name> { }` blocks persist one workflow's output into a named, schema-typed record. They replace the removed `persistence { }` block. A `type: stream` node in another workflow can read from the same stream (at a pinned version) to achieve workflow-to-workflow communication.
 
 **There is no `type:` field on a stream block** — the keyword `stream` identifies the block.
 
@@ -4841,7 +4793,7 @@ stream <name> {
   label: "<optional label>"          // defaults to <name>
   description: "<optional string>"
   enabled: <boolean>                  // optional; default treated as true
-  graph: <graph_name>                 // required; graph declared in this file
+  workflow: <workflow_name>                 // required; graph declared in this file
   version: <version_id>               // required; active writer version, must exist in versions:
 
   versions: {
@@ -4869,7 +4821,7 @@ Block-level:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `graph` | yes | Bare identifier naming a graph in the same file (or merged workspace). |
+| `graph` | yes | Bare identifier naming a workflow in the same file (or merged workspace). |
 | `version` | yes | Active writer `version_id` (`v1`, …). Must match a key in `versions:`. |
 | `versions` | yes | Non-empty map of `version_id` → `{ schema, condition?, prepare }`. |
 | `label` | no | Defaults to the stream's name. |
@@ -4890,7 +4842,7 @@ These `@ts` blocks get a specialized `context`:
 
 - `context.output.<leafNodeName>` — output of each DSL leaf node (node with no outgoing edges). Only leaves that actually executed appear. For a single-node graph, `context.output.root` holds the root output.
 - `context.nodes.<name>.input` / `.output` — per-node access for every executed node.
-- `context.nodes.root.input` — the graph's trigger input.
+- `context.nodes.root.input` — the workflow's trigger input.
 - `context.reviews`, `context.secrets`, `context.meta` — as in normal nodes (may be empty on CLI).
 
 Because `context.output` is keyed by leaf, and because `switch` routing means only one branch's leaves run, every leaf key is typed as independently optional by the LSP. Narrowing one case does not narrow sibling cases. Use `'leafName' in context.output`, optional chaining (`?.`), non-null assertion (`!`), or explicit runtime checks on the fallback branch.
@@ -4898,7 +4850,7 @@ Because `context.output` is keyed by leaf, and because `switch` routing means on
 #### Complete example — write side
 
 ```swirls
-graph process_leads {
+workflow process_leads {
   label: "Process incoming leads"
 
   root {
@@ -4938,7 +4890,7 @@ graph process_leads {
 stream scored_leads {
   label: "Scored leads"
   description: "Persists lead scoring output from process_leads"
-  graph: process_leads
+  workflow: process_leads
   version: v1
 
   versions: {
@@ -4974,10 +4926,10 @@ stream scored_leads {
 
 #### Reading a stream — the read side
 
-A `type: stream` node in another graph reads the persisted data at a pinned version:
+A `type: stream` node in another workflow reads the persisted data at a pinned version:
 
 ```swirls
-graph enrich_leads {
+workflow enrich_leads {
   label: "Enrich high-scoring leads"
 
   root {
@@ -4999,14 +4951,14 @@ See `node-stream` for the full filter operator list.
 #### Provisioning and versioning
 
 - Deploy provisions **one Postgres table per `(stream, version)`** — for example `project_<uuid>.stream_scored_leads_v1`.
-- Graph completion writes only to the deployment's active `version` (the block-level `version:` pointer).
+- Workflow completion writes only to the deployment's active `version` (the block-level `version:` pointer).
 - Re-deploying with a **changed `schema` for an existing version id** fails with a drift error. To evolve a record shape, add a **new** `versions:` entry (`v2`, …) and move the `version:` pointer; existing readers stay pinned to the old version until you migrate them.
 - The local CLI worker does not write or read stream data — exercise streams in a deployed project.
 
 #### Validation rules
 
 - Stream names must match `^[a-zA-Z0-9_]+$`. Duplicate names error with `Duplicate stream name "X"`.
-- `graph` is required (`Stream block requires "graph" (graph name)`) and must reference a declared graph (`Stream references graph "X" which is not defined`).
+- `graph` is required (`Stream block requires "workflow" (workflow name)`) and must reference a declared graph (`Stream references workflow "X" which is not defined`).
 - `version` is required (`Stream "X" requires "version" (active writer)`), must be a valid `version_id` (`… version pointer "X" is invalid — use v1, v2, …`), and must be declared under `versions:` (`… version "X" is not declared under versions { }`).
 - `versions:` must be non-empty (`Stream "X" requires a non-empty versions { } block`). Duplicate keys error (`… declares duplicate version key "X"`).
 - Each version requires a `schema` (`… version "vN" has no schema; add schema: @json { … } or schema: <name>`) and a non-empty `prepare` (`… version "vN" requires "prepare"`). A present-but-empty `condition` errors too.
@@ -5019,7 +4971,7 @@ The lexer treats `stream` as a keyword. At the top level:
 - `stream <name> { … }` — declare a stream block.
 - `stream:` at top-level is invalid and errors with: `"stream:" is only valid inside a node { } block (did you forget to close a brace?)`.
 
-Inside a graph body, `stream:` at graph scope (outside a node) errors the same way. Inside a `node { }` body, `stream:` is a normal config field (used by `type: stream` nodes as the stream reference).
+Inside a workflow body, `stream:` at workflow scope (outside a node) errors the same way. Inside a `node { }` body, `stream:` is a normal config field (used by `type: stream` nodes as the stream reference).
 
 ---
 
@@ -5053,7 +5005,7 @@ schema <name> {
 ```swirls
 schema contact_payload {
   label: "Contact payload"
-  description: "Shared JSON Schema for the contact form and process_form graph"
+  description: "Shared JSON Schema for the contact form and process_form workflow"
   schema: @json {
     {
       "type": "object",
@@ -5072,7 +5024,7 @@ form contact {
   schema: contact_payload
 }
 
-graph handle_contact {
+workflow handle_contact {
   label: "Handle contact"
 
   root {
@@ -5121,7 +5073,7 @@ Schema names must match `^[a-zA-Z0-9_]+$`. Hyphens, dots, and spaces are not all
 
 #### Workspace resolution
 
-Schema names resolve across all `.swirls` files in the workspace, the same way graphs and streams do. `swirls doctor` and deploy bundle the union of all schema declarations under the scanned working directory. The LSP single-file open may report a missing schema until the workspace is considered.
+Schema names resolve across all `.swirls` files in the workspace, the same way workflows and streams do. `swirls doctor` and deploy bundle the union of all schema declarations under the scanned working directory. The LSP single-file open may report a missing schema until the workspace is considered.
 
 #### Validation rules
 
@@ -5133,7 +5085,7 @@ Schema names resolve across all `.swirls` files in the workspace, the same way g
 
 ### Trigger Bindings
 
-Triggers connect a resource (form, webhook, or schedule) to a graph. When the resource fires, the graph executes with the resource's payload available as `context.nodes.root.input`.
+Triggers connect a resource (form, webhook, or schedule) to a workflow. When the resource fires, the workflow executes with the resource's payload available as `context.nodes.root.input`.
 
 **Only three resource types are valid in triggers:** `form`, `webhook`, `schedule`. There is no `agent:`, `stream:`, or `trigger:` type.
 
@@ -5141,33 +5093,33 @@ Triggers connect a resource (form, webhook, or schedule) to a graph. When the re
 
 ```swirls
 trigger <name> {
-  form:<form_name> -> <graph_name>
+  form:<form_name> -> <workflow_name>
   enabled: <boolean>
 }
 
 trigger <name> {
-  webhook:<webhook_name> -> <graph_name>
+  webhook:<webhook_name> -> <workflow_name>
   enabled: <boolean>
 }
 
 trigger <name> {
-  schedule:<schedule_name> -> <graph_name>
+  schedule:<schedule_name> -> <workflow_name>
   enabled: <boolean>
 }
 ```
 
-The binding is a single syntactic line `<type>:<name> -> <graph>`. There are no separate `resource:` / `graph:` fields. `enabled:` is the only other field; everything else is ignored.
+The binding is a single syntactic line `<type>:<name> -> <workflowName>`. There are no separate `resource:` / `graph:` fields. `enabled:` is the only other field; everything else is ignored.
 
 #### Incorrect (wrong syntax)
 
 ```swirls
 trigger my_trigger {
   form: contact_form
-  graph: process_form
+  workflow: process_form
 }
 ```
 
-Missing the `-> graphName` arrow. The trigger silently parses with empty `resourceName` and `graphName`, and the validator then complains about undefined references.
+Missing the `-> workflowName` arrow. The trigger silently parses with empty `resourceName` and `workflowName`, and the validator then complains about undefined references.
 
 #### Incorrect (agent type)
 
@@ -5198,13 +5150,13 @@ trigger daily_schedule {
 }
 ```
 
-Multiple triggers can target the same graph from different sources.
+Multiple triggers can target the same workflow from different sources.
 
 #### Validation rules
 
 - Trigger names must match `^[a-zA-Z0-9_]+$` and be unique in the file.
 - The referenced `form` / `webhook` / `schedule` must be declared in the same file, else: `Trigger references <type> "<name>" which is not defined`.
-- The referenced graph must be declared in the same file, else: `Trigger references graph "<name>" which is not defined`.
+- The referenced workflow must be declared in the same file, else: `Trigger references workflow "<name>" which is not defined`.
 
 #### `enabled`
 
@@ -5263,7 +5215,7 @@ secret creds {
   vars: [MY_TOKEN, ANOTHER_KEY]
 }
 
-graph g {
+workflow g {
   root {
     type: code
     label: "Entry"
@@ -5522,7 +5474,7 @@ disk proj {
   secrets: disk_creds
 }
 
-graph backup {
+workflow backup {
   label: "Backup logs"
   root {
     type: disk
@@ -5572,7 +5524,7 @@ agent <name> {
   maxTokens: <number>                 // optional
   maxSteps: <number>                  // optional
 
-  tools: [graph_a, graph_b]           // optional; graphs exposed as LLM-callable tools
+  tools: [graph_a, graph_b]           // optional; workflows exposed as LLM-callable tools
 
   role <role_name> {                  // zero or more roles
     description: "<optional>"
@@ -5593,7 +5545,7 @@ agent <name> {
 | `temperature` | no | Number. |
 | `maxTokens` | no | Number. |
 | `maxSteps` | no | Number. Caps how many tool-call turns the agent may take. |
-| `tools` | no | Array of bare identifiers naming graphs in the same workspace. |
+| `tools` | no | Array of bare identifiers naming workflows in the same workspace. |
 | `role <name> { }` | no | Zero or more named roles. Each may override `system` and narrow `tools`. |
 | `label` | no | Display string. |
 | `description` | no | Free-form description. |
@@ -5605,7 +5557,7 @@ secret ai_creds {
   vars: [OPENAI_API_KEY]
 }
 
-graph search_kb {
+workflow search_kb {
   label: "Search KB"
   root {
     type: code
@@ -5620,7 +5572,7 @@ graph search_kb {
   }
 }
 
-graph escalate {
+workflow escalate {
   label: "Escalate"
   root {
     type: code
@@ -5662,7 +5614,7 @@ agent triage {
   }
 }
 
-graph handle_ticket {
+workflow handle_ticket {
   label: "Handle ticket"
   root {
     type: agent
@@ -5681,7 +5633,7 @@ graph handle_ticket {
 - Agent names must match `^[a-zA-Z0-9_]+$`. Duplicate names error.
 - `provider` must be one of the four allowed values.
 - `model` must be a non-empty quoted string.
-- Every entry in `tools:` must name a graph defined in the workspace.
+- Every entry in `tools:` must name a workflow defined in the workspace.
 - Every `role <name> { }` must have a unique name within the agent block. Each role's `tools:` must be a subset of the agent's top-level `tools:`.
 - `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `role:`, it must name a declared role in that block.
 
@@ -5692,14 +5644,14 @@ See `node-agent` for the binding side.
 
 ### Persistence Is Top-Level Stream, Not a Block
 
-The old `persistence { }` block inside a graph has been **removed** from the language. Do not use it. The parser emits a hard error: `persistence { } blocks have been removed — use a top-level stream block instead`.
+The old `persistence { }` block inside a workflow has been **removed** from the language. Do not use it. The parser emits a hard error: `persistence { } blocks have been removed — use a top-level stream block instead`.
 
-Replace persistence with a top-level `stream <name> { }` declaration that references the graph by name.
+Replace persistence with a top-level `stream <name> { }` declaration that references the workflow by name.
 
 **Incorrect (uses the removed persistence block):**
 
 ```swirls
-graph submissions {
+workflow submissions {
   label: "Record submission"
 
   persistence {
@@ -5719,7 +5671,7 @@ graph submissions {
 **Correct (top-level stream block):**
 
 ```swirls
-graph submissions {
+workflow submissions {
   label: "Record submission"
 
   root {
@@ -5754,7 +5706,7 @@ graph submissions {
 
 stream submission_log {
   label: "Submission log"
-  graph: submissions
+  workflow: submissions
   version: v1
 
   versions: {
@@ -5787,17 +5739,17 @@ stream submission_log {
 
 | Old persistence | New top-level stream |
 |-----------------|----------------------|
-| Inside `graph { }` | Top-level block `stream <name> { }` |
+| Inside `workflow { }` | Top-level block `stream <name> { }` |
 | Single implicit shape | **One or more `versions:`**, each with an explicit, required `schema` |
 | No version pointer | **Required `version:`** names the active writer version |
 | No mapping layer | **Required `prepare: @ts { ... }` per version** returns the shape |
 | `condition:` optional | `condition:` optional per version (must be non-empty if given) |
-| Stream name defaulted to graph name | Stream has its own `<name>`; multiple streams can reference one graph |
+| Stream name defaulted to workflow name | Stream has its own `<name>`; multiple streams can reference one workflow |
 | Context accessed via `context.nodes` | `prepare` / `condition` access `context.output.<leafNode>` plus `context.nodes` |
 
 #### Why it changed
 
-The old model coupled "what to store" to the graph definition. The new model separates concerns: graphs produce outputs, and one or more top-level stream blocks each decide whether and how to persist those outputs. This lets you add, remove, or re-shape persistence without editing the graph, and lets multiple streams tap the same graph output with different schemas and conditions.
+The old model coupled "what to store" to the workflow definition. The new model separates concerns: workflows produce outputs, and one or more top-level stream blocks each decide whether and how to persist those outputs. This lets you add, remove, or re-shape persistence without editing the workflow, and lets multiple streams tap the same workflow output with different schemas and conditions.
 
 See `resource-stream` for the full spec of top-level `stream { }` blocks and `node-stream` for reading persisted records.
 
@@ -5918,7 +5870,7 @@ filter: @ts {
 
 #### Conventions
 
-- The shape of each persisted record is fully controlled by the version's `prepare` return value and described by that version's `schema`. Think of the filter as filtering the prepared record, not a graph's raw node outputs.
+- The shape of each persisted record is fully controlled by the version's `prepare` return value and described by that version's `schema`. Think of the filter as filtering the prepared record, not a workflow's raw node outputs.
 - Reads are pinned to one `version`, so filter fields must exist in **that version's** schema/prepared shape. Different versions can expose different fields.
 - If you need to filter on multiple node outputs, combine them inside `prepare` so the persisted record exposes the fields you want.
 - `like` uses SQL `LIKE` semantics — `%` is the wildcard. No regex.
@@ -5934,7 +5886,7 @@ See `node-stream` for the full filter API and `resource-stream` for declaring ve
 
 ### Review Block Configuration
 
-Review blocks pause graph execution at a node and wait for human input. The reviewer sees the node's output and fills in a form defined by the review schema, then picks an action with an outcome of `approve` or `reject`.
+Review blocks pause workflow execution at a node and wait for human input. The reviewer sees the node's output and fills in a form defined by the review schema, then picks an action with an outcome of `approve` or `reject`.
 
 Any node type can have a review block. Execution pauses after the node runs and before downstream nodes execute.
 
@@ -6084,29 +6036,29 @@ The review schema determines the shape of `context.reviews.<nodeName>`. The LSP 
 
 ### Unicode in Comments Breaks Line Counting
 
-Using Unicode characters in `//` comments causes the parser to miscount lines. Graphs defined after the comment are silently dropped. `swirls doctor` reports success but with fewer graphs than expected. No error is emitted.
+Using Unicode characters in `//` comments causes the parser to miscount lines. Workflows defined after the comment are silently dropped. `swirls doctor` reports success but with fewer workflows than expected. No error is emitted.
 
 **Incorrect (Unicode box-drawing and arrow characters):**
 
 ```swirls
 // ──────────────────────────────
-// Graph: get_token → fetch OAuth
+// Workflow: get_token → fetch OAuth
 // ──────────────────────────────
-graph get_token {
+workflow get_token {
   label: "Get Token"
   root { type: code label: "Entry" code: @ts { return {} } }
 }
 ```
 
-The `get_token` graph is silently dropped.
+The `get_token` workflow is silently dropped.
 
 **Correct (ASCII only):**
 
 ```swirls
 // -------------------------------------------
-// Graph: get_token - fetch OAuth
+// Workflow: get_token - fetch OAuth
 // -------------------------------------------
-graph get_token {
+workflow get_token {
   label: "Get Token"
   root { type: code label: "Entry" code: @ts { return {} } }
 }
@@ -6118,7 +6070,7 @@ Characters to avoid in comments: `─`, `│`, `→`, `←`, `↑`, `↓`, `—`
 
 ### Hyphenated Header Keys Parsed as Subtraction
 
-Header keys like `Content-Type` cause the parser to treat the hyphen as a subtraction operator. Everything from that point to EOF is silently consumed. All subsequent graphs, triggers, and resources are dropped.
+Header keys like `Content-Type` cause the parser to treat the hyphen as a subtraction operator. Everything from that point to EOF is silently consumed. All subsequent workflows, triggers, and resources are dropped.
 
 **Incorrect (hyphenated header key, unquoted):**
 
@@ -6170,9 +6122,9 @@ HTTP nodes default to JSON content type. If you don't need custom headers, simpl
 
 ### Double-Quote Characters Inside @ts Blocks
 
-Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block itself appears to parse correctly, but all subsequent graphs, triggers, and resources in the file are silently dropped.
+Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block itself appears to parse correctly, but all subsequent workflows, triggers, and resources in the file are silently dropped.
 
-This is one of the most common causes of "missing graphs" with no error output.
+This is one of the most common causes of "missing workflows" with no error output.
 
 **Incorrect (regex with double-quote):**
 
@@ -6209,7 +6161,7 @@ code: @ts {
 }
 ```
 
-When `swirls doctor` reports fewer graphs than you defined with no error messages, check all `@ts` blocks for literal `"` characters.
+When `swirls doctor` reports fewer workflows than you defined with no error messages, check all `@ts` blocks for literal `"` characters.
 
 ---
 
@@ -6277,11 +6229,11 @@ Any time you need a literal `$` followed by a `${` interpolation, use string con
 
 ---
 
-### Parser Silently Drops Graphs
+### Parser Silently Drops Workflows
 
-The Swirls parser has several bugs where invalid or unsupported syntax causes it to silently stop parsing the rest of the file. `swirls doctor` reports success but with fewer graphs/forms/triggers than expected. No error is emitted.
+The Swirls parser has several bugs where invalid or unsupported syntax causes it to silently stop parsing the rest of the file. `swirls doctor` reports success but with fewer workflows/forms/triggers than expected. No error is emitted.
 
-**How to detect:** Always compare the doctor summary counts against what you defined. If doctor reports 2 graphs but you wrote 4, the parser silently dropped 2.
+**How to detect:** Always compare the doctor summary counts against what you defined. If doctor reports 2 workflows but you wrote 4, the parser silently dropped 2.
 
 **Common causes of silent drops (in order of likelihood):**
 
@@ -6298,9 +6250,9 @@ The Swirls parser has several bugs where invalid or unsupported syntax causes it
 **Debugging steps:**
 
 1. Run `bunx swirls doctor` and note the counts
-2. Count the forms, graphs, and triggers you defined
+2. Count the forms, workflows, and triggers you defined
 3. If counts don't match, binary-search by commenting out halves of the file
-4. Check the section above the first missing graph for parser-breaking patterns
+4. Check the section above the first missing workflow for parser-breaking patterns
 5. Fix the pattern and re-run doctor
 
 The issue is always in or before the first missing item, never after it.
@@ -6309,7 +6261,7 @@ The issue is always in or before the first missing item, never after it.
 
 ### Parse Errors Cascade Past the Actual Problem
 
-A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "expected form, webhook, schedule, graph, or trigger", look above the reported line.
+A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "expected form, webhook, schedule, workflow, or trigger", look above the reported line.
 
 **Common causes of cascading errors:**
 
@@ -6346,8 +6298,8 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 
 **Structure validation:**
 
-- [ ] Every `graph` has exactly one `root { }` block
-- [ ] Every `graph` has a `label` field
+- [ ] Every `workflow` has exactly one `root { }` block
+- [ ] Every `workflow` has a `label` field
 - [ ] `flow { }` edges only reference defined node names
 - [ ] No cycles in edges
 - [ ] No self-referencing edges
@@ -6362,7 +6314,7 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 - [ ] Every `code` node has a `code` field
 - [ ] Every `switch` node has `cases` and `router` fields
 - [ ] Every `http` node has a `url` field
-- [ ] Every `graph` node has `graph` and `input` fields
+- [ ] Every `workflow` node has `graph` and `input` fields
 - [ ] Every `bucket` node has an `operation` field
 - [ ] Every `disk` node has `disk` and `command` fields
 - [ ] Every `postgres` node has a `postgres` field and exactly one of `select` or `insert`
@@ -6371,8 +6323,8 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 
 **Trigger validation:**
 
-- [ ] All graphs referenced by `type: graph` nodes are in the same file
-- [ ] Trigger bindings reference resources and graphs defined in the same file
+- [ ] All workflows referenced by `type: workflow` nodes are in the same file
+- [ ] Trigger bindings reference resources and workflows defined in the same file
 - [ ] Secret keys use only `[a-zA-Z0-9_]` characters
 
 **File references:**
@@ -6386,7 +6338,7 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 
 **After running doctor:**
 
-- [ ] Doctor summary counts match the number of forms/graphs/triggers you defined
+- [ ] Doctor summary counts match the number of forms/workflows/triggers you defined
 - [ ] No unexpected warnings about unused schemas or types
 
 ---
@@ -6400,19 +6352,19 @@ Every error and warning the validator can emit, grouped by category. Use this as
 - `<Kind> name: Name must contain only letters, numbers, and underscores` — The name contains a hyphen, dot, space, or other char. Fix to `^[a-zA-Z0-9_]+$`.
 - `Duplicate <kind> name "<n>"` — Two declarations share a name. Rename one.
 
-#### Graphs
+#### Workflows
 
-- `Graph must have exactly one root node (no incoming edges), but none were found. Check for cycles.` — The DAG has no entry point. Add `root { }` or break the cycle.
-- `Graph must have exactly one root node, but found N: a, b, ...` — More than one node has no incoming edges. Connect them or remove the extras.
-- `Graph must declare root { } as the entry node; the node with no incoming edges must be the root block (found "<n>" instead).` — The entry node exists but was declared `node foo { }` instead of `root { }`. Rename to `root`.
-- `Graph contains a cycle - DAG workflows cannot have cycles` — Some edge points backwards. Remove it or route through a new node.
-- `Duplicate node name "<n>" in graph` — Two nodes in the same graph share a name.
+- `Workflow must have exactly one root node (no incoming edges), but none were found. Check for cycles.` — The DAG has no entry point. Add `root { }` or break the cycle.
+- `Workflow must have exactly one root node, but found N: a, b, ...` — More than one node has no incoming edges. Connect them or remove the extras.
+- `Workflow must declare root { } as the entry node; the node with no incoming edges must be the root block (found "<n>" instead).` — The entry node exists but was declared `node foo { }` instead of `root { }`. Rename to `root`.
+- `Workflow contains a cycle - DAG workflows cannot have cycles` — Some edge points backwards. Remove it or route through a new node.
+- `Duplicate node name "<n>" in workflow` — Two nodes in the same workflow share a name.
 - `Edge references non-existent source node "<n>"` / `Edge references non-existent target node "<n>"` — Typo, or the node was dropped due to a parse error. Check spelling; check that the node block wasn't rejected.
 - `Edge cannot connect a node to itself` — Self-loop. Remove.
 
 #### Nodes (general)
 
-- `Invalid node type "<t>". Must be one of: ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while` — Unknown type name. Use one of the 16.
+- `Invalid node type "<t>". Must be one of: ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while` — Unknown type name. Use one of the 16.
 - `Node type "<t>" requires "<field>"` — Missing required field. See the node-type rule for the required set.
 
 #### Secrets map
@@ -6455,8 +6407,8 @@ Required keys: `stream`, `version`, `filter`.
 `schema`, `condition`, and `prepare` live **inside a `versions:` entry**, never at the top level.
 
 - `Duplicate stream name "<n>"` — Two stream blocks share a name.
-- `Stream block requires "graph" (graph name)` — Add `graph: <graph_name>`.
-- `Stream references graph "<n>" which is not defined` — Fix the graph name (file or workspace).
+- `Stream block requires "workflow" (workflow name)` — Add `workflow: <workflow_name>`.
+- `Stream references workflow "<n>" which is not defined` — Fix the workflow name (file or workspace).
 - `Stream "<n>" requires "version" (active writer)` — Add the block-level `version:` pointer.
 - `Stream "<n>" version pointer "<v>" is invalid — use v1, v2, …` — Pointer must match `^v[1-9][0-9]*$`.
 - `Stream "<n>" requires a non-empty versions { } block` — Declare at least one `versions: { v1 { … } }` entry.
@@ -6484,10 +6436,10 @@ Required keys: `stream`, `version`, `filter`.
 - `Invalid ai kind "<k>". Must be one of: text, object, image, video, embed` — Fix the `kind:` value.
 - Warning: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` — Either drop the schema or change kind.
 
-#### Graph (subgraph) nodes
+#### Workflow (subgraph) nodes
 
-- `Graph node requires "graph"` — Add `graph: <name>`.
-- `Graph node references graph "<n>" which is not defined` — Fix the name or declare the child graph.
+- `Workflow node requires "workflow"` — Add `workflow: <name>`.
+- `Workflow node references workflow "<n>" which is not defined` — Fix the name or declare the child workflow.
 
 #### Map / while nodes
 
@@ -6496,10 +6448,10 @@ Required keys: `stream`, `version`, `filter`.
 - `map node requires maxItems as a positive number` — Add `maxItems: <n>` with `n > 0`.
 - `map node concurrency must be a positive integer when set` — Fix to a positive integer or remove `concurrency:`.
 - `while node requires maxIterations as a positive integer` — Add `maxIterations: <n>` with `n` an integer ≥ 1.
-- `map node requires exactly one of subgraph { } or graph: <name>` — You set both, or neither. Pick one.
-- `while node requires exactly one of subgraph { } or graph: <name>` — Same — pick one.
-- `Node references graph "<n>" which is not defined` — `graph: <n>` does not match a graph in the workspace.
-- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` (inline @json, object literal, or bare schema name) to the inline `subgraph { }` root or the referenced graph's root.
+- `map node requires exactly one of subgraph { } or workflow: <name>` — You set both, or neither. Pick one.
+- `while node requires exactly one of subgraph { } or workflow: <name>` — Same — pick one.
+- `Node references workflow "<n>" which is not defined` — `workflow: <n>` does not match a workflow in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` (inline @json, object literal, or bare schema name) to the inline `subgraph { }` root or the referenced workflow's root.
 - Parser error: `Expected { after subgraph` — Don't put a colon between `subgraph` and `{`.
 - Parser error: `label is not valid inside subgraph { }` / `description is not valid inside subgraph { }` — Subgraphs don't take their own label/description.
 
@@ -6549,7 +6501,7 @@ Required keys: `stream`, `version`, `filter`.
 #### Triggers
 
 - `Trigger references <type> "<n>" which is not defined`.
-- `Trigger references graph "<g>" which is not defined`.
+- `Trigger references workflow "<g>" which is not defined`.
 
 #### Review
 

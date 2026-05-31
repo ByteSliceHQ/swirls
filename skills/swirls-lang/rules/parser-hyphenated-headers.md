@@ -6,7 +6,7 @@ tags: parser, headers, hyphen, content-type, silent, drop
 
 ## Hyphenated Header Keys Parsed as Subtraction
 
-Header keys like `Content-Type` cause the parser to treat the hyphen as a subtraction operator. Everything from that point to EOF is silently consumed. All subsequent graphs, triggers, and resources are dropped.
+Header keys like `Content-Type` cause the parser to treat the hyphen as a subtraction operator. Everything from that point to EOF is silently consumed. All subsequent workflows, triggers, and resources are dropped.
 
 **Incorrect (hyphenated header key, unquoted):**
 

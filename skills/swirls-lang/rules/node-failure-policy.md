@@ -6,7 +6,7 @@ tags: node, failurePolicy, retry, fallback, skip, fail, durable
 
 ## Node Failure Policy
 
-Any node can declare a `failurePolicy:` to control what the durable DAG engine does when that node's execution throws. Without a policy, the default is `fail` (the whole graph execution errors).
+Any node can declare a `failurePolicy:` to control what the durable DAG engine does when that node's execution throws. Without a policy, the default is `fail` (the whole workflow execution errors).
 
 ### Shape
 
@@ -23,8 +23,8 @@ failurePolicy: {
 
 | Strategy | Meaning |
 |----------|---------|
-| `fail` | Node failure errors the whole graph execution (default). |
-| `retry` | Re-run the node up to `maxRetries` times, with `backoffMs` between attempts. If still failing, the graph errors. |
+| `fail` | Node failure errors the whole workflow execution (default). |
+| `retry` | Re-run the node up to `maxRetries` times, with `backoffMs` between attempts. If still failing, the workflow errors. |
 | `skip` | Mark the node as skipped and continue; downstream nodes run without this node's output. |
 | `fallback` | Replace the node's output with `fallbackValue` and continue. |
 

@@ -89,7 +89,7 @@ The validator errors: `Form name: Name must contain only letters, numbers, and u
 
 ### Schema reference (bare identifier)
 
-You can declare a top-level `schema <name> { }` block once and reference it from the form by bare identifier. The same name can also be used as `inputSchema:` on the graph root the trigger fires.
+You can declare a top-level `schema <name> { }` block once and reference it from the form by bare identifier. The same name can also be used as `inputSchema:` on the workflow root the trigger fires.
 
 ```swirls
 schema contact_payload {
@@ -107,9 +107,9 @@ form contact {
 
 See `resource-schema`.
 
-### Binding a form to a graph
+### Binding a form to a workflow
 
-Forms don't execute on their own. Declare a `trigger` to send submissions to a graph:
+Forms don't execute on their own. Declare a `trigger` to send submissions to a workflow:
 
 ```swirls
 trigger on_contact {

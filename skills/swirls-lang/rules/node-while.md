@@ -6,7 +6,7 @@ tags: node, while, loop, condition, update, maxIterations, iteration, subgraph
 
 ## While Nodes
 
-A `while` node runs a child graph (inline `subgraph { }` or referenced `graph: <name>`) repeatedly until `condition` returns false or `maxIterations` is reached. Each iteration receives the previous iteration's output via `update`.
+A `while` node runs a child workflow (inline `subgraph { }` or referenced `workflow: <name>`) repeatedly until `condition` returns false or `maxIterations` is reached. Each iteration receives the previous iteration's output via `update`.
 
 ### Required fields
 
@@ -15,8 +15,8 @@ A `while` node runs a child graph (inline `subgraph { }` or referenced `graph: <
 - `update` — `@ts` block returning the next iteration's input. Has access to the previous iteration's output.
 - `maxIterations` — positive integer. Hard cap to prevent runaway loops.
 - Exactly one of:
-  - `subgraph { ... }` — inline child graph (no colon). The inline form's root must declare `inputSchema`.
-  - `graph: <name>` — bare identifier referencing a top-level graph in the workspace. That graph's root must declare `inputSchema`.
+  - `subgraph { ... }` — inline child workflow (no colon). The inline form's root must declare `inputSchema`.
+  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That graph's root must declare `inputSchema`.
 
 ### Inline subgraph
 
@@ -82,7 +82,7 @@ Inside the subgraph:
 
 ### Output shape
 
-The while node's output is an object with `lastOutput`, keyed by the child graph's leaf-node names:
+The while node's output is an object with `lastOutput`, keyed by the child workflow's leaf-node names:
 
 ```ts
 context.nodes.refine_digest.output.lastOutput.<leafName>
@@ -112,9 +112,9 @@ node done {
 
 - `Node type "while" requires "input" / "condition" / "update" / "maxIterations"` — Required field missing.
 - `while node requires maxIterations as a positive integer` — Must be ≥ 1 and integer.
-- `while node requires exactly one of subgraph { } or graph: <name>` — Pick one.
-- `Node references graph "<n>" which is not defined` — `graph: <n>` is unknown in the workspace.
-- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` to the inline root or the referenced graph's root.
+- `while node requires exactly one of subgraph { } or workflow: <name>` — Pick one.
+- `Node references workflow "<n>" which is not defined` — `workflow: <n>` is unknown in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` to the inline root or the referenced workflow's root.
 
 ### Common mistakes
 

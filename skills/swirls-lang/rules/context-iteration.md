@@ -6,7 +6,7 @@ tags: context, iteration, map, while, item, index, input, previous, loop
 
 ## context.iteration - Map / While Iteration Data
 
-Inside a `map` or `while` node's child graph (inline `subgraph { }` or referenced `graph: <name>`), `context.iteration` carries the per-iteration state. The fields available depend on the node type.
+Inside a `map` or `while` node's child workflow (inline `subgraph { }` or referenced `workflow: <name>`), `context.iteration` carries the per-iteration state. The fields available depend on the node type.
 
 ### `map` nodes
 
@@ -137,5 +137,5 @@ node done {
 - **Treating map output as a flat list** — Each entry is `{ leafName: leafOutput }`, not the leaf output directly. Index by leaf name.
 - **Treating while output as an array** — While runs sequentially; output is `output.lastOutput` (single object), not an array of iterations.
 - **Reading `context.iteration.previous` on iteration 0** — It's `undefined`. Use `?.` or `if (context.iteration.index > 0) { ... }`.
-- **Using `context.nodes.root.input` inside a subgraph** — That's the parent graph's root input. Use `context.iteration.item` (map) or `context.iteration.input` (while) inside the subgraph.
+- **Using `context.nodes.root.input` inside a subgraph** — That's the parent workflow's root input. Use `context.iteration.item` (map) or `context.iteration.input` (while) inside the subgraph.
 - **Mutating `context.iteration.input`** — Treat it as read-only. Return a new object from `update` to advance state.

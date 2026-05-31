@@ -21,12 +21,6 @@ webhook nps_response {
 graph process_nps {
   label: "Process NPS Response"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "nps_scores"
-  }
-
   root {
     type: code
     label: "Parse response"
@@ -85,7 +79,7 @@ graph process_nps {
   }
 
   node followup_email {
-    type: resend
+    type: email
     label: "Send follow-up"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }
@@ -112,6 +106,40 @@ graph process_nps {
     route -["detractor"]-> analyze_detractor
     analyze_detractor -> followup_email
     route -["other"]-> log_score
+  }
+}
+
+stream nps_scores {
+  label: "NPS scores"
+  graph: process_nps
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["email", "score", "category"],
+          "properties": {
+            "email": { "type": "string" },
+            "score": { "type": "number" },
+            "category": { "type": "string" }
+          }
+        }
+      }
+
+      condition: @ts { return true }
+
+      prepare: @ts {
+        const logged = context.output.log_score
+        if (logged) return logged
+        return {
+          email: context.nodes.root.output.email,
+          score: context.nodes.root.output.score,
+          category: context.nodes.root.output.category
+        }
+      }
+    }
   }
 }
 

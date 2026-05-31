@@ -80,7 +80,7 @@ graph announce_release {
   }
 
   node send_email {
-    type: resend
+    type: email
     label: "Send email announcement"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

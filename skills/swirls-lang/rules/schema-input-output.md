@@ -81,7 +81,7 @@ schema contact_payload {
   }
 }
 
-graph handle {
+workflow handle {
   label: "Handle"
 
   root {
@@ -116,7 +116,7 @@ graph handle {
 
 ### Map / while subgraph root
 
-Inside a `subgraph { }` block on a `map` or `while` node, the root **must** declare `inputSchema`. The validator emits: `map/while subgraph root must declare inputSchema for typed iteration`. This types `context.iteration.item` (map) or `context.iteration.input` (while). See `graph-subgraph`.
+Inside a `subgraph { }` block on a `map` or `while` node, the root **must** declare `inputSchema`. The validator emits: `map/while subgraph root must declare inputSchema for typed iteration`. This types `context.iteration.item` (map) or `context.iteration.input` (while). See `workflow-subgraph`.
 
 ### Best practice
 

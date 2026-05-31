@@ -1,5 +1,5 @@
 /**
- * Demonstrates parallel branches in a graph.
+ * Demonstrates parallel branches in a workflow.
  * Root fans out to multiple independent nodes that run concurrently.
  */
 

@@ -1,12 +1,12 @@
 ---
 title: DAG Constraints
 impact: CRITICAL
-tags: graph, dag, cycle, validation, edges
+tags: workflow, dag, cycle, validation, edges
 ---
 
 ## DAG Constraints
 
-Graphs must be directed acyclic graphs (DAGs). The validator enforces no cycles, exactly one root, and valid edge references.
+Workflows must be directed acyclic workflows (DAGs). The validator enforces no cycles, exactly one root, and valid edge references.
 
 **Incorrect (cycle in edges):**
 
@@ -18,7 +18,7 @@ flow {
 }
 ```
 
-Error: "Graph contains a cycle - DAG workflows cannot have cycles"
+Error: "Workflow contains a cycle - DAG workflows cannot have cycles"
 
 **Incorrect (edge references non-existent node):**
 
@@ -44,7 +44,7 @@ Error: "Edge cannot connect a node to itself"
 **Correct (valid DAG with parallel and sequential branches):**
 
 ```swirls
-graph pipeline {
+workflow pipeline {
   label: "Pipeline"
 
   root {

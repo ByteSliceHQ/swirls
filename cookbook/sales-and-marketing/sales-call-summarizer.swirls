@@ -21,12 +21,6 @@ webhook call_transcript {
 graph summarize_call {
   label: "Summarize Sales Call"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "call_summaries"
-  }
-
   root {
     type: code
     label: "Extract transcript"
@@ -91,6 +85,36 @@ graph summarize_call {
   flow {
     root -> analyze
     analyze -> result
+  }
+}
+
+stream call_summaries {
+  label: "Call summaries"
+  graph: summarize_call
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["rep", "company", "summary", "stage", "probability", "sentiment"],
+          "properties": {
+            "rep": { "type": "string" },
+            "company": { "type": "string" },
+            "summary": { "type": "string" },
+            "stage": { "type": "string" },
+            "probability": { "type": "number" },
+            "sentiment": { "type": "string" },
+            "next_steps": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+
+      condition: @ts { return context.output.result != null }
+
+      prepare: @ts { return context.output.result }
+    }
   }
 }
 

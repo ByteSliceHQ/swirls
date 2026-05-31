@@ -22,12 +22,6 @@ webhook support_interaction {
 graph score_csat {
   label: "Score CSAT"
 
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "csat_scores"
-  }
-
   root {
     type: code
     label: "Extract interaction"
@@ -79,7 +73,7 @@ graph score_csat {
   }
 
   node followup {
-    type: resend
+    type: email
     label: "Send follow-up"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }
@@ -108,6 +102,44 @@ graph score_csat {
     score -> route
     route -["needs_followup"]-> followup
     route -["ok"]-> store_result
+  }
+}
+
+stream csat_scores {
+  label: "CSAT scores"
+  graph: score_csat
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["customer", "channel", "score", "resolved", "sentiment"],
+          "properties": {
+            "customer": { "type": "string" },
+            "channel": { "type": "string" },
+            "score": { "type": "number" },
+            "resolved": { "type": "boolean" },
+            "sentiment": { "type": "string" }
+          }
+        }
+      }
+
+      condition: @ts { return true }
+
+      prepare: @ts {
+        const stored = context.output.store_result
+        if (stored) return stored
+        return {
+          customer: context.nodes.root.output.customer_email,
+          channel: context.nodes.root.output.channel,
+          score: context.nodes.score.output.score,
+          resolved: context.nodes.score.output.resolved,
+          sentiment: context.nodes.score.output.customer_sentiment
+        }
+      }
+    }
   }
 }
 

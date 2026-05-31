@@ -4,24 +4,24 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "4.0.0"
+  version: "5.0.0"
 ---
 
 # Swirls Language
 
-Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, graph declarations, all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / schema / disk / agent blocks, reviews, failure policies, and known parser pitfalls.
+Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations, all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / schema / disk / agent blocks, reviews, failure policies, and known parser pitfalls.
 
 ## When to Apply
 
 - Writing new `.swirls` files from scratch.
-- Adding nodes, graphs, streams, schemas, or triggers to existing `.swirls` files.
+- Adding nodes, workflows, streams, schemas, or triggers to existing `.swirls` files.
 - Debugging parse errors or validation failures from `swirls doctor`.
 - Writing `@ts` blocks (TypeScript code in nodes).
 - Defining JSON Schemas for inputs, outputs, forms, and webhooks (inline or via top-level `schema` blocks referenced by name).
-- Connecting graphs to forms, webhooks, or schedules via triggers.
+- Connecting workflows to forms, webhooks, or schedules via triggers.
 - Configuring form `visibility` (`public` / `internal`) and webhook shared-secret auth (`secret:` + `header:`).
-- Building per-item iteration with `map` nodes or counter/condition loops with `while` nodes (inline `subgraph { }` or referenced `graph: <name>`).
-- Persisting graph output with versioned top-level `stream { }` blocks and reading it with version-pinned `type: stream` nodes.
+- Building per-item iteration with `map` nodes or counter/condition loops with `while` nodes (inline `subgraph { }` or referenced `workflow: <name>`).
+- Persisting workflow output with versioned top-level `stream { }` blocks and reading it with version-pinned `type: stream` nodes.
 - Configuring human-in-the-loop review blocks.
 - Declaring external Postgres databases and writing parameterized SQL nodes.
 
@@ -31,7 +31,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 |---|----------|--------|--------|-------|
 | 1 | **Language Spec** | **CRITICAL** | `spec-` | **READ FIRST. Exhaustive list of valid syntax, keywords, node types, fields. If it is not listed here, it does not exist.** |
 | 2 | File Structure | HIGH | `structure-` | Top-level declarations, file discovery, comment restrictions |
-| 3 | Graph & Node Basics | CRITICAL | `graph-` | Root node, flow block, edges, DAG rules, inline `subgraph { }` for map/while |
+| 3 | Workflow & Node Basics | CRITICAL | `workflow-` | Root node, flow block, edges, DAG rules, inline `subgraph { }` for map/while |
 | 4 | Node Types | CRITICAL | `node-` | All 16 node types, required/optional fields, secrets map, failure policy |
 | 5 | TypeScript Blocks | CRITICAL | `ts-` | @ts patterns, sandbox limits, safe code |
 | 6 | Schema & Typing | HIGH | `schema-` | JSON Schema, inputSchema/outputSchema/schema placement, bare-identifier refs to top-level `schema` blocks |
@@ -48,16 +48,16 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `spec-common-mistakes` - **The most common incorrect patterns with corrections. Check your output against these before returning any .swirls code.**
 
 ### 2. File Structure
-- `structure-top-level-declarations` - The twelve valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, graph, stream, trigger, secret, auth, postgres, disk, agent
+- `structure-top-level-declarations` - The twelve valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent
 - `structure-file-discovery` - File extensions, discovery rules, `.ts.swirls` files
 - `structure-comments` - Comment syntax and ASCII-only restriction
 
-### 3. Graph & Node Basics
-- `graph-anatomy` - Graph structure: label, description, root, nodes, flow (persistence block removed)
-- `graph-root-node` - Every graph needs exactly one `root { }` block
-- `graph-flow-block` - Connecting nodes with edges and labeled edges
-- `graph-dag-rules` - No cycles, one root, edge validation
-- `graph-subgraph` - Inline `subgraph { }` block (no colon) inside `map`/`while` nodes; same body as a graph but no own label/description; subgraph root must declare `inputSchema`
+### 3. Workflow & Node Basics
+- `workflow-anatomy` - Workflow structure: label, description, root, nodes, flow (persistence block removed)
+- `workflow-root-node` - Every workflow needs exactly one `root { }` block
+- `workflow-flow-block` - Connecting nodes with edges and labeled edges
+- `workflow-dag-rules` - No cycles, one root, edge validation
+- `workflow-subgraph` - Inline `subgraph { }` block (no colon) inside `map`/`while` nodes; same body as a workflow but no own label/description; subgraph root must declare `inputSchema`
 
 ### 4. Node Types (16 total)
 - `node-code` - Code nodes: sandboxed TypeScript execution
@@ -69,9 +69,9 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `node-scrape` - Scrape nodes (`type: scrape`): web scraping via Firecrawl
 - `node-parallel` - Parallel nodes: search / extract / findall operations
 - `node-stream` - Stream nodes: reading persisted stream data at a pinned `version` with filters
-- `node-graph` - Graph nodes: calling subgraphs (one-shot)
-- `node-map` - Map nodes: per-item iteration with inline `subgraph { }` or `graph: <name>`; required `items`, `maxItems`; optional `concurrency`
-- `node-while` - While nodes: counter/condition loops with `input`, `condition`, `update`, `maxIterations` plus `subgraph { }` or `graph: <name>`
+- `node-workflow` - Workflow nodes: calling subgraphs (one-shot)
+- `node-map` - Map nodes: per-item iteration with inline `subgraph { }` or `workflow: <name>`; required `items`, `maxItems`; optional `concurrency`
+- `node-while` - While nodes: counter/condition loops with `input`, `condition`, `update`, `maxIterations` plus `subgraph { }` or `workflow: <name>`
 - `node-wait` - Wait nodes: pausing execution
 - `node-bucket` - Bucket nodes: object storage upload/download
 - `node-disk` - Disk nodes: bash exec on a top-level `disk` block (Archil-backed)
@@ -104,9 +104,9 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `resource-form` - Form declarations with label, schema, enabled, `visibility public | internal` (default internal)
 - `resource-webhook` - Webhook declarations with shared-secret `secret: <block>.<VAR>` + `header: "X-..."` verification (paired); reserved-headers list
 - `resource-schedule` - Schedule declarations with cron and timezone
-- `resource-stream` - Top-level `stream { }` blocks: graph, `version` pointer, and a `versions:` map with per-version schema/condition/prepare
+- `resource-stream` - Top-level `stream { }` blocks: `workflow`, `version` pointer, and a `versions:` map with per-version schema/condition/prepare
 - `resource-schema` - Top-level `schema <name> { }` blocks: reusable JSON Schemas referenced by bare identifier from forms / webhooks / root inputSchema / root outputSchema / non-root schema / review schema
-- `resource-trigger-binding` - Trigger syntax: `resourceType:name -> graphName` (form / webhook / schedule only)
+- `resource-trigger-binding` - Trigger syntax: `resourceType:name -> workflowName` (form / webhook / schedule only)
 - `resource-secrets` - Top-level `secret { vars: [...] }` blocks
 - `resource-auth` - Top-level `auth` blocks (oauth, api_key, basic, bearer, cloud) and http-node `auth:` references
 - `resource-postgres` - Top-level `postgres` blocks: connection, table schemas, secret references
@@ -125,10 +125,10 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 ### 11. Parser Pitfalls
 - `parser-unicode-comments` - Unicode in comments breaks line counting
 - `parser-hyphenated-headers` - Hyphenated header keys parsed as subtraction
-- `parser-double-quotes-in-ts` - Double-quote chars inside `@ts` blocks drop graphs
+- `parser-double-quotes-in-ts` - Double-quote chars inside `@ts` blocks drop workflows
 - `parser-nested-templates` - Nested template literals break `@ts` parsing
 - `parser-dollar-interpolation` - `$${}` breaks `@ts` parsing
-- `parser-silent-drops` - Parser silently drops graphs with no error
+- `parser-silent-drops` - Parser silently drops workflows with no error
 - `parser-cascade-errors` - Parse errors cascade past the actual problem
 - `parser-validation-checklist` - Pre-flight checklist before running `swirls doctor`
 - `parser-validation-rules` - Exhaustive list of validator diagnostics and how to fix each

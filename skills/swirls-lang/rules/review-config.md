@@ -6,7 +6,7 @@ tags: review, human, approval, schema, actions, hitl
 
 ## Review Block Configuration
 
-Review blocks pause graph execution at a node and wait for human input. The reviewer sees the node's output and fills in a form defined by the review schema, then picks an action with an outcome of `approve` or `reject`.
+Review blocks pause workflow execution at a node and wait for human input. The reviewer sees the node's output and fills in a form defined by the review schema, then picks an action with an outcome of `approve` or `reject`.
 
 Any node type can have a review block. Execution pauses after the node runs and before downstream nodes execute.
 

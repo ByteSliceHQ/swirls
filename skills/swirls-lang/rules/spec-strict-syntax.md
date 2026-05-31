@@ -13,7 +13,7 @@ The Swirls DSL is a declarative configuration language. It is not TypeScript, YA
 These are the only keywords recognized by the lexer (`packages/language/src/lexer.ts`). Any other word is parsed as an identifier or a quoted string.
 
 ```
-form, webhook, schedule, graph, trigger, secret, auth, postgres, stream, schema,
+form, webhook, schedule, workflow, trigger, secret, auth, postgres, stream, schema,
 disk, agent, role,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
@@ -21,6 +21,8 @@ subgraph, map, while, items, update, maxItems, maxIterations, concurrency
 ```
 
 Note: `persistence` is NOT a keyword. The old `persistence { }` block has been removed. Use a top-level `stream { }` block instead.
+
+Note: `graph` is a legacy alias for `workflow` (top-level declarations, `type: graph`, and config field `graph:`). Prefer `workflow` in new code; the serializer canonicalizes to `workflow`.
 
 ### Complete top-level declaration list
 
@@ -32,7 +34,7 @@ schema <name> { }
 form <name> { }
 webhook <name> { }
 schedule <name> { }
-graph <name> { }
+workflow <name> { }
 stream <name> { }
 trigger <name> { }
 secret <name> { }
@@ -46,7 +48,7 @@ There are **12** top-level block kinds (plus the optional `version:` line). The 
 
 ### Resource name pattern
 
-All resource names (forms, webhooks, schedules, graphs, streams, triggers, secrets, auth, postgres, schemas, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -59,7 +61,7 @@ Names may start with a digit. Hyphens, dots, spaces, and other characters are no
 These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `packages/core/src/schemas.ts`.
 
 ```
-ai, agent, bucket, code, disk, email, graph, http,
+ai, agent, bucket, code, disk, email, workflow, http,
 map, parallel, postgres, scrape, stream, switch, wait, while
 ```
 
@@ -71,7 +73,7 @@ Notes on aliases that do NOT exist:
 - `http` is the type name, not `api`, `request`, or `fetch`.
 - `wait` is the type name, not `delay` or `sleep`.
 - `ai` is the type name, not `llm`, `chat`, or `prompt`.
-- `graph` is the type name for subgraphs, not `subgraph`, `call`, or `child`.
+- `workflow` is the type name for subgraphs, not `subgraph`, `call`, or `child`. (`type: graph` and `graph:` are legacy aliases.)
 - `postgres` is the type name, not `db`, `database`, or `sql`.
 - `bucket` is the type name, not `storage`, `file`, or `s3`.
 - `parallel` is the type name, not `fanout` or `workers`. Use `map` for per-item iteration.
@@ -86,7 +88,7 @@ These are the only value forms that can appear after a `:` in a field assignment
 - String literal: `"value"`
 - Number: `42`, `3.14`
 - Boolean: `true`, `false`
-- Bare identifier: `my_name` (parsed as a string; used to reference top-level blocks like `graph: helper_graph`, `stream: my_stream`, `schema: my_schema`)
+- Bare identifier: `my_name` (parsed as a string; used to reference top-level blocks like `workflow: helper_graph`, `stream: my_stream`, `schema: my_schema`)
 - Object literal: `{ key: value, key2: value2 }` (comma-separated)
 - Array literal: `[item1, item2]` (comma-separated)
 - TypeScript block: `@ts { ... }`
@@ -114,9 +116,9 @@ No other edge syntax exists. No conditional edges, no weighted edges, no `=>`, n
 Inside a `trigger <name> { }` block, exactly one binding line:
 
 ```
-form:<formName> -> <graphName>
-webhook:<webhookName> -> <graphName>
-schedule:<scheduleName> -> <graphName>
+form:<formName> -> <workflowName>
+webhook:<webhookName> -> <workflowName>
+schedule:<scheduleName> -> <workflowName>
 ```
 
 Only three resource types are valid in triggers: `form`, `webhook`, `schedule`. There is no `agent:`, `stream:`, `trigger:`, `http:`, or any other prefix.
@@ -155,7 +157,7 @@ header: "Header-Name"
 
 ### Inline `subgraph { }` block (map / while only)
 
-`map` and `while` nodes accept an inline `subgraph { ... }` block instead of a `graph: <name>` reference. The keyword takes **no colon**:
+`map` and `while` nodes accept an inline `subgraph { ... }` block instead of a `workflow: <name>` reference. The keyword takes **no colon**:
 
 ```swirls
 node each_item {
@@ -174,7 +176,7 @@ node each_item {
 }
 ```
 
-`subgraph { }` body has the same shape as `graph { }` body (`root { }`, `node { }`, `flow { }`) but cannot have its own `label:` or `description:`. The subgraph root MUST declare `inputSchema` for typed iteration. A node uses **exactly one** of `subgraph { }` or `graph: <name>` — never both, never neither.
+`subgraph { }` body has the same shape as `workflow { }` body (`root { }`, `node { }`, `flow { }`) but cannot have its own `label:` or `description:`. The subgraph root MUST declare `inputSchema` for typed iteration. A node uses **exactly one** of `subgraph { }` or `workflow: <name>` — never both, never neither.
 
 ### Constructs that DO NOT exist
 
@@ -200,11 +202,11 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No inline TypeScript outside of `@ts` blocks.** You cannot write `code: return {}`. It must be `code: @ts { return {} }`.
 
-**No `persistence { }` blocks.** They have been removed. The parser emits: `persistence { } blocks have been removed — use a top-level stream block instead`. Use `stream <name> { graph: g, version: v1, versions: { v1 { schema, condition?, prepare } } }` at the top level. `schema`, `condition`, and `prepare` live inside a `versions:` entry, never at the top level of the block.
+**No `persistence { }` blocks.** They have been removed. The parser emits: `persistence { } blocks have been removed — use a top-level stream block instead`. Use `stream <name> { workflow: g, version: v1, versions: { v1 { schema, condition?, prepare } } }` at the top level. `schema`, `condition`, and `prepare` live inside a `versions:` entry, never at the top level of the block.
 
 **No `outputSchema` on non-root nodes.** Use `schema` instead. The parser rejects `outputSchema` on non-root nodes with: `Use "schema" instead of "outputSchema" in node blocks`.
 
-**No `inputSchema` on non-root nodes (except a `subgraph { }` root).** Only the outer-graph root and a map/while subgraph root accept `inputSchema`. The parser emits: `inputSchema is only allowed in root { } blocks` and drops the entire node.
+**No `inputSchema` on non-root nodes (except a `subgraph { }` root).** Only the outer-workflow root and a map/while subgraph root accept `inputSchema`. The parser emits: `inputSchema is only allowed in root { } blocks` and drops the entire node.
 
 **No conditional routing at the edge level.** Conditional routing requires a `switch` node with `cases` and `router`, plus labeled edges in the flow block.
 
@@ -226,7 +228,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `llm`, `prompt`, or `chat` node type.** The correct type name is `ai`.
 
-**No `subgraph`, `child`, or `call` node type.** The correct type name is `graph`. (`subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
+**No `subgraph`, `child`, or `call` node type.** The correct type name is `workflow`. (`subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
 
 **No `db`, `database`, or `sql` node type for external databases.** The correct type name is `postgres`.
 
@@ -234,11 +236,11 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `template` or `render` node type.** Generate text in `code` or `ai` nodes.
 
-**No `loop`, `retry`, `for`, or generic `iter` node type.** Use `map` (per-item iteration) or `while` (counter / condition). The graph itself is a DAG and cannot have cycles.
+**No `loop`, `retry`, `for`, or generic `iter` node type.** Use `map` (per-item iteration) or `while` (counter / condition). The workflow itself is a DAG and cannot have cycles.
 
 **No `webhook` or `form` or `schedule` as node types.** These are top-level resource declarations only. Nodes receive data through triggers via `context.nodes.root.input`.
 
-**No `trigger` node type.** Triggers are top-level declarations that bind resources to graphs.
+**No `trigger` node type.** Triggers are top-level declarations that bind resources to workflows.
 
 ### Valid fields per node type
 
@@ -264,11 +266,11 @@ No user `schema:` — vendor-managed output shape.
 
 **stream** (node, read side) — required: `stream` (bare identifier naming a top-level `stream <name> { }` block), `version` (the `versions:` key to read, e.g. `v1`), `filter` (@ts returning a `StreamFilter` object of shape `{ field: { op: value } }` where op is `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`). `streamId`, `query`, `querySql` are removed; using them produces validator errors.
 
-**graph** — required: `graph` (bare identifier naming a graph in the same file), `input` (@ts returning the input object to pass to the subgraph).
+**workflow** — required: `workflow` (bare identifier naming a workflow in the same file), `input` (@ts returning the input object to pass to the subgraph).
 
-**map** — required: `items` (@ts returning array), `maxItems` (positive number), plus exactly one of `subgraph { ... }` (inline block, no colon) or `graph: <name>` (reference to a top-level graph). Optional: `concurrency` (positive integer). The subgraph/referenced-graph root must declare `inputSchema` (typed iteration). Iteration context: `context.iteration.item` is the current element. See `node-map` and `graph-subgraph`.
+**map** — required: `items` (@ts returning array), `maxItems` (positive number), plus exactly one of `subgraph { ... }` (inline block, no colon) or `workflow: <name>` (reference to a top-level workflow). Optional: `concurrency` (positive integer). The subgraph/referenced-workflow root must declare `inputSchema` (typed iteration). Iteration context: `context.iteration.item` is the current element. See `node-map` and `workflow-subgraph`.
 
-**while** — required: `input` (@ts returning the initial loop state), `condition` (@ts returning boolean; loop continues while true), `update` (@ts returning the next iteration's input), `maxIterations` (positive integer), plus exactly one of `subgraph { ... }` or `graph: <name>`. The subgraph/referenced-graph root must declare `inputSchema`. Iteration context: `context.iteration.input` (initial), `context.iteration.index` (counter), `context.iteration.previous` (last iteration's leaf outputs). See `node-while`.
+**while** — required: `input` (@ts returning the initial loop state), `condition` (@ts returning boolean; loop continues while true), `update` (@ts returning the next iteration's input), `maxIterations` (positive integer), plus exactly one of `subgraph { ... }` or `workflow: <name>`. The subgraph/referenced-workflow root must declare `inputSchema`. Iteration context: `context.iteration.input` (initial), `context.iteration.index` (counter), `context.iteration.previous` (last iteration's leaf outputs). See `node-while`.
 
 **wait** — no required fields. Optional: `amount` (number), `unit` (`seconds`/`minutes`/`hours`/`days`), `secondsFromConfig`.
 
@@ -276,7 +278,7 @@ No user `schema:` — vendor-managed output shape.
 
 **disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). No user `schema:`. See `node-disk` and `resource-disk`.
 
-**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `role` (bare identifier naming a role inside the agent block), `tools` (array of bare identifiers naming graphs to expose as LLM-callable tools), `system` (@ts; per-call system-prompt override). See `node-agent` and `resource-agent`.
+**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `role` (bare identifier naming a role inside the agent block), `tools` (array of bare identifiers naming workflows to expose as LLM-callable tools), `system` (@ts; per-call system-prompt override). See `node-agent` and `resource-agent`.
 
 **postgres** (node) — required: `postgres` (bare identifier naming a top-level `postgres <name> { }` block) and exactly one of `select:` (@sql SELECT or WITH) or `insert:` (@sql INSERT, optionally with ON CONFLICT). Other fields: `params` (@ts returning an object whose keys match `{{key}}` placeholders in the SQL; required when SQL has placeholders, always required for `insert:`), `condition` (@ts returning boolean; only valid on `insert:` nodes), `schema` (recommended for `select:` to type the row output).
 

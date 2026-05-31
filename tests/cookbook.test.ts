@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Cookbook graph execution test suite.
+ * Cookbook workflow execution test suite.
  *
  * Starts a local mock server for HTTP-based services (Slack, inventory, uptime),
- * optionally connects to a Docker postgres, then runs ALL triggered graphs in
- * parallel with a hard timeout per graph. Streams results as each completes.
+ * optionally connects to a Docker postgres, then runs ALL triggered workflows in
+ * parallel with a hard timeout per workflow. Streams results as each completes.
  *
  * Usage:
  *   bun run tests/cookbook.test.ts              # mock server auto-starts
@@ -15,19 +15,19 @@
  *   bun run tests/cookbook.test.ts              # auto-detects postgres
  *
  * Exit codes:
- *   0 — all runnable graphs passed
- *   1 — one or more graphs failed or timed out
+ *   0 — all runnable workflows passed
+ *   1 — one or more workflows failed or timed out
  *
- * NOTE: Graphs with `ai` nodes make real LLM calls through OpenRouter and
- * will incur API costs. Graphs with `resend` nodes send real emails.
+ * NOTE: Workflows with `ai` nodes make real LLM calls through OpenRouter and
+ * will incur API costs. Workflows with `email` nodes send real emails.
  */
 
 import { join } from "node:path"
 import {
   scanCookbookSync,
-  buildGraphTestInfos,
+  buildWorkflowTestInfos,
   getAvailableEnvVars,
-  type GraphTestInfo,
+  type WorkflowTestInfo,
 } from "./parse"
 import {
   startMockServer,
@@ -56,7 +56,7 @@ const clean = (s: string) =>
     .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
     .replace(/\[?\d*[GJK]/g, "")
     .replace(/[◒◐◓◑■▲●○│◇┌┐└┘├┤─]/g, "")
-    .replace(/Executing graph\.*/g, "")
+    .replace(/Executing workflow\.*/g, "")
     .replace(/\s{2,}/g, " ")
     .trim()
 
@@ -99,22 +99,22 @@ function isPostgresAvailable(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Execute a single graph with hard timeout
+// Execute a single workflow with hard timeout
 // ---------------------------------------------------------------------------
 
 interface RunResult {
-  graph: GraphTestInfo
+  workflow: WorkflowTestInfo
   status: "pass" | "fail" | "timeout"
   durationMs: number
   error?: string
 }
 
-async function executeGraph(graph: GraphTestInfo): Promise<RunResult> {
+async function executeWorkflow(workflow: WorkflowTestInfo): Promise<RunResult> {
   const start = performance.now()
-  const inputJson = JSON.stringify(graph.input)
+  const inputJson = JSON.stringify(workflow.input)
 
   const proc = Bun.spawn(
-    ["swirls", "graph", "execute", graph.name, "--input", inputJson],
+    ["swirls", "graph", "execute", workflow.name, "--input", inputJson],
     { cwd: cookbookDir, stdout: "pipe", stderr: "pipe" },
   )
 
@@ -134,7 +134,7 @@ async function executeGraph(graph: GraphTestInfo): Promise<RunResult> {
   const durationMs = performance.now() - start
 
   if (timedOut) {
-    return { graph, status: "timeout", durationMs }
+    return  { workflow, status: "timeout", durationMs }
   }
 
   if (exitCode !== 0) {
@@ -151,10 +151,10 @@ async function executeGraph(graph: GraphTestInfo): Promise<RunResult> {
         ) ??
       clean(raw).split("\n").filter(Boolean).pop() ??
       "unknown error"
-    return { graph, status: "fail", durationMs, error: errorLine }
+    return  { workflow, status: "fail", durationMs, error: errorLine }
   }
 
-  return { graph, status: "pass", durationMs }
+  return  { workflow, status: "pass", durationMs }
 }
 
 // ---------------------------------------------------------------------------
@@ -200,46 +200,46 @@ async function main() {
 
   try {
     // --- Categorize (AFTER mock env vars are set) ---
-    const allGraphs = buildGraphTestInfos(parsed)
+    const allWorkflows = buildWorkflowTestInfos(parsed)
     const available = getAvailableEnvVars(cookbookDir)
 
     interface SkipInfo {
-      graph: GraphTestInfo
+      workflow: WorkflowTestInfo
       reason: string
     }
 
-    const runnable: GraphTestInfo[] = []
+    const runnable: WorkflowTestInfo[] = []
     const skipped: SkipInfo[] = []
 
-    for (const graph of allGraphs) {
-      if (!graph.triggerType) {
-        skipped.push({ graph, reason: "subgraph (tested via parent)" })
+    for (const workflow of allWorkflows) {
+      if (!workflow.triggerType) {
+        skipped.push({ workflow, reason: "subgraph (tested via parent)" })
         continue
       }
-      if (graph.hasWaitNode) {
-        skipped.push({ graph, reason: "wait node" })
+      if (workflow.hasWaitNode) {
+        skipped.push({ workflow, reason: "wait node" })
         continue
       }
-      if (graph.cloudOnly) {
-        skipped.push({ graph, reason: "cloud-only (bucket/stream)" })
+      if (workflow.cloudOnly) {
+        skipped.push({ workflow, reason: "cloud-only (bucket/stream)" })
         continue
       }
-      const missing = [...graph.requiredEnvVars].filter(
+      const missing = [...workflow.requiredEnvVars].filter(
         (v) => !available.has(v),
       )
       if (missing.length > 0) {
-        skipped.push({ graph, reason: `missing env: ${missing.join(", ")}` })
+        skipped.push({ workflow, reason: `missing env: ${missing.join(", ")}` })
         continue
       }
-      runnable.push(graph)
+      runnable.push(workflow)
     }
 
     console.log(
-      `${bold("cookbook test suite")} — ${allGraphs.length} graphs found, ${runnable.length} runnable, ${skipped.length} skipped\n`,
+      `${bold("cookbook test suite")} — ${allWorkflows.length} workflows found, ${runnable.length} runnable, ${skipped.length} skipped\n`,
     )
 
-    for (const { graph, reason } of skipped) {
-      console.log(`${yellow("SKIP")} ${graph.name} ${dim(`(${reason})`)}`)
+    for (const { workflow, reason } of skipped) {
+      console.log(`${yellow("SKIP")} ${workflow.name} ${dim(`(${reason})`)}`)
     }
     if (skipped.length > 0) console.log()
 
@@ -250,10 +250,10 @@ async function main() {
     }
 
     console.log(
-      `\n${bold("executing")} ${runnable.length} graphs ${dim(`(${CONCURRENCY} concurrent, ${TIMEOUT_MS / 1000}s timeout each)`)}\n`,
+      `\n${bold("executing")} ${runnable.length} workflows ${dim(`(${CONCURRENCY} concurrent, ${TIMEOUT_MS / 1000}s timeout each)`)}\n`,
     )
 
-    // --- Execute graphs ---
+    // --- Execute workflows ---
     let passed = 0
     let failed = 0
     let timedout = 0
@@ -263,32 +263,32 @@ async function main() {
 
     async function runNext(): Promise<void> {
       while (queue.length > 0) {
-        const graph = queue.shift()!
-        const result = await executeGraph(graph)
+        const workflow = queue.shift()!
+        const result = await executeWorkflow(workflow)
         results.push(result)
         completed++
 
         const progress = dim(`[${completed}/${runnable.length}]`)
         const duration = dim(`${(result.durationMs / 1000).toFixed(1)}s`)
-        const types = dim(`[${[...result.graph.nodeTypes].join(", ")}]`)
+        const types = dim(`[${[...result.workflow.nodeTypes].join(", ")}]`)
 
         switch (result.status) {
           case "pass":
             passed++
             console.log(
-              `${green("PASS")} ${result.graph.name} ${types} ${duration} ${progress}`,
+              `${green("PASS")} ${result.workflow.name} ${types} ${duration} ${progress}`,
             )
             break
           case "timeout":
             timedout++
             console.log(
-              `${red("TIME")} ${result.graph.name} ${types} ${dim(`>${TIMEOUT_MS / 1000}s`)} ${progress}`,
+              `${red("TIME")} ${result.workflow.name} ${types} ${dim(`>${TIMEOUT_MS / 1000}s`)} ${progress}`,
             )
             break
           case "fail":
             failed++
             console.log(
-              `${red("FAIL")} ${result.graph.name} ${types} ${duration} ${progress}`,
+              `${red("FAIL")} ${result.workflow.name} ${types} ${duration} ${progress}`,
             )
             if (result.error) {
               console.log(`     ${dim(result.error)}`)
@@ -313,7 +313,7 @@ async function main() {
       console.log(bold("failures:"))
       for (const f of failures) {
         const tag = f.status === "timeout" ? "TIMEOUT" : "ERROR"
-        console.log(`  ${f.graph.name} (${f.graph.file}) — ${tag}`)
+        console.log(`  ${f.workflow.name} (${f.workflow.file}) — ${tag}`)
         if (f.error) console.log(`    ${f.error}`)
       }
       console.log()

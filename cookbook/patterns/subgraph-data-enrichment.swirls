@@ -1,6 +1,6 @@
 /**
- * Demonstrates the subgraph pattern. A helper graph enriches company data,
- * and the main graph calls it as a node.
+ * Demonstrates the subgraph pattern. A helper workflow enriches company data,
+ * and the main workflow calls it as a node.
  */
 
 webhook company_data {
@@ -36,7 +36,7 @@ graph enrich_company {
   }
 
   node scrape_site {
-    type: firecrawl
+    type: scrape
     label: "Scrape company site"
     url: @ts { return "https://" + context.nodes.root.output.domain }
     onlyMainContent: true

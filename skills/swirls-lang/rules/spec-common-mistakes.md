@@ -182,8 +182,8 @@ Conditional routing requires a switch node with labeled edges.
 ```swirls
 import { utils } from "./helpers"
 
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root {
     type: code
     label: "Entry"
@@ -195,8 +195,8 @@ graph my_graph {
 **Correct:**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root {
     type: code
     label: "Entry"
@@ -214,7 +214,7 @@ No imports exist. For reusable code, use `@ts "path.ts.swirls"` file references 
 ```swirls
 const API_URL = "https://api.example.com"
 
-graph fetch {
+workflow fetch {
   label: "Fetch"
   root {
     type: http
@@ -227,7 +227,7 @@ graph fetch {
 **Correct:**
 
 ```swirls
-graph fetch {
+workflow fetch {
   label: "Fetch"
   root {
     type: http
@@ -344,14 +344,14 @@ node per_item {
 
 There are exactly 16 node types: `ai`, `agent`, `bucket`, `code`, `disk`, `email`, `graph`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`. Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
 
-### 12. Missing label on graph or node
+### 12. Missing label on workflow or node
 
-Labels default to the block name, so this parses, but best practice is to set an explicit one for readability. Graphs require `label:` for proper display in the Portal.
+Labels default to the block name, so this parses, but best practice is to set an explicit one for readability. Workflows require `label:` for proper display in the Portal.
 
 **Sub-optimal:**
 
 ```swirls
-graph my_graph {
+workflow my_graph {
   root {
     type: code
     code: @ts { return {} }
@@ -362,8 +362,8 @@ graph my_graph {
 **Correct:**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root {
     type: code
     label: "Entry"
@@ -377,8 +377,8 @@ graph my_graph {
 **Incorrect:**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root { type: code label: "Entry" code: @ts { return {} } }
   node step { type: code label: "Step" code: @ts { return {} } }
   root -> step
@@ -390,8 +390,8 @@ The parser emits: `Edge declarations must be inside a flow { } block`.
 **Correct:**
 
 ```swirls
-graph my_graph {
-  label: "My Graph"
+workflow my_graph {
+  label: "My Workflow"
   root { type: code label: "Entry" code: @ts { return {} } }
   node step { type: code label: "Step" code: @ts { return {} } }
   flow {
@@ -470,7 +470,7 @@ node process {
 **Incorrect:**
 
 ```swirls
-graph submissions {
+workflow submissions {
   label: "Submissions"
   persistence {
     enabled: true
@@ -489,7 +489,7 @@ The parser errors: `persistence { } blocks have been removed — use a top-level
 **Correct:**
 
 ```swirls
-graph submissions {
+workflow submissions {
   label: "Submissions"
   root {
     type: code
@@ -501,7 +501,7 @@ graph submissions {
 
 stream submission_log {
   label: "Submission log"
-  graph: submissions
+  workflow: submissions
   version: v1
   versions: {
     v1 {
@@ -583,7 +583,7 @@ trigger on_submission {
 trigger my_trigger {
   resource: contact_form
   resourceType: form
-  graph: my_graph
+  workflow: my_graph
 }
 ```
 
@@ -596,7 +596,7 @@ trigger my_trigger {
 }
 ```
 
-The binding is a single syntactic line `<type>:<name> -> <graph>`. No separate fields.
+The binding is a single syntactic line `<type>:<name> -> <workflowName>`. No separate fields.
 
 ### 21. Using an array for `secrets:`
 
@@ -624,14 +624,14 @@ node call_api {
 }
 ```
 
-### 22. Referencing a graph or stream as a string on a node
+### 22. Referencing a workflow or stream as a string on a node
 
 **Incorrect:**
 
 ```swirls
 node call_helper {
-  type: graph
-  graph: "helper_graph"
+  type: workflow
+  workflow: "helper_graph"
   input: @ts { return {} }
 }
 ```
@@ -640,13 +640,13 @@ node call_helper {
 
 ```swirls
 node call_helper {
-  type: graph
-  graph: helper_graph
+  type: workflow
+  workflow: helper_graph
   input: @ts { return {} }
 }
 ```
 
-`graph:` on a graph node, `stream:` on a stream node, `postgres:` on a postgres node, and `auth:` on an http node all take **bare identifiers**, not quoted strings. (Bare identifiers are parsed as string values, so `"helper_graph"` also works, but convention is bare.)
+`workflow:` on a workflow node, `stream:` on a stream node, `postgres:` on a postgres node, and `auth:` on an http node all take **bare identifiers**, not quoted strings. (Bare identifiers are parsed as string values, so `"helper_graph"` also works, but convention is bare.)
 
 ### 23. Hyphenated or non-alphanumeric resource name
 
@@ -668,7 +668,7 @@ form contact_form {
 }
 ```
 
-Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, graphs, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids.
+Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, workflows, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids.
 
 ### 24. Setting `visibility` like a key:value pair on a form
 
@@ -769,9 +769,9 @@ node each_item {
 }
 ```
 
-See `graph-subgraph`.
+See `workflow-subgraph`.
 
-### 27. Map / while node with both `subgraph { }` and `graph:`
+### 27. Map / while node with both `subgraph { }` `and `workflow:`
 
 **Incorrect:**
 
@@ -780,14 +780,14 @@ node each_item {
   type: map
   items: @ts { return [] }
   maxItems: 10
-  graph: helper_graph
+  workflow: helper_graph
   subgraph {
     root { type: code code: @ts { return {} } }
   }
 }
 ```
 
-The validator errors: `map node requires exactly one of subgraph { } or graph: <name>`. Pick one. Use `graph: <name>` to call an existing top-level graph; use `subgraph { }` to inline the iteration body.
+The validator errors: `map node requires exactly one of subgraph { } or workflow: <name>`. Pick one. Use `workflow: <name>` to call an existing top-level workflow; use `subgraph { }` to inline the iteration body.
 
 ### 28. Map / while subgraph root without `inputSchema`
 
@@ -908,7 +908,7 @@ form contact {
   }
 }
 
-graph handle {
+workflow handle {
   label: "Handle"
   root {
     type: code
@@ -938,7 +938,7 @@ form contact {
   schema: contact_payload
 }
 
-graph handle {
+workflow handle {
   label: "Handle"
   root {
     type: code

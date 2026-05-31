@@ -8,16 +8,16 @@ tags: comments, unicode, ascii, parser
 
 Swirls supports single-line (`//`) and multi-line (`/* */`) comments. Doc comments (`/* */`) placed before a declaration are shown on hover in the LSP.
 
-Unicode characters in comments break the parser's line counting and cause graphs after the comment to be silently dropped.
+Unicode characters in comments break the parser's line counting and cause workflows after the comment to be silently dropped.
 
 **Incorrect (Unicode in comments):**
 
 ```swirls
 // ──────────────────────────────
-// Graph: get_token → fetch OAuth
+// Workflow: get_token → fetch OAuth
 // ──────────────────────────────
-graph get_token {
-  // This graph may be silently dropped
+workflow get_token {
+  // This workflow may be silently dropped
 }
 ```
 
@@ -25,10 +25,10 @@ graph get_token {
 
 ```swirls
 // -------------------------------------------
-// Graph: get_token - fetch OAuth
+// Workflow: get_token - fetch OAuth
 // -------------------------------------------
-graph get_token {
-  // This graph is parsed correctly
+workflow get_token {
+  // This workflow is parsed correctly
 }
 ```
 

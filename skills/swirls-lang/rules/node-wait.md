@@ -6,7 +6,7 @@ tags: node, wait, delay, pause, duration
 
 ## Wait Nodes
 
-Wait nodes pause graph execution for a specified duration.
+Wait nodes pause workflow execution for a specified duration.
 
 **Correct (static wait):**
 

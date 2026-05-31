@@ -13,19 +13,19 @@ Every error and warning the validator can emit, grouped by category. Use this as
 - `<Kind> name: Name must contain only letters, numbers, and underscores` — The name contains a hyphen, dot, space, or other char. Fix to `^[a-zA-Z0-9_]+$`.
 - `Duplicate <kind> name "<n>"` — Two declarations share a name. Rename one.
 
-### Graphs
+### Workflows
 
-- `Graph must have exactly one root node (no incoming edges), but none were found. Check for cycles.` — The DAG has no entry point. Add `root { }` or break the cycle.
-- `Graph must have exactly one root node, but found N: a, b, ...` — More than one node has no incoming edges. Connect them or remove the extras.
-- `Graph must declare root { } as the entry node; the node with no incoming edges must be the root block (found "<n>" instead).` — The entry node exists but was declared `node foo { }` instead of `root { }`. Rename to `root`.
-- `Graph contains a cycle - DAG workflows cannot have cycles` — Some edge points backwards. Remove it or route through a new node.
-- `Duplicate node name "<n>" in graph` — Two nodes in the same graph share a name.
+- `Workflow must have exactly one root node (no incoming edges), but none were found. Check for cycles.` — The DAG has no entry point. Add `root { }` or break the cycle.
+- `Workflow must have exactly one root node, but found N: a, b, ...` — More than one node has no incoming edges. Connect them or remove the extras.
+- `Workflow must declare root { } as the entry node; the node with no incoming edges must be the root block (found "<n>" instead).` — The entry node exists but was declared `node foo { }` instead of `root { }`. Rename to `root`.
+- `Workflow contains a cycle - DAG workflows cannot have cycles` — Some edge points backwards. Remove it or route through a new node.
+- `Duplicate node name "<n>" in workflow` — Two nodes in the same workflow share a name.
 - `Edge references non-existent source node "<n>"` / `Edge references non-existent target node "<n>"` — Typo, or the node was dropped due to a parse error. Check spelling; check that the node block wasn't rejected.
 - `Edge cannot connect a node to itself` — Self-loop. Remove.
 
 ### Nodes (general)
 
-- `Invalid node type "<t>". Must be one of: ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while` — Unknown type name. Use one of the 16.
+- `Invalid node type "<t>". Must be one of: ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while` — Unknown type name. Use one of the 16.
 - `Node type "<t>" requires "<field>"` — Missing required field. See the node-type rule for the required set.
 
 ### Secrets map
@@ -68,8 +68,8 @@ Required keys: `stream`, `version`, `filter`.
 `schema`, `condition`, and `prepare` live **inside a `versions:` entry**, never at the top level.
 
 - `Duplicate stream name "<n>"` — Two stream blocks share a name.
-- `Stream block requires "graph" (graph name)` — Add `graph: <graph_name>`.
-- `Stream references graph "<n>" which is not defined` — Fix the graph name (file or workspace).
+- `Stream block requires "workflow" (workflow name)` — Add `workflow: <workflow_name>`.
+- `Stream references workflow "<n>" which is not defined` — Fix the workflow name (file or workspace).
 - `Stream "<n>" requires "version" (active writer)` — Add the block-level `version:` pointer.
 - `Stream "<n>" version pointer "<v>" is invalid — use v1, v2, …` — Pointer must match `^v[1-9][0-9]*$`.
 - `Stream "<n>" requires a non-empty versions { } block` — Declare at least one `versions: { v1 { … } }` entry.
@@ -97,10 +97,10 @@ Required keys: `stream`, `version`, `filter`.
 - `Invalid ai kind "<k>". Must be one of: text, object, image, video, embed` — Fix the `kind:` value.
 - Warning: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` — Either drop the schema or change kind.
 
-### Graph (subgraph) nodes
+### Workflow (subgraph) nodes
 
-- `Graph node requires "graph"` — Add `graph: <name>`.
-- `Graph node references graph "<n>" which is not defined` — Fix the name or declare the child graph.
+- `Workflow node requires "workflow"` — Add `workflow: <name>`.
+- `Workflow node references workflow "<n>" which is not defined` — Fix the name or declare the child workflow.
 
 ### Map / while nodes
 
@@ -109,10 +109,10 @@ Required keys: `stream`, `version`, `filter`.
 - `map node requires maxItems as a positive number` — Add `maxItems: <n>` with `n > 0`.
 - `map node concurrency must be a positive integer when set` — Fix to a positive integer or remove `concurrency:`.
 - `while node requires maxIterations as a positive integer` — Add `maxIterations: <n>` with `n` an integer ≥ 1.
-- `map node requires exactly one of subgraph { } or graph: <name>` — You set both, or neither. Pick one.
-- `while node requires exactly one of subgraph { } or graph: <name>` — Same — pick one.
-- `Node references graph "<n>" which is not defined` — `graph: <n>` does not match a graph in the workspace.
-- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` (inline @json, object literal, or bare schema name) to the inline `subgraph { }` root or the referenced graph's root.
+- `map node requires exactly one of subgraph { } or workflow: <name>` — You set both, or neither. Pick one.
+- `while node requires exactly one of subgraph { } or workflow: <name>` — Same — pick one.
+- `Node references workflow "<n>" which is not defined` — `workflow: <n>` does not match a workflow in the workspace.
+- `map/while subgraph root must declare inputSchema for typed iteration` — Add `inputSchema` (inline @json, object literal, or bare schema name) to the inline `subgraph { }` root or the referenced workflow's root.
 - Parser error: `Expected { after subgraph` — Don't put a colon between `subgraph` and `{`.
 - Parser error: `label is not valid inside subgraph { }` / `description is not valid inside subgraph { }` — Subgraphs don't take their own label/description.
 
@@ -162,7 +162,7 @@ Required keys: `stream`, `version`, `filter`.
 ### Triggers
 
 - `Trigger references <type> "<n>" which is not defined`.
-- `Trigger references graph "<g>" which is not defined`.
+- `Trigger references workflow "<g>" which is not defined`.
 
 ### Review
 

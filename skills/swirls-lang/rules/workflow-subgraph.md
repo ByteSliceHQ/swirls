@@ -1,12 +1,12 @@
 ---
 title: Inline `subgraph { }` Block (Map / While)
 impact: HIGH
-tags: graph, subgraph, inline, map, while, iteration, no-colon, body
+tags: workflow, subgraph, inline, map, while, iteration, no-colon, body
 ---
 
 ## Inline `subgraph { }` Block
 
-`map` and `while` nodes can either reference a top-level graph by name (`graph: <name>`) or define the iteration body inline as a `subgraph { ... }` block. The inline form is keyword-only — **no colon, no quotes, no value**.
+`map` and `while` nodes can either reference a top-level workflow by name (`workflow: <name>`) or define the iteration body inline as a `subgraph { ... }` block. The inline form is keyword-only — **no colon, no quotes, no value**.
 
 ### Syntax
 
@@ -29,7 +29,7 @@ node <name> {
 
 ### Body shape
 
-`subgraph { }` accepts the same inner body as `graph { }`:
+`subgraph { }` accepts the same inner body as `workflow { }`:
 
 - Exactly one `root { }` block (entry node).
 - Zero or more `node <name> { }` blocks.
@@ -42,7 +42,7 @@ label is not valid inside subgraph { }
 description is not valid inside subgraph { }
 ```
 
-The subgraph runs in the parent graph's namespace; it does not have a separate name or display label.
+The subgraph runs in the parent workflow's namespace; it does not have a separate name or display label.
 
 ### Required: `inputSchema` on the root
 
@@ -129,27 +129,27 @@ node refine_digest {
 }
 ```
 
-### Inline subgraph vs. referenced graph
+### Inline subgraph vs. referenced workflow
 
 Pick one based on reuse:
 
 - **Inline `subgraph { }`** — The iteration body is single-purpose and lives next to the loop. Easier to read top-to-bottom.
-- **`graph: <name>`** — The same body is used elsewhere too, or the body is large enough to want its own file/section. The referenced graph's root must still declare `inputSchema`.
+- **`workflow: <name>`** — The same body is used elsewhere too, or the body is large enough to want its own file/section. The referenced workflow's root must still declare `inputSchema`.
 
 The validator rejects both-set and neither-set:
 
 ```
-map node requires exactly one of subgraph { } or graph: <name>
-while node requires exactly one of subgraph { } or graph: <name>
+map node requires exactly one of subgraph { } or workflow: <name>
+while node requires exactly one of subgraph { } or workflow: <name>
 ```
 
 ### DAG rules apply
 
-The subgraph is a DAG: exactly one root (the `root { }` block), no cycles, every edge target must be a declared node. The validator runs `dagValidation` on it just like any top-level graph.
+The subgraph is a DAG: exactly one root (the `root { }` block), no cycles, every edge target must be a declared node. The validator runs `dagValidation` on it just like any top-level workflow.
 
 ### Edges live in `flow { }`
 
-Edges inside a subgraph go in a `flow { }` block, same as a top-level graph:
+Edges inside a subgraph go in a `flow { }` block, same as a top-level workflow:
 
 ```swirls
 subgraph {
@@ -163,4 +163,4 @@ subgraph {
 
 ### Iteration context
 
-The subgraph (or referenced graph) sees `context.iteration.*` instead of just `context.nodes.root.input`. See `context-iteration`.
+The subgraph (or referenced workflow) sees `context.iteration.*` instead of just `context.nodes.root.input`. See `context-iteration`.

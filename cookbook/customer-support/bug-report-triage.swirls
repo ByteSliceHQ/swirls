@@ -110,7 +110,7 @@ graph triage_bug {
   }
 
   node ack_reporter {
-    type: resend
+    type: email
     label: "Acknowledge reporter"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

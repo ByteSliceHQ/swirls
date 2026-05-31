@@ -130,7 +130,7 @@ graph approve_document {
   }
 
   node request_revisions {
-    type: resend
+    type: email
     label: "Request revisions"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

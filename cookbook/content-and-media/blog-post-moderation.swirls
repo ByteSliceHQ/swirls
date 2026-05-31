@@ -94,7 +94,7 @@ graph moderate_post {
   }
 
   node notify_author {
-    type: resend
+    type: email
     label: "Notify author"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

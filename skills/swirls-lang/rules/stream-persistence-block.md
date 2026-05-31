@@ -6,14 +6,14 @@ tags: stream, persistence, removed, migration, condition, prepare
 
 ## Persistence Is Top-Level Stream, Not a Block
 
-The old `persistence { }` block inside a graph has been **removed** from the language. Do not use it. The parser emits a hard error: `persistence { } blocks have been removed — use a top-level stream block instead`.
+The old `persistence { }` block inside a workflow has been **removed** from the language. Do not use it. The parser emits a hard error: `persistence { } blocks have been removed — use a top-level stream block instead`.
 
-Replace persistence with a top-level `stream <name> { }` declaration that references the graph by name.
+Replace persistence with a top-level `stream <name> { }` declaration that references the workflow by name.
 
 **Incorrect (uses the removed persistence block):**
 
 ```swirls
-graph submissions {
+workflow submissions {
   label: "Record submission"
 
   persistence {
@@ -33,7 +33,7 @@ graph submissions {
 **Correct (top-level stream block):**
 
 ```swirls
-graph submissions {
+workflow submissions {
   label: "Record submission"
 
   root {
@@ -68,7 +68,7 @@ graph submissions {
 
 stream submission_log {
   label: "Submission log"
-  graph: submissions
+  workflow: submissions
   version: v1
 
   versions: {
@@ -101,16 +101,16 @@ stream submission_log {
 
 | Old persistence | New top-level stream |
 |-----------------|----------------------|
-| Inside `graph { }` | Top-level block `stream <name> { }` |
+| Inside `workflow { }` | Top-level block `stream <name> { }` |
 | Single implicit shape | **One or more `versions:`**, each with an explicit, required `schema` |
 | No version pointer | **Required `version:`** names the active writer version |
 | No mapping layer | **Required `prepare: @ts { ... }` per version** returns the shape |
 | `condition:` optional | `condition:` optional per version (must be non-empty if given) |
-| Stream name defaulted to graph name | Stream has its own `<name>`; multiple streams can reference one graph |
+| Stream name defaulted to workflow name | Stream has its own `<name>`; multiple streams can reference one workflow |
 | Context accessed via `context.nodes` | `prepare` / `condition` access `context.output.<leafNode>` plus `context.nodes` |
 
 ### Why it changed
 
-The old model coupled "what to store" to the graph definition. The new model separates concerns: graphs produce outputs, and one or more top-level stream blocks each decide whether and how to persist those outputs. This lets you add, remove, or re-shape persistence without editing the graph, and lets multiple streams tap the same graph output with different schemas and conditions.
+The old model coupled "what to store" to the workflow definition. The new model separates concerns: workflows produce outputs, and one or more top-level stream blocks each decide whether and how to persist those outputs. This lets you add, remove, or re-shape persistence without editing the workflow, and lets multiple streams tap the same workflow output with different schemas and conditions.
 
 See `resource-stream` for the full spec of top-level `stream { }` blocks and `node-stream` for reading persisted records.

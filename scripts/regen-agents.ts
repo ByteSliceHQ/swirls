@@ -23,9 +23,9 @@ const sections: Record<string, Section> = {
     title: '2. File Structure',
     ordered: ['structure-top-level-declarations', 'structure-file-discovery', 'structure-comments'],
   },
-  graph: {
-    title: '3. Graph & Node Basics',
-    ordered: ['graph-anatomy', 'graph-root-node', 'graph-flow-block', 'graph-dag-rules', 'graph-subgraph'],
+  workflow: {
+    title: '3. Workflow & Node Basics',
+    ordered: ['workflow-anatomy', 'workflow-root-node', 'workflow-flow-block', 'workflow-dag-rules', 'workflow-subgraph'],
   },
   node: {
     title: '4. Node Types',
@@ -39,7 +39,7 @@ const sections: Record<string, Section> = {
       'node-scrape',
       'node-parallel',
       'node-stream',
-      'node-graph',
+      'node-workflow',
       'node-map',
       'node-while',
       'node-wait',
@@ -145,7 +145,7 @@ const header =
   `# Swirls Language - Complete Reference\n\n` +
   `> Comprehensive guide for authoring \`.swirls\` workflow files. Compiled from the individual rule files under \`rules/\`.\n>\n` +
   `> **Source of truth lives in \`rules/\`.** This file is regenerated from those rules by \`scripts/regen-agents.ts\`. When in doubt, defer to \`rules/spec-strict-syntax.md\` and \`rules/spec-common-mistakes.md\`.\n>\n` +
-  `> Current scope: **16 node types** (\`ai, agent, bucket, code, disk, email, graph, http, map, parallel, postgres, scrape, stream, switch, wait, while\`), **12 top-level declarations** (\`schema, form, webhook, schedule, graph, stream, trigger, secret, auth, postgres, disk, agent\`), inline \`subgraph { }\` for map/while, form \`visibility public | internal\`, webhook shared-secret \`secret:\` + \`header:\`, top-level \`schema <name> { }\` blocks referenced by bare identifier, and \`context.iteration.*\` (item/index/input/previous) for map/while subgraphs.\n\n`
+  `> Current scope: **16 node types** (\`ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while\`), **12 top-level declarations** (\`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent\`), inline \`subgraph { }\` for map/while, form \`visibility public | internal\`, webhook shared-secret \`secret:\` + \`header:\`, top-level \`schema <name> { }\` blocks referenced by bare identifier, and \`context.iteration.*\` (item/index/input/previous) for map/while subgraphs.\n\n`
 
 const warnings: string[] = []
 const sectionBlocks: string[] = [header]

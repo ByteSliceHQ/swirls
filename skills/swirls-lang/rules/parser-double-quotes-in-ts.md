@@ -6,9 +6,9 @@ tags: parser, double-quote, ts, string, silent, drop
 
 ## Double-Quote Characters Inside @ts Blocks
 
-Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block itself appears to parse correctly, but all subsequent graphs, triggers, and resources in the file are silently dropped.
+Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block itself appears to parse correctly, but all subsequent workflows, triggers, and resources in the file are silently dropped.
 
-This is one of the most common causes of "missing graphs" with no error output.
+This is one of the most common causes of "missing workflows" with no error output.
 
 **Incorrect (regex with double-quote):**
 
@@ -45,4 +45,4 @@ code: @ts {
 }
 ```
 
-When `swirls doctor` reports fewer graphs than you defined with no error messages, check all `@ts` blocks for literal `"` characters.
+When `swirls doctor` reports fewer workflows than you defined with no error messages, check all `@ts` blocks for literal `"` characters.

@@ -34,7 +34,7 @@ schema <name> {
 ```swirls
 schema contact_payload {
   label: "Contact payload"
-  description: "Shared JSON Schema for the contact form and process_form graph"
+  description: "Shared JSON Schema for the contact form and process_form workflow"
   schema: @json {
     {
       "type": "object",
@@ -53,7 +53,7 @@ form contact {
   schema: contact_payload
 }
 
-graph handle_contact {
+workflow handle_contact {
   label: "Handle contact"
 
   root {
@@ -102,7 +102,7 @@ Schema names must match `^[a-zA-Z0-9_]+$`. Hyphens, dots, and spaces are not all
 
 ### Workspace resolution
 
-Schema names resolve across all `.swirls` files in the workspace, the same way graphs and streams do. `swirls doctor` and deploy bundle the union of all schema declarations under the scanned working directory. The LSP single-file open may report a missing schema until the workspace is considered.
+Schema names resolve across all `.swirls` files in the workspace, the same way workflows and streams do. `swirls doctor` and deploy bundle the union of all schema declarations under the scanned working directory. The LSP single-file open may report a missing schema until the workspace is considered.
 
 ### Validation rules
 

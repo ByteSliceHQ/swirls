@@ -53,7 +53,7 @@ graph build_digest {
   }
 
   node send_digest {
-    type: resend
+    type: email
     label: "Send digest email"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }

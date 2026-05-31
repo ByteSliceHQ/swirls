@@ -1,6 +1,6 @@
 /**
  * Demonstrates persistence and stream queries.
- * One graph logs events, another queries and reports on them.
+ * One workflow logs events, another queries and reports on them.
  */
 
 webhook log_event {
@@ -26,12 +26,6 @@ schedule daily_report {
 
 graph record_event {
   label: "Record Event"
-
-  persistence {
-    enabled: true
-    condition: @ts { return true }
-    name: "events"
-  }
 
   root {
     type: code
@@ -70,26 +64,10 @@ graph generate_report {
   node recent_events {
     type: stream
     label: "Query recent events"
-    stream: "events"
-    query: @sql {
-      SELECT "root.event_type" AS event_type, "root.value" AS value, "root.source" AS source
-      FROM {{table}}
-      WHERE created_at > NOW() - INTERVAL '24 hours'
-      ORDER BY created_at DESC
-      LIMIT 100
-    }
-    schema: @json {
-      {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "event_type": { "type": "string" },
-            "value": { "type": "number" },
-            "source": { "type": "string" }
-          }
-        }
-      }
+    stream: events
+    version: v1
+    filter: @ts {
+      return {}
     }
   }
 
@@ -114,7 +92,7 @@ graph generate_report {
   }
 
   node send_report {
-    type: resend
+    type: email
     label: "Send report"
     from: @ts { return "no-reply@transactional.byteslice.co" }
     to: @ts { return "cj@swirls.ai" }
@@ -129,6 +107,32 @@ graph generate_report {
     root -> recent_events
     recent_events -> summarize
     summarize -> send_report
+  }
+}
+
+stream events {
+  label: "Events"
+  graph: record_event
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["event_type", "value"],
+          "properties": {
+            "event_type": { "type": "string" },
+            "value": { "type": "number" },
+            "source": { "type": "string" }
+          }
+        }
+      }
+
+      condition: @ts { return context.output.root != null }
+
+      prepare: @ts { return context.output.root }
+    }
   }
 }
 
