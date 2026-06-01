@@ -71,7 +71,7 @@ Multiple top-level keys AND together. Multiple operators on the same key also AN
 
 Filters address two field kinds uniformly:
 
-- **System columns:** `id`, `created_at`, `deployment_id`, `graph_execution_id` — mapped to direct column comparisons on the version table.
+- **System columns:** `id`, `created_at`, `deployment_id`, `workflow_execution_id` — mapped to direct column comparisons on the version table.
 - **Payload fields:** anything else — the fields your `prepare` returned for this version, mapped to the matching column.
 
 You do not need to distinguish; the runtime infers it.

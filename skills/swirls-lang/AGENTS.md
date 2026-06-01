@@ -4,7 +4,7 @@
 >
 > **Source of truth lives in `rules/`.** This file is regenerated from those rules by `scripts/regen-agents.ts`. When in doubt, defer to `rules/spec-strict-syntax.md` and `rules/spec-common-mistakes.md`.
 >
-> Current scope: **16 node types** (`ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while`), **12 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent`), inline `subgraph { }` for map/while, form `visibility public | internal`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, and `context.iteration.*` (item/index/input/previous) for map/while subgraphs.
+> Current scope: **16 node types** (`agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`; `graph` is a legacy alias for `workflow`), **13 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel`), inline `subgraph { }` for map/while, form `visibility public | internal`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, `context.iteration.*` (item/index/input/previous) for map/while subgraphs, agent subagent `team`, and `channel` blocks binding an agent to Slack / Linear / Discord / web.
 
 
 # 1. Language Specification (READ FIRST)
@@ -18,16 +18,16 @@ The Swirls DSL is a declarative configuration language. It is not TypeScript, YA
 These are the only keywords recognized by the lexer (`packages/language/src/lexer.ts`). Any other word is parsed as an identifier or a quoted string.
 
 ```
-form, webhook, schedule, workflow, trigger, secret, auth, postgres, stream, schema,
-disk, agent, role,
+form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, schema,
+disk, agent, channel, role, tools,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
 subgraph, map, while, items, update, maxItems, maxIterations, concurrency
 ```
 
-Note: `persistence` is NOT a keyword. The old `persistence { }` block has been removed. Use a top-level `stream { }` block instead.
+Note: `workflow` is the canonical keyword for a workflow declaration and the `type: workflow` (subworkflow) node. `graph` is a still-accepted **legacy alias** for both: the parser maps `graph` → `workflow` (block keyword, `type:`, and the `graph:` reference field). Prefer `workflow`; expect to see `graph` in older files.
 
-Note: `graph` is a legacy alias for `workflow` (top-level declarations, `type: graph`, and config field `graph:`). Prefer `workflow` in new code; the serializer canonicalizes to `workflow`.
+Note: `persistence` is NOT a keyword. The old `persistence { }` block has been removed. Use a top-level `stream { }` block instead.
 
 #### Complete top-level declaration list
 
@@ -47,13 +47,14 @@ auth <name> { }
 postgres <name> { }
 disk <name> { }
 agent <name> { }
+channel <name> { }
 ```
 
-There are **12** top-level block kinds (plus the optional `version:` line). The newest are `disk <name> { }` (Archil-backed remote disk that `type: disk` nodes mount) and `agent <name> { }` (LLM agent definition with tools and roles that `type: agent` nodes bind to).
+There are **13** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. The newest are `agent <name> { }` (LLM agent definition with tools, roles, and a subagent `team`, bound by `type: agent` nodes) and `channel <name> { }` (binds an agent to a chat platform — Slack, Linear, Discord, or web). `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount.
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -66,9 +67,11 @@ Names may start with a digit. Hyphens, dots, spaces, and other characters are no
 These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `packages/core/src/schemas.ts`.
 
 ```
-ai, agent, bucket, code, disk, email, workflow, http,
-map, parallel, postgres, scrape, stream, switch, wait, while
+agent, ai, bucket, code, disk, email, http, map,
+parallel, postgres, scrape, stream, switch, wait, while, workflow
 ```
+
+The subworkflow node is `type: workflow` (legacy alias `type: graph`, which the validator normalizes to `workflow`). When `swirls doctor` rejects an unknown type it lists the valid set sorted: `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`.
 
 Notes on aliases that do NOT exist:
 - `email` is the type name, not `resend`, `mail`, or `mailer`. (The Resend vendor backs it; the DSL type is `email`.)
@@ -78,7 +81,7 @@ Notes on aliases that do NOT exist:
 - `http` is the type name, not `api`, `request`, or `fetch`.
 - `wait` is the type name, not `delay` or `sleep`.
 - `ai` is the type name, not `llm`, `chat`, or `prompt`.
-- `workflow` is the type name for subgraphs, not `subgraph`, `call`, or `child`. (`type: graph` and `graph:` are legacy aliases.)
+- `workflow` is the type name for calling a subworkflow, not `subworkflow`, `subgraph`, `call`, or `child`. (`graph` is a legacy alias for `workflow`; `subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
 - `postgres` is the type name, not `db`, `database`, or `sql`.
 - `bucket` is the type name, not `storage`, `file`, or `s3`.
 - `parallel` is the type name, not `fanout` or `workers`. Use `map` for per-item iteration.
@@ -93,7 +96,7 @@ These are the only value forms that can appear after a `:` in a field assignment
 - String literal: `"value"`
 - Number: `42`, `3.14`
 - Boolean: `true`, `false`
-- Bare identifier: `my_name` (parsed as a string; used to reference top-level blocks like `workflow: helper_graph`, `stream: my_stream`, `schema: my_schema`)
+- Bare identifier: `my_name` (parsed as a string; used to reference top-level blocks like `workflow: helper_workflow`, `stream: my_stream`, `schema: my_schema`)
 - Object literal: `{ key: value, key2: value2 }` (comma-separated)
 - Array literal: `[item1, item2]` (comma-separated)
 - TypeScript block: `@ts { ... }`
@@ -160,6 +163,25 @@ header: "Header-Name"
 
 `secret:` uses dot notation between the secret block name and the variable name (no quotes). `header:` is a quoted string naming the inbound HTTP header. Both must be set together (or neither). Setting only one is a validator error. Setting neither emits a warning that the webhook accepts unverified requests. Reserved headers (e.g. `Cookie`, `Host`, `Content-Type`, `User-Agent`, `X-Forwarded-*`) are rejected. See `resource-webhook`.
 
+#### Channel block fields
+
+`channel <name> { }` binds an `agent` block to a chat platform. Fields:
+
+```
+platform: slack | linear | discord | web      // required
+integration: slack | linear | discord | web    // required; must equal platform
+agent: <agentName>                             // required; bare identifier of a top-level agent block
+mode: mention | dm | all                       // optional; defaults to mention
+enabled: true | false                          // optional; defaults to enabled
+label: "..."   description: "..."              // optional
+```
+
+`platform`, `integration`, and `mode` are bare keyword values (not quoted). `integration` must equal `platform` or it is a validator error. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. See `resource-channel`.
+
+#### Agent subagent team
+
+`agent <name> { }` accepts `team: [ agentName, ... ]` — a bare-identifier array of other agent blocks this agent may delegate to. Each team member becomes a callable tool. An agent cannot list itself, and a team member name cannot collide with a workflow name in the same agent's `tools`. See `resource-agent`.
+
 #### Inline `subgraph { }` block (map / while only)
 
 `map` and `while` nodes accept an inline `subgraph { ... }` block instead of a `workflow: <name>` reference. The keyword takes **no colon**:
@@ -181,7 +203,7 @@ node each_item {
 }
 ```
 
-`subgraph { }` body has the same shape as `workflow { }` body (`root { }`, `node { }`, `flow { }`) but cannot have its own `label:` or `description:`. The subgraph root MUST declare `inputSchema` for typed iteration. A node uses **exactly one** of `subgraph { }` or `workflow: <name>` — never both, never neither.
+`subgraph { }` body has the same shape as `graph { }` body (`root { }`, `node { }`, `flow { }`) but cannot have its own `label:` or `description:`. The subgraph root MUST declare `inputSchema` for typed iteration. A node uses **exactly one** of `subgraph { }` or `workflow: <name>` — never both, never neither.
 
 #### Constructs that DO NOT exist
 
@@ -211,7 +233,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `outputSchema` on non-root nodes.** Use `schema` instead. The parser rejects `outputSchema` on non-root nodes with: `Use "schema" instead of "outputSchema" in node blocks`.
 
-**No `inputSchema` on non-root nodes (except a `subgraph { }` root).** Only the outer-workflow root and a map/while subgraph root accept `inputSchema`. The parser emits: `inputSchema is only allowed in root { } blocks` and drops the entire node.
+**No `inputSchema` on non-root nodes (except a `subgraph { }` root).** Only the outer-graph root and a map/while subgraph root accept `inputSchema`. The parser emits: `inputSchema is only allowed in root { } blocks` and drops the entire node.
 
 **No conditional routing at the edge level.** Conditional routing requires a `switch` node with `cases` and `router`, plus labeled edges in the flow block.
 
@@ -233,7 +255,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `llm`, `prompt`, or `chat` node type.** The correct type name is `ai`.
 
-**No `subgraph`, `child`, or `call` node type.** The correct type name is `workflow`. (`subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
+**No `subworkflow`, `subgraph`, `child`, or `call` node type.** The correct type name is `workflow` (legacy alias `graph`). (`subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
 
 **No `db`, `database`, or `sql` node type for external databases.** The correct type name is `postgres`.
 
@@ -271,7 +293,7 @@ No user `schema:` — vendor-managed output shape.
 
 **stream** (node, read side) — required: `stream` (bare identifier naming a top-level `stream <name> { }` block), `version` (the `versions:` key to read, e.g. `v1`), `filter` (@ts returning a `StreamFilter` object of shape `{ field: { op: value } }` where op is `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`). `streamId`, `query`, `querySql` are removed; using them produces validator errors.
 
-**workflow** — required: `workflow` (bare identifier naming a workflow in the same file), `input` (@ts returning the input object to pass to the subgraph).
+**workflow** (legacy alias `graph`) — required: `workflow` (bare identifier naming a workflow in the same file; `graph:` is the legacy alias and is normalized to `workflow`), `input` (@ts returning the input object to pass to the subworkflow).
 
 **map** — required: `items` (@ts returning array), `maxItems` (positive number), plus exactly one of `subgraph { ... }` (inline block, no colon) or `workflow: <name>` (reference to a top-level workflow). Optional: `concurrency` (positive integer). The subgraph/referenced-workflow root must declare `inputSchema` (typed iteration). Iteration context: `context.iteration.item` is the current element. See `node-map` and `workflow-subgraph`.
 
@@ -283,7 +305,7 @@ No user `schema:` — vendor-managed output shape.
 
 **disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). No user `schema:`. See `node-disk` and `resource-disk`.
 
-**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `role` (bare identifier naming a role inside the agent block), `tools` (array of bare identifiers naming workflows to expose as LLM-callable tools), `system` (@ts; per-call system-prompt override). See `node-agent` and `resource-agent`.
+**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `role` (bare identifier naming a role inside the agent block), `tools` (array of bare identifiers narrowing within the effective tool set), `system` (@ts; per-call system-prompt override), `schema` (structured-output constraint; use `schema`, never `outputSchema`). See `node-agent` and `resource-agent`.
 
 **postgres** (node) — required: `postgres` (bare identifier naming a top-level `postgres <name> { }` block) and exactly one of `select:` (@sql SELECT or WITH) or `insert:` (@sql INSERT, optionally with ON CONFLICT). Other fields: `params` (@ts returning an object whose keys match `{{key}}` placeholders in the SQL; required when SQL has placeholders, always required for `insert:`), `condition` (@ts returning boolean; only valid on `insert:` nodes), `schema` (recommended for `select:` to type the row output).
 
@@ -485,7 +507,7 @@ Conditional routing requires a switch node with labeled edges.
 ```swirls
 import { utils } from "./helpers"
 
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root {
     type: code
@@ -498,7 +520,7 @@ workflow my_graph {
 **Correct:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root {
     type: code
@@ -645,7 +667,7 @@ node per_item {
 }
 ```
 
-There are exactly 16 node types: `ai`, `agent`, `bucket`, `code`, `disk`, `email`, `graph`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`. Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
+There are exactly 16 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
 
 #### 12. Missing label on workflow or node
 
@@ -654,7 +676,7 @@ Labels default to the block name, so this parses, but best practice is to set an
 **Sub-optimal:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   root {
     type: code
     code: @ts { return {} }
@@ -665,7 +687,7 @@ workflow my_graph {
 **Correct:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root {
     type: code
@@ -680,7 +702,7 @@ workflow my_graph {
 **Incorrect:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root { type: code label: "Entry" code: @ts { return {} } }
   node step { type: code label: "Step" code: @ts { return {} } }
@@ -693,7 +715,7 @@ The parser emits: `Edge declarations must be inside a flow { } block`.
 **Correct:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root { type: code label: "Entry" code: @ts { return {} } }
   node step { type: code label: "Step" code: @ts { return {} } }
@@ -863,7 +885,7 @@ Stream nodes reference a stream block by bare identifier (not a string), pin a `
 
 ```swirls
 trigger agent_trigger {
-  agent:my_agent -> my_graph
+  agent:my_agent -> my_workflow
 }
 ```
 
@@ -873,7 +895,7 @@ There is no `agent` trigger type. Only `form`, `webhook`, and `schedule` are val
 
 ```swirls
 trigger on_submission {
-  form:contact_form -> my_graph
+  form:contact_form -> my_workflow
   enabled: true
 }
 ```
@@ -886,7 +908,7 @@ trigger on_submission {
 trigger my_trigger {
   resource: contact_form
   resourceType: form
-  workflow: my_graph
+  workflow: my_workflow
 }
 ```
 
@@ -894,12 +916,12 @@ trigger my_trigger {
 
 ```swirls
 trigger my_trigger {
-  form:contact_form -> my_graph
+  form:contact_form -> my_workflow
   enabled: true
 }
 ```
 
-The binding is a single syntactic line `<type>:<name> -> <workflowName>`. No separate fields.
+The binding is a single syntactic line `<type>:<name> -> <workflow>`. No separate fields.
 
 #### 21. Using an array for `secrets:`
 
@@ -934,7 +956,7 @@ node call_api {
 ```swirls
 node call_helper {
   type: workflow
-  workflow: "helper_graph"
+  workflow: "helper_workflow"
   input: @ts { return {} }
 }
 ```
@@ -944,12 +966,12 @@ node call_helper {
 ```swirls
 node call_helper {
   type: workflow
-  workflow: helper_graph
+  workflow: helper_workflow
   input: @ts { return {} }
 }
 ```
 
-`workflow:` on a workflow node, `stream:` on a stream node, `postgres:` on a postgres node, and `auth:` on an http node all take **bare identifiers**, not quoted strings. (Bare identifiers are parsed as string values, so `"helper_graph"` also works, but convention is bare.)
+`workflow:` on a workflow node, `stream:` on a stream node, `postgres:` on a postgres node, and `auth:` on an http node all take **bare identifiers**, not quoted strings. (Bare identifiers are parsed as string values, so `"helper_workflow"` also works, but convention is bare.)
 
 #### 23. Hyphenated or non-alphanumeric resource name
 
@@ -1074,7 +1096,7 @@ node each_item {
 
 See `workflow-subgraph`.
 
-#### 27. Map / while node with both `subgraph { }` `and `workflow:`
+#### 27. Map / while node with both `subgraph { }` and `workflow:`
 
 **Incorrect:**
 
@@ -1083,7 +1105,7 @@ node each_item {
   type: map
   items: @ts { return [] }
   maxItems: 10
-  workflow: helper_graph
+  workflow: helper_workflow
   subgraph {
     root { type: code code: @ts { return {} } }
   }
@@ -1254,24 +1276,81 @@ workflow handle {
 
 The bare identifier (`contact_payload`) references the top-level `schema` block. See `resource-schema`.
 
+#### 33. Channel `platform` and `integration` mismatch
+
+A `channel` block's `integration` must equal its `platform`. They are separate fields (surface vs credential source) but a mismatch is rejected.
+
+**Incorrect:**
+
+```swirls
+channel concierge_slack {
+  platform: slack
+  integration: web      // mismatch
+  agent: concierge
+}
+```
+
+Error: `Channel "concierge_slack" platform "slack" must match integration "web"`.
+
+**Correct:**
+
+```swirls
+channel concierge_slack {
+  platform: slack
+  integration: slack
+  agent: concierge
+  mode: mention
+}
+```
+
+Also: `platform`, `integration`, and `mode` are bare keyword values, and `agent:` is a bare identifier naming an `agent` block (not a quoted string). Two enabled channels cannot share the same `platform : mode : agent` tuple. See `resource-channel`.
+
+#### 34. Agent `team` that references itself or forms a cycle
+
+`team: [ … ]` names other `agent` blocks as subagents. An agent cannot list itself, a team member cannot collide with one of the agent's `tools:` workflow names, and the delegation chain cannot contain a cycle.
+
+**Incorrect:**
+
+```swirls
+agent orchestrator {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  team: [orchestrator]   // self-reference
+}
+```
+
+Error: `Agent "orchestrator" cannot include itself in team:`. A loop such as `a -> b -> a` errors with `Agent team contains a cycle: a -> b -> a`.
+
+**Correct:**
+
+```swirls
+agent orchestrator {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  team: [researcher, writer]
+}
+```
+
+Team members are bare identifiers, not quoted strings. See `resource-agent`.
+
 
 # 2. File Structure
 
 ### Top-Level Declarations
 
-A `.swirls` file contains twelve kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains thirteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
 ```swirls
 import { helper } from "./utils.swirls"
 
-export workflow my_graph {
+export workflow my_workflow {
   // ...
 }
 ```
 
-The parser errors: `Unexpected token: expected schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, or agent`.
+The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, or schema`.
 
 **Correct (all top-level declarations demonstrated):**
 
@@ -1350,22 +1429,39 @@ trigger on_contact {
   form:contact -> process
   enabled: true
 }
+
+agent concierge {
+  label: "Concierge"
+  secrets: api_creds
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+}
+
+channel concierge_web {
+  label: "Concierge (Web)"
+  platform: web
+  agent: concierge
+  integration: web
+  mode: dm
+  enabled: true
+}
 ```
 
-#### The twelve valid top-level blocks
+#### The thirteen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
 - `webhook <name> { }` — HTTP endpoints for external payloads. See `resource-webhook`.
 - `schedule <name> { }` — Cron-based triggers. See `resource-schedule`.
-- `workflow <name> { }` — Workflow DAGs. See `workflow-anatomy`.
+- `workflow <name> { }` — Workflow DAGs (legacy keyword: `graph`). See `workflow-anatomy`.
 - `stream <name> { }` — Persist a workflow's output as typed records. See `resource-stream`.
 - `trigger <name> { }` — Binds resources to workflows. See `resource-trigger-binding`.
 - `secret <name> { }` — Named groups of secret var identifiers. See `resource-secrets`.
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.
 - `postgres <name> { }` — External PostgreSQL connection and table schemas. See `resource-postgres`.
 - `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
-- `agent <name> { }` — LLM agent definition (provider, model, tools, roles); `type: agent` nodes bind to it. See `resource-agent`.
+- `agent <name> { }` — LLM agent definition (provider, model, tools, roles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
+- `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 
 #### Version line
 
@@ -1467,12 +1563,13 @@ Use only ASCII characters in comments: letters, digits, spaces, hyphens, undersc
 
 ### Workflow Anatomy
 
-A workflow is a directed acyclic graph (DAG) of nodes connected by edges. It contains a label, optional description, exactly one root node, zero or more additional nodes, and a flow block.
+A workflow is a directed acyclic graph (DAG) of nodes connected by edges. It contains a label, optional description, exactly one root node, zero or more additional nodes, and an optional `flow { }` block.
 
-**Incorrect (missing required parts):**
+**Incorrect (missing root):**
 
 ```swirls
 workflow my_workflow {
+  label: "My Workflow"
   node step1 {
     type: code
     label: "Step"
@@ -1481,7 +1578,7 @@ workflow my_workflow {
 }
 ```
 
-This fails because there is no `label` and no `root { }` block.
+Every workflow must declare exactly one `root { }` block.
 
 **Correct (complete workflow structure):**
 
@@ -1507,6 +1604,9 @@ workflow my_workflow {
   node process {
     type: code
     label: "Process"
+    schema: @json {
+      { "type": "object", "properties": { "result": { "type": "string" } } }
+    }
     code: @ts {
       const x = context.nodes.root.output.x
       return { result: x }
@@ -1519,12 +1619,41 @@ workflow my_workflow {
 }
 ```
 
-Workflow fields:
-- `label` - Required display name
-- `description` - Optional description
-- `root { }` - Required entry node (exactly one)
-- `node <name> { }` - Additional nodes (zero or more)
-- `flow { }` - Edge declarations connecting nodes
+#### Valid top-level keys inside `workflow { }`
+
+| Key | Required | Notes |
+|-----|----------|-------|
+| `label:` | implicit required | Display string. Defaults to the workflow name if omitted. |
+| `description:` | no | Free-form. |
+| `root { }` | yes | Exactly one; the entry node. Uses `root { }` syntax, not `node root { }`. |
+| `node <name> { }` | no | Zero or more additional nodes. |
+| `flow { }` | no (required if there are edges) | Contains edge declarations. |
+
+#### Constructs that are NOT valid inside `workflow { }`
+
+- `persistence { }` — removed. The parser errors with a migration message. Use a top-level `stream { }` block instead. See `stream-persistence-block` and `resource-stream`.
+- Edge lines at workflow scope (`root -> foo` outside `flow { }`) — parser error: `Edge declarations must be inside a flow { } block`.
+- `stream:` at workflow scope (outside a node) — parser error: `"stream:" is only valid inside a node { } block`.
+- Bare `type:`, `schema:`, `prompt:` at workflow scope — these only belong inside `root { }` or `node { }` bodies.
+
+#### Persistence
+
+To persist a workflow's output, add a **top-level** `stream <name> { }` block that names the workflow. Do not put persistence inside the workflow. See `resource-stream`.
+
+```swirls
+workflow my_workflow { ... }
+
+stream my_workflow_log {
+  workflow: my_workflow
+  version: v1
+  versions: {
+    v1 {
+      schema: @json { ... }
+      prepare: @ts { return { ... } }
+    }
+  }
+}
+```
 
 ---
 
@@ -1656,7 +1785,7 @@ node handle_urgent {
   type: ai
   kind: text
   label: "Handle urgent"
-  model: "gpt-4o-mini"
+  model: "google/gemini-2.5-flash"
   prompt: @ts { return context.nodes.root.output.body }
 }
 
@@ -1686,7 +1815,7 @@ Edge rules:
 
 ### DAG Constraints
 
-Workflows must be directed acyclic workflows (DAGs). The validator enforces no cycles, exactly one root, and valid edge references.
+Workflows must be directed acyclic graphs (DAGs). The validator enforces no cycles, exactly one root, and valid edge references.
 
 **Incorrect (cycle in edges):**
 
@@ -2099,11 +2228,11 @@ AI nodes infer `OPENROUTER_API_KEY` as a secret. You do not need to declare it.
 
 ### Agent Nodes
 
-Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, or overrides `system`.
+Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, runtime knobs, optional sandbox sizing, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, overrides `system`, or constrains structured output with `schema`.
 
-For a one-shot LLM call (no tools, no loop), use `ai` instead. `agent` is for multi-step harnesses with tool use.
+Use `agent` when you need tools, a persistent workspace (read/write/edit/bash/grep/find/ls), multi-step reasoning, or chat. For a one-shot LLM call with no tools and no multi-step work, use `ai` instead.
 
-**Required fields:** `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (`@ts`).
+**Required fields:** `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (`@ts` block or file ref).
 
 #### Incorrect (missing required fields)
 
@@ -2115,6 +2244,19 @@ node ask {
 ```
 
 The validator errors: `Node type "agent" requires "agent"`. The node must reference a declared `agent` block by name.
+
+#### Incorrect (`outputSchema` on a node is a hard parse error)
+
+```swirls
+node ask {
+  type: agent
+  agent: triage
+  prompt: @ts { return "Hi" }
+  outputSchema: @json { { "type": "object" } }
+}
+```
+
+Parse error: `Use "schema" instead of "outputSchema" in node blocks`. Structured output on a node uses `schema:`, never `outputSchema:`. (`outputSchema` is root-only and belongs on workflow roots, not nodes.)
 
 #### Correct (minimal agent node)
 
@@ -2144,7 +2286,7 @@ workflow handle {
 }
 ```
 
-#### Correct (role and narrowed tools)
+#### Correct (role, narrowed tools, structured output)
 
 ```swirls
 node ask {
@@ -2159,20 +2301,48 @@ node ask {
   prompt: @ts {
     return context.nodes.root.input.question
   }
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["answer"],
+      "properties": { "answer": { "type": "string" } }
+    }
+  }
 }
 ```
 
-`role:` must name a `role <name> { }` declared inside the bound `agent` block. `tools:` (on the node) further narrows the tools exposed to this specific call; it must be a subset of the agent block's `tools:`. `system:` overrides the agent's default system prompt for this call only.
+`role:` must name a `role <name> { }` declared inside the bound `agent` block. `system:` overrides the agent's default system prompt for this call only. `schema:` constrains the final structured output; without it the turn returns the plain completion string.
+
+#### System-prompt precedence
+
+System prompt pieces apply low to high: agent `system` (lowest) -> role `system` (if a role is chosen) -> node `system` (highest, wins last for final instructions).
+
+#### Tools (workflows-as-tools only)
+
+Tools are workflows exposed to the LLM. There is no MCP, HTTP, or builtin tool syntax. Each tool workflow must have a non-empty workflow-level `description`, a root-node `inputSchema`, and an output schema on every leaf node. See `resource-agent` for the tool-workflow contract.
+
+Node `tools:` may only narrow within the effective set: the role's tools when a role is chosen and declares `tools:`, otherwise the agent block's `tools:`. It cannot add tools beyond that set.
+
+If the agent block declares a subagent `team:`, each team member is also exposed to the model as a callable tool (delegated to as its own agent). See `resource-agent` for the team contract.
+
+#### Execution shape
+
+A turn runs a tool-call loop capped by the agent's `maxSteps` (default **20**, not 10). Built-in workspace tools (read, write, edit, bash, grep, find, ls) run inside a persistent, per-agent sandbox. Sandbox provisioning is lazy: chat-only turns that never call a tool never start one. Workspace files persist across turns for the same agent. Each subgraph named in the effective `tools:` is exposed to the model using its workflow `description` (tool help text) and root `inputSchema` (call arguments). Tool results are the subgraph's leaf outputs.
+
+#### Persistent chat
+
+Multi-turn chat is not authored in the DSL. Start a persistent transcript with `swirls chat start <agent_name>`; the platform stores history (Postgres) and threads each turn's messages back into the agent. The agent's workspace files persist across turns of the same chat.
 
 #### Fields
 
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
 | `agent` | yes | Bare identifier | Names a top-level `agent <name> { }` block. |
-| `prompt` | yes | `@ts` block | User prompt for this turn. |
+| `prompt` | yes | `@ts` block or file ref | User prompt for this turn. |
 | `role` | no | Bare identifier | Names a `role` declared inside the bound agent block. |
-| `tools` | no | Array of bare identifiers | Subset of the agent block's tool workflows. |
-| `system` | no | `@ts` block | Overrides the agent block's default `system:` for this call. |
+| `tools` | no | Array of bare identifiers | Narrows within the effective tool set (role tools if a role is chosen and declares tools, else agent tools). |
+| `system` | no | `@ts` block | Overrides the agent block's default `system:` for this call (highest precedence). |
+| `schema` | no | `@json` block, named ref, or inline object | Constrains structured final output. Never `outputSchema`. |
 
 Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
 
@@ -2686,7 +2856,7 @@ Multiple top-level keys AND together. Multiple operators on the same key also AN
 
 Filters address two field kinds uniformly:
 
-- **System columns:** `id`, `created_at`, `deployment_id`, `graph_execution_id` — mapped to direct column comparisons on the version table.
+- **System columns:** `id`, `created_at`, `deployment_id`, `workflow_execution_id` — mapped to direct column comparisons on the version table.
 - **Payload fields:** anything else — the fields your `prepare` returned for this version, mapped to the matching column.
 
 You do not need to distinguish; the runtime infers it.
@@ -2778,9 +2948,9 @@ See `resource-stream` for the write side (top-level `stream { }` block declarati
 
 ---
 
-### Workflow Nodes (Subgraphs)
+### Workflow Nodes (Subworkflows)
 
-Workflow nodes call another workflow as a subgraph. The child workflow runs independently with the provided input, and its leaf node outputs become available to downstream nodes.
+`type: workflow` nodes call another workflow as a subworkflow. The child workflow runs independently with the provided input, and its leaf node outputs become available to downstream nodes. (`type: graph` is a legacy alias for `type: workflow`, and the `graph:` reference field is a legacy alias for `workflow:`. Both are normalized to the `workflow` forms.)
 
 **Required fields:** `workflow`, `input`
 
@@ -2794,11 +2964,24 @@ node run_helper {
 }
 ```
 
-Error: "Node type 'workflow' requires 'input'"
+Error: `Node type "workflow" requires "input"`
 
-**Cross-file workflow refs:** `workflow:` may name a `workflow` declared in **another** `.swirls` file. `swirls doctor` builds a workspace index and resolves the name across the tree (single-file / LSP validation still requires the workflow in that file).
+**Incorrect (referencing a workflow in another file):**
 
-**Example (helper workflow in the same file—simplest layout):**
+```swirls
+// helper.swirls defines helper_workflow
+// main.swirls references it
+node run_helper {
+  type: workflow
+  label: "Run helper"
+  workflow: helper_workflow
+  input: @ts { return context.nodes.root.input }
+}
+```
+
+Warning: `swirls doctor` does not resolve cross-file references. It reports `Workflow node references workflow "helper_workflow" which is not defined`. Keep related workflows in the same file.
+
+**Correct (subgraph in same file):**
 
 ```swirls
 workflow helper_workflow {
@@ -2855,13 +3038,17 @@ workflow main_workflow {
 }
 ```
 
-Subgraph output is accessed as `context.nodes.<workflowNodeName>.output.<leafNodeName>`. The leaf node names come from the child workflow.
+Subworkflow output is accessed as `context.nodes.<workflowNodeName>.output.<leafNodeName>`. The leaf node names come from the child workflow.
 
 Workflow node fields:
 | Field | Required | Type |
 |-------|----------|------|
-| `workflow` | yes | Workflow name (workspace-resolvable across `.swirls` files under `swirls doctor`) |
+| `workflow` | yes | Workflow name (resolved across the workspace). Legacy alias: `graph`. |
 | `input` | yes | `@ts` block |
+
+#### Related: map / while inline subgraphs
+
+`type: workflow` runs the child workflow **once**. For per-item iteration over a list, use `type: map` (each item runs the child once). For repeated execution until a condition is false, use `type: while`. Both accept either `workflow: <name>` (the same kind of reference shown above) or an inline `subgraph { ... }` block (no colon) — see `node-map`, `node-while`, and `workflow-subgraph`.
 
 ---
 
@@ -2875,7 +3062,7 @@ A `map` node iterates over an array and runs a child workflow (inline `subgraph 
 - `maxItems` — positive number. Hard cap; the validator rejects unbounded loops.
 - Exactly one of:
   - `subgraph { ... }` — inline child workflow (no colon). The inline form's root must declare `inputSchema`.
-  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That graph's root must declare `inputSchema`.
+  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That workflow's root must declare `inputSchema`.
 
 #### Optional fields
 
@@ -2934,7 +3121,7 @@ node per_ticket {
 }
 ```
 
-#### Referenced graph
+#### Referenced workflow
 
 ```swirls
 workflow normalize_ticket {
@@ -3016,7 +3203,7 @@ A `while` node runs a child workflow (inline `subgraph { }` or referenced `workf
 - `maxIterations` — positive integer. Hard cap to prevent runaway loops.
 - Exactly one of:
   - `subgraph { ... }` — inline child workflow (no colon). The inline form's root must declare `inputSchema`.
-  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That graph's root must declare `inputSchema`.
+  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That workflow's root must declare `inputSchema`.
 
 #### Inline subgraph
 
@@ -4196,8 +4383,8 @@ node result {
   type: code
   label: "Result"
   code: @ts {
-    // run_helper is a workflow node calling helper_graph
-    // helper_graph's root is its leaf node
+    // run_helper is a workflow node calling helper_workflow
+    // helper_workflow's root is its leaf node
     const out = context.nodes.run_helper.output.root
     return { doubled: out.value }
   }
@@ -4213,7 +4400,7 @@ Pattern summary:
 
 ### context.iteration - Map / While Iteration Data
 
-Inside a `map` or `while` node's child workflow (inline `subgraph { }` or referenced `workflow: <name>`), `context.iteration` carries the per-iteration state. The fields available depend on the node type.
+Inside a `map` or `while` node's child graph (inline `subgraph { }` or referenced `workflow: <name>`), `context.iteration` carries the per-iteration state. The fields available depend on the node type.
 
 #### `map` nodes
 
@@ -4344,7 +4531,7 @@ node done {
 - **Treating map output as a flat list** — Each entry is `{ leafName: leafOutput }`, not the leaf output directly. Index by leaf name.
 - **Treating while output as an array** — While runs sequentially; output is `output.lastOutput` (single object), not an array of iterations.
 - **Reading `context.iteration.previous` on iteration 0** — It's `undefined`. Use `?.` or `if (context.iteration.index > 0) { ... }`.
-- **Using `context.nodes.root.input` inside a subgraph** — That's the parent workflow's root input. Use `context.iteration.item` (map) or `context.iteration.input` (while) inside the subgraph.
+- **Using `context.nodes.root.input` inside a subgraph** — That's the parent graph's root input. Use `context.iteration.item` (map) or `context.iteration.input` (while) inside the subgraph.
 - **Mutating `context.iteration.input`** — Treat it as read-only. Return a new object from `update` to advance state.
 
 ---
@@ -4793,7 +4980,7 @@ stream <name> {
   label: "<optional label>"          // defaults to <name>
   description: "<optional string>"
   enabled: <boolean>                  // optional; default treated as true
-  workflow: <workflow_name>                 // required; graph declared in this file
+  workflow: <workflow_name>                 // required; workflow declared in this file
   version: <version_id>               // required; active writer version, must exist in versions:
 
   versions: {
@@ -4821,7 +5008,7 @@ Block-level:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `graph` | yes | Bare identifier naming a workflow in the same file (or merged workspace). |
+| `workflow` | yes | Bare identifier naming a workflow in the same file (or merged workspace). |
 | `version` | yes | Active writer `version_id` (`v1`, …). Must match a key in `versions:`. |
 | `versions` | yes | Non-empty map of `version_id` → `{ schema, condition?, prepare }`. |
 | `label` | no | Defaults to the stream's name. |
@@ -4840,7 +5027,7 @@ Per-version (inside `versions:`):
 
 These `@ts` blocks get a specialized `context`:
 
-- `context.output.<leafNodeName>` — output of each DSL leaf node (node with no outgoing edges). Only leaves that actually executed appear. For a single-node graph, `context.output.root` holds the root output.
+- `context.output.<leafNodeName>` — output of each DSL leaf node (node with no outgoing edges). Only leaves that actually executed appear. For a single-node workflow, `context.output.root` holds the root output.
 - `context.nodes.<name>.input` / `.output` — per-node access for every executed node.
 - `context.nodes.root.input` — the workflow's trigger input.
 - `context.reviews`, `context.secrets`, `context.meta` — as in normal nodes (may be empty on CLI).
@@ -4958,7 +5145,7 @@ See `node-stream` for the full filter operator list.
 #### Validation rules
 
 - Stream names must match `^[a-zA-Z0-9_]+$`. Duplicate names error with `Duplicate stream name "X"`.
-- `graph` is required (`Stream block requires "workflow" (workflow name)`) and must reference a declared graph (`Stream references workflow "X" which is not defined`).
+- `workflow` is required (`Stream block requires "workflow" (workflow name)`) and must reference a declared workflow (`Stream references workflow "X" which is not defined`).
 - `version` is required (`Stream "X" requires "version" (active writer)`), must be a valid `version_id` (`… version pointer "X" is invalid — use v1, v2, …`), and must be declared under `versions:` (`… version "X" is not declared under versions { }`).
 - `versions:` must be non-empty (`Stream "X" requires a non-empty versions { } block`). Duplicate keys error (`… declares duplicate version key "X"`).
 - Each version requires a `schema` (`… version "vN" has no schema; add schema: @json { … } or schema: <name>`) and a non-empty `prepare` (`… version "vN" requires "prepare"`). A present-but-empty `condition` errors too.
@@ -5108,7 +5295,7 @@ trigger <name> {
 }
 ```
 
-The binding is a single syntactic line `<type>:<name> -> <workflowName>`. There are no separate `resource:` / `graph:` fields. `enabled:` is the only other field; everything else is ignored.
+The binding is a single syntactic line `<type>:<name> -> <workflow>`. There are no separate `resource:` / `workflow:` fields. `enabled:` is the only other field; everything else is ignored.
 
 #### Incorrect (wrong syntax)
 
@@ -5125,7 +5312,7 @@ Missing the `-> workflowName` arrow. The trigger silently parses with empty `res
 
 ```swirls
 trigger agent_trigger {
-  agent:my_agent -> my_graph
+  agent:my_agent -> my_workflow
 }
 ```
 
@@ -5501,9 +5688,9 @@ See `node-disk` for the read/exec side.
 
 ### Agent Block Declaration
 
-Top-level `agent <name> { }` blocks declare an LLM agentic harness: which provider and model to use, which secret block holds the API key, a default system prompt, runtime knobs, the tools (subgraphs) the model may call, and zero or more named `role <name> { }` sub-blocks. `type: agent` nodes bind to an agent block by bare identifier.
+Top-level `agent <name> { }` blocks declare an LLM agentic harness: which provider and model to use, which secret block holds the API key, a default system prompt, runtime knobs, optional sandbox sizing, the tools (workflows) the model may call, an optional subagent `team` it may delegate to, and zero or more named `role <name> { }` sub-blocks. `type: agent` nodes bind to an agent block by bare identifier, and `channel` blocks expose an agent on a chat platform.
 
-**There is no `type:` field on an agent block** — the keyword `agent` identifies the block.
+**There is no `type:` field on an agent block** — the keyword `agent` identifies the block. Names must match `^[a-zA-Z0-9_]+$`.
 
 #### Syntax
 
@@ -5512,24 +5699,36 @@ agent <name> {
   label: "<optional>"
   description: "<optional>"
 
-  provider: openrouter | anthropic | openai | google
-  model: "<string>"
-  secrets: <secret_block>             // optional
+  provider: openrouter | anthropic | openai | google   // optional, default openrouter
+  model: "<string>"                                     // REQUIRED quoted string
+  secrets: <secret_block>                               // REQUIRED bare identifier ref
 
-  system: @ts {                       // optional default system prompt
+  system: @ts {                       // optional default system prompt (@ts only)
     return "..."
   }
 
   temperature: <number>               // optional
   maxTokens: <number>                 // optional
-  maxSteps: <number>                  // optional
+  maxSteps: <number>                  // optional; default 20
 
-  tools: [graph_a, graph_b]           // optional; workflows exposed as LLM-callable tools
+  tools: [workflow_a, workflow_b]           // optional; workflows exposed as LLM-callable tools
+  team: [agent_b, agent_c]                  // optional; other agents this one may delegate to
+
+  sandbox: {                          // optional; workspace sizing + lifecycle
+    cpus: 2
+    memoryMiB: 1024
+    diskGiB: 10
+    autoStopMinutes: 15
+    autoArchiveMinutes: 60
+    autoDeleteMinutes: 1440
+    ephemeral: false
+  }
 
   role <role_name> {                  // zero or more roles
     description: "<optional>"
-    tools: [graph_a]                  // optional; subset of agent.tools
+    tools: [workflow_a]                  // optional; SUBSET of agent.tools
     system: @ts { return "..." }      // optional override
+    sandbox: { cpus: 1 }              // optional override
   }
 }
 ```
@@ -5538,17 +5737,46 @@ agent <name> {
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `provider` | yes | Bare identifier: `openrouter`, `anthropic`, `openai`, or `google`. |
-| `model` | yes | Quoted string. |
-| `secrets` | no | Bare identifier naming a top-level `secret` block. |
-| `system` | no | `@ts` block returning the default system prompt. |
+| `model` | yes | Non-empty quoted string. |
+| `secrets` | yes | Bare identifier naming a top-level `secret` block. NOT a string. The block must declare the provider key var. |
+| `provider` | no | Bare identifier: `openrouter` (default), `anthropic`, `openai`, or `google`. |
+| `system` | no | `@ts` block returning the default system prompt. `@ts` only. |
 | `temperature` | no | Number. |
 | `maxTokens` | no | Number. |
-| `maxSteps` | no | Number. Caps how many tool-call turns the agent may take. |
-| `tools` | no | Array of bare identifiers naming workflows in the same workspace. |
-| `role <name> { }` | no | Zero or more named roles. Each may override `system` and narrow `tools`. |
+| `maxSteps` | no | Number. Caps how many tool-call turns the agent may take. Default **20**. |
+| `tools` | no | Array of bare identifiers naming tool workflows in the workspace. |
+| `team` | no | Array of bare identifiers naming other `agent` blocks this agent may delegate to as subagents. See below. |
+| `sandbox: { }` | no | Workspace sizing and lifecycle. See below. |
+| `role <name> { }` | no | Zero or more named roles. Each may override `system`, `sandbox`, and narrow `tools`. |
 | `label` | no | Display string. |
 | `description` | no | Free-form description. |
+
+#### Provider key mapping
+
+The bound `secret` block must declare the env var matching the provider:
+
+| `provider` | Required secret var |
+|------------|---------------------|
+| `openrouter` (default) | `OPENROUTER_API_KEY` |
+| `anthropic` | `ANTHROPIC_API_KEY` |
+| `openai` | `OPENAI_API_KEY` |
+| `google` | `GOOGLE_GENERATIVE_AI_API_KEY` |
+
+#### Sandbox block
+
+The optional `sandbox: { }` block sizes and governs the per-agent persistent workspace (where built-in read/write/edit/bash/grep/find/ls tools run). All fields are optional numbers/booleans:
+
+| Field | Bound | Notes |
+|-------|-------|-------|
+| `cpus` | `>= 1` | vCPU count. |
+| `memoryMiB` | `>= 128` | Memory in MiB. |
+| `diskGiB` | `>= 1` | Disk in GiB. |
+| `autoStopMinutes` | `>= 0` | Idle stop; `0` disables. |
+| `autoArchiveMinutes` | `>= -1` | Idle archive; `-1` disables. |
+| `autoDeleteMinutes` | `>= -1` | Idle delete; `-1` disables. |
+| `ephemeral` | boolean | Discard workspace after the turn. |
+
+Out-of-bounds values error with `Agent "<name>": sandbox.<field> must be ...`.
 
 #### Complete example
 
@@ -5559,6 +5787,7 @@ secret ai_creds {
 
 workflow search_kb {
   label: "Search KB"
+  description: "Search the knowledge base for relevant articles."
   root {
     type: code
     label: "Search"
@@ -5574,6 +5803,7 @@ workflow search_kb {
 
 workflow escalate {
   label: "Escalate"
+  description: "Escalate a ticket to a senior engineer and return the new ticket id."
   root {
     type: code
     label: "Escalate"
@@ -5592,9 +5822,16 @@ agent triage {
   provider: openai
   model: "gpt-4o"
   secrets: ai_creds
-  maxSteps: 5
+  maxSteps: 8
   temperature: 0.2
   tools: [search_kb, escalate]
+
+  sandbox: {
+    cpus: 2
+    memoryMiB: 1024
+    diskGiB: 10
+    autoStopMinutes: 15
+  }
 
   system: @ts {
     return "You are a support triage agent. Use tools to resolve tickets."
@@ -5628,16 +5865,203 @@ workflow handle_ticket {
 }
 ```
 
+#### Tool workflows (workflows-as-tools only)
+
+Tools are workflows exposed to the model. There is no MCP, HTTP, or builtin tool syntax. Each entry in `tools: [ … ]` must name a workflow in the workspace that:
+
+- Has a non-empty workflow-level `description:` (fed to the model as tool help text).
+- Has a root node with JSON `inputSchema` (defines the tool call arguments).
+- Has an output schema on **every leaf node** (`outputSchema` on the root if it is a leaf, or `schema` on non-root leaves).
+
+Built-in workspace tools (read, write, edit, bash, grep, find, ls) are always available inside the sandbox and are not declared in `tools:`.
+
+#### Subagent teams
+
+`team: [ … ]` lists other `agent` blocks this agent may delegate to. Each team member becomes a callable tool: the model invokes it with a task description, the member runs as its own agent (own model, tools, and sandbox), and returns its result to the caller. Use teams to compose specialists behind one orchestrator instead of giving a single agent every tool and instruction.
+
+```swirls
+agent researcher {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  tools: [search_kb]
+  system: @ts { return "Research the question and return concise findings with sources." }
+}
+
+agent writer {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  system: @ts { return "Turn findings into clear, well-structured prose." }
+}
+
+agent orchestrator {
+  secrets: vendor_keys
+  model: "google/gemini-3.1-flash-lite"
+  maxSteps: 16
+  team: [researcher, writer]
+  system: @ts {
+    return [
+      "You coordinate specialists.",
+      "Call a team tool with a clear task describing what to do.",
+      "Relay the specialist's answer plainly.",
+    ].join("\n")
+  }
+}
+```
+
+Team members are referenced by bare identifier (not a quoted string). A `team` member becomes a tool alongside the agent's `tools` workflows, so their names share one namespace.
+
 #### Validation rules
 
 - Agent names must match `^[a-zA-Z0-9_]+$`. Duplicate names error.
-- `provider` must be one of the four allowed values.
-- `model` must be a non-empty quoted string.
-- Every entry in `tools:` must name a workflow defined in the workspace.
-- Every `role <name> { }` must have a unique name within the agent block. Each role's `tools:` must be a subset of the agent's top-level `tools:`.
+- `model` must be a non-empty quoted string. `secrets` is required and is a bare identifier, not a string.
+- `provider`, if present, must be one of the four allowed values; it defaults to `openrouter`.
+- Every entry in `tools:` must name a tool workflow defined in the workspace.
+- Every entry in `team:` must name a defined `agent` block in the workspace. An agent cannot list itself, a team member name cannot collide with a `tools:` workflow name in the same agent, and teams cannot form a cycle (`a -> b -> a` is rejected, as is any longer loop).
+- Every `role <name> { }` must have a unique name within the agent block. Each role's `tools:` must be a SUBSET of the agent's top-level `tools:`.
+- `sandbox.<field>` values must satisfy the bounds above.
 - `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `role:`, it must name a declared role in that block.
 
 See `node-agent` for the binding side.
+
+---
+
+### Channel Block Declaration
+
+Top-level `channel <name> { }` blocks bind an `agent` block to a chat platform. Once a channel is enabled, the agent answers messages on that platform: each inbound message starts an agent turn and the agent's reply is posted back to the conversation. The same agent block can simultaneously back a `type: agent` node, a `swirls chat` session, and one or more channels.
+
+**There is no `type:` field on a channel block** — the keyword `channel` identifies the block. A channel is not a node and cannot appear inside a workflow's `flow { }`.
+
+#### Syntax
+
+```swirls
+channel <name> {
+  platform: slack | linear | discord | web    // required
+  integration: slack | linear | discord | web  // required; must equal platform
+  agent: <agent_name>                           // required; bare identifier
+  mode: mention | dm | all                      // optional; defaults to mention
+  enabled: true | false                         // optional; defaults to enabled
+  label: "<optional label>"
+  description: "<optional description>"
+}
+```
+
+`platform`, `integration`, and `mode` take **bare keyword values** (not quoted strings). `agent` is a **bare identifier** naming a top-level `agent` block, not a quoted string.
+
+#### Required vs optional fields
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `platform` | yes | Bare value. One of `slack`, `linear`, `discord`, `web`. Where messages are delivered. |
+| `integration` | yes | Bare value. Credential source for the binding. **Must equal `platform`.** |
+| `agent` | yes | Bare identifier naming an `agent` block (same file or another file in the workspace). |
+| `mode` | no | Bare value `mention` (default), `dm`, or `all`. Controls which inbound events reach the agent. |
+| `enabled` | no | Boolean. `false` makes the binding inactive. Defaults to enabled. |
+| `label` | no | Display string shown in the Portal. |
+| `description` | no | Description shown in the Portal. |
+
+#### Platforms and modes
+
+| `platform` | Where the agent runs |
+|------------|----------------------|
+| `slack` | Slack channels and DMs. |
+| `linear` | Linear issues and comments. |
+| `discord` | Discord servers and DMs. |
+| `web` | The embedded web chat surface. |
+
+| `mode` | The agent responds to |
+|--------|-----------------------|
+| `mention` (default) | Only messages that @-mention the agent. |
+| `dm` | Only direct messages. |
+| `all` | Both mentions and direct messages. |
+
+The `web` surface typically uses `mode: dm`.
+
+**Correct (one agent, two surfaces):**
+
+```swirls
+secret vendor_keys {
+  vars: [ OPENROUTER_API_KEY ]
+}
+
+agent concierge {
+  label: "Concierge"
+  secrets: vendor_keys
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  maxSteps: 8
+  system: @ts {
+    return "You are a helpful concierge. Prefer tools over guessing."
+  }
+}
+
+channel slack_concierge {
+  label: "Concierge (Slack)"
+  platform: slack
+  integration: slack
+  agent: concierge
+  mode: mention
+  enabled: true
+}
+
+channel web_concierge {
+  label: "Concierge (Web)"
+  platform: web
+  integration: web
+  agent: concierge
+  mode: dm
+  enabled: true
+}
+```
+
+#### Routing uniqueness
+
+The runtime routes an inbound event by the tuple `platform : mode : agent`. **Two enabled channels cannot share the same tuple** — the runtime would not know which binding wins. A disabled channel (`enabled: false`) does not count, so an inactive duplicate is allowed.
+
+```swirls
+// Valid: same platform + mode, different agents.
+channel slack_concierge { platform: slack  integration: slack  agent: concierge  mode: mention }
+channel slack_researcher { platform: slack  integration: slack  agent: researcher  mode: mention }
+```
+
+```swirls
+// Invalid: two enabled bindings for slack:mention:concierge.
+channel a { platform: slack  integration: slack  agent: concierge  mode: mention }
+channel b { platform: slack  integration: slack  agent: concierge  mode: mention }
+```
+
+#### Common mistakes
+
+**`platform` and `integration` mismatch.** The two fields must be equal.
+
+```swirls
+// Incorrect
+channel bad { platform: slack  integration: web  agent: concierge }
+```
+
+```swirls
+// Correct
+channel good { platform: slack  integration: slack  agent: concierge }
+```
+
+**`agent` as a quoted string.** It is a bare identifier naming an `agent` block.
+
+```swirls
+// Incorrect
+channel bad { platform: web  integration: web  agent: "concierge" }
+```
+
+```swirls
+// Correct
+channel good { platform: web  integration: web  agent: concierge }
+```
+
+#### Validation diagnostics
+
+- `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
+- `Channel "<n>" platform "<p>" must match integration "<i>"` — set `integration` equal to `platform`.
+- `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — change `mode`, point one at a different agent, or disable one.
+
+See `resource-agent` for the `agent` block (including subagent `team`).
 
 
 # 9. Streams
@@ -5839,7 +6263,7 @@ These are the first-class columns exposed on every stream row.
 | `id` | identifier | Row id. |
 | `created_at` | timestamp | When the row was persisted. |
 | `deployment_id` | string | Deployment that wrote the row. |
-| `graph_execution_id` | string | Execution that produced the row. |
+| `workflow_execution_id` | string | Execution that produced the row. |
 
 Use them directly in the filter object:
 
@@ -6314,7 +6738,7 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 - [ ] Every `code` node has a `code` field
 - [ ] Every `switch` node has `cases` and `router` fields
 - [ ] Every `http` node has a `url` field
-- [ ] Every `workflow` node has `graph` and `input` fields
+- [ ] Every `workflow` node has `workflow` and `input` fields
 - [ ] Every `bucket` node has an `operation` field
 - [ ] Every `disk` node has `disk` and `command` fields
 - [ ] Every `postgres` node has a `postgres` field and exactly one of `select` or `insert`
@@ -6364,7 +6788,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 #### Nodes (general)
 
-- `Invalid node type "<t>". Must be one of: ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while` — Unknown type name. Use one of the 16.
+- `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow` — Unknown type name. Use one of the 16. (`graph` is accepted as a legacy alias and normalized to `workflow`, so it never trips this error.)
 - `Node type "<t>" requires "<field>"` — Missing required field. See the node-type rule for the required set.
 
 #### Secrets map
@@ -6436,7 +6860,7 @@ Required keys: `stream`, `version`, `filter`.
 - `Invalid ai kind "<k>". Must be one of: text, object, image, video, embed` — Fix the `kind:` value.
 - Warning: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` — Either drop the schema or change kind.
 
-#### Workflow (subgraph) nodes
+#### Workflow (subworkflow) nodes
 
 - `Workflow node requires "workflow"` — Add `workflow: <name>`.
 - `Workflow node references workflow "<n>" which is not defined` — Fix the name or declare the child workflow.
@@ -6506,4 +6930,25 @@ Required keys: `stream`, `version`, `filter`.
 #### Review
 
 - `review: <path> — <message>` — The review block didn't match the schema (e.g. bad action outcome, missing required field). Fix per the message.
+
+#### Agents (and subagent teams)
+
+- `Duplicate agent block name "<n>"` — Two `agent` blocks share a name.
+- `Invalid agent provider "<p>". Must be one of: openrouter, anthropic, openai, google` — Fix the `provider:` value.
+- `Agent block requires a non-empty model field` — Add `model: "..."`.
+- `Agent "<n>" references undefined secret block "<b>"` — `secrets:` must name a declared `secret` block.
+- `Agent "<n>" secret block must declare "<VAR>" for provider "<p>"` — The provider needs its vendor key (e.g. `OPENROUTER_API_KEY`) listed in the referenced secret block's `vars`.
+- `Workflow "<n>" is used as an agent tool but the workflow-level description field is missing or empty` — A tool workflow needs a non-empty top-level `description:`.
+- `Agent tool workflow "<n>" must declare inputSchema on the root node` — Add `inputSchema` to the tool workflow's `root`.
+- `Agent tool workflow "<n>" requires output schema on leaf node "<leaf>"` — Every leaf node of a tool workflow needs a `schema`/`outputSchema`.
+- `Agent "<n>" cannot include itself in team:` — Remove the self-reference.
+- `Agent "<n>" team member "<m>" is not defined in the workspace` — `team:` must name declared `agent` blocks.
+- `Agent "<n>" team member "<m>" conflicts with a workflow tool of the same name` — A `team` member and a `tools` workflow share a name; rename one.
+- `Agent team contains a cycle: a -> b -> a` — Subagent delegation must not form a loop.
+
+#### Channels
+
+- `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
+- `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`.
+- `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — Two enabled channels share the same `platform : mode : agent` tuple. Change `mode`, point one at a different agent, or set `enabled: false` on one.
 

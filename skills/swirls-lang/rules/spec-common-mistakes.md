@@ -182,7 +182,7 @@ Conditional routing requires a switch node with labeled edges.
 ```swirls
 import { utils } from "./helpers"
 
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root {
     type: code
@@ -195,7 +195,7 @@ workflow my_graph {
 **Correct:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root {
     type: code
@@ -342,7 +342,7 @@ node per_item {
 }
 ```
 
-There are exactly 16 node types: `ai`, `agent`, `bucket`, `code`, `disk`, `email`, `graph`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`. Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
+There are exactly 16 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
 
 ### 12. Missing label on workflow or node
 
@@ -351,7 +351,7 @@ Labels default to the block name, so this parses, but best practice is to set an
 **Sub-optimal:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   root {
     type: code
     code: @ts { return {} }
@@ -362,7 +362,7 @@ workflow my_graph {
 **Correct:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root {
     type: code
@@ -377,7 +377,7 @@ workflow my_graph {
 **Incorrect:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root { type: code label: "Entry" code: @ts { return {} } }
   node step { type: code label: "Step" code: @ts { return {} } }
@@ -390,7 +390,7 @@ The parser emits: `Edge declarations must be inside a flow { } block`.
 **Correct:**
 
 ```swirls
-workflow my_graph {
+workflow my_workflow {
   label: "My Workflow"
   root { type: code label: "Entry" code: @ts { return {} } }
   node step { type: code label: "Step" code: @ts { return {} } }
@@ -560,7 +560,7 @@ Stream nodes reference a stream block by bare identifier (not a string), pin a `
 
 ```swirls
 trigger agent_trigger {
-  agent:my_agent -> my_graph
+  agent:my_agent -> my_workflow
 }
 ```
 
@@ -570,7 +570,7 @@ There is no `agent` trigger type. Only `form`, `webhook`, and `schedule` are val
 
 ```swirls
 trigger on_submission {
-  form:contact_form -> my_graph
+  form:contact_form -> my_workflow
   enabled: true
 }
 ```
@@ -583,7 +583,7 @@ trigger on_submission {
 trigger my_trigger {
   resource: contact_form
   resourceType: form
-  workflow: my_graph
+  workflow: my_workflow
 }
 ```
 
@@ -591,12 +591,12 @@ trigger my_trigger {
 
 ```swirls
 trigger my_trigger {
-  form:contact_form -> my_graph
+  form:contact_form -> my_workflow
   enabled: true
 }
 ```
 
-The binding is a single syntactic line `<type>:<name> -> <workflowName>`. No separate fields.
+The binding is a single syntactic line `<type>:<name> -> <workflow>`. No separate fields.
 
 ### 21. Using an array for `secrets:`
 
@@ -631,7 +631,7 @@ node call_api {
 ```swirls
 node call_helper {
   type: workflow
-  workflow: "helper_graph"
+  workflow: "helper_workflow"
   input: @ts { return {} }
 }
 ```
@@ -641,12 +641,12 @@ node call_helper {
 ```swirls
 node call_helper {
   type: workflow
-  workflow: helper_graph
+  workflow: helper_workflow
   input: @ts { return {} }
 }
 ```
 
-`workflow:` on a workflow node, `stream:` on a stream node, `postgres:` on a postgres node, and `auth:` on an http node all take **bare identifiers**, not quoted strings. (Bare identifiers are parsed as string values, so `"helper_graph"` also works, but convention is bare.)
+`workflow:` on a workflow node, `stream:` on a stream node, `postgres:` on a postgres node, and `auth:` on an http node all take **bare identifiers**, not quoted strings. (Bare identifiers are parsed as string values, so `"helper_workflow"` also works, but convention is bare.)
 
 ### 23. Hyphenated or non-alphanumeric resource name
 
@@ -771,7 +771,7 @@ node each_item {
 
 See `workflow-subgraph`.
 
-### 27. Map / while node with both `subgraph { }` `and `workflow:`
+### 27. Map / while node with both `subgraph { }` and `workflow:`
 
 **Incorrect:**
 
@@ -780,7 +780,7 @@ node each_item {
   type: map
   items: @ts { return [] }
   maxItems: 10
-  workflow: helper_graph
+  workflow: helper_workflow
   subgraph {
     root { type: code code: @ts { return {} } }
   }
@@ -950,3 +950,60 @@ workflow handle {
 ```
 
 The bare identifier (`contact_payload`) references the top-level `schema` block. See `resource-schema`.
+
+### 33. Channel `platform` and `integration` mismatch
+
+A `channel` block's `integration` must equal its `platform`. They are separate fields (surface vs credential source) but a mismatch is rejected.
+
+**Incorrect:**
+
+```swirls
+channel concierge_slack {
+  platform: slack
+  integration: web      // mismatch
+  agent: concierge
+}
+```
+
+Error: `Channel "concierge_slack" platform "slack" must match integration "web"`.
+
+**Correct:**
+
+```swirls
+channel concierge_slack {
+  platform: slack
+  integration: slack
+  agent: concierge
+  mode: mention
+}
+```
+
+Also: `platform`, `integration`, and `mode` are bare keyword values, and `agent:` is a bare identifier naming an `agent` block (not a quoted string). Two enabled channels cannot share the same `platform : mode : agent` tuple. See `resource-channel`.
+
+### 34. Agent `team` that references itself or forms a cycle
+
+`team: [ … ]` names other `agent` blocks as subagents. An agent cannot list itself, a team member cannot collide with one of the agent's `tools:` workflow names, and the delegation chain cannot contain a cycle.
+
+**Incorrect:**
+
+```swirls
+agent orchestrator {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  team: [orchestrator]   // self-reference
+}
+```
+
+Error: `Agent "orchestrator" cannot include itself in team:`. A loop such as `a -> b -> a` errors with `Agent team contains a cycle: a -> b -> a`.
+
+**Correct:**
+
+```swirls
+agent orchestrator {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  team: [researcher, writer]
+}
+```
+
+Team members are bare identifiers, not quoted strings. See `resource-agent`.

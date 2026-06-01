@@ -19,7 +19,7 @@ stream <name> {
   label: "<optional label>"          // defaults to <name>
   description: "<optional string>"
   enabled: <boolean>                  // optional; default treated as true
-  workflow: <workflow_name>                 // required; graph declared in this file
+  workflow: <workflow_name>                 // required; workflow declared in this file
   version: <version_id>               // required; active writer version, must exist in versions:
 
   versions: {
@@ -47,7 +47,7 @@ Block-level:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `graph` | yes | Bare identifier naming a workflow in the same file (or merged workspace). |
+| `workflow` | yes | Bare identifier naming a workflow in the same file (or merged workspace). |
 | `version` | yes | Active writer `version_id` (`v1`, …). Must match a key in `versions:`. |
 | `versions` | yes | Non-empty map of `version_id` → `{ schema, condition?, prepare }`. |
 | `label` | no | Defaults to the stream's name. |
@@ -66,7 +66,7 @@ Per-version (inside `versions:`):
 
 These `@ts` blocks get a specialized `context`:
 
-- `context.output.<leafNodeName>` — output of each DSL leaf node (node with no outgoing edges). Only leaves that actually executed appear. For a single-node graph, `context.output.root` holds the root output.
+- `context.output.<leafNodeName>` — output of each DSL leaf node (node with no outgoing edges). Only leaves that actually executed appear. For a single-node workflow, `context.output.root` holds the root output.
 - `context.nodes.<name>.input` / `.output` — per-node access for every executed node.
 - `context.nodes.root.input` — the workflow's trigger input.
 - `context.reviews`, `context.secrets`, `context.meta` — as in normal nodes (may be empty on CLI).
@@ -184,7 +184,7 @@ See `node-stream` for the full filter operator list.
 ### Validation rules
 
 - Stream names must match `^[a-zA-Z0-9_]+$`. Duplicate names error with `Duplicate stream name "X"`.
-- `graph` is required (`Stream block requires "workflow" (workflow name)`) and must reference a declared graph (`Stream references workflow "X" which is not defined`).
+- `workflow` is required (`Stream block requires "workflow" (workflow name)`) and must reference a declared workflow (`Stream references workflow "X" which is not defined`).
 - `version` is required (`Stream "X" requires "version" (active writer)`), must be a valid `version_id` (`… version pointer "X" is invalid — use v1, v2, …`), and must be declared under `versions:` (`… version "X" is not declared under versions { }`).
 - `versions:` must be non-empty (`Stream "X" requires a non-empty versions { } block`). Duplicate keys error (`… declares duplicate version key "X"`).
 - Each version requires a `schema` (`… version "vN" has no schema; add schema: @json { … } or schema: <name>`) and a non-empty `prepare` (`… version "vN" requires "prepare"`). A present-but-empty `condition` errors too.

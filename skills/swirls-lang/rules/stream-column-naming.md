@@ -17,7 +17,7 @@ These are the first-class columns exposed on every stream row.
 | `id` | identifier | Row id. |
 | `created_at` | timestamp | When the row was persisted. |
 | `deployment_id` | string | Deployment that wrote the row. |
-| `graph_execution_id` | string | Execution that produced the row. |
+| `workflow_execution_id` | string | Execution that produced the row. |
 
 Use them directly in the filter object:
 

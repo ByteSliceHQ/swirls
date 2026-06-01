@@ -29,7 +29,7 @@ trigger <name> {
 }
 ```
 
-The binding is a single syntactic line `<type>:<name> -> <workflowName>`. There are no separate `resource:` / `graph:` fields. `enabled:` is the only other field; everything else is ignored.
+The binding is a single syntactic line `<type>:<name> -> <workflow>`. There are no separate `resource:` / `workflow:` fields. `enabled:` is the only other field; everything else is ignored.
 
 ### Incorrect (wrong syntax)
 
@@ -46,7 +46,7 @@ Missing the `-> workflowName` arrow. The trigger silently parses with empty `res
 
 ```swirls
 trigger agent_trigger {
-  agent:my_agent -> my_graph
+  agent:my_agent -> my_workflow
 }
 ```
 

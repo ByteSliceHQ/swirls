@@ -35,7 +35,7 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 - [ ] Every `code` node has a `code` field
 - [ ] Every `switch` node has `cases` and `router` fields
 - [ ] Every `http` node has a `url` field
-- [ ] Every `workflow` node has `graph` and `input` fields
+- [ ] Every `workflow` node has `workflow` and `input` fields
 - [ ] Every `bucket` node has an `operation` field
 - [ ] Every `disk` node has `disk` and `command` fields
 - [ ] Every `postgres` node has a `postgres` field and exactly one of `select` or `insert`

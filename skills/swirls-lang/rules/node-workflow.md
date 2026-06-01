@@ -1,12 +1,12 @@
 ---
-title: Workflow Nodes (Subgraphs)
+title: Workflow Nodes (Subworkflows)
 impact: HIGH
-tags: node, workflow, subgraph, input, output
+tags: node, workflow, graph, subgraph, input, output
 ---
 
-## Workflow Nodes (Subgraphs)
+## Workflow Nodes (Subworkflows)
 
-Workflow nodes call another workflow as a subgraph. The child workflow runs independently with the provided input, and its leaf node outputs become available to downstream nodes.
+`type: workflow` nodes call another workflow as a subworkflow. The child workflow runs independently with the provided input, and its leaf node outputs become available to downstream nodes. (`type: graph` is a legacy alias for `type: workflow`, and the `graph:` reference field is a legacy alias for `workflow:`. Both are normalized to the `workflow` forms.)
 
 **Required fields:** `workflow`, `input`
 
@@ -20,11 +20,24 @@ node run_helper {
 }
 ```
 
-Error: "Node type 'workflow' requires 'input'"
+Error: `Node type "workflow" requires "input"`
 
-**Cross-file workflow refs:** `workflow:` may name a `workflow` declared in **another** `.swirls` file. `swirls doctor` builds a workspace index and resolves the name across the tree (single-file / LSP validation still requires the workflow in that file).
+**Incorrect (referencing a workflow in another file):**
 
-**Example (helper workflow in the same file—simplest layout):**
+```swirls
+// helper.swirls defines helper_workflow
+// main.swirls references it
+node run_helper {
+  type: workflow
+  label: "Run helper"
+  workflow: helper_workflow
+  input: @ts { return context.nodes.root.input }
+}
+```
+
+Warning: `swirls doctor` does not resolve cross-file references. It reports `Workflow node references workflow "helper_workflow" which is not defined`. Keep related workflows in the same file.
+
+**Correct (subgraph in same file):**
 
 ```swirls
 workflow helper_workflow {
@@ -81,10 +94,14 @@ workflow main_workflow {
 }
 ```
 
-Subgraph output is accessed as `context.nodes.<workflowNodeName>.output.<leafNodeName>`. The leaf node names come from the child workflow.
+Subworkflow output is accessed as `context.nodes.<workflowNodeName>.output.<leafNodeName>`. The leaf node names come from the child workflow.
 
 Workflow node fields:
 | Field | Required | Type |
 |-------|----------|------|
-| `workflow` | yes | Workflow name (workspace-resolvable across `.swirls` files under `swirls doctor`) |
+| `workflow` | yes | Workflow name (resolved across the workspace). Legacy alias: `graph`. |
 | `input` | yes | `@ts` block |
+
+### Related: map / while inline subgraphs
+
+`type: workflow` runs the child workflow **once**. For per-item iteration over a list, use `type: map` (each item runs the child once). For repeated execution until a condition is false, use `type: while`. Both accept either `workflow: <name>` (the same kind of reference shown above) or an inline `subgraph { ... }` block (no colon) — see `node-map`, `node-while`, and `workflow-subgraph`.

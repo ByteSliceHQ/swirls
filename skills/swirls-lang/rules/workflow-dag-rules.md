@@ -6,7 +6,7 @@ tags: workflow, dag, cycle, validation, edges
 
 ## DAG Constraints
 
-Workflows must be directed acyclic workflows (DAGs). The validator enforces no cycles, exactly one root, and valid edge references.
+Workflows must be directed acyclic graphs (DAGs). The validator enforces no cycles, exactly one root, and valid edge references.
 
 **Incorrect (cycle in edges):**
 

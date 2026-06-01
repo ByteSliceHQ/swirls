@@ -69,8 +69,8 @@ node result {
   type: code
   label: "Result"
   code: @ts {
-    // run_helper is a workflow node calling helper_graph
-    // helper_graph's root is its leaf node
+    // run_helper is a workflow node calling helper_workflow
+    // helper_workflow's root is its leaf node
     const out = context.nodes.run_helper.output.root
     return { doubled: out.value }
   }

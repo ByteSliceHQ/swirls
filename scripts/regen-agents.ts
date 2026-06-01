@@ -25,7 +25,13 @@ const sections: Record<string, Section> = {
   },
   workflow: {
     title: '3. Workflow & Node Basics',
-    ordered: ['workflow-anatomy', 'workflow-root-node', 'workflow-flow-block', 'workflow-dag-rules', 'workflow-subgraph'],
+    ordered: [
+      'workflow-anatomy',
+      'workflow-root-node',
+      'workflow-flow-block',
+      'workflow-dag-rules',
+      'workflow-subgraph',
+    ],
   },
   node: {
     title: '4. Node Types',
@@ -84,6 +90,7 @@ const sections: Record<string, Section> = {
       'resource-postgres',
       'resource-disk',
       'resource-agent',
+      'resource-channel',
     ],
   },
   stream: {
@@ -145,7 +152,7 @@ const header =
   `# Swirls Language - Complete Reference\n\n` +
   `> Comprehensive guide for authoring \`.swirls\` workflow files. Compiled from the individual rule files under \`rules/\`.\n>\n` +
   `> **Source of truth lives in \`rules/\`.** This file is regenerated from those rules by \`scripts/regen-agents.ts\`. When in doubt, defer to \`rules/spec-strict-syntax.md\` and \`rules/spec-common-mistakes.md\`.\n>\n` +
-  `> Current scope: **16 node types** (\`ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while\`), **12 top-level declarations** (\`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent\`), inline \`subgraph { }\` for map/while, form \`visibility public | internal\`, webhook shared-secret \`secret:\` + \`header:\`, top-level \`schema <name> { }\` blocks referenced by bare identifier, and \`context.iteration.*\` (item/index/input/previous) for map/while subgraphs.\n\n`
+  `> Current scope: **16 node types** (\`agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow\`; \`graph\` is a legacy alias for \`workflow\`), **13 top-level declarations** (\`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel\`), inline \`subgraph { }\` for map/while, form \`visibility public | internal\`, webhook shared-secret \`secret:\` + \`header:\`, top-level \`schema <name> { }\` blocks referenced by bare identifier, \`context.iteration.*\` (item/index/input/previous) for map/while subgraphs, agent subagent \`team\`, and \`channel\` blocks binding an agent to Slack / Linear / Discord / web.\n\n`
 
 const warnings: string[] = []
 const sectionBlocks: string[] = [header]

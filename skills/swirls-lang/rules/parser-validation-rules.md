@@ -25,7 +25,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 ### Nodes (general)
 
-- `Invalid node type "<t>". Must be one of: ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while` — Unknown type name. Use one of the 16.
+- `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow` — Unknown type name. Use one of the 16. (`graph` is accepted as a legacy alias and normalized to `workflow`, so it never trips this error.)
 - `Node type "<t>" requires "<field>"` — Missing required field. See the node-type rule for the required set.
 
 ### Secrets map
@@ -97,7 +97,7 @@ Required keys: `stream`, `version`, `filter`.
 - `Invalid ai kind "<k>". Must be one of: text, object, image, video, embed` — Fix the `kind:` value.
 - Warning: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` — Either drop the schema or change kind.
 
-### Workflow (subgraph) nodes
+### Workflow (subworkflow) nodes
 
 - `Workflow node requires "workflow"` — Add `workflow: <name>`.
 - `Workflow node references workflow "<n>" which is not defined` — Fix the name or declare the child workflow.
@@ -167,3 +167,24 @@ Required keys: `stream`, `version`, `filter`.
 ### Review
 
 - `review: <path> — <message>` — The review block didn't match the schema (e.g. bad action outcome, missing required field). Fix per the message.
+
+### Agents (and subagent teams)
+
+- `Duplicate agent block name "<n>"` — Two `agent` blocks share a name.
+- `Invalid agent provider "<p>". Must be one of: openrouter, anthropic, openai, google` — Fix the `provider:` value.
+- `Agent block requires a non-empty model field` — Add `model: "..."`.
+- `Agent "<n>" references undefined secret block "<b>"` — `secrets:` must name a declared `secret` block.
+- `Agent "<n>" secret block must declare "<VAR>" for provider "<p>"` — The provider needs its vendor key (e.g. `OPENROUTER_API_KEY`) listed in the referenced secret block's `vars`.
+- `Workflow "<n>" is used as an agent tool but the workflow-level description field is missing or empty` — A tool workflow needs a non-empty top-level `description:`.
+- `Agent tool workflow "<n>" must declare inputSchema on the root node` — Add `inputSchema` to the tool workflow's `root`.
+- `Agent tool workflow "<n>" requires output schema on leaf node "<leaf>"` — Every leaf node of a tool workflow needs a `schema`/`outputSchema`.
+- `Agent "<n>" cannot include itself in team:` — Remove the self-reference.
+- `Agent "<n>" team member "<m>" is not defined in the workspace` — `team:` must name declared `agent` blocks.
+- `Agent "<n>" team member "<m>" conflicts with a workflow tool of the same name` — A `team` member and a `tools` workflow share a name; rename one.
+- `Agent team contains a cycle: a -> b -> a` — Subagent delegation must not form a loop.
+
+### Channels
+
+- `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
+- `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`.
+- `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — Two enabled channels share the same `platform : mode : agent` tuple. Change `mode`, point one at a different agent, or set `enabled: false` on one.

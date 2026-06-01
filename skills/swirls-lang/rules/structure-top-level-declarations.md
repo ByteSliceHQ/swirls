@@ -1,24 +1,24 @@
 ---
 title: Top-Level Declarations
 impact: HIGH
-tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent
+tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel
 ---
 
 ## Top-Level Declarations
 
-A `.swirls` file contains twelve kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains thirteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
 ```swirls
 import { helper } from "./utils.swirls"
 
-export workflow my_graph {
+export workflow my_workflow {
   // ...
 }
 ```
 
-The parser errors: `Unexpected token: expected schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, or agent`.
+The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, or schema`.
 
 **Correct (all top-level declarations demonstrated):**
 
@@ -97,22 +97,39 @@ trigger on_contact {
   form:contact -> process
   enabled: true
 }
+
+agent concierge {
+  label: "Concierge"
+  secrets: api_creds
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+}
+
+channel concierge_web {
+  label: "Concierge (Web)"
+  platform: web
+  agent: concierge
+  integration: web
+  mode: dm
+  enabled: true
+}
 ```
 
-### The twelve valid top-level blocks
+### The thirteen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
 - `webhook <name> { }` — HTTP endpoints for external payloads. See `resource-webhook`.
 - `schedule <name> { }` — Cron-based triggers. See `resource-schedule`.
-- `workflow <name> { }` — Workflow DAGs. See `workflow-anatomy`.
+- `workflow <name> { }` — Workflow DAGs (legacy keyword: `graph`). See `workflow-anatomy`.
 - `stream <name> { }` — Persist a workflow's output as typed records. See `resource-stream`.
 - `trigger <name> { }` — Binds resources to workflows. See `resource-trigger-binding`.
 - `secret <name> { }` — Named groups of secret var identifiers. See `resource-secrets`.
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.
 - `postgres <name> { }` — External PostgreSQL connection and table schemas. See `resource-postgres`.
 - `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
-- `agent <name> { }` — LLM agent definition (provider, model, tools, roles); `type: agent` nodes bind to it. See `resource-agent`.
+- `agent <name> { }` — LLM agent definition (provider, model, tools, roles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
+- `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 
 ### Version line
 

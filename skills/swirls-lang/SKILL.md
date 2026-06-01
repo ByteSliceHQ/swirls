@@ -4,12 +4,12 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "5.0.0"
+  version: "4.2.0"
 ---
 
 # Swirls Language
 
-Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations, all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / schema / disk / agent blocks, reviews, failure policies, and known parser pitfalls.
+Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / schema / disk / agent / channel blocks, agent subagent teams, reviews, failure policies, and known parser pitfalls.
 
 ## When to Apply
 
@@ -22,6 +22,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - Configuring form `visibility` (`public` / `internal`) and webhook shared-secret auth (`secret:` + `header:`).
 - Building per-item iteration with `map` nodes or counter/condition loops with `while` nodes (inline `subgraph { }` or referenced `workflow: <name>`).
 - Persisting workflow output with versioned top-level `stream { }` blocks and reading it with version-pinned `type: stream` nodes.
+- Declaring `agent` blocks (with tools, roles, and subagent `team`) and binding them to chat platforms with `channel` blocks.
 - Configuring human-in-the-loop review blocks.
 - Declaring external Postgres databases and writing parameterized SQL nodes.
 
@@ -36,7 +37,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 | 5 | TypeScript Blocks | CRITICAL | `ts-` | @ts patterns, sandbox limits, safe code |
 | 6 | Schema & Typing | HIGH | `schema-` | JSON Schema, inputSchema/outputSchema/schema placement, bare-identifier refs to top-level `schema` blocks |
 | 7 | Context Object | HIGH | `context-` | context.nodes, context.reviews, context.secrets, context.meta, context.iteration |
-| 8 | Resources & Triggers | HIGH | `resource-` | Forms (incl. `visibility`), webhooks (incl. `secret:`/`header:`), schedules, secrets, auth blocks, postgres blocks, top-level stream and schema blocks, trigger bindings |
+| 8 | Resources & Triggers | HIGH | `resource-` | Forms (incl. `visibility`), webhooks (incl. `secret:`/`header:`), schedules, secrets, auth blocks, postgres blocks, agent blocks (incl. subagent `team`), channel blocks, top-level stream and schema blocks, trigger bindings |
 | 9 | Streams | MEDIUM | `stream-` | Filter operators, field paths, migration from persistence |
 | 10 | Reviews | MEDIUM | `review-` | Human-in-the-loop review config |
 | 11 | Parser Pitfalls | CRITICAL | `parser-` | Known parser bugs, silent drops, validator diagnostics |
@@ -48,12 +49,12 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `spec-common-mistakes` - **The most common incorrect patterns with corrections. Check your output against these before returning any .swirls code.**
 
 ### 2. File Structure
-- `structure-top-level-declarations` - The twelve valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent
+- `structure-top-level-declarations` - The thirteen valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel
 - `structure-file-discovery` - File extensions, discovery rules, `.ts.swirls` files
 - `structure-comments` - Comment syntax and ASCII-only restriction
 
 ### 3. Workflow & Node Basics
-- `workflow-anatomy` - Workflow structure: label, description, root, nodes, flow (persistence block removed)
+- `workflow-anatomy` - Workflow structure: label, description, root, nodes, flow (persistence block removed). The keyword is `workflow` (legacy alias `graph`).
 - `workflow-root-node` - Every workflow needs exactly one `root { }` block
 - `workflow-flow-block` - Connecting nodes with edges and labeled edges
 - `workflow-dag-rules` - No cycles, one root, edge validation
@@ -62,14 +63,14 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 ### 4. Node Types (16 total)
 - `node-code` - Code nodes: sandboxed TypeScript execution
 - `node-ai` - AI nodes: text, object, image, video, embed kinds
-- `node-agent` - Agent nodes: bind to a top-level `agent` block; tools, roles, prompt
+- `node-agent` - Agent nodes: bind to a top-level `agent` block; tools, roles, prompt, structured `schema`, maxSteps tool loop (default 20), persistent sandbox workspace, `swirls chat start`
 - `node-switch` - Switch nodes: conditional routing with cases
 - `node-http` - HTTP nodes: making API requests
 - `node-email` - Email nodes (`type: email`): sending email via Resend
 - `node-scrape` - Scrape nodes (`type: scrape`): web scraping via Firecrawl
 - `node-parallel` - Parallel nodes: search / extract / findall operations
 - `node-stream` - Stream nodes: reading persisted stream data at a pinned `version` with filters
-- `node-workflow` - Workflow nodes: calling subgraphs (one-shot)
+- `node-workflow` - Workflow nodes (`type: workflow`, legacy alias `graph`): calling a subworkflow (one-shot)
 - `node-map` - Map nodes: per-item iteration with inline `subgraph { }` or `workflow: <name>`; required `items`, `maxItems`; optional `concurrency`
 - `node-while` - While nodes: counter/condition loops with `input`, `condition`, `update`, `maxIterations` plus `subgraph { }` or `workflow: <name>`
 - `node-wait` - Wait nodes: pausing execution
@@ -111,7 +112,8 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `resource-auth` - Top-level `auth` blocks (oauth, api_key, basic, bearer, cloud) and http-node `auth:` references
 - `resource-postgres` - Top-level `postgres` blocks: connection, table schemas, secret references
 - `resource-disk` - Top-level `disk` blocks: Archil-backed remote disks (`id: "dsk-..."`, secrets)
-- `resource-agent` - Top-level `agent` blocks: provider, model, tools, optional `role` sub-blocks
+- `resource-agent` - Top-level `agent` blocks: required model + secrets, provider enum (default openrouter), tools (workflows-as-tools), subagent `team`, optional `sandbox { }` sizing/lifecycle, optional `role` sub-blocks
+- `resource-channel` - Top-level `channel` blocks: bind an agent to a chat platform (`platform`/`integration` slack/linear/discord/web, `agent`, `mode` mention/dm/all, `enabled`); platform must equal integration
 
 ### 9. Streams
 - `stream-persistence-block` - Migration note: `persistence { }` removed; use top-level `stream { }`

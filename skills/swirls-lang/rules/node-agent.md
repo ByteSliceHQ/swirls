@@ -1,16 +1,16 @@
 ---
 title: Agent Nodes
 impact: HIGH
-tags: node, agent, llm, tools, role, prompt, harness
+tags: node, agent, llm, tools, role, prompt, harness, sandbox, chat, schema
 ---
 
 ## Agent Nodes
 
-Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, or overrides `system`.
+Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, runtime knobs, optional sandbox sizing, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, overrides `system`, or constrains structured output with `schema`.
 
-For a one-shot LLM call (no tools, no loop), use `ai` instead. `agent` is for multi-step harnesses with tool use.
+Use `agent` when you need tools, a persistent workspace (read/write/edit/bash/grep/find/ls), multi-step reasoning, or chat. For a one-shot LLM call with no tools and no multi-step work, use `ai` instead.
 
-**Required fields:** `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (`@ts`).
+**Required fields:** `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (`@ts` block or file ref).
 
 ### Incorrect (missing required fields)
 
@@ -22,6 +22,19 @@ node ask {
 ```
 
 The validator errors: `Node type "agent" requires "agent"`. The node must reference a declared `agent` block by name.
+
+### Incorrect (`outputSchema` on a node is a hard parse error)
+
+```swirls
+node ask {
+  type: agent
+  agent: triage
+  prompt: @ts { return "Hi" }
+  outputSchema: @json { { "type": "object" } }
+}
+```
+
+Parse error: `Use "schema" instead of "outputSchema" in node blocks`. Structured output on a node uses `schema:`, never `outputSchema:`. (`outputSchema` is root-only and belongs on workflow roots, not nodes.)
 
 ### Correct (minimal agent node)
 
@@ -51,7 +64,7 @@ workflow handle {
 }
 ```
 
-### Correct (role and narrowed tools)
+### Correct (role, narrowed tools, structured output)
 
 ```swirls
 node ask {
@@ -66,20 +79,48 @@ node ask {
   prompt: @ts {
     return context.nodes.root.input.question
   }
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["answer"],
+      "properties": { "answer": { "type": "string" } }
+    }
+  }
 }
 ```
 
-`role:` must name a `role <name> { }` declared inside the bound `agent` block. `tools:` (on the node) further narrows the tools exposed to this specific call; it must be a subset of the agent block's `tools:`. `system:` overrides the agent's default system prompt for this call only.
+`role:` must name a `role <name> { }` declared inside the bound `agent` block. `system:` overrides the agent's default system prompt for this call only. `schema:` constrains the final structured output; without it the turn returns the plain completion string.
+
+### System-prompt precedence
+
+System prompt pieces apply low to high: agent `system` (lowest) -> role `system` (if a role is chosen) -> node `system` (highest, wins last for final instructions).
+
+### Tools (workflows-as-tools only)
+
+Tools are workflows exposed to the LLM. There is no MCP, HTTP, or builtin tool syntax. Each tool workflow must have a non-empty workflow-level `description`, a root-node `inputSchema`, and an output schema on every leaf node. See `resource-agent` for the tool-workflow contract.
+
+Node `tools:` may only narrow within the effective set: the role's tools when a role is chosen and declares `tools:`, otherwise the agent block's `tools:`. It cannot add tools beyond that set.
+
+If the agent block declares a subagent `team:`, each team member is also exposed to the model as a callable tool (delegated to as its own agent). See `resource-agent` for the team contract.
+
+### Execution shape
+
+A turn runs a tool-call loop capped by the agent's `maxSteps` (default **20**, not 10). Built-in workspace tools (read, write, edit, bash, grep, find, ls) run inside a persistent, per-agent sandbox. Sandbox provisioning is lazy: chat-only turns that never call a tool never start one. Workspace files persist across turns for the same agent. Each subgraph named in the effective `tools:` is exposed to the model using its workflow `description` (tool help text) and root `inputSchema` (call arguments). Tool results are the subgraph's leaf outputs.
+
+### Persistent chat
+
+Multi-turn chat is not authored in the DSL. Start a persistent transcript with `swirls chat start <agent_name>`; the platform stores history (Postgres) and threads each turn's messages back into the agent. The agent's workspace files persist across turns of the same chat.
 
 ### Fields
 
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
 | `agent` | yes | Bare identifier | Names a top-level `agent <name> { }` block. |
-| `prompt` | yes | `@ts` block | User prompt for this turn. |
+| `prompt` | yes | `@ts` block or file ref | User prompt for this turn. |
 | `role` | no | Bare identifier | Names a `role` declared inside the bound agent block. |
-| `tools` | no | Array of bare identifiers | Subset of the agent block's tool workflows. |
-| `system` | no | `@ts` block | Overrides the agent block's default `system:` for this call. |
+| `tools` | no | Array of bare identifiers | Narrows within the effective tool set (role tools if a role is chosen and declares tools, else agent tools). |
+| `system` | no | `@ts` block | Overrides the agent block's default `system:` for this call (highest precedence). |
+| `schema` | no | `@json` block, named ref, or inline object | Constrains structured final output. Never `outputSchema`. |
 
 Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
 

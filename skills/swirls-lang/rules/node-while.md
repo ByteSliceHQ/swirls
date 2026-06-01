@@ -16,7 +16,7 @@ A `while` node runs a child workflow (inline `subgraph { }` or referenced `workf
 - `maxIterations` — positive integer. Hard cap to prevent runaway loops.
 - Exactly one of:
   - `subgraph { ... }` — inline child workflow (no colon). The inline form's root must declare `inputSchema`.
-  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That graph's root must declare `inputSchema`.
+  - `workflow: <name>` — bare identifier referencing a top-level workflow in the workspace. That workflow's root must declare `inputSchema`.
 
 ### Inline subgraph
 
