@@ -1,12 +1,12 @@
 ---
 title: Safe TypeScript Patterns
 impact: CRITICAL
-tags: ts, patterns, safe, template, string, concatenation
+tags: ts, patterns, safe, template, string, regex
 ---
 
 ## Safe TypeScript Patterns
 
-The Swirls parser has known issues with certain TypeScript patterns inside `@ts { }` blocks. Some patterns are always safe. Others silently break parsing. Use this as a quick reference.
+The `@ts { }` scanner tracks braces, strings (single, double, template), and comments. Most ordinary TypeScript parses fine. The known hazards are regex literals containing quote characters and unbalanced braces. Use this as a quick reference.
 
 **Always safe:**
 
@@ -14,43 +14,47 @@ The Swirls parser has known issues with certain TypeScript patterns inside `@ts 
 // Simple string concatenation
 return "Hello, " + name + "!"
 
-// Single-level template literals with ${} interpolation
+// Template literals, including nested ones
 return `Hello, ${name}!`
+return `Summary:\n${items.map(w => `  - ${w}`).join("\n")}`
 
-// Nullish coalescing
+// Literal $ before interpolation (currency)
+return `Total: $${amount.toFixed(2)}`
+
+// Double-quote characters inside strings
+return '"' + value + '"'
+if (s.includes('"')) { }
+
+// Nullish coalescing, ternaries, spreads
 const val = input.field ?? "default"
+const label = score > 80 ? "high" : "low"
+return { ...context.nodes.root.output, extra: "value" }
 
-// JSON.stringify (no nested templates)
+// JSON.stringify
 return JSON.stringify({ key: value })
 
-// Array methods with concatenation (not nested templates)
-items.map(x => "- " + x).join("\n")
-
-// Ternary expressions
-const label = score > 80 ? "high" : "low"
-
-// Object spreads
-return { ...context.nodes.root.output, extra: "value" }
+// Regex literals WITHOUT quote characters
+/\d+/g.test(s)
+s.replace(/\s+/g, " ")
 ```
 
-**Avoid (breaks parsing):**
+**Avoid (silently truncates the rest of the file):**
 
 ```typescript
-// Nested template literals - use concatenation instead
-`outer ${`inner ${x}`}`
-// Fix: "outer " + `inner ${x}`
-
-// Dollar sign before interpolation - use concatenation
-`$${amount}`
-// Fix: "$" + amount
-
-// Literal double-quote characters - use String.fromCharCode(34)
-s.includes('"')
-// Fix: s.indexOf(String.fromCharCode(34)) >= 0
-
-// Regex with double-quote
+// Regex literal containing a quote character — the scanner mistakes it
+// for a string boundary and desyncs. See ts-regex-literals.
 s.replace(/"/g, '""')
-// Fix: s.split(String.fromCharCode(34)).join(String.fromCharCode(34) + String.fromCharCode(34))
+/can't/.test(s)
+// Fix: build from strings — new RegExp(String.fromCharCode(34)), or
+// use split/join: s.split(String.fromCharCode(34)).join("")
 ```
 
-When in doubt, use string concatenation instead of template literals, and `String.fromCharCode(34)` instead of literal double-quote characters.
+**Avoid (parse errors / mangled config):**
+
+```typescript
+// Unbalanced braces anywhere in the block — the scanner counts { } depth
+// to find the end of @ts { }. A regex or string trick that leaves braces
+// unbalanced ends the block early.
+```
+
+Strings and comments inside `@ts` are scanned with full escape handling, so `\"`, `\\`, and backticks inside `${ … }` all work. When in doubt about a regex, build it with `new RegExp(...)` from string parts.

@@ -33,8 +33,8 @@ schedule daily {
 Schedule fields:
 | Field | Required | Type |
 |-------|----------|------|
-| `label` | yes | String |
-| `cron` | yes | Cron expression string |
+| `label` | recommended | String (defaults to empty when omitted) |
+| `cron` | yes | Cron expression string. Missing it is a parse error: `Schedule must have cron` |
 | `timezone` | no | IANA timezone string |
 | `enabled` | no | Boolean (default: true) |
 

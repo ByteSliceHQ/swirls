@@ -8,7 +8,7 @@
 ## 2. File Structure (structure)
 
 **Impact:** HIGH
-**Description:** Top-level declarations, file discovery, and comment syntax. The foundation for every .swirls file.
+**Description:** The sixteen top-level declarations, file discovery, and comment syntax. The foundation for every .swirls file.
 
 ## 3. Workflow & Node Basics (workflow)
 
@@ -38,7 +38,7 @@
 ## 8. Resources & Triggers (resource)
 
 **Impact:** HIGH
-**Description:** Declaring forms (with `visibility public/internal`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, secrets, auth, postgres, disk, agent, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
+**Description:** Declaring forms (with `visibility: public/internal` and HTTP Basic `auth:`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, secrets, auth, postgres, disk, agent, channel, access/role/policy, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
 
 ## 9. Streams (stream)
 
@@ -53,4 +53,4 @@
 ## 11. Parser Pitfalls (parser)
 
 **Impact:** CRITICAL
-**Description:** Known parser bugs that silently drop workflows, plus an exhaustive cheatsheet of validator diagnostics. Unicode in comments, hyphenated headers (use @ts blocks), double-quotes in @ts, nested templates, nested code blocks. Essential knowledge to avoid hours of debugging.
+**Description:** Lexer hazards that silently truncate files, plus an exhaustive cheatsheet of validator diagnostics. Regex literals with quote characters in @ts blocks, stray characters at DSL level, hyphenated object keys (use @ts blocks), nested code blocks. Essential knowledge to avoid hours of debugging.

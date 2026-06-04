@@ -1,12 +1,12 @@
 ---
 title: Top-Level Declarations
 impact: HIGH
-tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel
+tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, access, role, policy
 ---
 
 ## Top-Level Declarations
 
-A `.swirls` file contains thirteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains sixteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -35,7 +35,7 @@ schema contact_payload {
 form contact {
   label: "Contact"
   enabled: true
-  visibility public
+  visibility: public
   schema: contact_payload
 }
 
@@ -77,6 +77,10 @@ secret api_creds {
   vars: [API_KEY, SHARED_SECRET]
 }
 
+secret vendor_keys {
+  vars: [OPENROUTER_API_KEY]
+}
+
 auth my_auth {
   type: api_key
   secrets: api_creds
@@ -100,7 +104,7 @@ trigger on_contact {
 
 agent concierge {
   label: "Concierge"
-  secrets: api_creds
+  secrets: vendor_keys
   provider: openrouter
   model: "openai/gpt-4o-mini"
 }
@@ -113,9 +117,23 @@ channel concierge_web {
   mode: dm
   enabled: true
 }
+
+access {
+  default: deny
+}
+
+role admins {
+  match {
+    org_role: admin
+  }
+}
+
+policy {
+  allow admins -> agent concierge
+}
 ```
 
-### The thirteen valid top-level blocks
+### The sixteen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -128,8 +146,11 @@ channel concierge_web {
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.
 - `postgres <name> { }` — External PostgreSQL connection and table schemas. See `resource-postgres`.
 - `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
-- `agent <name> { }` — LLM agent definition (provider, model, tools, roles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
+- `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
+- `access { }` — Nameless singleton; default access posture (`default: deny | allow`). See `resource-access-control`.
+- `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
+- `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. See `resource-access-control`.
 
 ### Version line
 

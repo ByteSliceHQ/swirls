@@ -4,7 +4,7 @@
 >
 > **Source of truth lives in `rules/`.** This file is regenerated from those rules by `scripts/regen-agents.ts`. When in doubt, defer to `rules/spec-strict-syntax.md` and `rules/spec-common-mistakes.md`.
 >
-> Current scope: **16 node types** (`agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`; `graph` is a legacy alias for `workflow`), **13 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel`), inline `subgraph { }` for map/while, form `visibility public | internal`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, `context.iteration.*` (item/index/input/previous) for map/while subgraphs, agent subagent `team`, and `channel` blocks binding an agent to Slack / Linear / Discord / web.
+> Current scope: **16 node types** (`agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`; `graph` is a legacy alias for `workflow`), **16 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, access, role, policy`), inline `subgraph { }` for map/while, form `visibility: public | internal` and HTTP Basic `auth:`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, `context.iteration.*` (item/index/input/previous) for map/while subgraphs, agent subagent `team`, `channel` blocks binding an agent to Slack / Linear / Discord / web, and access-control `access` / `role` / `policy` blocks.
 
 
 # 1. Language Specification (READ FIRST)
@@ -19,7 +19,8 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, schema,
-disk, agent, channel, role, tools,
+disk, agent, channel, profile, tools,
+role, access, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
 subgraph, map, while, items, update, maxItems, maxIterations, concurrency
@@ -48,13 +49,16 @@ postgres <name> { }
 disk <name> { }
 agent <name> { }
 channel <name> { }
+access { }
+role <name> { }
+policy { }
 ```
 
-There are **13** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. The newest are `agent <name> { }` (LLM agent definition with tools, roles, and a subagent `team`, bound by `type: agent` nodes) and `channel <name> { }` (binds an agent to a chat platform — Slack, Linear, Discord, or web). `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount.
+There are **16** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control trio — `access { }` (nameless; default posture), `role <name> { }` (claim matching), and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants) — is covered in `resource-access-control`.
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -64,7 +68,7 @@ Names may start with a digit. Hyphens, dots, spaces, and other characters are no
 
 #### Complete node type list
 
-These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `packages/core/src/schemas.ts`.
+These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `@swirls/schemas` (`packages/schemas/src/schemas.ts`).
 
 ```
 agent, ai, bucket, code, disk, email, http, map,
@@ -94,7 +98,7 @@ Notes on aliases that do NOT exist:
 These are the only value forms that can appear after a `:` in a field assignment.
 
 - String literal: `"value"`
-- Number: `42`, `3.14`
+- Number: `42`, `3.14`, `-1` (negative literals are supported)
 - Boolean: `true`, `false`
 - Bare identifier: `my_name` (parsed as a string; used to reference top-level blocks like `workflow: helper_workflow`, `stream: my_stream`, `schema: my_schema`)
 - Object literal: `{ key: value, key2: value2 }` (comma-separated)
@@ -141,16 +145,18 @@ oauth, api_key, basic, bearer, cloud
 
 No other types exist. `jwt`, `mtls`, `session`, `cookie`, `saml`, `digest`, `ntlm` are not valid.
 
-#### Form visibility keyword
+#### Form visibility and auth fields
 
-`form <name> { }` accepts the special bare keyword `visibility` (no colon) with one of two values:
+`form <name> { }` accepts a `visibility:` field whose value is a **bare identifier** — one of two values:
 
 ```
-visibility public
-visibility internal
+visibility: public
+visibility: internal
 ```
 
-Default is `internal` when omitted. `public` exposes the form via the Triggers service at `/triggers/forms/:projectId/:formName`. `internal` returns 404 from Triggers (the dashboard can still read/edit the form). Quoted values like `visibility "public"` are a parser error. See `resource-form`.
+Default is `internal` when omitted. `public` exposes the form via the Triggers service at `/triggers/forms/:projectId/:formName`. `internal` returns 404 from Triggers (the dashboard can still read/edit the form). A quoted value (`visibility: "public"`) or a missing colon (`visibility public`) is a parser error. See `resource-form`.
+
+`form <name> { }` also accepts `auth: <authBlockName>` — a bare identifier referencing a top-level `auth` block with `type: basic`. The Triggers service then requires HTTP Basic credentials (from the auth block's secret vars) on form GET/POST. Visibility is enforced first, so `auth:` is dead config on internal forms. See `resource-form`.
 
 #### Webhook authentication fields
 
@@ -176,7 +182,11 @@ enabled: true | false                          // optional; defaults to enabled
 label: "..."   description: "..."              // optional
 ```
 
-`platform`, `integration`, and `mode` are bare keyword values (not quoted). `integration` must equal `platform` or it is a validator error. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. See `resource-channel`.
+`platform`, `integration`, and `mode` are conventionally bare values (the parser also accepts quoted strings). `integration` must equal `platform` or it is a validator error. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"`. See `resource-channel`.
+
+#### Access-control blocks
+
+`access { default: deny | allow }` sets the deployment's default posture. `role <name> { match { <claim>: <value> } }` derives a role from verified principal attributes (scalar value = equality, array value = membership). `policy { allow|deny <role> -> agent <name>|* { workflows: […], tools: […] } }` grants roles access to agents. See `resource-access-control`.
 
 #### Agent subagent team
 
@@ -209,7 +219,7 @@ node each_item {
 
 The following constructs do not exist in the Swirls DSL. Do not use them.
 
-**No control flow at DSL level:** `if`, `else`, `do`, `switch` (as a keyword), `case`, `default`, `break`, `continue`, `return`, `match`. (`while` and `map` are node types, not control flow keywords.)
+**No control flow at DSL level:** `if`, `else`, `do`, `switch` (as a keyword), `case`, `default`, `break`, `continue`, `return`. (`while` and `map` are node types, not control flow keywords; `match` is the claim-matching block inside `role` declarations, not a control-flow construct.)
 
 **No `for` keyword.** Iteration is done via the `map` node (per-item) or `while` node (counter / condition).
 
@@ -273,7 +283,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 Only these fields have semantics for each node type. All types additionally accept `type`, `label`, `description`, `secrets`, `review`, `failurePolicy`. Root nodes additionally accept `inputSchema` and `outputSchema`. Non-root nodes accept `schema` (not `outputSchema`).
 
-**ai** — required: `kind`. Valid kinds: `text`, `object`, `image`, `video`, `embed`. Other fields: `model`, `prompt` (@ts), `temperature`, `maxTokens`, `options` (object; for image: `n`, `size`, `aspectRatio`), `schema` (required for `kind: object`; warning if set on `kind: text`).
+**ai** — required: `kind`. Valid kinds: `text`, `object`, `image`, `video`, `embed`. Other fields: `model`, `prompt` (@ts), `provider` (`openrouter` default, `anthropic`, `openai`, `google`), `temperature`, `maxTokens`, `options` (object; for image: `n`, `size`, `aspectRatio`), `schema` (required for `kind: object`; warning if set on `kind: text`).
 
 **code** — required: `code` (@ts block or `@ts "file.ts.swirls"`). Other fields: `schema`.
 
@@ -303,9 +313,9 @@ No user `schema:` — vendor-managed output shape.
 
 **bucket** — required: `operation` (`download` or `upload`). Optional: `path`.
 
-**disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). No user `schema:`. See `node-disk` and `resource-disk`.
+**disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). Optional: `schema` (typing the command output). See `node-disk` and `resource-disk`.
 
-**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `role` (bare identifier naming a role inside the agent block), `tools` (array of bare identifiers narrowing within the effective tool set), `system` (@ts; per-call system-prompt override), `schema` (structured-output constraint; use `schema`, never `outputSchema`). See `node-agent` and `resource-agent`.
+**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `profile` (bare identifier naming a profile inside the agent block), `tools` (array of bare identifiers narrowing within the effective tool set), `system` (@ts; per-call system-prompt override), `schema` (structured-output constraint; use `schema`, never `outputSchema`). See `node-agent` and `resource-agent`.
 
 **postgres** (node) — required: `postgres` (bare identifier naming a top-level `postgres <name> { }` block) and exactly one of `select:` (@sql SELECT or WITH) or `insert:` (@sql INSERT, optionally with ON CONFLICT). Other fields: `params` (@ts returning an object whose keys match `{{key}}` placeholders in the SQL; required when SQL has placeholders, always required for `insert:`), `condition` (@ts returning boolean; only valid on `insert:` nodes), `schema` (recommended for `select:` to type the row output).
 
@@ -316,6 +326,7 @@ No user `schema:` — vendor-managed output shape.
 - `secrets` — object literal: `{ blockName: [VAR1, VAR2], otherBlock: [VAR3] }`. The block name must be a declared top-level `secret` block and each var must appear in that block's `vars` list. Accessed at runtime as `context.secrets.blockName.VAR1`.
 - `review` — either `review: true` or `review: { enabled, title, description, content, schema, actions, approvedOutput, rejectedOutput }`. See `review-config`.
 - `failurePolicy` (optional) — `{ strategy: "fail" | "retry" | "skip" | "fallback", maxRetries, backoffMs, fallbackValue }`.
+- `format` — presentation format for the node's output, a bare identifier: `markdown`, `html`, `text`, `image`, `video`, `audio`, `mixed`, or `json`. The validator checks the declared output schema is compatible (top-level string, a `{ markdown | html | text | url }` string property, or a `contentMediaType` hint; `json`/`mixed` always pass).
 
 #### Schema reference syntax (bare identifier)
 
@@ -326,6 +337,8 @@ No user `schema:` — vendor-managed output shape.
 - A bare identifier naming a top-level `schema <name> { }` block: `inputSchema: contact_payload`.
 
 The bare-identifier form requires a matching `schema <name> { }` declaration somewhere in the workspace. See `resource-schema`.
+
+Placement is strict: `inputSchema` and `outputSchema` belong on **root blocks only**; non-root nodes use `schema`. A `schema:` key on a **root** block is not recognized — the parser cannot consume its `@json` value and emits an `Unexpected token` error, dropping the rest of the root config. Use `outputSchema` on root.
 
 ---
 
@@ -995,9 +1008,9 @@ form contact_form {
 
 Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, workflows, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids.
 
-#### 24. Setting `visibility` like a key:value pair on a form
+#### 24. Quoting the `visibility` value (or dropping its colon) on a form
 
-**Incorrect:**
+**Incorrect (quoted value):**
 
 ```swirls
 form contact {
@@ -1006,14 +1019,25 @@ form contact {
 }
 ```
 
-The parser errors: `Expected \`public\` or \`internal\` after \`visibility\``. `visibility` is a bare keyword, not a key:value pair — there is no colon and the value is an unquoted identifier (`public` or `internal`).
+The parser errors: `Expected \`public\` or \`internal\` after \`visibility:\``. The value must be a **bare identifier** (`public` or `internal`), never a quoted string.
+
+**Incorrect (missing colon):**
+
+```swirls
+form contact {
+  label: "Contact"
+  visibility public
+}
+```
+
+The parser errors: `Expected \`:\` after \`visibility\``. `visibility` is a normal key:value field — the colon is required.
 
 **Correct:**
 
 ```swirls
 form contact {
   label: "Contact"
-  visibility public
+  visibility: public
 }
 ```
 
@@ -1276,7 +1300,31 @@ workflow handle {
 
 The bare identifier (`contact_payload`) references the top-level `schema` block. See `resource-schema`.
 
-#### 33. Channel `platform` and `integration` mismatch
+#### 33. Using `schema:` on a root block
+
+**Incorrect:**
+
+```swirls
+root {
+  type: code
+  code: @ts { return {} }
+  schema: @json { { "type": "object" } }
+}
+```
+
+`schema:` is not a recognized key on `root { }` blocks — the parser cannot consume the `@json` value, emits `Unexpected token`, and drops the rest of the root config. Root blocks use `inputSchema` and `outputSchema`; only non-root nodes use `schema`.
+
+**Correct:**
+
+```swirls
+root {
+  type: code
+  code: @ts { return {} }
+  outputSchema: @json { { "type": "object" } }
+}
+```
+
+#### 34. Channel `platform` and `integration` mismatch
 
 A `channel` block's `integration` must equal its `platform`. They are separate fields (surface vs credential source) but a mismatch is rejected.
 
@@ -1305,7 +1353,7 @@ channel concierge_slack {
 
 Also: `platform`, `integration`, and `mode` are bare keyword values, and `agent:` is a bare identifier naming an `agent` block (not a quoted string). Two enabled channels cannot share the same `platform : mode : agent` tuple. See `resource-channel`.
 
-#### 34. Agent `team` that references itself or forms a cycle
+#### 35. Agent `team` that references itself or forms a cycle
 
 `team: [ … ]` names other `agent` blocks as subagents. An agent cannot list itself, a team member cannot collide with one of the agent's `tools:` workflow names, and the delegation chain cannot contain a cycle.
 
@@ -1338,7 +1386,7 @@ Team members are bare identifiers, not quoted strings. See `resource-agent`.
 
 ### Top-Level Declarations
 
-A `.swirls` file contains thirteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains sixteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -1367,7 +1415,7 @@ schema contact_payload {
 form contact {
   label: "Contact"
   enabled: true
-  visibility public
+  visibility: public
   schema: contact_payload
 }
 
@@ -1409,6 +1457,10 @@ secret api_creds {
   vars: [API_KEY, SHARED_SECRET]
 }
 
+secret vendor_keys {
+  vars: [OPENROUTER_API_KEY]
+}
+
 auth my_auth {
   type: api_key
   secrets: api_creds
@@ -1432,7 +1484,7 @@ trigger on_contact {
 
 agent concierge {
   label: "Concierge"
-  secrets: api_creds
+  secrets: vendor_keys
   provider: openrouter
   model: "openai/gpt-4o-mini"
 }
@@ -1445,9 +1497,23 @@ channel concierge_web {
   mode: dm
   enabled: true
 }
+
+access {
+  default: deny
+}
+
+role admins {
+  match {
+    org_role: admin
+  }
+}
+
+policy {
+  allow admins -> agent concierge
+}
 ```
 
-#### The thirteen valid top-level blocks
+#### The sixteen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -1460,8 +1526,11 @@ channel concierge_web {
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.
 - `postgres <name> { }` — External PostgreSQL connection and table schemas. See `resource-postgres`.
 - `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
-- `agent <name> { }` — LLM agent definition (provider, model, tools, roles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
+- `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
+- `access { }` — Nameless singleton; default access posture (`default: deny | allow`). See `resource-access-control`.
+- `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
+- `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. See `resource-access-control`.
 
 #### Version line
 
@@ -1517,35 +1586,9 @@ root {
 
 ---
 
-### Comment Syntax and ASCII Restriction
+### Comment Syntax
 
-Swirls supports single-line (`//`) and multi-line (`/* */`) comments. Doc comments (`/* */`) placed before a declaration are shown on hover in the LSP.
-
-Unicode characters in comments break the parser's line counting and cause workflows after the comment to be silently dropped.
-
-**Incorrect (Unicode in comments):**
-
-```swirls
-// ──────────────────────────────
-// Workflow: get_token → fetch OAuth
-// ──────────────────────────────
-workflow get_token {
-  // This workflow may be silently dropped
-}
-```
-
-**Correct (ASCII only in comments):**
-
-```swirls
-// -------------------------------------------
-// Workflow: get_token - fetch OAuth
-// -------------------------------------------
-workflow get_token {
-  // This workflow is parsed correctly
-}
-```
-
-Doc comments appear in editor hover tooltips:
+Swirls supports single-line (`//`) and multi-line (`/* */`) comments. Doc comments (`/* */`) placed immediately before a top-level declaration (or a `node`/`root` block) attach to it and are shown on hover in the LSP.
 
 ```swirls
 /* Normalizes name, email, and message (trim + lowercase email). */
@@ -1556,7 +1599,25 @@ root {
 }
 ```
 
-Use only ASCII characters in comments: letters, digits, spaces, hyphens, underscores, periods, parentheses, and standard punctuation. Avoid box-drawing characters, arrows, em dashes, and other Unicode.
+#### Unicode
+
+Comment content may contain any characters — Unicode in `//` or `/* */` comments parses fine:
+
+```swirls
+// ──────────────────────────────
+// Workflow: get_token → fetch OAuth
+// ──────────────────────────────
+workflow get_token {
+  label: "Get Token"
+  root { type: code label: "Entry" code: @ts { return {} } }
+}
+```
+
+The hazard is Unicode (or any unrecognized character) **outside** comments, strings, and fenced blocks — at DSL token positions the lexer stops on it and silently drops the rest of the file. See `parser-illegal-characters`.
+
+#### Doc comments are preserved
+
+`/* ... */` block comments immediately before a top-level declaration attach to it as a doc comment and are preserved by the serializer. `//` line comments are skipped by the lexer and not preserved.
 
 
 # 3. Workflow & Node Basics
@@ -2125,7 +2186,7 @@ AI nodes call language models and other AI services. The `kind` field determines
 
 **Default model:** Unless the user specifies a different model, always use `google/gemini-2.5-flash` for text and object kinds. Use specialized models only for image generation (e.g. `openai/dall-e-3`) and embeddings (e.g. `openai/text-embedding-3-small`).
 
-**Required fields:** `kind`, `model`, `prompt`
+**Required fields:** `kind` (validator-enforced), plus `model` and `prompt` (required at runtime for a working call).
 
 **Incorrect (object kind without schema):**
 
@@ -2214,21 +2275,22 @@ AI kinds: `text`, `object`, `image`, `video`, `embed`
 AI node fields:
 | Field | Required | Type |
 |-------|----------|------|
-| `kind` | yes | text, object, image, video, embed |
-| `model` | yes | String (provider/model format) |
-| `prompt` | yes | `@ts` block |
+| `kind` | yes | text, object, image, video, embed. Invalid values error: `Invalid ai kind "<k>". Must be one of: text, object, image, video, embed` |
+| `model` | runtime | String (provider/model format) |
+| `prompt` | runtime | `@ts` block |
+| `provider` | no | Bare identifier: `openrouter` (default), `anthropic`, `openai`, `google`. Invalid values error: `Invalid ai provider "<p>". Must be one of: openrouter, anthropic, openai, google` |
 | `schema` | required for object | `@json` block |
 | `temperature` | no | Number (0-1) |
 | `maxTokens` | no | Number |
 | `options` | no | Object (kind-specific, e.g. n, size) |
 
-AI nodes infer `OPENROUTER_API_KEY` as a secret. You do not need to declare it.
+AI nodes resolve their vendor key from `provider:` (`OPENROUTER_API_KEY` by default; `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` otherwise). You do not need to declare it in `secrets:`.
 
 ---
 
 ### Agent Nodes
 
-Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, runtime knobs, optional sandbox sizing, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, overrides `system`, or constrains structured output with `schema`.
+Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, runtime knobs, optional sandbox sizing, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `profile`, narrows `tools`, overrides `system`, or constrains structured output with `schema`.
 
 Use `agent` when you need tools, a persistent workspace (read/write/edit/bash/grep/find/ls), multi-step reasoning, or chat. For a one-shot LLM call with no tools and no multi-step work, use `ai` instead.
 
@@ -2286,14 +2348,14 @@ workflow handle {
 }
 ```
 
-#### Correct (role, narrowed tools, structured output)
+#### Correct (profile, narrowed tools, structured output)
 
 ```swirls
 node ask {
   type: agent
-  label: "Ask with role"
+  label: "Ask with profile"
   agent: triage
-  role: support
+  profile: support
   tools: [search_kb]
   system: @ts {
     return "You are a senior support engineer. Be concise."
@@ -2311,17 +2373,17 @@ node ask {
 }
 ```
 
-`role:` must name a `role <name> { }` declared inside the bound `agent` block. `system:` overrides the agent's default system prompt for this call only. `schema:` constrains the final structured output; without it the turn returns the plain completion string.
+`profile:` must name a `profile <name> { }` declared inside the bound `agent` block. `system:` overrides the agent's default system prompt for this call only. `schema:` constrains the final structured output; without it the turn returns the plain completion string.
 
 #### System-prompt precedence
 
-System prompt pieces apply low to high: agent `system` (lowest) -> role `system` (if a role is chosen) -> node `system` (highest, wins last for final instructions).
+System prompt pieces apply low to high: agent `system` (lowest) -> profile `system` (if a profile is chosen) -> node `system` (highest, wins last for final instructions).
 
 #### Tools (workflows-as-tools only)
 
 Tools are workflows exposed to the LLM. There is no MCP, HTTP, or builtin tool syntax. Each tool workflow must have a non-empty workflow-level `description`, a root-node `inputSchema`, and an output schema on every leaf node. See `resource-agent` for the tool-workflow contract.
 
-Node `tools:` may only narrow within the effective set: the role's tools when a role is chosen and declares `tools:`, otherwise the agent block's `tools:`. It cannot add tools beyond that set.
+Node `tools:` may only narrow within the effective set: the profile's tools when a profile is chosen and declares `tools:`, otherwise the agent block's `tools:`. It cannot add tools beyond that set.
 
 If the agent block declares a subagent `team:`, each team member is also exposed to the model as a callable tool (delegated to as its own agent). See `resource-agent` for the team contract.
 
@@ -2339,8 +2401,8 @@ Multi-turn chat is not authored in the DSL. Start a persistent transcript with `
 |-------|----------|------|-------|
 | `agent` | yes | Bare identifier | Names a top-level `agent <name> { }` block. |
 | `prompt` | yes | `@ts` block or file ref | User prompt for this turn. |
-| `role` | no | Bare identifier | Names a `role` declared inside the bound agent block. |
-| `tools` | no | Array of bare identifiers | Narrows within the effective tool set (role tools if a role is chosen and declares tools, else agent tools). |
+| `profile` | no | Bare identifier | Names a `profile` declared inside the bound agent block. |
+| `tools` | no | Array of bare identifiers | Narrows within the effective tool set (profile tools if a profile is chosen and declares tools, else agent tools). |
 | `system` | no | `@ts` block | Overrides the agent block's default `system:` for this call (highest precedence). |
 | `schema` | no | `@json` block, named ref, or inline object | Constrains structured final output. Never `outputSchema`. |
 
@@ -2517,7 +2579,7 @@ Declare the vars your node needs in a top-level `secret` block, then reference t
 
 **Note:** Do not use HTTP nodes to call AI/LLM APIs directly. Use `ai` nodes instead — they handle model routing, authentication, and response parsing automatically.
 
-**Warning:** Do not use `headers` as a plain object literal with hyphenated keys like `Content-Type`. The parser treats hyphens as subtraction operators and silently drops the rest of the file. Always use a `@ts` block for headers so keys are JavaScript strings. See the parser-hyphenated-headers and ts-no-nested-code-blocks rules.
+**Warning:** Do not use `headers` as a plain object literal with hyphenated keys like `Content-Type`. Unquoted, the stray `-` stops the lexer and silently drops the rest of the file; quoted, the key is rejected and the headers object parses empty. Always use a `@ts` block for headers so keys are JavaScript strings. See the parser-hyphenated-headers and ts-no-nested-code-blocks rules.
 
 HTTP node fields:
 | Field | Required | Type |
@@ -2966,7 +3028,7 @@ node run_helper {
 
 Error: `Node type "workflow" requires "input"`
 
-**Incorrect (referencing a workflow in another file):**
+**Cross-file references resolve across the workspace:**
 
 ```swirls
 // helper.swirls defines helper_workflow
@@ -2979,9 +3041,9 @@ node run_helper {
 }
 ```
 
-Warning: `swirls doctor` does not resolve cross-file references. It reports `Workflow node references workflow "helper_workflow" which is not defined`. Keep related workflows in the same file.
+`swirls doctor` and deploy build a workspace index of every `.swirls` file under the working directory, so a workflow declared in another file resolves. `Workflow node references workflow "<n>" which is not defined` fires only when the name matches no workflow anywhere in the workspace (single-file tools without a workspace index may also report it until the full workspace is considered).
 
-**Correct (subgraph in same file):**
+**Correct (child workflow in the same file):**
 
 ```swirls
 workflow helper_workflow {
@@ -3333,6 +3395,7 @@ Wait node fields:
 |-------|----------|------|
 | `amount` | no | Number |
 | `unit` | no | "seconds", "minutes", "hours", "days" |
+| `secondsFromConfig` | no | `@ts` block returning the wait duration in seconds (dynamic alternative to `amount`/`unit`) |
 
 ---
 
@@ -3432,7 +3495,7 @@ node fetch_report {
 |-------|----------|------|-------|
 | `disk` | yes | Bare identifier | Names a top-level `disk <name> { }` block. |
 | `command` | yes | String or `@ts` block | Single shell command to execute on the disk. |
-| `schema` | **not allowed** | Vendor-managed; omit entirely. |
+| `schema` | no | `@json` block, object literal, or bare schema name | Types the command output for downstream `@ts` code. |
 
 Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
 
@@ -3534,7 +3597,7 @@ node upsert_lead {
 
 #### Key rules
 
-- `postgres:` must reference a top-level `postgres` block defined in the same file.
+- `postgres:` must reference a top-level `postgres` block declared in the workspace (same file or another `.swirls` file).
 - `select:` SQL must be a SELECT statement. `insert:` SQL must be INSERT (upsert with ON CONFLICT is allowed).
 - `{{key}}` placeholders are replaced with positional `$N` parameters at runtime. Values come from the `params:` return object. No SQL injection is possible.
 - Placeholder names do not need to match column names. They match by position in the INSERT column list, or by the SQL expression context on SELECT.
@@ -3752,7 +3815,7 @@ const email = context.nodes.root.input.email ?? ""
 return { email: email.toLowerCase() }
 ```
 
-The `@ts` prefix is used for: `code`, `prompt`, `router`, `from`, `to`, `subject`, `text`, `html`, `replyTo`, `url`, `body`, `headers`, `input`, `path`, and persistence `condition` fields.
+The `@ts` prefix is used for executable fields throughout the DSL: `code`, `prompt`, `system`, `router`, `from`, `to`, `subject`, `text`, `html`, `replyTo`, `url`, `body`, `headers`, `input`, `path`, `command`, `items`, `condition`, `update`, `filter`, `params`, `objective`, `searchQueries`, `urls`, `matchConditions`, and stream-version `condition` / `prepare`.
 
 **No nesting:** `@ts` blocks cannot contain other `@ts` blocks. Each `@ts` block is a leaf that contains executable code. If a field needs to produce a compound value (e.g., a headers object with multiple keys), use a single `@ts` block that returns the entire object. See the ts-no-nested-code-blocks rule.
 
@@ -3836,7 +3899,7 @@ Code nodes are strictly for reshaping inputs, normalizing strings, computing der
 
 ### Safe TypeScript Patterns
 
-The Swirls parser has known issues with certain TypeScript patterns inside `@ts { }` blocks. Some patterns are always safe. Others silently break parsing. Use this as a quick reference.
+The `@ts { }` scanner tracks braces, strings (single, double, template), and comments. Most ordinary TypeScript parses fine. The known hazards are regex literals containing quote characters and unbalanced braces. Use this as a quick reference.
 
 **Always safe:**
 
@@ -3844,169 +3907,98 @@ The Swirls parser has known issues with certain TypeScript patterns inside `@ts 
 // Simple string concatenation
 return "Hello, " + name + "!"
 
-// Single-level template literals with ${} interpolation
+// Template literals, including nested ones
 return `Hello, ${name}!`
+return `Summary:\n${items.map(w => `  - ${w}`).join("\n")}`
 
-// Nullish coalescing
+// Literal $ before interpolation (currency)
+return `Total: $${amount.toFixed(2)}`
+
+// Double-quote characters inside strings
+return '"' + value + '"'
+if (s.includes('"')) { }
+
+// Nullish coalescing, ternaries, spreads
 const val = input.field ?? "default"
+const label = score > 80 ? "high" : "low"
+return { ...context.nodes.root.output, extra: "value" }
 
-// JSON.stringify (no nested templates)
+// JSON.stringify
 return JSON.stringify({ key: value })
 
-// Array methods with concatenation (not nested templates)
-items.map(x => "- " + x).join("\n")
-
-// Ternary expressions
-const label = score > 80 ? "high" : "low"
-
-// Object spreads
-return { ...context.nodes.root.output, extra: "value" }
+// Regex literals WITHOUT quote characters
+/\d+/g.test(s)
+s.replace(/\s+/g, " ")
 ```
 
-**Avoid (breaks parsing):**
+**Avoid (silently truncates the rest of the file):**
 
 ```typescript
-// Nested template literals - use concatenation instead
-`outer ${`inner ${x}`}`
-// Fix: "outer " + `inner ${x}`
-
-// Dollar sign before interpolation - use concatenation
-`$${amount}`
-// Fix: "$" + amount
-
-// Literal double-quote characters - use String.fromCharCode(34)
-s.includes('"')
-// Fix: s.indexOf(String.fromCharCode(34)) >= 0
-
-// Regex with double-quote
+// Regex literal containing a quote character — the scanner mistakes it
+// for a string boundary and desyncs. See ts-regex-literals.
 s.replace(/"/g, '""')
-// Fix: s.split(String.fromCharCode(34)).join(String.fromCharCode(34) + String.fromCharCode(34))
+/can't/.test(s)
+// Fix: build from strings — new RegExp(String.fromCharCode(34)), or
+// use split/join: s.split(String.fromCharCode(34)).join("")
 ```
 
-When in doubt, use string concatenation instead of template literals, and `String.fromCharCode(34)` instead of literal double-quote characters.
+**Avoid (parse errors / mangled config):**
+
+```typescript
+// Unbalanced braces anywhere in the block — the scanner counts { } depth
+// to find the end of @ts { }. A regex or string trick that leaves braces
+// unbalanced ends the block early.
+```
+
+Strings and comments inside `@ts` are scanned with full escape handling, so `\"`, `\\`, and backticks inside `${ … }` all work. When in doubt about a regex, build it with `new RegExp(...)` from string parts.
 
 ---
 
-### No Double-Quote Characters in @ts Blocks
+### Regex Literals With Quote Characters Break @ts Scanning
 
-Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block appears to parse correctly, but all subsequent workflows in the file are silently dropped. `swirls doctor` reports fewer workflows than expected with no error.
+The `@ts { }` scanner understands TypeScript strings, template literals, and comments — but **not regex literals**. A quote character (`"`, `'`, or `` ` ``) inside a regex literal is mistaken for the start of a string. The scanner then consumes everything until the next matching quote, desyncs, and the rest of the file is **silently dropped** (no error; `swirls doctor` just reports fewer workflows).
 
-**Incorrect (regex with double-quote):**
-
-```swirls
-code: @ts {
-  s.replace(/"/g, '""')
-}
-```
-
-**Incorrect (string containing double-quote):**
+**Incorrect (regex containing a double quote):**
 
 ```swirls
 code: @ts {
-  return '"' + value + '"'
+  return { r: s.replace(/"/g, '') }
 }
 ```
 
-**Incorrect (checking for double-quote):**
+**Incorrect (regex containing a single quote):**
 
 ```swirls
 code: @ts {
-  if (s.includes('"')) { }
+  return { ok: /can't/.test(s) }
 }
 ```
 
-**Correct (use String.fromCharCode(34)):**
+**Correct (build the pattern from a string, or avoid quote chars in regex):**
 
 ```swirls
 code: @ts {
-  const Q = String.fromCharCode(34)
-  s.split(Q).join(Q + Q)          // instead of s.replace(/"/g, '""')
-  return Q + value + Q            // instead of '"' + value + '"'
-  if (s.indexOf(Q) >= 0) { }      // instead of s.includes('"')
+  const Q = String.fromCharCode(34)        // the " character
+  return { r: s.split(Q).join("") }        // instead of s.replace(/"/g, '')
 }
 ```
-
-This is one of the most common causes of "missing workflows" with no error message.
-
----
-
-### No Nested Template Literals in @ts Blocks
-
-Template literals inside `${}` interpolation expressions break `@ts` block parsing. The inner backtick is mistaken for the end of the outer template literal. All subsequent content in the file may be silently dropped.
-
-**Incorrect (nested template literals):**
 
 ```swirls
 code: @ts {
-  const result = `Summary:\n${items.map(w => `  - ${w}`).join("\n")}`
+  const re = new RegExp("can" + String.fromCharCode(39) + "t")  // ' is charCode 39
+  return { ok: re.test(s) }
 }
 ```
 
-**Correct (use string concatenation for the inner expression):**
+#### What is safe
 
-```swirls
-code: @ts {
-  const result = "Summary:\n" + items.map(w => "  - " + w).join("\n")
-}
-```
+- Regex literals **without** quote characters parse fine: `/\d+/g`, `/^https?:/`, `/a{2,3}/`.
+- Quote characters inside **proper strings** are fine: `'"'`, `"it's"`, `` `say "hi"` `` all parse correctly — the scanner tracks string boundaries, including escapes.
+- Nested template literals and `$${...}` parse correctly (the scanner brace-balances `${ … }` and recurses into inner backticks).
 
-**Incorrect (nested template in prompt):**
+The only @ts quoting hazard is a quote character inside a regex literal (or any other position the scanner cannot recognize as a string).
 
-```swirls
-prompt: @ts {
-  return `Results:\n${data.map(r => `${r.name}: ${r.score}`).join("\n")}`
-}
-```
-
-**Correct (concatenation):**
-
-```swirls
-prompt: @ts {
-  return "Results:\n" + data.map(r => r.name + ": " + r.score).join("\n")
-}
-```
-
-Rule: never use backticks inside `${}` interpolation. Use `+` concatenation or helper variables instead.
-
----
-
-### No Dollar Sign Before Interpolation
-
-A literal `$` immediately before `${...}` interpolation (e.g. formatting currency) breaks `@ts` block parsing. The parser sees `$${` and fails to determine where the interpolation begins.
-
-**Incorrect (dollar sign before interpolation):**
-
-```swirls
-code: @ts {
-  return `Total: $${amount.toFixed(2)}`
-}
-```
-
-**Correct (use concatenation):**
-
-```swirls
-code: @ts {
-  return "Total: $" + amount.toFixed(2)
-}
-```
-
-**Incorrect (price formatting):**
-
-```swirls
-prompt: @ts {
-  return `The price is $${price} per unit`
-}
-```
-
-**Correct (concatenation):**
-
-```swirls
-prompt: @ts {
-  return "The price is $" + price + " per unit"
-}
-```
-
-Any time you need a literal `$` followed by a `${` interpolation, use string concatenation instead of a template literal.
+When `swirls doctor` reports fewer workflows than you defined with no error output, search your `@ts` blocks for regex literals containing `"`, `'`, or backticks.
 
 ---
 
@@ -4051,15 +4043,19 @@ node call_api {
 **Correct (single @ts block returning the full object):**
 
 ```swirls
+secret api_creds {
+  vars: [API_KEY]
+}
+
 node call_api {
   type: http
   label: "Call API"
   url: "https://api.example.com/data"
   method: "POST"
-  secrets: [API_KEY]
+  secrets: { api_creds: [API_KEY] }
   headers: @ts {
     return {
-      "x-api-key": context.secrets.API_KEY,
+      "x-api-key": context.secrets.api_creds.API_KEY,
       "x-request-id": "abc123",
       "Content-Type": "application/json"
     }
@@ -4151,7 +4147,7 @@ The three schema keywords each have a specific placement. The parser enforces th
 
 - `inputSchema` on a non-root node → parser error: `inputSchema is only allowed in root { } blocks`. The entire node is dropped from the AST. (A map/while `subgraph { }` root counts as a root for this rule.)
 - `outputSchema` on a non-root node → parser error: `Use "schema" instead of "outputSchema" in node blocks`. The entire node is dropped from the AST.
-- `schema` on root is technically accepted but redundant — use `outputSchema` on root.
+- `schema` on root is **not recognized** — the parser cannot consume the value, emits `Unexpected token`, and the rest of the root config is dropped. Always use `outputSchema` on root.
 
 #### Three forms of schema value
 
@@ -4263,9 +4259,8 @@ Vendor-managed types:
 - `scrape`
 - `parallel`
 - `email`
-- `disk`
 
-These types provide their own runtime type shape; the LSP uses it automatically.
+These types provide their own runtime type shape; the LSP uses it automatically. (`disk` is NOT vendor-managed — a `schema:` on a disk node is allowed and types the command output.)
 
 #### AI text + schema warning
 
@@ -4675,14 +4670,14 @@ Available fields:
 
 ### Form Declarations
 
-Forms generate a UI in the Portal and an API endpoint. The schema defines the form fields. The `visibility` keyword controls whether the form is reachable through the Triggers service.
+Forms generate a UI in the Portal and an API endpoint. The schema defines the form fields. The `visibility` field controls whether the form is reachable through the Triggers service, and an optional `auth` field gates public forms behind HTTP Basic credentials.
 
 ```swirls
 form contact_form {
   label: "Contact Form"
   description: "Public contact form: name, email, and message."
   enabled: true
-  visibility public
+  visibility: public
   schema: @json {
     {
       "type": "object",
@@ -4705,19 +4700,20 @@ form contact_form {
 | `label` | recommended | String | Display name in the Portal. Defaults to empty when omitted. |
 | `description` | no | String | Longer description. |
 | `enabled` | no | Boolean | Default: enabled. Set to `false` to keep the declaration but pause submissions. |
-| `visibility` | no | bare keyword (no colon) | `public` or `internal`. Default: `internal`. |
+| `visibility` | no | bare identifier value | `public` or `internal` (unquoted). Default: `internal`. |
+| `auth` | no | bare identifier | Names a top-level `auth` block with `type: basic`. Triggers enforces HTTP Basic on the public form. |
 | `schema` | no | `@json` block, object literal, or bare schema name | JSON Schema for the form payload. The LSP types `context.nodes.root.input` from this schema when a trigger references the form. |
 
-#### `visibility` keyword
+#### `visibility` field
 
-`visibility` is a bare keyword (no colon) with one of two values:
+`visibility:` is a key:value field whose value is a **bare identifier** — one of two values:
 
-- **`visibility public`** — The form is served by Triggers at `/triggers/forms/:projectId/:formName`. External users can fetch the schema and submit payloads.
-- **`visibility internal`** (default) — Triggers refuses to render or accept submissions and returns 404 with the same body as form-not-found (no existence leak). The web/cloud dashboard can still read and edit the form. The trigger binding still fires when the dashboard submits.
+- **`visibility: public`** — The form is served by Triggers at `/triggers/forms/:projectId/:formName`. External users can fetch the schema and submit payloads.
+- **`visibility: internal`** (default) — Triggers refuses to render or accept submissions and returns 404 with the same body as form-not-found (no existence leak). The web/cloud dashboard can still read and edit the form. The trigger binding still fires when the dashboard submits.
 
-The default is `internal` (secure default). Specify `visibility public` only on forms intended for external traffic.
+The default is `internal` (secure default). Specify `visibility: public` only on forms intended for external traffic.
 
-**Incorrect (colon and quoted string):**
+**Incorrect (quoted string):**
 
 ```swirls
 form contact {
@@ -4726,9 +4722,9 @@ form contact {
 }
 ```
 
-The parser errors: `Expected \`public\` or \`internal\` after \`visibility\``.
+The parser errors: `Expected \`public\` or \`internal\` after \`visibility:\``. Any value other than the two identifiers errors: `Invalid visibility "<x>"; expected \`public\` or \`internal\``.
 
-**Correct:**
+**Incorrect (missing colon):**
 
 ```swirls
 form contact {
@@ -4736,6 +4732,47 @@ form contact {
   visibility public
 }
 ```
+
+The parser errors: `Expected \`:\` after \`visibility\``.
+
+**Correct:**
+
+```swirls
+form contact {
+  label: "Contact"
+  visibility: public
+}
+```
+
+#### `auth` field (HTTP Basic gate)
+
+`auth: <name>` references a top-level `auth` block by bare identifier. The referenced block must have `type: basic` and supply `username` / `password` vars from a secret block. The Triggers form GET and POST handlers then require an `Authorization: Basic` header whose decoded `user:pass` matches the decrypted secret values (401 with `WWW-Authenticate: Basic realm="<label>"` on miss).
+
+```swirls
+secret portal_creds {
+  vars: [PORTAL_USER, PORTAL_PASS]
+}
+
+auth portal {
+  type: basic
+  secrets: portal_creds
+  username: PORTAL_USER
+  password: PORTAL_PASS
+}
+
+form gated {
+  label: "Gated form"
+  visibility: public
+  auth: portal
+}
+```
+
+Validator diagnostics:
+
+- `Form "<n>" references undefined auth block "<a>"` — the name does not match a declared `auth` block.
+- `Form "<n>" auth block "<a>" must have type \`basic\` (found \`<type>\`)` — only `type: basic` auth blocks can gate forms.
+
+Visibility is enforced before auth, so `auth:` on an internal form is dead config (the form 404s before any auth check runs).
 
 #### Name pattern
 
@@ -4943,8 +4980,8 @@ schedule daily {
 Schedule fields:
 | Field | Required | Type |
 |-------|----------|------|
-| `label` | yes | String |
-| `cron` | yes | Cron expression string |
+| `label` | recommended | String (defaults to empty when omitted) |
+| `cron` | yes | Cron expression string. Missing it is a parse error: `Schedule must have cron` |
 | `timezone` | no | IANA timezone string |
 | `enabled` | no | Boolean (default: true) |
 
@@ -4980,7 +5017,7 @@ stream <name> {
   label: "<optional label>"          // defaults to <name>
   description: "<optional string>"
   enabled: <boolean>                  // optional; default treated as true
-  workflow: <workflow_name>                 // required; workflow declared in this file
+  workflow: <workflow_name>           // required; workflow declared in the workspace (legacy alias: graph:)
   version: <version_id>               // required; active writer version, must exist in versions:
 
   versions: {
@@ -5008,7 +5045,7 @@ Block-level:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `workflow` | yes | Bare identifier naming a workflow in the same file (or merged workspace). |
+| `workflow` | yes | Bare identifier (or quoted string) naming a workflow in the same file or merged workspace. `graph:` is a legacy alias. |
 | `version` | yes | Active writer `version_id` (`v1`, …). Must match a key in `versions:`. |
 | `versions` | yes | Non-empty map of `version_id` → `{ schema, condition?, prepare }`. |
 | `label` | no | Defaults to the stream's name. |
@@ -5341,9 +5378,9 @@ Multiple triggers can target the same workflow from different sources.
 
 #### Validation rules
 
-- Trigger names must match `^[a-zA-Z0-9_]+$` and be unique in the file.
-- The referenced `form` / `webhook` / `schedule` must be declared in the same file, else: `Trigger references <type> "<name>" which is not defined`.
-- The referenced workflow must be declared in the same file, else: `Trigger references workflow "<name>" which is not defined`.
+- Trigger names must match `^[a-zA-Z0-9_]+$`.
+- The referenced `form` / `webhook` / `schedule` must be declared in the workspace (same file or another `.swirls` file), else: `Trigger references <type> "<name>" which is not defined`.
+- The referenced workflow must be declared in the workspace, else: `Trigger references workflow "<name>" which is not defined`.
 
 #### `enabled`
 
@@ -5540,8 +5577,9 @@ The value is a bare identifier naming the auth block. Referencing an undefined a
 - Auth block names match `^[a-zA-Z0-9_]+$`.
 - Duplicate block names error.
 - `type:` is required and must be one of the five values above.
-- Identifier fields (`client_id`, `client_secret`, `key`, `username`, `password`, `token`) must each name a var declared in the referenced secret block. Otherwise the validator errors: `Auth "<name>" references undefined var "<VAR>" not declared in secret block "<secrets>"`.
-- `cloud` type should not reference `secrets`.
+- Identifier fields (`client_id`, `client_secret`, `key`, `username`, `password`, `token`) must each name a var declared in the referenced secret block. Otherwise the validator errors: `Auth "<name>" field "<field>" must reference a var from secret block "<secrets>"`.
+- `cloud` type should not reference `secrets` (warning: `Auth block "<name>" (cloud): cloud auth uses managed credentials and should not reference a secrets block`).
+- Forms can also reference an auth block via `auth: <name>`, but only `type: basic` blocks are accepted there. See `resource-form`.
 
 Runtime token exchange and header injection are platform concerns; the DSL validates references and required fields.
 
@@ -5633,8 +5671,8 @@ Top-level `disk <name> { }` blocks declare an Archil-backed remote disk that `ty
 disk <name> {
   label: "<optional label>"
   region: "<optional region>"
-  id: "dsk-..."             // required; Archil disk id
-  secrets: <secret_block>   // optional reference to a top-level secret block
+  id: "dsk-..."             // required; Archil disk id (dsk- + 16 hex chars)
+  secrets: <secret_block>   // required; the block must declare ARCHIL_API_KEY
 }
 ```
 
@@ -5642,8 +5680,8 @@ disk <name> {
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `id` | yes | Quoted string literal. Archil-issued disk identifier (typically `dsk-` + hex). |
-| `secrets` | no | Bare identifier naming a top-level `secret` block (e.g. one declaring `ARCHIL_API_KEY`). |
+| `id` | yes | Quoted string literal. Archil-issued disk identifier matching `^dsk-[0-9a-f]{16}$` exactly. |
+| `secrets` | yes | Bare identifier naming a top-level `secret` block that declares `ARCHIL_API_KEY` in its `vars`. |
 | `label` | no | Display string. Defaults to the disk's name. |
 | `region` | no | Quoted string (e.g. `"aws-us-east-1"`). |
 
@@ -5677,10 +5715,10 @@ workflow backup {
 
 #### Validation rules
 
-- Disk names must match `^[a-zA-Z0-9_]+$`. Duplicate names error.
-- `id:` must be a non-empty quoted string.
-- `secrets:` (if present) must reference an existing top-level `secret` block.
-- The `disk` node's `disk:` field must match a declared disk block by bare identifier.
+- Disk names must match `^[a-zA-Z0-9_]+$`. Duplicate names error: `Duplicate disk block name "<n>"`.
+- `id:` is required (`Disk block requires an id field (provider disk id)`) and must match `dsk-` + 16 hex characters (`Disk id must match pattern dsk- followed by 16 hex characters`).
+- `secrets:` is required: `Disk block requires secrets: pointing to a secret block that declares ARCHIL_API_KEY`. The referenced block must exist (`Disk "<n>" references undefined secret block "<s>"`) and must declare the var (`Secret block "<s>" must declare var "ARCHIL_API_KEY" for disk runtime API access`).
+- The `disk` node's `disk:` field must match a declared disk block by bare identifier (file-local or workspace).
 
 See `node-disk` for the read/exec side.
 
@@ -5688,7 +5726,7 @@ See `node-disk` for the read/exec side.
 
 ### Agent Block Declaration
 
-Top-level `agent <name> { }` blocks declare an LLM agentic harness: which provider and model to use, which secret block holds the API key, a default system prompt, runtime knobs, optional sandbox sizing, the tools (workflows) the model may call, an optional subagent `team` it may delegate to, and zero or more named `role <name> { }` sub-blocks. `type: agent` nodes bind to an agent block by bare identifier, and `channel` blocks expose an agent on a chat platform.
+Top-level `agent <name> { }` blocks declare an LLM agentic harness: which provider and model to use, which secret block holds the API key, a default system prompt, runtime knobs, optional sandbox sizing, the tools (workflows) the model may call, an optional subagent `team` it may delegate to, and zero or more named `profile <name> { }` sub-blocks. `type: agent` nodes bind to an agent block by bare identifier, and `channel` blocks expose an agent on a chat platform.
 
 **There is no `type:` field on an agent block** — the keyword `agent` identifies the block. Names must match `^[a-zA-Z0-9_]+$`.
 
@@ -5724,7 +5762,7 @@ agent <name> {
     ephemeral: false
   }
 
-  role <role_name> {                  // zero or more roles
+  profile <profile_name> {                  // zero or more profiles
     description: "<optional>"
     tools: [workflow_a]                  // optional; SUBSET of agent.tools
     system: @ts { return "..." }      // optional override
@@ -5747,7 +5785,7 @@ agent <name> {
 | `tools` | no | Array of bare identifiers naming tool workflows in the workspace. |
 | `team` | no | Array of bare identifiers naming other `agent` blocks this agent may delegate to as subagents. See below. |
 | `sandbox: { }` | no | Workspace sizing and lifecycle. See below. |
-| `role <name> { }` | no | Zero or more named roles. Each may override `system`, `sandbox`, and narrow `tools`. |
+| `profile <name> { }` | no | Zero or more named profiles. Each may override `system`, `sandbox`, and narrow `tools`. |
 | `label` | no | Display string. |
 | `description` | no | Free-form description. |
 
@@ -5837,12 +5875,12 @@ agent triage {
     return "You are a support triage agent. Use tools to resolve tickets."
   }
 
-  role support {
+  profile support {
     description: "Frontline support agent"
     tools: [search_kb]
   }
 
-  role escalations {
+  profile escalations {
     description: "Senior agent who can escalate"
     tools: [search_kb, escalate]
     system: @ts {
@@ -5857,7 +5895,7 @@ workflow handle_ticket {
     type: agent
     label: "Triage"
     agent: triage
-    role: support
+    profile: support
     prompt: @ts {
       return "Ticket: " + context.nodes.root.input.body
     }
@@ -5870,7 +5908,7 @@ workflow handle_ticket {
 Tools are workflows exposed to the model. There is no MCP, HTTP, or builtin tool syntax. Each entry in `tools: [ … ]` must name a workflow in the workspace that:
 
 - Has a non-empty workflow-level `description:` (fed to the model as tool help text).
-- Has a root node with JSON `inputSchema` (defines the tool call arguments).
+- Has a root node with JSON `inputSchema` that declares a **non-empty `properties` object** (defines the tool call arguments — a tool with zero input properties is rejected: `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object`).
 - Has an output schema on **every leaf node** (`outputSchema` on the root if it is a leaf, or `schema` on non-root leaves).
 
 Built-in workspace tools (read, write, edit, bash, grep, find, ls) are always available inside the sandbox and are not declared in `tools:`.
@@ -5917,9 +5955,9 @@ Team members are referenced by bare identifier (not a quoted string). A `team` m
 - `provider`, if present, must be one of the four allowed values; it defaults to `openrouter`.
 - Every entry in `tools:` must name a tool workflow defined in the workspace.
 - Every entry in `team:` must name a defined `agent` block in the workspace. An agent cannot list itself, a team member name cannot collide with a `tools:` workflow name in the same agent, and teams cannot form a cycle (`a -> b -> a` is rejected, as is any longer loop).
-- Every `role <name> { }` must have a unique name within the agent block. Each role's `tools:` must be a SUBSET of the agent's top-level `tools:`.
+- Every `profile <name> { }` must have a unique name within the agent block. Each profile's `tools:` must be a SUBSET of the agent's top-level `tools:`.
 - `sandbox.<field>` values must satisfy the bounds above.
-- `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `role:`, it must name a declared role in that block.
+- `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `profile:`, it must name a declared profile in that block.
 
 See `node-agent` for the binding side.
 
@@ -5945,7 +5983,7 @@ channel <name> {
 }
 ```
 
-`platform`, `integration`, and `mode` take **bare keyword values** (not quoted strings). `agent` is a **bare identifier** naming a top-level `agent` block, not a quoted string.
+`platform`, `integration`, and `mode` take **bare values** by convention (the parser also accepts quoted strings). `agent` is a bare identifier naming a top-level `agent` block (a quoted string also parses). Unlike most blocks, channels reject unknown keys: `Unknown channel property "<key>"`.
 
 #### Required vs optional fields
 
@@ -6043,15 +6081,10 @@ channel bad { platform: slack  integration: web  agent: concierge }
 channel good { platform: slack  integration: slack  agent: concierge }
 ```
 
-**`agent` as a quoted string.** It is a bare identifier naming an `agent` block.
+**`agent` as a quoted string.** Convention is a bare identifier naming an `agent` block (a quoted string parses to the same value, but write it bare).
 
 ```swirls
-// Incorrect
-channel bad { platform: web  integration: web  agent: "concierge" }
-```
-
-```swirls
-// Correct
+// Convention
 channel good { platform: web  integration: web  agent: concierge }
 ```
 
@@ -6060,8 +6093,84 @@ channel good { platform: web  integration: web  agent: concierge }
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
 - `Channel "<n>" platform "<p>" must match integration "<i>"` — set `integration` equal to `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — change `mode`, point one at a different agent, or disable one.
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
+- Parser: `channel must declare platform` / `channel must declare agent` / `channel must declare integration` — required field missing.
+- Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set.
 
 See `resource-agent` for the `agent` block (including subagent `team`).
+
+---
+
+### Access, Role, and Policy Blocks
+
+Three top-level blocks define identity-scoped access control for agents: `access { }` (default posture), `role <name> { }` (derive a named role from verified principal attributes), and `policy { }` (grant or deny roles access to agents and their workflows/tools).
+
+#### `access { }` — default posture
+
+A nameless singleton block. One field: `default:` with a bare value `deny` or `allow`.
+
+```swirls
+access {
+  default: deny
+}
+```
+
+- Absent: behavior is unchanged (open within the organization).
+- Present with `default: deny`: deny-by-default unless a `policy` grant allows.
+- Any other value errors: `access default: must be `deny` or `allow``.
+
+#### `role <name> { }` — claim matching
+
+Derives a named role from verified principal attributes. Conditions inside `match { }` AND together.
+
+```swirls
+role admins {
+  description: "Org admins"
+  match {
+    org_role: admin
+  }
+}
+
+role engineers {
+  match {
+    department: ["engineering", "platform"]   // list value = membership ("in")
+    employment: fulltime                       // scalar value = equality ("eq")
+  }
+}
+```
+
+- `match { <claim>: <value> }` — a scalar value (bare identifier, string, number, or boolean) is an equality test; an array value is a membership test.
+- Role names must match `^[a-zA-Z0-9_]+$`. Duplicate role names error: `Duplicate role name "<n>"`.
+- An empty `match { }` warns: `Role "<n>" has an empty match { } and will match no principal`.
+- `description:` is optional.
+
+#### `policy { }` — grants
+
+A nameless block containing one or more grant lines of the form `allow|deny <role> -> agent <name>|*`, each with an optional body narrowing the grant.
+
+```swirls
+policy {
+  allow admins -> agent *
+
+  allow engineers -> agent concierge {
+    workflows: [search_kb, escalate]
+    tools: [search_kb]
+  }
+
+  deny contractors -> agent billing_bot
+}
+```
+
+- `<role>` is a bare identifier naming a `role` block.
+- The target is `agent <name>` (a declared `agent` block) or `agent *` (every agent).
+- An omitted body grants all of the agent's workflows and tools. `workflows: [ … ]` and `tools: [ … ]` are bare-identifier arrays that narrow the grant.
+- Parse errors: `Expected role name after `allow``, `Expected `->` after role name`, `Expected `agent` after `->``, `Expected an agent name or `*``, `Expected `allow` or `deny` in policy block`.
+
+#### Notes
+
+- `role`, `access`, `match`, `policy`, `allow`, and `deny` are lexer keywords.
+- `access` and `policy` blocks take no name; `role` blocks are named.
+- The arrow in a grant is the same `->` token used by flow edges and trigger bindings.
 
 
 # 9. Streams
@@ -6458,45 +6567,50 @@ The review schema determines the shape of `context.reviews.<nodeName>`. The LSP 
 
 # 11. Parser Pitfalls & Validator Diagnostics
 
-### Unicode in Comments Breaks Line Counting
+### Stray Characters at DSL Level Stop Tokenization
 
-Using Unicode characters in `//` comments causes the parser to miscount lines. Workflows defined after the comment are silently dropped. `swirls doctor` reports success but with fewer workflows than expected. No error is emitted.
+The lexer recognizes a fixed character set at DSL level (identifiers, numbers, strings, braces, brackets, `:`, `,`, `.`, `*`, `->`, `-["…"]->`, negative numbers, `@ts`/`@json`/`@sql`, comments). Any other character **outside** a comment, string, or fenced block makes the lexer stop. Everything after it is **silently dropped** — no error, `swirls doctor` just reports fewer workflows.
 
-**Incorrect (Unicode box-drawing and arrow characters):**
-
-```swirls
-// ──────────────────────────────
-// Workflow: get_token → fetch OAuth
-// ──────────────────────────────
-workflow get_token {
-  label: "Get Token"
-  root { type: code label: "Entry" code: @ts { return {} } }
-}
-```
-
-The `get_token` workflow is silently dropped.
-
-**Correct (ASCII only):**
+**Incorrect (stray Unicode between declarations):**
 
 ```swirls
-// -------------------------------------------
-// Workflow: get_token - fetch OAuth
-// -------------------------------------------
-workflow get_token {
-  label: "Get Token"
-  root { type: code label: "Entry" code: @ts { return {} } }
-}
+workflow a { label: "A" root { type: code code: @ts { return {} } } }
+→
+workflow b { label: "B" root { type: code code: @ts { return {} } } }
 ```
 
-Characters to avoid in comments: `─`, `│`, `→`, `←`, `↑`, `↓`, `—`, `╌`, `═`, `║`, `╔`, `╗`, `╚`, `╝`, and any other non-ASCII characters.
+Workflow `b` is silently dropped.
+
+**Incorrect (unquoted hyphenated key — the `-` desyncs the lexer):**
+
+```swirls
+headers: { Content-Type: "application/json" }
+```
+
+See `parser-hyphenated-headers`.
+
+#### Where Unicode IS safe
+
+- **Comments** (`//` and `/* */`) — any characters, including box-drawing, arrows, and em dashes, parse fine.
+- **String literals** — `label: "café → done"` is fine.
+- **Inside `@ts { }` / `@json { }` / `@sql { }` bodies** — the fenced scanner only tracks braces, strings, and comments; other characters pass through.
+
+The hazard is only a character the lexer does not recognize in a **DSL-level token position** (between declarations, between fields, in place of a value).
+
+**How to detect:** compare `swirls doctor` counts against what you defined. If items are missing, the cutoff point is at or just after the last item that survived — look there for a stray character.
 
 ---
 
-### Hyphenated Header Keys Parsed as Subtraction
+### Hyphenated Keys in DSL Object Literals
 
-Header keys like `Content-Type` cause the parser to treat the hyphen as a subtraction operator. Everything from that point to EOF is silently consumed. All subsequent workflows, triggers, and resources are dropped.
+DSL-level object literals (like a plain `headers: { ... }` value) cannot carry hyphenated keys. The two failure modes differ:
 
-**Incorrect (hyphenated header key, unquoted):**
+- **Unquoted** `Content-Type:` — the lexer reads `Content`, then hits a stray `-` it cannot tokenize and **stops**. Everything to EOF is silently dropped (workflows, triggers, resources after this point disappear with no error).
+- **Quoted** `"Content-Type":` — DSL object keys must be bare identifiers; a quoted key is rejected. The parser emits `Unexpected token` errors and the object value ends up **empty** (your headers are silently lost), though later declarations recover.
+
+Either way the headers are broken. Use a `@ts` block instead.
+
+**Incorrect (unquoted hyphenated key — truncates the file):**
 
 ```swirls
 node call_api {
@@ -6507,13 +6621,11 @@ node call_api {
 }
 ```
 
-**Incorrect (hyphenated header key, quoted):**
+**Incorrect (quoted hyphenated key — headers parse to an empty object):**
 
 ```swirls
 headers: { "Content-Type": "application/json" }
 ```
-
-Even quoted keys with hyphens cause the same issue. This applies to plain object literals — the parser sees the hyphen as a subtraction operator.
 
 **Correct (use a @ts block that returns the headers object):**
 
@@ -6526,8 +6638,8 @@ node call_api {
   headers: @ts {
     return {
       "Content-Type": "application/json",
-      "x-api-key": context.secrets.API_KEY,
-      "Authorization": "Bearer " + context.secrets.AUTH_TOKEN
+      "x-api-key": context.secrets.api_creds.API_KEY,
+      "Authorization": "Bearer " + context.secrets.api_creds.AUTH_TOKEN
     }
   }
   body: @ts {
@@ -6536,7 +6648,7 @@ node call_api {
 }
 ```
 
-By using a `@ts` block, header keys are JavaScript string literals — the parser never sees the hyphens as operators. This is the only safe way to set custom headers with hyphenated keys.
+Inside a `@ts` block, header keys are JavaScript string literals — the lexer never sees the hyphens. This is the only safe way to set custom headers with hyphenated keys.
 
 **Also correct (omit headers if defaults suffice):**
 
@@ -6544,140 +6656,31 @@ HTTP nodes default to JSON content type. If you don't need custom headers, simpl
 
 ---
 
-### Double-Quote Characters Inside @ts Blocks
-
-Literal `"` characters inside `@ts { }` blocks confuse the parser's string boundary detection. The `@ts` block itself appears to parse correctly, but all subsequent workflows, triggers, and resources in the file are silently dropped.
-
-This is one of the most common causes of "missing workflows" with no error output.
-
-**Incorrect (regex with double-quote):**
-
-```swirls
-code: @ts {
-  s.replace(/"/g, '""')
-}
-```
-
-**Incorrect (string containing double-quote):**
-
-```swirls
-code: @ts {
-  return '"' + value + '"'
-}
-```
-
-**Incorrect (checking for double-quote):**
-
-```swirls
-code: @ts {
-  if (s.includes('"')) { }
-}
-```
-
-**Correct (use String.fromCharCode(34)):**
-
-```swirls
-code: @ts {
-  const Q = String.fromCharCode(34)
-  s.split(Q).join(Q + Q)          // instead of s.replace(/"/g, '""')
-  return Q + value + Q            // instead of '"' + value + '"'
-  if (s.indexOf(Q) >= 0) { }      // instead of s.includes('"')
-}
-```
-
-When `swirls doctor` reports fewer workflows than you defined with no error messages, check all `@ts` blocks for literal `"` characters.
-
----
-
-### Nested Template Literals Break @ts Parsing
-
-Template literals inside `${}` interpolation (valid JavaScript/TypeScript) break `@ts` block parsing. The inner backtick is mistaken for the end of the outer template literal. All content after the broken block may be silently dropped.
-
-**Incorrect:**
-
-```swirls
-code: @ts {
-  const result = `Summary:\n${items.map(w => `  - ${w}`).join("\n")}`
-}
-```
-
-**Correct (concatenation for the inner expression):**
-
-```swirls
-code: @ts {
-  const result = "Summary:\n" + items.map(w => "  - " + w).join("\n")
-}
-```
-
-**Incorrect (nested template in prompt):**
-
-```swirls
-prompt: @ts {
-  return `Results:\n${data.map(r => `${r.name}: ${r.score}`).join("\n")}`
-}
-```
-
-**Correct:**
-
-```swirls
-prompt: @ts {
-  return "Results:\n" + data.map(r => r.name + ": " + r.score).join("\n")
-}
-```
-
-Rule: never use backticks inside `${}` interpolation. Use string concatenation (`+`) instead.
-
----
-
-### Dollar Sign Before Interpolation Breaks Parsing
-
-A literal `$` immediately before a `${...}` interpolation (e.g. formatting currency as `$${amount}`) breaks `@ts` parsing. The parser sees `$${` and cannot determine where the interpolation begins.
-
-**Incorrect:**
-
-```swirls
-code: @ts {
-  return `Total: $${amount.toFixed(2)}`
-}
-```
-
-**Correct (concatenation):**
-
-```swirls
-code: @ts {
-  return "Total: $" + amount.toFixed(2)
-}
-```
-
-Any time you need a literal `$` followed by a `${` interpolation, use string concatenation.
-
----
-
 ### Parser Silently Drops Workflows
 
-The Swirls parser has several bugs where invalid or unsupported syntax causes it to silently stop parsing the rest of the file. `swirls doctor` reports success but with fewer workflows/forms/triggers than expected. No error is emitted.
+Some invalid input makes the lexer or parser stop or skip without emitting an error. `swirls doctor` reports success but with fewer workflows/forms/triggers than expected.
 
-**How to detect:** Always compare the doctor summary counts against what you defined. If doctor reports 2 workflows but you wrote 4, the parser silently dropped 2.
+**How to detect:** Always compare the doctor summary counts against what you defined. If doctor reports 2 workflows but you wrote 4, something silently dropped 2.
 
-**Common causes of silent drops (in order of likelihood):**
+**Causes of silent drops:**
 
-1. **Double-quote characters inside @ts blocks** - The parser's string boundary detection gets confused. Everything after the block is dropped.
+1. **Regex literals containing quote characters inside `@ts` blocks** — the scanner mistakes the quote for a string boundary and consumes everything to the next quote. See `ts-regex-literals`.
 
-2. **Nested template literals** - Inner backticks inside `${}` interpolation are mistaken for block boundaries.
+2. **Stray characters at DSL level** — a character the lexer does not recognize (stray Unicode, an unquoted hyphen in an object key) outside comments/strings/fenced blocks stops tokenization; the rest of the file is dropped. See `parser-illegal-characters` and `parser-hyphenated-headers`.
 
-3. **Dollar sign before interpolation** - `$${amount}` breaks interpolation parsing.
+3. **`inputSchema` or `outputSchema` on a non-root node** — the parser emits an error but also **drops the whole node**, which then cascades into "Edge references non-existent node" diagnostics.
 
-4. **Unicode in comments** - Non-ASCII characters in `//` comments break line counting.
+4. **Unbalanced braces in `@ts` / `@json` / `@sql` blocks** — the fenced scanner brace-balances to find the end of the block; an extra `{` swallows following declarations into the block.
 
-5. **Hyphenated header keys** - `Content-Type` in headers is parsed as subtraction, consuming everything to EOF.
+**Not hazards (parse correctly):** nested template literals, `$${...}`, double-quote characters inside properly quoted strings, and Unicode inside comments or string literals.
 
 **Debugging steps:**
 
 1. Run `bunx swirls doctor` and note the counts
 2. Count the forms, workflows, and triggers you defined
 3. If counts don't match, binary-search by commenting out halves of the file
-4. Check the section above the first missing workflow for parser-breaking patterns
-5. Fix the pattern and re-run doctor
+4. Check the section above the first missing item for the patterns above
+5. Fix and re-run doctor
 
 The issue is always in or before the first missing item, never after it.
 
@@ -6685,23 +6688,22 @@ The issue is always in or before the first missing item, never after it.
 
 ### Parse Errors Cascade Past the Actual Problem
 
-A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "expected form, webhook, schedule, workflow, or trigger", look above the reported line.
+A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "Unexpected token: expected form, webhook, schedule, graph, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, or schema", look above the reported line.
 
 **Common causes of cascading errors:**
 
-1. Unrecognized fields (like `secrets: ["KEY"]` with quoted strings)
-2. Inline objects with special characters in keys
-3. Mismatched braces in `@ts` or `@json` blocks
-4. Double-quote characters inside `@ts` blocks
-5. Nested template literals or `$${...}` in `@ts` blocks
-6. Unicode characters in comments
+1. Mismatched braces in `@ts`, `@json`, or `@sql` blocks
+2. Misplaced schema keys (`inputSchema`/`outputSchema` on a non-root node) — the node is dropped, then its edges fail
+3. Quoted keys with special characters in DSL object literals (use a `@ts` block instead)
+4. Regex literals containing quote characters inside `@ts` blocks
+5. A missing `{` or `}` on a block declaration
 
 **Debugging strategy:**
 
 When doctor reports an error at line N, look at lines 1 through N for:
-- Unbalanced `{` and `}` in `@ts` or `@json` blocks
-- Any of the parser-breaking patterns from the parser pitfalls section
-- Unrecognized field names on nodes
+- Unbalanced `{` and `}` in fenced blocks
+- Any of the silent-drop patterns (see `parser-silent-drops`)
+- Unrecognized field names or misplaced keys on nodes
 
 The actual problem is usually 5-50 lines above the reported line.
 
@@ -6709,16 +6711,16 @@ The actual problem is usually 5-50 lines above the reported line.
 
 ### Pre-Flight Validation Checklist
 
-Before running `swirls doctor`, verify every item on this checklist. Each item corresponds to a known parser bug or validation failure.
+Before running `swirls doctor`, verify every item on this checklist. Each item corresponds to a known lexer hazard or validation failure.
 
 **Parser safety (silent drops):**
 
-- [ ] Comments use ASCII only (no box-drawing, arrows, em dashes, or other Unicode)
+- [ ] No regex literals containing `"`, `'`, or backtick characters inside `@ts` blocks (build with `new RegExp(...)` / `String.fromCharCode` instead)
+- [ ] No stray Unicode or other unrecognized characters at DSL level (comments and strings are fine)
 - [ ] No `headers` field using plain object literals with hyphenated keys (use a `@ts` block instead)
-- [ ] No literal `"` characters inside `@ts` blocks (use `String.fromCharCode(34)`)
-- [ ] No nested template literals inside `@ts` blocks (use concatenation)
-- [ ] No `$${...}` patterns in template literals (use concatenation)
 - [ ] No nested `@ts` or `@json` blocks inside other code blocks (use a single block that returns the full object)
+- [ ] Braces balanced in all `@ts { }`, `@json { }`, and `@sql { }` blocks
+- [ ] No `inputSchema`/`outputSchema` on non-root nodes (the parser drops the whole node)
 
 **Structure validation:**
 
@@ -6732,23 +6734,25 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 
 - [ ] Every `email` node has `from`, `to`, and `subject` fields
 - [ ] Every `scrape` node has a `url` field
-- [ ] Every `ai` node has `kind`, `model`, and `prompt` fields
-- [ ] Every `ai` node with `kind: object` has a `schema`
-- [ ] Every `agent` node has `agent` and `prompt` fields, and any `role:` matches a role in the bound agent block
+- [ ] Every `ai` node has a `kind` field (and `model` + `prompt` for a working call; `schema` for `kind: object`)
+- [ ] Every `agent` node has `agent` and `prompt` fields, and any `profile:` matches a profile in the bound agent block
 - [ ] Every `code` node has a `code` field
 - [ ] Every `switch` node has `cases` and `router` fields
 - [ ] Every `http` node has a `url` field
 - [ ] Every `workflow` node has `workflow` and `input` fields
 - [ ] Every `bucket` node has an `operation` field
 - [ ] Every `disk` node has `disk` and `command` fields
+- [ ] Every `map` node has `items`, `maxItems`, and exactly one of `subgraph { }` or `workflow:`
+- [ ] Every `while` node has `input`, `condition`, `update`, `maxIterations`, and exactly one of `subgraph { }` or `workflow:`
+- [ ] Every `stream` node has `stream`, `version`, and `filter`
 - [ ] Every `postgres` node has a `postgres` field and exactly one of `select` or `insert`
 - [ ] Every `postgres` node with `insert` has a `params` field
-- [ ] Every `postgres` node references a `postgres` block defined in the same file
 
-**Trigger validation:**
+**Cross-references (resolved across the workspace — all `.swirls` files under the working directory):**
 
-- [ ] All workflows referenced by `type: workflow` nodes are in the same file
-- [ ] Trigger bindings reference resources and workflows defined in the same file
+- [ ] Workflows referenced by `type: workflow` / `map` / `while` nodes are declared somewhere in the workspace
+- [ ] Trigger bindings reference declared resources and workflows
+- [ ] `postgres:` / `disk:` / `agent:` / `stream:` node fields name declared top-level blocks
 - [ ] Secret keys use only `[a-zA-Z0-9_]` characters
 
 **File references:**
@@ -6758,7 +6762,7 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 **Schema validation:**
 
 - [ ] `@json` blocks contain valid JSON (double-quoted keys, no trailing commas)
-- [ ] Braces are balanced in all `@ts { }`, `@json { }`, and `@sql { }` blocks
+- [ ] Bare schema names (`inputSchema: foo`) resolve to a top-level `schema foo { }` block
 
 **After running doctor:**
 
@@ -6807,7 +6811,9 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 - `Auth block "<n>" requires type: oauth, api_key, basic, bearer, or cloud` — Missing or invalid `type:`.
 - `Auth "<n>" references undefined secret block "<s>"` — `secrets:` names a block that does not exist.
-- `Auth "<n>" references undefined var "<V>" not declared in secret block "<s>"` — A field like `client_id: FOO` but `FOO` is not in that secret block's `vars:`.
+- `Auth "<n>" field "<f>" must reference a var from secret block "<s>"` — A field like `client_id: FOO` but `FOO` is not in that secret block's `vars:`.
+- `Auth type oauth requires "<f>"` (grant_type / client_id / client_secret / token_url), `Auth type api_key requires "key"`, `Auth type api_key requires "header" or "query_param"`, `Auth type basic requires "<f>"` (username / password), `Auth type bearer requires "token"`, `Auth block "<n>" (cloud): missing required field "provider"` / `"connection_id"` — type-specific required fields.
+- Warning: `Auth block "<n>" (cloud): cloud auth uses managed credentials and should not reference a secrets block`.
 
 #### HTTP / auth usage
 
@@ -6881,8 +6887,12 @@ Required keys: `stream`, `version`, `filter`.
 
 #### Forms
 
-- Parser error: `Expected \`public\` or \`internal\` after \`visibility\`` — `visibility` is a bare keyword (no colon, no quotes). Use `visibility public` or `visibility internal`.
+- Parser error: `Expected \`:\` after \`visibility\`` — `visibility` is a key:value field; the colon is required.
+- Parser error: `Expected \`public\` or \`internal\` after \`visibility:\`` — The value must be a bare identifier, not a quoted string.
 - Parser error: `Invalid visibility "<x>"; expected \`public\` or \`internal\`` — Only those two values are valid.
+- Parser error: `Expected auth block name (bare identifier) after \`auth:\`` — Form `auth:` takes a bare identifier.
+- `Form "<n>" references undefined auth block "<a>"` — `auth:` must name a declared `auth` block.
+- `Form "<n>" auth block "<a>" must have type \`basic\` (found \`<t>\`)` — Only basic auth blocks can gate forms.
 
 #### Webhooks (authentication)
 
@@ -6903,24 +6913,28 @@ Required keys: `stream`, `version`, `filter`.
 
 #### Postgres (top-level block)
 
-- `Postgres block "<n>": connection is required` — Add `connection:`.
-- Warning: `Postgres block "<n>": plaintext connection string — use a secret` — Move the URL into a secret.
-- `Postgres block "<n>": connection references var "<V>" not declared in secret block "<s>"` — Var must appear in the referenced block's `vars`.
-- `Postgres block "<n>" requires at least one "table"` — Add a `table <name> { schema: @json { ... } }`.
-- `Postgres block "<n>": duplicate table "<t>"` — Rename one.
-- `Postgres block "<n>": table "<t>" requires "schema"` — Each table needs a JSON Schema.
+- `Postgres block requires a connection field` — Add `connection:`.
+- Warning: `Postgres connection contains a plaintext string. Use a secret identifier for production deployments.` — Move the URL into a secret.
+- `Invalid connection secret key (use only letters, digits, and underscore)` — Bare `connection:` identifiers must match the secret key pattern.
+- `Postgres "<n>" connection "<c>" must reference a var from secret block "<s>"` — When `secrets:` is set, the bare `connection:` var must appear in that block's `vars`.
+- `Postgres "<n>" references undefined secret block "<s>"` — `secrets:` names a missing block.
+- `Postgres block must declare at least one table` — Add a `table <name> { schema: @json { ... } }`.
+- `Duplicate table name "<t>" in postgres block` — Rename one.
+- `Table "<t>" requires a schema` — Each table needs a JSON Schema.
+- `Duplicate postgres block name "<n>"` — Two blocks share a name.
 
 #### Postgres nodes
 
-- `Postgres node requires "postgres"` — Add `postgres: <block_name>`.
-- `Postgres node references postgres block "<b>" which is not defined`.
-- `Postgres node requires exactly one of "select" or "insert"` — Remove the other, or add the missing one.
-- `Postgres insert node requires "params"` — Inserts always need params.
-- `select must begin with SELECT or WITH` / `insert must begin with INSERT`.
-- `select references table "<t>" not declared in postgres block "<b>"` — Add the table declaration.
-- `insert references table "<t>" not declared in postgres block "<b>"`.
-- `INSERT values must be parenthesized: VALUES ({{key}}, ...)`.
-- `Param "<p>" has no matching {{<p>}} placeholder in SQL` / `Placeholder {{<p>}} has no matching key in params` — Align placeholder names with params keys.
+- `Postgres node requires a "postgres" field` — Add `postgres: <block_name>`.
+- `Postgres node references undefined postgres block "<b>"`.
+- `Postgres node cannot have both "select" and "insert"` / `Postgres node requires exactly one of "select" or "insert"` — Use exactly one.
+- `Postgres insert node requires a "params" (@ts block)` — Inserts always need params.
+- `Postgres select must be a SELECT statement` (SELECT or WITH) / `Postgres insert must be an INSERT statement`.
+- `Table "<t>" is not declared in postgres block "<b>"` — Every table in the SQL must appear in the block's `table { }` declarations.
+- `Column "<c>" is not declared on table "<t>" in postgres block "<b>"` — Explicit `INSERT INTO t (col1, …)` columns must exist on the declared table schema.
+- `Postgres INSERT VALUES clause must wrap row values in parentheses, e.g. VALUES ({{key}})`.
+- `SQL placeholder "{{<k>}}" has no matching key in params return object` — Every `{{key}}` must be a key of the object `params:` returns. (Extra params keys are not flagged.)
+- `condition is only valid on postgres insert nodes` / `condition must be a @ts block`.
 
 #### Triggers
 
@@ -6940,6 +6954,7 @@ Required keys: `stream`, `version`, `filter`.
 - `Agent "<n>" secret block must declare "<VAR>" for provider "<p>"` — The provider needs its vendor key (e.g. `OPENROUTER_API_KEY`) listed in the referenced secret block's `vars`.
 - `Workflow "<n>" is used as an agent tool but the workflow-level description field is missing or empty` — A tool workflow needs a non-empty top-level `description:`.
 - `Agent tool workflow "<n>" must declare inputSchema on the root node` — Add `inputSchema` to the tool workflow's `root`.
+- `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object. Add at least one input property so the agent can call the tool.` — Tool input schemas need at least one property.
 - `Agent tool workflow "<n>" requires output schema on leaf node "<leaf>"` — Every leaf node of a tool workflow needs a `schema`/`outputSchema`.
 - `Agent "<n>" cannot include itself in team:` — Remove the self-reference.
 - `Agent "<n>" team member "<m>" is not defined in the workspace` — `team:` must name declared `agent` blocks.
@@ -6951,4 +6966,17 @@ Required keys: `stream`, `version`, `filter`.
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
 - `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — Two enabled channels share the same `platform : mode : agent` tuple. Change `mode`, point one at a different agent, or set `enabled: false` on one.
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `channel must declare integration` / `Unknown channel property "<key>"`.
+
+#### Output format (`format:` on nodes)
+
+- `Invalid output format "<f>". Use one of: markdown, html, text, image, video, audio, mixed, json.` — Fix the `format:` value (bare identifier).
+- `Output schema is incompatible with format "<f>" (expect top-level string, a { markdown | html | text | url } string field, or contentMediaType hint).` — The node's resolved output schema cannot be projected into the declared format. `json` and `mixed` are always compatible.
+
+#### Access control (`access` / `role` / `policy`)
+
+- `Duplicate role name "<n>"` — Two `role` blocks share a name.
+- Warning: `Role "<n>" has an empty match { } and will match no principal` — Add at least one claim condition.
+- Parser: `access default: must be \`deny\` or \`allow\`` / `access default: expected \`deny\` or \`allow\``.
+- Parser: `Expected role name after \`allow\`` / `Expected \`->\` after role name` / `Expected \`agent\` after \`->\`` / `Expected an agent name or \`*\`` / `Expected \`allow\` or \`deny\` in policy block` — Grant lines are `allow|deny <role> -> agent <name>|*`.
 

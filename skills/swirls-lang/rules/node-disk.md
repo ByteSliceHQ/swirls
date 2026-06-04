@@ -65,7 +65,7 @@ node fetch_report {
 |-------|----------|------|-------|
 | `disk` | yes | Bare identifier | Names a top-level `disk <name> { }` block. |
 | `command` | yes | String or `@ts` block | Single shell command to execute on the disk. |
-| `schema` | **not allowed** | Vendor-managed; omit entirely. |
+| `schema` | no | `@json` block, object literal, or bare schema name | Types the command output for downstream `@ts` code. |
 
 Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
 

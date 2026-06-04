@@ -670,9 +670,9 @@ form contact_form {
 
 Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, workflows, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids.
 
-### 24. Setting `visibility` like a key:value pair on a form
+### 24. Quoting the `visibility` value (or dropping its colon) on a form
 
-**Incorrect:**
+**Incorrect (quoted value):**
 
 ```swirls
 form contact {
@@ -681,14 +681,25 @@ form contact {
 }
 ```
 
-The parser errors: `Expected \`public\` or \`internal\` after \`visibility\``. `visibility` is a bare keyword, not a key:value pair — there is no colon and the value is an unquoted identifier (`public` or `internal`).
+The parser errors: `Expected \`public\` or \`internal\` after \`visibility:\``. The value must be a **bare identifier** (`public` or `internal`), never a quoted string.
+
+**Incorrect (missing colon):**
+
+```swirls
+form contact {
+  label: "Contact"
+  visibility public
+}
+```
+
+The parser errors: `Expected \`:\` after \`visibility\``. `visibility` is a normal key:value field — the colon is required.
 
 **Correct:**
 
 ```swirls
 form contact {
   label: "Contact"
-  visibility public
+  visibility: public
 }
 ```
 
@@ -951,7 +962,31 @@ workflow handle {
 
 The bare identifier (`contact_payload`) references the top-level `schema` block. See `resource-schema`.
 
-### 33. Channel `platform` and `integration` mismatch
+### 33. Using `schema:` on a root block
+
+**Incorrect:**
+
+```swirls
+root {
+  type: code
+  code: @ts { return {} }
+  schema: @json { { "type": "object" } }
+}
+```
+
+`schema:` is not a recognized key on `root { }` blocks — the parser cannot consume the `@json` value, emits `Unexpected token`, and drops the rest of the root config. Root blocks use `inputSchema` and `outputSchema`; only non-root nodes use `schema`.
+
+**Correct:**
+
+```swirls
+root {
+  type: code
+  code: @ts { return {} }
+  outputSchema: @json { { "type": "object" } }
+}
+```
+
+### 34. Channel `platform` and `integration` mismatch
 
 A `channel` block's `integration` must equal its `platform`. They are separate fields (surface vs credential source) but a mismatch is rejected.
 
@@ -980,7 +1015,7 @@ channel concierge_slack {
 
 Also: `platform`, `integration`, and `mode` are bare keyword values, and `agent:` is a bare identifier naming an `agent` block (not a quoted string). Two enabled channels cannot share the same `platform : mode : agent` tuple. See `resource-channel`.
 
-### 34. Agent `team` that references itself or forms a cycle
+### 35. Agent `team` that references itself or forms a cycle
 
 `team: [ … ]` names other `agent` blocks as subagents. An agent cannot list itself, a team member cannot collide with one of the agent's `tools:` workflow names, and the delegation chain cannot contain a cycle.
 

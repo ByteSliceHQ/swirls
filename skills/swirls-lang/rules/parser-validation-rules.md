@@ -44,7 +44,9 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 - `Auth block "<n>" requires type: oauth, api_key, basic, bearer, or cloud` — Missing or invalid `type:`.
 - `Auth "<n>" references undefined secret block "<s>"` — `secrets:` names a block that does not exist.
-- `Auth "<n>" references undefined var "<V>" not declared in secret block "<s>"` — A field like `client_id: FOO` but `FOO` is not in that secret block's `vars:`.
+- `Auth "<n>" field "<f>" must reference a var from secret block "<s>"` — A field like `client_id: FOO` but `FOO` is not in that secret block's `vars:`.
+- `Auth type oauth requires "<f>"` (grant_type / client_id / client_secret / token_url), `Auth type api_key requires "key"`, `Auth type api_key requires "header" or "query_param"`, `Auth type basic requires "<f>"` (username / password), `Auth type bearer requires "token"`, `Auth block "<n>" (cloud): missing required field "provider"` / `"connection_id"` — type-specific required fields.
+- Warning: `Auth block "<n>" (cloud): cloud auth uses managed credentials and should not reference a secrets block`.
 
 ### HTTP / auth usage
 
@@ -118,8 +120,12 @@ Required keys: `stream`, `version`, `filter`.
 
 ### Forms
 
-- Parser error: `Expected \`public\` or \`internal\` after \`visibility\`` — `visibility` is a bare keyword (no colon, no quotes). Use `visibility public` or `visibility internal`.
+- Parser error: `Expected \`:\` after \`visibility\`` — `visibility` is a key:value field; the colon is required.
+- Parser error: `Expected \`public\` or \`internal\` after \`visibility:\`` — The value must be a bare identifier, not a quoted string.
 - Parser error: `Invalid visibility "<x>"; expected \`public\` or \`internal\`` — Only those two values are valid.
+- Parser error: `Expected auth block name (bare identifier) after \`auth:\`` — Form `auth:` takes a bare identifier.
+- `Form "<n>" references undefined auth block "<a>"` — `auth:` must name a declared `auth` block.
+- `Form "<n>" auth block "<a>" must have type \`basic\` (found \`<t>\`)` — Only basic auth blocks can gate forms.
 
 ### Webhooks (authentication)
 
@@ -140,24 +146,28 @@ Required keys: `stream`, `version`, `filter`.
 
 ### Postgres (top-level block)
 
-- `Postgres block "<n>": connection is required` — Add `connection:`.
-- Warning: `Postgres block "<n>": plaintext connection string — use a secret` — Move the URL into a secret.
-- `Postgres block "<n>": connection references var "<V>" not declared in secret block "<s>"` — Var must appear in the referenced block's `vars`.
-- `Postgres block "<n>" requires at least one "table"` — Add a `table <name> { schema: @json { ... } }`.
-- `Postgres block "<n>": duplicate table "<t>"` — Rename one.
-- `Postgres block "<n>": table "<t>" requires "schema"` — Each table needs a JSON Schema.
+- `Postgres block requires a connection field` — Add `connection:`.
+- Warning: `Postgres connection contains a plaintext string. Use a secret identifier for production deployments.` — Move the URL into a secret.
+- `Invalid connection secret key (use only letters, digits, and underscore)` — Bare `connection:` identifiers must match the secret key pattern.
+- `Postgres "<n>" connection "<c>" must reference a var from secret block "<s>"` — When `secrets:` is set, the bare `connection:` var must appear in that block's `vars`.
+- `Postgres "<n>" references undefined secret block "<s>"` — `secrets:` names a missing block.
+- `Postgres block must declare at least one table` — Add a `table <name> { schema: @json { ... } }`.
+- `Duplicate table name "<t>" in postgres block` — Rename one.
+- `Table "<t>" requires a schema` — Each table needs a JSON Schema.
+- `Duplicate postgres block name "<n>"` — Two blocks share a name.
 
 ### Postgres nodes
 
-- `Postgres node requires "postgres"` — Add `postgres: <block_name>`.
-- `Postgres node references postgres block "<b>" which is not defined`.
-- `Postgres node requires exactly one of "select" or "insert"` — Remove the other, or add the missing one.
-- `Postgres insert node requires "params"` — Inserts always need params.
-- `select must begin with SELECT or WITH` / `insert must begin with INSERT`.
-- `select references table "<t>" not declared in postgres block "<b>"` — Add the table declaration.
-- `insert references table "<t>" not declared in postgres block "<b>"`.
-- `INSERT values must be parenthesized: VALUES ({{key}}, ...)`.
-- `Param "<p>" has no matching {{<p>}} placeholder in SQL` / `Placeholder {{<p>}} has no matching key in params` — Align placeholder names with params keys.
+- `Postgres node requires a "postgres" field` — Add `postgres: <block_name>`.
+- `Postgres node references undefined postgres block "<b>"`.
+- `Postgres node cannot have both "select" and "insert"` / `Postgres node requires exactly one of "select" or "insert"` — Use exactly one.
+- `Postgres insert node requires a "params" (@ts block)` — Inserts always need params.
+- `Postgres select must be a SELECT statement` (SELECT or WITH) / `Postgres insert must be an INSERT statement`.
+- `Table "<t>" is not declared in postgres block "<b>"` — Every table in the SQL must appear in the block's `table { }` declarations.
+- `Column "<c>" is not declared on table "<t>" in postgres block "<b>"` — Explicit `INSERT INTO t (col1, …)` columns must exist on the declared table schema.
+- `Postgres INSERT VALUES clause must wrap row values in parentheses, e.g. VALUES ({{key}})`.
+- `SQL placeholder "{{<k>}}" has no matching key in params return object` — Every `{{key}}` must be a key of the object `params:` returns. (Extra params keys are not flagged.)
+- `condition is only valid on postgres insert nodes` / `condition must be a @ts block`.
 
 ### Triggers
 
@@ -177,6 +187,7 @@ Required keys: `stream`, `version`, `filter`.
 - `Agent "<n>" secret block must declare "<VAR>" for provider "<p>"` — The provider needs its vendor key (e.g. `OPENROUTER_API_KEY`) listed in the referenced secret block's `vars`.
 - `Workflow "<n>" is used as an agent tool but the workflow-level description field is missing or empty` — A tool workflow needs a non-empty top-level `description:`.
 - `Agent tool workflow "<n>" must declare inputSchema on the root node` — Add `inputSchema` to the tool workflow's `root`.
+- `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object. Add at least one input property so the agent can call the tool.` — Tool input schemas need at least one property.
 - `Agent tool workflow "<n>" requires output schema on leaf node "<leaf>"` — Every leaf node of a tool workflow needs a `schema`/`outputSchema`.
 - `Agent "<n>" cannot include itself in team:` — Remove the self-reference.
 - `Agent "<n>" team member "<m>" is not defined in the workspace` — `team:` must name declared `agent` blocks.
@@ -188,3 +199,16 @@ Required keys: `stream`, `version`, `filter`.
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
 - `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — Two enabled channels share the same `platform : mode : agent` tuple. Change `mode`, point one at a different agent, or set `enabled: false` on one.
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `channel must declare integration` / `Unknown channel property "<key>"`.
+
+### Output format (`format:` on nodes)
+
+- `Invalid output format "<f>". Use one of: markdown, html, text, image, video, audio, mixed, json.` — Fix the `format:` value (bare identifier).
+- `Output schema is incompatible with format "<f>" (expect top-level string, a { markdown | html | text | url } string field, or contentMediaType hint).` — The node's resolved output schema cannot be projected into the declared format. `json` and `mixed` are always compatible.
+
+### Access control (`access` / `role` / `policy`)
+
+- `Duplicate role name "<n>"` — Two `role` blocks share a name.
+- Warning: `Role "<n>" has an empty match { } and will match no principal` — Add at least one claim condition.
+- Parser: `access default: must be \`deny\` or \`allow\`` / `access default: expected \`deny\` or \`allow\``.
+- Parser: `Expected role name after \`allow\`` / `Expected \`->\` after role name` / `Expected \`agent\` after \`->\`` / `Expected an agent name or \`*\`` / `Expected \`allow\` or \`deny\` in policy block` — Grant lines are `allow|deny <role> -> agent <name>|*`.

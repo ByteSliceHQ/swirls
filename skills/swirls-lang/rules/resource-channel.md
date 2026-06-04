@@ -24,7 +24,7 @@ channel <name> {
 }
 ```
 
-`platform`, `integration`, and `mode` take **bare keyword values** (not quoted strings). `agent` is a **bare identifier** naming a top-level `agent` block, not a quoted string.
+`platform`, `integration`, and `mode` take **bare values** by convention (the parser also accepts quoted strings). `agent` is a bare identifier naming a top-level `agent` block (a quoted string also parses). Unlike most blocks, channels reject unknown keys: `Unknown channel property "<key>"`.
 
 ### Required vs optional fields
 
@@ -122,15 +122,10 @@ channel bad { platform: slack  integration: web  agent: concierge }
 channel good { platform: slack  integration: slack  agent: concierge }
 ```
 
-**`agent` as a quoted string.** It is a bare identifier naming an `agent` block.
+**`agent` as a quoted string.** Convention is a bare identifier naming an `agent` block (a quoted string parses to the same value, but write it bare).
 
 ```swirls
-// Incorrect
-channel bad { platform: web  integration: web  agent: "concierge" }
-```
-
-```swirls
-// Correct
+// Convention
 channel good { platform: web  integration: web  agent: concierge }
 ```
 
@@ -139,5 +134,8 @@ channel good { platform: web  integration: web  agent: concierge }
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
 - `Channel "<n>" platform "<p>" must match integration "<i>"` — set `integration` equal to `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — change `mode`, point one at a different agent, or disable one.
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
+- Parser: `channel must declare platform` / `channel must declare agent` / `channel must declare integration` — required field missing.
+- Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set.
 
 See `resource-agent` for the `agent` block (including subagent `team`).

@@ -14,7 +14,8 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, schema,
-disk, agent, channel, role, tools,
+disk, agent, channel, profile, tools,
+role, access, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
 subgraph, map, while, items, update, maxItems, maxIterations, concurrency
@@ -43,13 +44,16 @@ postgres <name> { }
 disk <name> { }
 agent <name> { }
 channel <name> { }
+access { }
+role <name> { }
+policy { }
 ```
 
-There are **13** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. The newest are `agent <name> { }` (LLM agent definition with tools, roles, and a subagent `team`, bound by `type: agent` nodes) and `channel <name> { }` (binds an agent to a chat platform — Slack, Linear, Discord, or web). `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount.
+There are **16** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control trio — `access { }` (nameless; default posture), `role <name> { }` (claim matching), and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants) — is covered in `resource-access-control`.
 
 ### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -59,7 +63,7 @@ Names may start with a digit. Hyphens, dots, spaces, and other characters are no
 
 ### Complete node type list
 
-These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `packages/core/src/schemas.ts`.
+These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `@swirls/schemas` (`packages/schemas/src/schemas.ts`).
 
 ```
 agent, ai, bucket, code, disk, email, http, map,
@@ -89,7 +93,7 @@ Notes on aliases that do NOT exist:
 These are the only value forms that can appear after a `:` in a field assignment.
 
 - String literal: `"value"`
-- Number: `42`, `3.14`
+- Number: `42`, `3.14`, `-1` (negative literals are supported)
 - Boolean: `true`, `false`
 - Bare identifier: `my_name` (parsed as a string; used to reference top-level blocks like `workflow: helper_workflow`, `stream: my_stream`, `schema: my_schema`)
 - Object literal: `{ key: value, key2: value2 }` (comma-separated)
@@ -136,16 +140,18 @@ oauth, api_key, basic, bearer, cloud
 
 No other types exist. `jwt`, `mtls`, `session`, `cookie`, `saml`, `digest`, `ntlm` are not valid.
 
-### Form visibility keyword
+### Form visibility and auth fields
 
-`form <name> { }` accepts the special bare keyword `visibility` (no colon) with one of two values:
+`form <name> { }` accepts a `visibility:` field whose value is a **bare identifier** — one of two values:
 
 ```
-visibility public
-visibility internal
+visibility: public
+visibility: internal
 ```
 
-Default is `internal` when omitted. `public` exposes the form via the Triggers service at `/triggers/forms/:projectId/:formName`. `internal` returns 404 from Triggers (the dashboard can still read/edit the form). Quoted values like `visibility "public"` are a parser error. See `resource-form`.
+Default is `internal` when omitted. `public` exposes the form via the Triggers service at `/triggers/forms/:projectId/:formName`. `internal` returns 404 from Triggers (the dashboard can still read/edit the form). A quoted value (`visibility: "public"`) or a missing colon (`visibility public`) is a parser error. See `resource-form`.
+
+`form <name> { }` also accepts `auth: <authBlockName>` — a bare identifier referencing a top-level `auth` block with `type: basic`. The Triggers service then requires HTTP Basic credentials (from the auth block's secret vars) on form GET/POST. Visibility is enforced first, so `auth:` is dead config on internal forms. See `resource-form`.
 
 ### Webhook authentication fields
 
@@ -171,7 +177,11 @@ enabled: true | false                          // optional; defaults to enabled
 label: "..."   description: "..."              // optional
 ```
 
-`platform`, `integration`, and `mode` are bare keyword values (not quoted). `integration` must equal `platform` or it is a validator error. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. See `resource-channel`.
+`platform`, `integration`, and `mode` are conventionally bare values (the parser also accepts quoted strings). `integration` must equal `platform` or it is a validator error. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"`. See `resource-channel`.
+
+### Access-control blocks
+
+`access { default: deny | allow }` sets the deployment's default posture. `role <name> { match { <claim>: <value> } }` derives a role from verified principal attributes (scalar value = equality, array value = membership). `policy { allow|deny <role> -> agent <name>|* { workflows: […], tools: […] } }` grants roles access to agents. See `resource-access-control`.
 
 ### Agent subagent team
 
@@ -204,7 +214,7 @@ node each_item {
 
 The following constructs do not exist in the Swirls DSL. Do not use them.
 
-**No control flow at DSL level:** `if`, `else`, `do`, `switch` (as a keyword), `case`, `default`, `break`, `continue`, `return`, `match`. (`while` and `map` are node types, not control flow keywords.)
+**No control flow at DSL level:** `if`, `else`, `do`, `switch` (as a keyword), `case`, `default`, `break`, `continue`, `return`. (`while` and `map` are node types, not control flow keywords; `match` is the claim-matching block inside `role` declarations, not a control-flow construct.)
 
 **No `for` keyword.** Iteration is done via the `map` node (per-item) or `while` node (counter / condition).
 
@@ -268,7 +278,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 Only these fields have semantics for each node type. All types additionally accept `type`, `label`, `description`, `secrets`, `review`, `failurePolicy`. Root nodes additionally accept `inputSchema` and `outputSchema`. Non-root nodes accept `schema` (not `outputSchema`).
 
-**ai** — required: `kind`. Valid kinds: `text`, `object`, `image`, `video`, `embed`. Other fields: `model`, `prompt` (@ts), `temperature`, `maxTokens`, `options` (object; for image: `n`, `size`, `aspectRatio`), `schema` (required for `kind: object`; warning if set on `kind: text`).
+**ai** — required: `kind`. Valid kinds: `text`, `object`, `image`, `video`, `embed`. Other fields: `model`, `prompt` (@ts), `provider` (`openrouter` default, `anthropic`, `openai`, `google`), `temperature`, `maxTokens`, `options` (object; for image: `n`, `size`, `aspectRatio`), `schema` (required for `kind: object`; warning if set on `kind: text`).
 
 **code** — required: `code` (@ts block or `@ts "file.ts.swirls"`). Other fields: `schema`.
 
@@ -298,9 +308,9 @@ No user `schema:` — vendor-managed output shape.
 
 **bucket** — required: `operation` (`download` or `upload`). Optional: `path`.
 
-**disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). No user `schema:`. See `node-disk` and `resource-disk`.
+**disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). Optional: `schema` (typing the command output). See `node-disk` and `resource-disk`.
 
-**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `role` (bare identifier naming a role inside the agent block), `tools` (array of bare identifiers narrowing within the effective tool set), `system` (@ts; per-call system-prompt override), `schema` (structured-output constraint; use `schema`, never `outputSchema`). See `node-agent` and `resource-agent`.
+**agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `profile` (bare identifier naming a profile inside the agent block), `tools` (array of bare identifiers narrowing within the effective tool set), `system` (@ts; per-call system-prompt override), `schema` (structured-output constraint; use `schema`, never `outputSchema`). See `node-agent` and `resource-agent`.
 
 **postgres** (node) — required: `postgres` (bare identifier naming a top-level `postgres <name> { }` block) and exactly one of `select:` (@sql SELECT or WITH) or `insert:` (@sql INSERT, optionally with ON CONFLICT). Other fields: `params` (@ts returning an object whose keys match `{{key}}` placeholders in the SQL; required when SQL has placeholders, always required for `insert:`), `condition` (@ts returning boolean; only valid on `insert:` nodes), `schema` (recommended for `select:` to type the row output).
 
@@ -311,6 +321,7 @@ No user `schema:` — vendor-managed output shape.
 - `secrets` — object literal: `{ blockName: [VAR1, VAR2], otherBlock: [VAR3] }`. The block name must be a declared top-level `secret` block and each var must appear in that block's `vars` list. Accessed at runtime as `context.secrets.blockName.VAR1`.
 - `review` — either `review: true` or `review: { enabled, title, description, content, schema, actions, approvedOutput, rejectedOutput }`. See `review-config`.
 - `failurePolicy` (optional) — `{ strategy: "fail" | "retry" | "skip" | "fallback", maxRetries, backoffMs, fallbackValue }`.
+- `format` — presentation format for the node's output, a bare identifier: `markdown`, `html`, `text`, `image`, `video`, `audio`, `mixed`, or `json`. The validator checks the declared output schema is compatible (top-level string, a `{ markdown | html | text | url }` string property, or a `contentMediaType` hint; `json`/`mixed` always pass).
 
 ### Schema reference syntax (bare identifier)
 
@@ -321,3 +332,5 @@ No user `schema:` — vendor-managed output shape.
 - A bare identifier naming a top-level `schema <name> { }` block: `inputSchema: contact_payload`.
 
 The bare-identifier form requires a matching `schema <name> { }` declaration somewhere in the workspace. See `resource-schema`.
+
+Placement is strict: `inputSchema` and `outputSchema` belong on **root blocks only**; non-root nodes use `schema`. A `schema:` key on a **root** block is not recognized — the parser cannot consume its `@json` value and emits an `Unexpected token` error, dropping the rest of the root config. Use `outputSchema` on root.

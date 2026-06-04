@@ -45,15 +45,19 @@ node call_api {
 **Correct (single @ts block returning the full object):**
 
 ```swirls
+secret api_creds {
+  vars: [API_KEY]
+}
+
 node call_api {
   type: http
   label: "Call API"
   url: "https://api.example.com/data"
   method: "POST"
-  secrets: [API_KEY]
+  secrets: { api_creds: [API_KEY] }
   headers: @ts {
     return {
-      "x-api-key": context.secrets.API_KEY,
+      "x-api-key": context.secrets.api_creds.API_KEY,
       "x-request-id": "abc123",
       "Content-Type": "application/json"
     }

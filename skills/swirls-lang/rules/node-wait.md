@@ -24,3 +24,4 @@ Wait node fields:
 |-------|----------|------|
 | `amount` | no | Number |
 | `unit` | no | "seconds", "minutes", "hours", "days" |
+| `secondsFromConfig` | no | `@ts` block returning the wait duration in seconds (dynamic alternative to `amount`/`unit`) |

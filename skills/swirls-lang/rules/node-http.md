@@ -85,7 +85,7 @@ Declare the vars your node needs in a top-level `secret` block, then reference t
 
 **Note:** Do not use HTTP nodes to call AI/LLM APIs directly. Use `ai` nodes instead — they handle model routing, authentication, and response parsing automatically.
 
-**Warning:** Do not use `headers` as a plain object literal with hyphenated keys like `Content-Type`. The parser treats hyphens as subtraction operators and silently drops the rest of the file. Always use a `@ts` block for headers so keys are JavaScript strings. See the parser-hyphenated-headers and ts-no-nested-code-blocks rules.
+**Warning:** Do not use `headers` as a plain object literal with hyphenated keys like `Content-Type`. Unquoted, the stray `-` stops the lexer and silently drops the rest of the file; quoted, the key is rejected and the headers object parses empty. Always use a `@ts` block for headers so keys are JavaScript strings. See the parser-hyphenated-headers and ts-no-nested-code-blocks rules.
 
 HTTP node fields:
 | Field | Required | Type |

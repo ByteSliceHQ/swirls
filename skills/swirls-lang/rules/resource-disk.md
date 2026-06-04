@@ -16,8 +16,8 @@ Top-level `disk <name> { }` blocks declare an Archil-backed remote disk that `ty
 disk <name> {
   label: "<optional label>"
   region: "<optional region>"
-  id: "dsk-..."             // required; Archil disk id
-  secrets: <secret_block>   // optional reference to a top-level secret block
+  id: "dsk-..."             // required; Archil disk id (dsk- + 16 hex chars)
+  secrets: <secret_block>   // required; the block must declare ARCHIL_API_KEY
 }
 ```
 
@@ -25,8 +25,8 @@ disk <name> {
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `id` | yes | Quoted string literal. Archil-issued disk identifier (typically `dsk-` + hex). |
-| `secrets` | no | Bare identifier naming a top-level `secret` block (e.g. one declaring `ARCHIL_API_KEY`). |
+| `id` | yes | Quoted string literal. Archil-issued disk identifier matching `^dsk-[0-9a-f]{16}$` exactly. |
+| `secrets` | yes | Bare identifier naming a top-level `secret` block that declares `ARCHIL_API_KEY` in its `vars`. |
 | `label` | no | Display string. Defaults to the disk's name. |
 | `region` | no | Quoted string (e.g. `"aws-us-east-1"`). |
 
@@ -60,9 +60,9 @@ workflow backup {
 
 ### Validation rules
 
-- Disk names must match `^[a-zA-Z0-9_]+$`. Duplicate names error.
-- `id:` must be a non-empty quoted string.
-- `secrets:` (if present) must reference an existing top-level `secret` block.
-- The `disk` node's `disk:` field must match a declared disk block by bare identifier.
+- Disk names must match `^[a-zA-Z0-9_]+$`. Duplicate names error: `Duplicate disk block name "<n>"`.
+- `id:` is required (`Disk block requires an id field (provider disk id)`) and must match `dsk-` + 16 hex characters (`Disk id must match pattern dsk- followed by 16 hex characters`).
+- `secrets:` is required: `Disk block requires secrets: pointing to a secret block that declares ARCHIL_API_KEY`. The referenced block must exist (`Disk "<n>" references undefined secret block "<s>"`) and must declare the var (`Secret block "<s>" must declare var "ARCHIL_API_KEY" for disk runtime API access`).
+- The `disk` node's `disk:` field must match a declared disk block by bare identifier (file-local or workspace).
 
 See `node-disk` for the read/exec side.

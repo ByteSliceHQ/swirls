@@ -75,9 +75,9 @@ Multiple triggers can target the same workflow from different sources.
 
 ### Validation rules
 
-- Trigger names must match `^[a-zA-Z0-9_]+$` and be unique in the file.
-- The referenced `form` / `webhook` / `schedule` must be declared in the same file, else: `Trigger references <type> "<name>" which is not defined`.
-- The referenced workflow must be declared in the same file, else: `Trigger references workflow "<name>" which is not defined`.
+- Trigger names must match `^[a-zA-Z0-9_]+$`.
+- The referenced `form` / `webhook` / `schedule` must be declared in the workspace (same file or another `.swirls` file), else: `Trigger references <type> "<name>" which is not defined`.
+- The referenced workflow must be declared in the workspace, else: `Trigger references workflow "<name>" which is not defined`.
 
 ### `enabled`
 

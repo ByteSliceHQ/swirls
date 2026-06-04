@@ -22,7 +22,7 @@ node run_helper {
 
 Error: `Node type "workflow" requires "input"`
 
-**Incorrect (referencing a workflow in another file):**
+**Cross-file references resolve across the workspace:**
 
 ```swirls
 // helper.swirls defines helper_workflow
@@ -35,9 +35,9 @@ node run_helper {
 }
 ```
 
-Warning: `swirls doctor` does not resolve cross-file references. It reports `Workflow node references workflow "helper_workflow" which is not defined`. Keep related workflows in the same file.
+`swirls doctor` and deploy build a workspace index of every `.swirls` file under the working directory, so a workflow declared in another file resolves. `Workflow node references workflow "<n>" which is not defined` fires only when the name matches no workflow anywhere in the workspace (single-file tools without a workspace index may also report it until the full workspace is considered).
 
-**Correct (subgraph in same file):**
+**Correct (child workflow in the same file):**
 
 ```swirls
 workflow helper_workflow {

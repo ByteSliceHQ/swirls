@@ -1,14 +1,19 @@
 ---
-title: Hyphenated Header Keys Parsed as Subtraction
+title: Hyphenated Keys in DSL Object Literals
 impact: CRITICAL
 tags: parser, headers, hyphen, content-type, silent, drop
 ---
 
-## Hyphenated Header Keys Parsed as Subtraction
+## Hyphenated Keys in DSL Object Literals
 
-Header keys like `Content-Type` cause the parser to treat the hyphen as a subtraction operator. Everything from that point to EOF is silently consumed. All subsequent workflows, triggers, and resources are dropped.
+DSL-level object literals (like a plain `headers: { ... }` value) cannot carry hyphenated keys. The two failure modes differ:
 
-**Incorrect (hyphenated header key, unquoted):**
+- **Unquoted** `Content-Type:` — the lexer reads `Content`, then hits a stray `-` it cannot tokenize and **stops**. Everything to EOF is silently dropped (workflows, triggers, resources after this point disappear with no error).
+- **Quoted** `"Content-Type":` — DSL object keys must be bare identifiers; a quoted key is rejected. The parser emits `Unexpected token` errors and the object value ends up **empty** (your headers are silently lost), though later declarations recover.
+
+Either way the headers are broken. Use a `@ts` block instead.
+
+**Incorrect (unquoted hyphenated key — truncates the file):**
 
 ```swirls
 node call_api {
@@ -19,13 +24,11 @@ node call_api {
 }
 ```
 
-**Incorrect (hyphenated header key, quoted):**
+**Incorrect (quoted hyphenated key — headers parse to an empty object):**
 
 ```swirls
 headers: { "Content-Type": "application/json" }
 ```
-
-Even quoted keys with hyphens cause the same issue. This applies to plain object literals — the parser sees the hyphen as a subtraction operator.
 
 **Correct (use a @ts block that returns the headers object):**
 
@@ -38,8 +41,8 @@ node call_api {
   headers: @ts {
     return {
       "Content-Type": "application/json",
-      "x-api-key": context.secrets.API_KEY,
-      "Authorization": "Bearer " + context.secrets.AUTH_TOKEN
+      "x-api-key": context.secrets.api_creds.API_KEY,
+      "Authorization": "Bearer " + context.secrets.api_creds.AUTH_TOKEN
     }
   }
   body: @ts {
@@ -48,7 +51,7 @@ node call_api {
 }
 ```
 
-By using a `@ts` block, header keys are JavaScript string literals — the parser never sees the hyphens as operators. This is the only safe way to set custom headers with hyphenated keys.
+Inside a `@ts` block, header keys are JavaScript string literals — the lexer never sees the hyphens. This is the only safe way to set custom headers with hyphenated keys.
 
 **Also correct (omit headers if defaults suffice):**
 

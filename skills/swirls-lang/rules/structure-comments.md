@@ -1,38 +1,12 @@
 ---
-title: Comment Syntax and ASCII Restriction
-impact: CRITICAL
-tags: comments, unicode, ascii, parser
+title: Comment Syntax
+impact: HIGH
+tags: comments, unicode, ascii, parser, doc-comment
 ---
 
-## Comment Syntax and ASCII Restriction
+## Comment Syntax
 
-Swirls supports single-line (`//`) and multi-line (`/* */`) comments. Doc comments (`/* */`) placed before a declaration are shown on hover in the LSP.
-
-Unicode characters in comments break the parser's line counting and cause workflows after the comment to be silently dropped.
-
-**Incorrect (Unicode in comments):**
-
-```swirls
-// ──────────────────────────────
-// Workflow: get_token → fetch OAuth
-// ──────────────────────────────
-workflow get_token {
-  // This workflow may be silently dropped
-}
-```
-
-**Correct (ASCII only in comments):**
-
-```swirls
-// -------------------------------------------
-// Workflow: get_token - fetch OAuth
-// -------------------------------------------
-workflow get_token {
-  // This workflow is parsed correctly
-}
-```
-
-Doc comments appear in editor hover tooltips:
+Swirls supports single-line (`//`) and multi-line (`/* */`) comments. Doc comments (`/* */`) placed immediately before a top-level declaration (or a `node`/`root` block) attach to it and are shown on hover in the LSP.
 
 ```swirls
 /* Normalizes name, email, and message (trim + lowercase email). */
@@ -43,4 +17,22 @@ root {
 }
 ```
 
-Use only ASCII characters in comments: letters, digits, spaces, hyphens, underscores, periods, parentheses, and standard punctuation. Avoid box-drawing characters, arrows, em dashes, and other Unicode.
+### Unicode
+
+Comment content may contain any characters — Unicode in `//` or `/* */` comments parses fine:
+
+```swirls
+// ──────────────────────────────
+// Workflow: get_token → fetch OAuth
+// ──────────────────────────────
+workflow get_token {
+  label: "Get Token"
+  root { type: code label: "Entry" code: @ts { return {} } }
+}
+```
+
+The hazard is Unicode (or any unrecognized character) **outside** comments, strings, and fenced blocks — at DSL token positions the lexer stops on it and silently drops the rest of the file. See `parser-illegal-characters`.
+
+### Doc comments are preserved
+
+`/* ... */` block comments immediately before a top-level declaration attach to it as a doc comment and are preserved by the serializer. `//` line comments are skipped by the lexer and not preserved.

@@ -6,16 +6,16 @@ tags: parser, validation, checklist, doctor, preflight
 
 ## Pre-Flight Validation Checklist
 
-Before running `swirls doctor`, verify every item on this checklist. Each item corresponds to a known parser bug or validation failure.
+Before running `swirls doctor`, verify every item on this checklist. Each item corresponds to a known lexer hazard or validation failure.
 
 **Parser safety (silent drops):**
 
-- [ ] Comments use ASCII only (no box-drawing, arrows, em dashes, or other Unicode)
+- [ ] No regex literals containing `"`, `'`, or backtick characters inside `@ts` blocks (build with `new RegExp(...)` / `String.fromCharCode` instead)
+- [ ] No stray Unicode or other unrecognized characters at DSL level (comments and strings are fine)
 - [ ] No `headers` field using plain object literals with hyphenated keys (use a `@ts` block instead)
-- [ ] No literal `"` characters inside `@ts` blocks (use `String.fromCharCode(34)`)
-- [ ] No nested template literals inside `@ts` blocks (use concatenation)
-- [ ] No `$${...}` patterns in template literals (use concatenation)
 - [ ] No nested `@ts` or `@json` blocks inside other code blocks (use a single block that returns the full object)
+- [ ] Braces balanced in all `@ts { }`, `@json { }`, and `@sql { }` blocks
+- [ ] No `inputSchema`/`outputSchema` on non-root nodes (the parser drops the whole node)
 
 **Structure validation:**
 
@@ -29,23 +29,25 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 
 - [ ] Every `email` node has `from`, `to`, and `subject` fields
 - [ ] Every `scrape` node has a `url` field
-- [ ] Every `ai` node has `kind`, `model`, and `prompt` fields
-- [ ] Every `ai` node with `kind: object` has a `schema`
-- [ ] Every `agent` node has `agent` and `prompt` fields, and any `role:` matches a role in the bound agent block
+- [ ] Every `ai` node has a `kind` field (and `model` + `prompt` for a working call; `schema` for `kind: object`)
+- [ ] Every `agent` node has `agent` and `prompt` fields, and any `profile:` matches a profile in the bound agent block
 - [ ] Every `code` node has a `code` field
 - [ ] Every `switch` node has `cases` and `router` fields
 - [ ] Every `http` node has a `url` field
 - [ ] Every `workflow` node has `workflow` and `input` fields
 - [ ] Every `bucket` node has an `operation` field
 - [ ] Every `disk` node has `disk` and `command` fields
+- [ ] Every `map` node has `items`, `maxItems`, and exactly one of `subgraph { }` or `workflow:`
+- [ ] Every `while` node has `input`, `condition`, `update`, `maxIterations`, and exactly one of `subgraph { }` or `workflow:`
+- [ ] Every `stream` node has `stream`, `version`, and `filter`
 - [ ] Every `postgres` node has a `postgres` field and exactly one of `select` or `insert`
 - [ ] Every `postgres` node with `insert` has a `params` field
-- [ ] Every `postgres` node references a `postgres` block defined in the same file
 
-**Trigger validation:**
+**Cross-references (resolved across the workspace — all `.swirls` files under the working directory):**
 
-- [ ] All workflows referenced by `type: workflow` nodes are in the same file
-- [ ] Trigger bindings reference resources and workflows defined in the same file
+- [ ] Workflows referenced by `type: workflow` / `map` / `while` nodes are declared somewhere in the workspace
+- [ ] Trigger bindings reference declared resources and workflows
+- [ ] `postgres:` / `disk:` / `agent:` / `stream:` node fields name declared top-level blocks
 - [ ] Secret keys use only `[a-zA-Z0-9_]` characters
 
 **File references:**
@@ -55,7 +57,7 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 **Schema validation:**
 
 - [ ] `@json` blocks contain valid JSON (double-quoted keys, no trailing commas)
-- [ ] Braces are balanced in all `@ts { }`, `@json { }`, and `@sql { }` blocks
+- [ ] Bare schema names (`inputSchema: foo`) resolve to a top-level `schema foo { }` block
 
 **After running doctor:**
 

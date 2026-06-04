@@ -46,7 +46,7 @@ node handle_urgent {
   type: ai
   kind: text
   label: "Handle urgent"
-  model: "gpt-4o-mini"
+  model: "google/gemini-2.5-flash"
   prompt: @ts { return context.nodes.root.output.body }
 }
 

@@ -18,7 +18,7 @@ The three schema keywords each have a specific placement. The parser enforces th
 
 - `inputSchema` on a non-root node → parser error: `inputSchema is only allowed in root { } blocks`. The entire node is dropped from the AST. (A map/while `subgraph { }` root counts as a root for this rule.)
 - `outputSchema` on a non-root node → parser error: `Use "schema" instead of "outputSchema" in node blocks`. The entire node is dropped from the AST.
-- `schema` on root is technically accepted but redundant — use `outputSchema` on root.
+- `schema` on root is **not recognized** — the parser cannot consume the value, emits `Unexpected token`, and the rest of the root config is dropped. Always use `outputSchema` on root.
 
 ### Three forms of schema value
 
@@ -130,9 +130,8 @@ Vendor-managed types:
 - `scrape`
 - `parallel`
 - `email`
-- `disk`
 
-These types provide their own runtime type shape; the LSP uses it automatically.
+These types provide their own runtime type shape; the LSP uses it automatically. (`disk` is NOT vendor-managed — a `schema:` on a disk node is allowed and types the command output.)
 
 ### AI text + schema warning
 

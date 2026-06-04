@@ -1,12 +1,12 @@
 ---
 title: Agent Nodes
 impact: HIGH
-tags: node, agent, llm, tools, role, prompt, harness, sandbox, chat, schema
+tags: node, agent, llm, tools, profile, prompt, harness, sandbox, chat, schema
 ---
 
 ## Agent Nodes
 
-Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, runtime knobs, optional sandbox sizing, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `role`, narrows `tools`, overrides `system`, or constrains structured output with `schema`.
+Agent nodes run an LLM agentic harness defined by a top-level `agent` block. The agent block declares provider, model, secret keys, default system prompt, runtime knobs, optional sandbox sizing, and the workflows exposed as LLM-callable tools. The agent node binds to that block, supplies a `prompt`, and optionally selects a `profile`, narrows `tools`, overrides `system`, or constrains structured output with `schema`.
 
 Use `agent` when you need tools, a persistent workspace (read/write/edit/bash/grep/find/ls), multi-step reasoning, or chat. For a one-shot LLM call with no tools and no multi-step work, use `ai` instead.
 
@@ -64,14 +64,14 @@ workflow handle {
 }
 ```
 
-### Correct (role, narrowed tools, structured output)
+### Correct (profile, narrowed tools, structured output)
 
 ```swirls
 node ask {
   type: agent
-  label: "Ask with role"
+  label: "Ask with profile"
   agent: triage
-  role: support
+  profile: support
   tools: [search_kb]
   system: @ts {
     return "You are a senior support engineer. Be concise."
@@ -89,17 +89,17 @@ node ask {
 }
 ```
 
-`role:` must name a `role <name> { }` declared inside the bound `agent` block. `system:` overrides the agent's default system prompt for this call only. `schema:` constrains the final structured output; without it the turn returns the plain completion string.
+`profile:` must name a `profile <name> { }` declared inside the bound `agent` block. `system:` overrides the agent's default system prompt for this call only. `schema:` constrains the final structured output; without it the turn returns the plain completion string.
 
 ### System-prompt precedence
 
-System prompt pieces apply low to high: agent `system` (lowest) -> role `system` (if a role is chosen) -> node `system` (highest, wins last for final instructions).
+System prompt pieces apply low to high: agent `system` (lowest) -> profile `system` (if a profile is chosen) -> node `system` (highest, wins last for final instructions).
 
 ### Tools (workflows-as-tools only)
 
 Tools are workflows exposed to the LLM. There is no MCP, HTTP, or builtin tool syntax. Each tool workflow must have a non-empty workflow-level `description`, a root-node `inputSchema`, and an output schema on every leaf node. See `resource-agent` for the tool-workflow contract.
 
-Node `tools:` may only narrow within the effective set: the role's tools when a role is chosen and declares `tools:`, otherwise the agent block's `tools:`. It cannot add tools beyond that set.
+Node `tools:` may only narrow within the effective set: the profile's tools when a profile is chosen and declares `tools:`, otherwise the agent block's `tools:`. It cannot add tools beyond that set.
 
 If the agent block declares a subagent `team:`, each team member is also exposed to the model as a callable tool (delegated to as its own agent). See `resource-agent` for the team contract.
 
@@ -117,8 +117,8 @@ Multi-turn chat is not authored in the DSL. Start a persistent transcript with `
 |-------|----------|------|-------|
 | `agent` | yes | Bare identifier | Names a top-level `agent <name> { }` block. |
 | `prompt` | yes | `@ts` block or file ref | User prompt for this turn. |
-| `role` | no | Bare identifier | Names a `role` declared inside the bound agent block. |
-| `tools` | no | Array of bare identifiers | Narrows within the effective tool set (role tools if a role is chosen and declares tools, else agent tools). |
+| `profile` | no | Bare identifier | Names a `profile` declared inside the bound agent block. |
+| `tools` | no | Array of bare identifiers | Narrows within the effective tool set (profile tools if a profile is chosen and declares tools, else agent tools). |
 | `system` | no | `@ts` block | Overrides the agent block's default `system:` for this call (highest precedence). |
 | `schema` | no | `@json` block, named ref, or inline object | Constrains structured final output. Never `outputSchema`. |
 

@@ -1,12 +1,12 @@
 ---
 title: Agent Block Declaration
 impact: HIGH
-tags: resource, agent, llm, provider, model, role, tools, sandbox, secrets, top-level
+tags: resource, agent, llm, provider, model, profile, tools, sandbox, secrets, top-level
 ---
 
 ## Agent Block Declaration
 
-Top-level `agent <name> { }` blocks declare an LLM agentic harness: which provider and model to use, which secret block holds the API key, a default system prompt, runtime knobs, optional sandbox sizing, the tools (workflows) the model may call, an optional subagent `team` it may delegate to, and zero or more named `role <name> { }` sub-blocks. `type: agent` nodes bind to an agent block by bare identifier, and `channel` blocks expose an agent on a chat platform.
+Top-level `agent <name> { }` blocks declare an LLM agentic harness: which provider and model to use, which secret block holds the API key, a default system prompt, runtime knobs, optional sandbox sizing, the tools (workflows) the model may call, an optional subagent `team` it may delegate to, and zero or more named `profile <name> { }` sub-blocks. `type: agent` nodes bind to an agent block by bare identifier, and `channel` blocks expose an agent on a chat platform.
 
 **There is no `type:` field on an agent block** — the keyword `agent` identifies the block. Names must match `^[a-zA-Z0-9_]+$`.
 
@@ -42,7 +42,7 @@ agent <name> {
     ephemeral: false
   }
 
-  role <role_name> {                  // zero or more roles
+  profile <profile_name> {                  // zero or more profiles
     description: "<optional>"
     tools: [workflow_a]                  // optional; SUBSET of agent.tools
     system: @ts { return "..." }      // optional override
@@ -65,7 +65,7 @@ agent <name> {
 | `tools` | no | Array of bare identifiers naming tool workflows in the workspace. |
 | `team` | no | Array of bare identifiers naming other `agent` blocks this agent may delegate to as subagents. See below. |
 | `sandbox: { }` | no | Workspace sizing and lifecycle. See below. |
-| `role <name> { }` | no | Zero or more named roles. Each may override `system`, `sandbox`, and narrow `tools`. |
+| `profile <name> { }` | no | Zero or more named profiles. Each may override `system`, `sandbox`, and narrow `tools`. |
 | `label` | no | Display string. |
 | `description` | no | Free-form description. |
 
@@ -155,12 +155,12 @@ agent triage {
     return "You are a support triage agent. Use tools to resolve tickets."
   }
 
-  role support {
+  profile support {
     description: "Frontline support agent"
     tools: [search_kb]
   }
 
-  role escalations {
+  profile escalations {
     description: "Senior agent who can escalate"
     tools: [search_kb, escalate]
     system: @ts {
@@ -175,7 +175,7 @@ workflow handle_ticket {
     type: agent
     label: "Triage"
     agent: triage
-    role: support
+    profile: support
     prompt: @ts {
       return "Ticket: " + context.nodes.root.input.body
     }
@@ -188,7 +188,7 @@ workflow handle_ticket {
 Tools are workflows exposed to the model. There is no MCP, HTTP, or builtin tool syntax. Each entry in `tools: [ … ]` must name a workflow in the workspace that:
 
 - Has a non-empty workflow-level `description:` (fed to the model as tool help text).
-- Has a root node with JSON `inputSchema` (defines the tool call arguments).
+- Has a root node with JSON `inputSchema` that declares a **non-empty `properties` object** (defines the tool call arguments — a tool with zero input properties is rejected: `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object`).
 - Has an output schema on **every leaf node** (`outputSchema` on the root if it is a leaf, or `schema` on non-root leaves).
 
 Built-in workspace tools (read, write, edit, bash, grep, find, ls) are always available inside the sandbox and are not declared in `tools:`.
@@ -235,8 +235,8 @@ Team members are referenced by bare identifier (not a quoted string). A `team` m
 - `provider`, if present, must be one of the four allowed values; it defaults to `openrouter`.
 - Every entry in `tools:` must name a tool workflow defined in the workspace.
 - Every entry in `team:` must name a defined `agent` block in the workspace. An agent cannot list itself, a team member name cannot collide with a `tools:` workflow name in the same agent, and teams cannot form a cycle (`a -> b -> a` is rejected, as is any longer loop).
-- Every `role <name> { }` must have a unique name within the agent block. Each role's `tools:` must be a SUBSET of the agent's top-level `tools:`.
+- Every `profile <name> { }` must have a unique name within the agent block. Each profile's `tools:` must be a SUBSET of the agent's top-level `tools:`.
 - `sandbox.<field>` values must satisfy the bounds above.
-- `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `role:`, it must name a declared role in that block.
+- `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `profile:`, it must name a declared profile in that block.
 
 See `node-agent` for the binding side.

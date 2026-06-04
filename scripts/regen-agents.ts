@@ -62,9 +62,7 @@ const sections: Record<string, Section> = {
       'ts-block-syntax',
       'ts-sandbox-limits',
       'ts-safe-patterns',
-      'ts-no-double-quotes',
-      'ts-no-nested-templates',
-      'ts-no-dollar-interpolation',
+      'ts-regex-literals',
       'ts-no-nested-code-blocks',
     ],
   },
@@ -91,6 +89,7 @@ const sections: Record<string, Section> = {
       'resource-disk',
       'resource-agent',
       'resource-channel',
+      'resource-access-control',
     ],
   },
   stream: {
@@ -104,11 +103,8 @@ const sections: Record<string, Section> = {
   parser: {
     title: '11. Parser Pitfalls & Validator Diagnostics',
     ordered: [
-      'parser-unicode-comments',
+      'parser-illegal-characters',
       'parser-hyphenated-headers',
-      'parser-double-quotes-in-ts',
-      'parser-nested-templates',
-      'parser-dollar-interpolation',
       'parser-silent-drops',
       'parser-cascade-errors',
       'parser-validation-checklist',
@@ -152,7 +148,7 @@ const header =
   `# Swirls Language - Complete Reference\n\n` +
   `> Comprehensive guide for authoring \`.swirls\` workflow files. Compiled from the individual rule files under \`rules/\`.\n>\n` +
   `> **Source of truth lives in \`rules/\`.** This file is regenerated from those rules by \`scripts/regen-agents.ts\`. When in doubt, defer to \`rules/spec-strict-syntax.md\` and \`rules/spec-common-mistakes.md\`.\n>\n` +
-  `> Current scope: **16 node types** (\`agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow\`; \`graph\` is a legacy alias for \`workflow\`), **13 top-level declarations** (\`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel\`), inline \`subgraph { }\` for map/while, form \`visibility public | internal\`, webhook shared-secret \`secret:\` + \`header:\`, top-level \`schema <name> { }\` blocks referenced by bare identifier, \`context.iteration.*\` (item/index/input/previous) for map/while subgraphs, agent subagent \`team\`, and \`channel\` blocks binding an agent to Slack / Linear / Discord / web.\n\n`
+  `> Current scope: **16 node types** (\`agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow\`; \`graph\` is a legacy alias for \`workflow\`), **16 top-level declarations** (\`schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, access, role, policy\`), inline \`subgraph { }\` for map/while, form \`visibility: public | internal\` and HTTP Basic \`auth:\`, webhook shared-secret \`secret:\` + \`header:\`, top-level \`schema <name> { }\` blocks referenced by bare identifier, \`context.iteration.*\` (item/index/input/previous) for map/while subgraphs, agent subagent \`team\`, \`channel\` blocks binding an agent to Slack / Linear / Discord / web, and access-control \`access\` / \`role\` / \`policy\` blocks.\n\n`
 
 const warnings: string[] = []
 const sectionBlocks: string[] = [header]

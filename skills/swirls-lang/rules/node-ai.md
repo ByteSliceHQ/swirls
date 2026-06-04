@@ -10,7 +10,7 @@ AI nodes call language models and other AI services. The `kind` field determines
 
 **Default model:** Unless the user specifies a different model, always use `google/gemini-2.5-flash` for text and object kinds. Use specialized models only for image generation (e.g. `openai/dall-e-3`) and embeddings (e.g. `openai/text-embedding-3-small`).
 
-**Required fields:** `kind`, `model`, `prompt`
+**Required fields:** `kind` (validator-enforced), plus `model` and `prompt` (required at runtime for a working call).
 
 **Incorrect (object kind without schema):**
 
@@ -99,12 +99,13 @@ AI kinds: `text`, `object`, `image`, `video`, `embed`
 AI node fields:
 | Field | Required | Type |
 |-------|----------|------|
-| `kind` | yes | text, object, image, video, embed |
-| `model` | yes | String (provider/model format) |
-| `prompt` | yes | `@ts` block |
+| `kind` | yes | text, object, image, video, embed. Invalid values error: `Invalid ai kind "<k>". Must be one of: text, object, image, video, embed` |
+| `model` | runtime | String (provider/model format) |
+| `prompt` | runtime | `@ts` block |
+| `provider` | no | Bare identifier: `openrouter` (default), `anthropic`, `openai`, `google`. Invalid values error: `Invalid ai provider "<p>". Must be one of: openrouter, anthropic, openai, google` |
 | `schema` | required for object | `@json` block |
 | `temperature` | no | Number (0-1) |
 | `maxTokens` | no | Number |
 | `options` | no | Object (kind-specific, e.g. n, size) |
 
-AI nodes infer `OPENROUTER_API_KEY` as a secret. You do not need to declare it.
+AI nodes resolve their vendor key from `provider:` (`OPENROUTER_API_KEY` by default; `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` otherwise). You do not need to declare it in `secrets:`.

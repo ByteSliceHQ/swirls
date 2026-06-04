@@ -101,7 +101,8 @@ The value is a bare identifier naming the auth block. Referencing an undefined a
 - Auth block names match `^[a-zA-Z0-9_]+$`.
 - Duplicate block names error.
 - `type:` is required and must be one of the five values above.
-- Identifier fields (`client_id`, `client_secret`, `key`, `username`, `password`, `token`) must each name a var declared in the referenced secret block. Otherwise the validator errors: `Auth "<name>" references undefined var "<VAR>" not declared in secret block "<secrets>"`.
-- `cloud` type should not reference `secrets`.
+- Identifier fields (`client_id`, `client_secret`, `key`, `username`, `password`, `token`) must each name a var declared in the referenced secret block. Otherwise the validator errors: `Auth "<name>" field "<field>" must reference a var from secret block "<secrets>"`.
+- `cloud` type should not reference `secrets` (warning: `Auth block "<name>" (cloud): cloud auth uses managed credentials and should not reference a secrets block`).
+- Forms can also reference an auth block via `auth: <name>`, but only `type: basic` blocks are accepted there. See `resource-form`.
 
 Runtime token exchange and header injection are platform concerns; the DSL validates references and required fields.

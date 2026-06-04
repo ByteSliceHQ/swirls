@@ -19,7 +19,7 @@ stream <name> {
   label: "<optional label>"          // defaults to <name>
   description: "<optional string>"
   enabled: <boolean>                  // optional; default treated as true
-  workflow: <workflow_name>                 // required; workflow declared in this file
+  workflow: <workflow_name>           // required; workflow declared in the workspace (legacy alias: graph:)
   version: <version_id>               // required; active writer version, must exist in versions:
 
   versions: {
@@ -47,7 +47,7 @@ Block-level:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `workflow` | yes | Bare identifier naming a workflow in the same file (or merged workspace). |
+| `workflow` | yes | Bare identifier (or quoted string) naming a workflow in the same file or merged workspace. `graph:` is a legacy alias. |
 | `version` | yes | Active writer `version_id` (`v1`, …). Must match a key in `versions:`. |
 | `versions` | yes | Non-empty map of `version_id` → `{ schema, condition?, prepare }`. |
 | `label` | no | Defaults to the stream's name. |
