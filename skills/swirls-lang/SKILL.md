@@ -4,10 +4,17 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "4.3.0"
+  version: "5.1.0"
 ---
 
 # Swirls Language
+
+> **Canonical source.** The latest version of this skill is always published at
+> <https://swirls.ai/.well-known/agent-skills/swirls-lang/SKILL.md>, with an
+> integrity digest in <https://swirls.ai/.well-known/agent-skills/index.json>
+> (Agent Skills Discovery). Rules files resolve relative to that URL. The
+> GitHub copy at `ByteSliceHQ/swirls` is a mirror; if your copy's version
+> trails the index, prefer the published one.
 
 Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / schema / disk / agent / channel blocks, access-control blocks (`access` / `role` / `policy`), agent subagent teams, reviews, failure policies, output `format:`, and known parser pitfalls.
 
