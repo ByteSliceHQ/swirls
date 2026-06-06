@@ -76,7 +76,7 @@ The validator checks that every block name is declared and every listed var appe
 
 Values are set out-of-band (not in `.swirls` files):
 
-- CLI: `bunx swirls env set MY_TOKEN`
+- CLI: `swirls secret set MY_TOKEN=...`
 - Portal: the secrets vault UI.
 
 Vault keys are flat by var name; the block is a logical grouping for reference and validation, not a namespace at the storage layer.

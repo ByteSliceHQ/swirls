@@ -4583,7 +4583,7 @@ Var names in the `secret` block and in each node's `secrets:` map must match `[a
 
 These are resolved by the runtime for those node types (e.g. `OPENROUTER_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` for `ai` and `agent`, `RESEND_API_KEY` for `email`, `FIRECRAWL_API_KEY` for `scrape`, `PARALLEL_API_KEY` for `parallel`, `ARCHIL_API_KEY` for `disk`). They are not exposed on `context.secrets` for user `@ts` code; declare your own keys in a `secret` block if you need them in code.
 
-Set secret values via `bunx swirls env set VAR_NAME` or the dashboard (vault keys remain flat by var name).
+Set secret values via `swirls secret set VAR_NAME=...` or the Portal (vault keys remain flat by var name).
 
 ---
 
@@ -5460,7 +5460,7 @@ The validator checks that every block name is declared and every listed var appe
 
 Values are set out-of-band (not in `.swirls` files):
 
-- CLI: `bunx swirls env set MY_TOKEN`
+- CLI: `swirls secret set MY_TOKEN=...`
 - Portal: the secrets vault UI.
 
 Vault keys are flat by var name; the block is a logical grouping for reference and validation, not a namespace at the storage layer.
