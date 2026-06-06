@@ -22,13 +22,24 @@ Write `.swirls` files and deploy with `swirls deploy` or `git push`.
 - Visit our [website](https://swirls.ai) to learn more about Swirls.
 - Visit the [quickstart](https://swirls.ai/docs/quickstart) to get started.
 
+## Skills
+
+Skills are used to write correct `.swirls` files.
+They are used by Claude Code, Cursor, Codex, and other LLM agents.
+
+```bash
+bunx skills add https://github.com/ByteSliceHQ/swirls
+```
+
+For strict syntax and parser-safe patterns, see `skills/swirls-lang/AGENTS.md`.
+
 ## Documentation
 
 Visit [https://swirls.ai/docs](https://swirls.ai/docs) to view the full documentation.
 
 ## Community
 
-The Next.js community can be found on [Discord](https://discord.gg/ZXTBZGjQ5a) where you can ask questions, voice ideas, and share your projects with other people.
+The Swirls community can be found on [Discord](https://discord.gg/ZXTBZGjQ5a) where you can ask questions, voice ideas, and share your projects with other people.
 
 ---
 
