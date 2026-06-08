@@ -1,7 +1,7 @@
 ---
 title: Channel Block Declaration
 impact: MEDIUM
-tags: resource, channel, top-level, agent, slack, linear, discord, web, platform, integration, mode
+tags: resource, channel, top-level, agent, slack, linear, discord, web, platform, integration, connection, mode
 ---
 
 ## Channel Block Declaration
@@ -15,7 +15,8 @@ Top-level `channel <name> { }` blocks bind an `agent` block to a chat platform. 
 ```swirls
 channel <name> {
   platform: slack | linear | discord | web    // required
-  integration: slack | linear | discord | web  // required; must equal platform
+  integration: slack | linear | discord | web  // optional; defaults to platform; must equal platform
+  connection: <connection_name>                 // optional; bare name of a top-level connection block
   agent: <agent_name>                           // required; bare identifier
   mode: mention | dm | all                      // optional; defaults to mention
   enabled: true | false                         // optional; defaults to enabled
@@ -31,7 +32,8 @@ channel <name> {
 | Field | Required | Notes |
 |-------|----------|-------|
 | `platform` | yes | Bare value. One of `slack`, `linear`, `discord`, `web`. Where messages are delivered. |
-| `integration` | yes | Bare value. Credential source for the binding. **Must equal `platform`.** |
+| `integration` | no | Bare value. Credential source for the binding. Defaults to `platform`; when set, **must equal `platform`.** |
+| `connection` | no | Bare name of a top-level `connection` block supplying the OAuth credential. Its `provider` must match `platform`. Lets one project bind multiple connections of the same provider. See `resource-connection`. |
 | `agent` | yes | Bare identifier naming an `agent` block (same file or another file in the workspace). |
 | `mode` | no | Bare value `mention` (default), `dm`, or `all`. Controls which inbound events reach the agent. |
 | `enabled` | no | Boolean. `false` makes the binding inactive. Defaults to enabled. |
@@ -132,10 +134,12 @@ channel good { platform: web  integration: web  agent: concierge }
 ### Validation diagnostics
 
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
-- `Channel "<n>" platform "<p>" must match integration "<i>"` — set `integration` equal to `platform`.
+- `Channel "<n>" platform "<p>" must match integration "<i>"` — set `integration` equal to `platform` (or omit it; it defaults to `platform`).
+- `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
+- `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — the connection's `provider` differs from the channel's `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — change `mode`, point one at a different agent, or disable one.
 - Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
-- Parser: `channel must declare platform` / `channel must declare agent` / `channel must declare integration` — required field missing.
+- Parser: `channel must declare platform` / `channel must declare agent` — required field missing. (`integration` is no longer required; it defaults to `platform`.)
 - Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set.
 
 See `resource-agent` for the `agent` block (including subagent `team`).

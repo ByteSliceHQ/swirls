@@ -1,20 +1,22 @@
 ---
 title: Auth Block Declaration
 impact: HIGH
-tags: resource, auth, oauth, api_key, basic, bearer, cloud, top-level, http
+tags: resource, auth, oauth, api_key, basic, bearer, top-level, http
 ---
 
 ## Auth Block Declaration
 
-Declares named authentication configuration. Most types are linked to a top-level `secret` block via `secrets: <block_name>`, with identifier fields (`client_id`, `token`, etc.) that name vars declared in that block's `vars` list. `auth:` can only be referenced from `http` nodes.
+Declares named authentication configuration. Each type is linked to a top-level `secret` block via `secrets: <block_name>`, with identifier fields (`client_id`, `token`, etc.) that name vars declared in that block's `vars` list. `auth:` can only be referenced from `http` nodes.
+
+Use `auth` for credentials you bring yourself. For a Swirls-brokered OAuth grant (Slack, Linear, ...), declare a top-level `connection` block instead and reference it via `connection:` on the http node. See `resource-connection`.
 
 ### Supported `type` values
 
 ```
-oauth, api_key, basic, bearer, cloud
+oauth, api_key, basic, bearer
 ```
 
-Any other value triggers: `Auth block "<name>" requires type: oauth, api_key, basic, bearer, or cloud`.
+Any other value triggers: `Auth block "<name>" requires type: oauth, api_key, basic, or bearer`. (The `cloud` type has been removed; use a `connection` block.)
 
 ### oauth
 
@@ -70,18 +72,6 @@ auth my_bearer {
 }
 ```
 
-### cloud
-
-**Required fields:** `type`, `provider`, `connection_id`. **Does not use** `secrets:` — the validator warns if it sees one.
-
-```swirls
-auth aws_connection {
-  type: cloud
-  provider: "aws"
-  connection_id: "prod-account-us-east-1"
-}
-```
-
 ### Referencing an auth block
 
 `auth:` is only valid on `http` nodes. The validator errors otherwise: `"auth" is only valid on http nodes`.
@@ -100,9 +90,8 @@ The value is a bare identifier naming the auth block. Referencing an undefined a
 
 - Auth block names match `^[a-zA-Z0-9_]+$`.
 - Duplicate block names error.
-- `type:` is required and must be one of the five values above.
+- `type:` is required and must be one of the four values above.
 - Identifier fields (`client_id`, `client_secret`, `key`, `username`, `password`, `token`) must each name a var declared in the referenced secret block. Otherwise the validator errors: `Auth "<name>" field "<field>" must reference a var from secret block "<secrets>"`.
-- `cloud` type should not reference `secrets` (warning: `Auth block "<name>" (cloud): cloud auth uses managed credentials and should not reference a secrets block`).
 - Forms can also reference an auth block via `auth: <name>`, but only `type: basic` blocks are accepted there. See `resource-form`.
 
 Runtime token exchange and header injection are platform concerns; the DSL validates references and required fields.

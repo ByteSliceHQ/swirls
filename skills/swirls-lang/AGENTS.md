@@ -19,7 +19,7 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, schema,
-disk, agent, channel, profile, tools,
+disk, agent, channel, connection, profile, tools,
 role, access, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
@@ -49,16 +49,17 @@ postgres <name> { }
 disk <name> { }
 agent <name> { }
 channel <name> { }
+connection <name> { }
 access { }
 role <name> { }
 policy { }
 ```
 
-There are **16** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control trio — `access { }` (nameless; default posture), `role <name> { }` (claim matching), and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants) — is covered in `resource-access-control`.
+There are **17** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control trio — `access { }` (nameless; default posture), `role <name> { }` (claim matching), and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants) — is covered in `resource-access-control`.
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, connections, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -140,10 +141,10 @@ Only three resource types are valid in triggers: `form`, `webhook`, `schedule`. 
 Inside an `auth <name> { }` block, `type:` must be one of:
 
 ```
-oauth, api_key, basic, bearer, cloud
+oauth, api_key, basic, bearer
 ```
 
-No other types exist. `jwt`, `mtls`, `session`, `cookie`, `saml`, `digest`, `ntlm` are not valid.
+No other types exist. `jwt`, `mtls`, `session`, `cookie`, `saml`, `digest`, `ntlm` are not valid. The `cloud` type has been removed; for a Swirls-brokered OAuth grant use a top-level `connection` block (see below).
 
 #### Form visibility and auth fields
 
@@ -175,14 +176,26 @@ header: "Header-Name"
 
 ```
 platform: slack | linear | discord | web      // required
-integration: slack | linear | discord | web    // required; must equal platform
+integration: slack | linear | discord | web    // optional; defaults to platform; must equal platform
+connection: <connectionName>                   // optional; bare name of a top-level connection block
 agent: <agentName>                             // required; bare identifier of a top-level agent block
 mode: mention | dm | all                       // optional; defaults to mention
 enabled: true | false                          // optional; defaults to enabled
 label: "..."   description: "..."              // optional
 ```
 
-`platform`, `integration`, and `mode` are conventionally bare values (the parser also accepts quoted strings). `integration` must equal `platform` or it is a validator error. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"`. See `resource-channel`.
+`platform`, `integration`, and `mode` are conventionally bare values (the parser also accepts quoted strings). `integration` is optional and defaults to `platform`; when set it must equal `platform` or it is a validator error. `connection` optionally names a top-level `connection` block supplying the OAuth credential; its `provider` must match `platform`. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"`. See `resource-channel`.
+
+#### Connection block fields
+
+`connection <name> { }` declares a project-scoped, Swirls-brokered outbound OAuth slot. Fields:
+
+```
+provider: slack | linear | discord | linkedin | microsoft   // required; bare value
+label: "..."   description: "..."                            // optional
+```
+
+`provider` is the only required field and must be one of the five values. A connection is referenced by bare name from an `http` node (`connection: <name>`) or a channel (`connection: <name>`); a node sets either `auth` or `connection`, never both. See `resource-connection`.
 
 #### Access-control blocks
 
@@ -289,7 +302,7 @@ Only these fields have semantics for each node type. All types additionally acce
 
 **switch** — required: `cases` (non-empty array of alphanumeric+underscore strings), `router` (@ts returning one of the case strings).
 
-**http** — required: `url` (@ts or string). Other fields: `method` (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`), `headers` (@ts returning object), `body` (@ts), `auth` (bare identifier referencing an auth block; `auth` is only valid on http nodes).
+**http** — required: `url` (@ts or string). Other fields: `method` (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`), `headers` (@ts returning object), `body` (@ts), `auth` (bare identifier referencing an auth block) or `connection` (bare identifier referencing a `connection` block) — set one, not both. Both `auth` and `connection` are only valid on http nodes.
 
 **scrape** — required: `url`. Other fields: `onlyMainContent`, `formats` (array), `maxAge`, `parsers` (array). No user `schema:` — vendor-managed output shape. Backed by Firecrawl (`FIRECRAWL_API_KEY`).
 
@@ -1386,7 +1399,7 @@ Team members are bare identifiers, not quoted strings. See `resource-agent`.
 
 ### Top-Level Declarations
 
-A `.swirls` file contains sixteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains seventeen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -1498,6 +1511,11 @@ channel concierge_web {
   enabled: true
 }
 
+connection acme_slack {
+  label: "Acme Slack"
+  provider: slack
+}
+
 access {
   default: deny
 }
@@ -1513,7 +1531,7 @@ policy {
 }
 ```
 
-#### The sixteen valid top-level blocks
+#### The seventeen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -1528,6 +1546,7 @@ policy {
 - `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
 - `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
+- `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
 - `access { }` — Nameless singleton; default access posture (`default: deny | allow`). See `resource-access-control`.
 - `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
 - `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. See `resource-access-control`.
@@ -2575,7 +2594,7 @@ node call_api {
 }
 ```
 
-Declare the vars your node needs in a top-level `secret` block, then reference that block in the node's `secrets:` map. HTTP nodes also support an `auth:` field that references a top-level `auth` block for OAuth, API key, basic, or bearer authentication. See `resource-secrets` and `resource-auth` rules.
+Declare the vars your node needs in a top-level `secret` block, then reference that block in the node's `secrets:` map. HTTP nodes also support an `auth:` field that references a top-level `auth` block for OAuth, API key, basic, or bearer authentication. For a Swirls-brokered OAuth grant (Slack, Linear, ...), use `connection:` referencing a top-level `connection` block instead. Set **either** `auth` **or** `connection` on a node, never both. See `resource-secrets`, `resource-auth`, and `resource-connection` rules.
 
 **Note:** Do not use HTTP nodes to call AI/LLM APIs directly. Use `ai` nodes instead — they handle model routing, authentication, and response parsing automatically.
 
@@ -2588,6 +2607,8 @@ HTTP node fields:
 | `method` | no | "GET", "POST", "PUT", "DELETE", "PATCH" (default: "GET") |
 | `headers` | no | `@ts` block returning an object (use string keys for hyphenated names) |
 | `body` | no | `@ts` block |
+| `auth` | no | bare identifier naming a top-level `auth` block (mutually exclusive with `connection`) |
+| `connection` | no | bare identifier naming a top-level `connection` block (mutually exclusive with `auth`) |
 | `schema` | no | `@json` block (use `outputSchema` only on root nodes) |
 
 ---
@@ -5482,15 +5503,17 @@ Do not list these in a `secret` block unless you also want them accessible from 
 
 ### Auth Block Declaration
 
-Declares named authentication configuration. Most types are linked to a top-level `secret` block via `secrets: <block_name>`, with identifier fields (`client_id`, `token`, etc.) that name vars declared in that block's `vars` list. `auth:` can only be referenced from `http` nodes.
+Declares named authentication configuration. Each type is linked to a top-level `secret` block via `secrets: <block_name>`, with identifier fields (`client_id`, `token`, etc.) that name vars declared in that block's `vars` list. `auth:` can only be referenced from `http` nodes.
+
+Use `auth` for credentials you bring yourself. For a Swirls-brokered OAuth grant (Slack, Linear, ...), declare a top-level `connection` block instead and reference it via `connection:` on the http node. See `resource-connection`.
 
 #### Supported `type` values
 
 ```
-oauth, api_key, basic, bearer, cloud
+oauth, api_key, basic, bearer
 ```
 
-Any other value triggers: `Auth block "<name>" requires type: oauth, api_key, basic, bearer, or cloud`.
+Any other value triggers: `Auth block "<name>" requires type: oauth, api_key, basic, or bearer`. (The `cloud` type has been removed; use a `connection` block.)
 
 #### oauth
 
@@ -5546,18 +5569,6 @@ auth my_bearer {
 }
 ```
 
-#### cloud
-
-**Required fields:** `type`, `provider`, `connection_id`. **Does not use** `secrets:` — the validator warns if it sees one.
-
-```swirls
-auth aws_connection {
-  type: cloud
-  provider: "aws"
-  connection_id: "prod-account-us-east-1"
-}
-```
-
 #### Referencing an auth block
 
 `auth:` is only valid on `http` nodes. The validator errors otherwise: `"auth" is only valid on http nodes`.
@@ -5576,9 +5587,8 @@ The value is a bare identifier naming the auth block. Referencing an undefined a
 
 - Auth block names match `^[a-zA-Z0-9_]+$`.
 - Duplicate block names error.
-- `type:` is required and must be one of the five values above.
+- `type:` is required and must be one of the four values above.
 - Identifier fields (`client_id`, `client_secret`, `key`, `username`, `password`, `token`) must each name a var declared in the referenced secret block. Otherwise the validator errors: `Auth "<name>" field "<field>" must reference a var from secret block "<secrets>"`.
-- `cloud` type should not reference `secrets` (warning: `Auth block "<name>" (cloud): cloud auth uses managed credentials and should not reference a secrets block`).
 - Forms can also reference an auth block via `auth: <name>`, but only `type: basic` blocks are accepted there. See `resource-form`.
 
 Runtime token exchange and header injection are platform concerns; the DSL validates references and required fields.
@@ -5974,7 +5984,8 @@ Top-level `channel <name> { }` blocks bind an `agent` block to a chat platform. 
 ```swirls
 channel <name> {
   platform: slack | linear | discord | web    // required
-  integration: slack | linear | discord | web  // required; must equal platform
+  integration: slack | linear | discord | web  // optional; defaults to platform; must equal platform
+  connection: <connection_name>                 // optional; bare name of a top-level connection block
   agent: <agent_name>                           // required; bare identifier
   mode: mention | dm | all                      // optional; defaults to mention
   enabled: true | false                         // optional; defaults to enabled
@@ -5990,7 +6001,8 @@ channel <name> {
 | Field | Required | Notes |
 |-------|----------|-------|
 | `platform` | yes | Bare value. One of `slack`, `linear`, `discord`, `web`. Where messages are delivered. |
-| `integration` | yes | Bare value. Credential source for the binding. **Must equal `platform`.** |
+| `integration` | no | Bare value. Credential source for the binding. Defaults to `platform`; when set, **must equal `platform`.** |
+| `connection` | no | Bare name of a top-level `connection` block supplying the OAuth credential. Its `provider` must match `platform`. Lets one project bind multiple connections of the same provider. See `resource-connection`. |
 | `agent` | yes | Bare identifier naming an `agent` block (same file or another file in the workspace). |
 | `mode` | no | Bare value `mention` (default), `dm`, or `all`. Controls which inbound events reach the agent. |
 | `enabled` | no | Boolean. `false` makes the binding inactive. Defaults to enabled. |
@@ -6091,13 +6103,102 @@ channel good { platform: web  integration: web  agent: concierge }
 #### Validation diagnostics
 
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
-- `Channel "<n>" platform "<p>" must match integration "<i>"` — set `integration` equal to `platform`.
+- `Channel "<n>" platform "<p>" must match integration "<i>"` — set `integration` equal to `platform` (or omit it; it defaults to `platform`).
+- `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
+- `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — the connection's `provider` differs from the channel's `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — change `mode`, point one at a different agent, or disable one.
 - Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
-- Parser: `channel must declare platform` / `channel must declare agent` / `channel must declare integration` — required field missing.
+- Parser: `channel must declare platform` / `channel must declare agent` — required field missing. (`integration` is no longer required; it defaults to `platform`.)
 - Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set.
 
 See `resource-agent` for the `agent` block (including subagent `team`).
+
+---
+
+### Connection Block Declaration
+
+Top-level `connection <name> { }` blocks declare a named, project-scoped, outbound OAuth integration slot (Slack, Linear, ...). The DSL declares the slot by name and provider; a human authorizes the grant in the project's Connections UI. Nodes and channels reference a connection by name, and Swirls brokers a short-lived token at execution time. **No credentials live in the file.**
+
+A connection is the replacement for the removed `cloud` auth type. Use `connection` for a Swirls-brokered grant; use `auth` for credentials you bring yourself (see `resource-auth`).
+
+**There is no `type:` field on a connection block** — the keyword `connection` identifies the block.
+
+#### Syntax
+
+```swirls
+connection <name> {
+  provider: slack | linear | discord | linkedin | microsoft   // required; bare value
+  label: "<optional label>"
+  description: "<optional description>"
+}
+```
+
+`provider` takes a **bare value** by convention (the parser also accepts a quoted string). It is the only required field.
+
+#### Required vs optional fields
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `provider` | yes | Bare value. One of `slack`, `linear`, `discord`, `linkedin`, `microsoft`. |
+| `label` | no | Display string shown in the Connections UI. |
+| `description` | no | Description shown in the Connections UI. |
+
+#### Providers
+
+```
+slack, linear, discord, linkedin, microsoft
+```
+
+No other providers exist. The set mirrors Fabric's integration providers.
+
+#### Referencing a connection
+
+A connection is referenced by bare name from two places:
+
+**HTTP nodes** via `connection: <name>`. The token is injected into the request at execution time. `connection` is only valid on `http` nodes. A node sets **either** `auth` **or** `connection`, never both.
+
+```swirls
+connection slack_workspace {
+  label: "Acme Slack"
+  provider: slack
+}
+
+node post_message {
+  type: http
+  method: "POST"
+  url: "https://slack.com/api/chat.postMessage"
+  connection: slack_workspace
+  body: @ts {
+    return JSON.stringify({ channel: "C123", text: "done" })
+  }
+}
+```
+
+**Channels** via `connection: <name>`. The connection's `provider` must match the channel's `platform`. See `resource-channel`.
+
+```swirls
+channel slack_concierge {
+  platform: slack
+  agent: concierge
+  connection: slack_workspace
+  mode: mention
+}
+```
+
+#### Validation diagnostics
+
+- `Connection block name: <msg>` — name must match `^[a-zA-Z0-9_]+$`.
+- `Duplicate connection block name "<n>"` — two connection blocks share a name.
+- `Connection "<n>" requires a provider` — `provider:` is missing.
+- `Connection "<n>" provider "<p>" must be one of: slack, linear, discord, linkedin, microsoft` — unsupported provider.
+- Parser: `connection must declare provider` / `connection provider must be a name` / `Unknown connection property "<key>"` / `Expected connection name`.
+- `HTTP node references undefined connection "<n>"` — a node's `connection:` value is not a declared connection block.
+- `"connection" is only valid on http nodes` — `connection:` appears on a non-http node.
+- `Node "<n>": set "auth" or "connection", not both. Use "auth" for your own credentials, "connection" for a Swirls-brokered grant.` — a node set both fields.
+- `Channel "<n>" references unknown connection "<c>"` — a channel's `connection:` value is not a declared connection block.
+- `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — the connection provider differs from the channel platform.
+
+Token exchange and header injection are platform concerns; the DSL validates references and the provider value.
 
 ---
 
@@ -6809,16 +6910,26 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 #### Auth blocks
 
-- `Auth block "<n>" requires type: oauth, api_key, basic, bearer, or cloud` — Missing or invalid `type:`.
+- `Auth block "<n>" requires type: oauth, api_key, basic, or bearer` — Missing or invalid `type:`. (The `cloud` type has been removed; use a `connection` block.)
 - `Auth "<n>" references undefined secret block "<s>"` — `secrets:` names a block that does not exist.
 - `Auth "<n>" field "<f>" must reference a var from secret block "<s>"` — A field like `client_id: FOO` but `FOO` is not in that secret block's `vars:`.
-- `Auth type oauth requires "<f>"` (grant_type / client_id / client_secret / token_url), `Auth type api_key requires "key"`, `Auth type api_key requires "header" or "query_param"`, `Auth type basic requires "<f>"` (username / password), `Auth type bearer requires "token"`, `Auth block "<n>" (cloud): missing required field "provider"` / `"connection_id"` — type-specific required fields.
-- Warning: `Auth block "<n>" (cloud): cloud auth uses managed credentials and should not reference a secrets block`.
+- `Auth type oauth requires "<f>"` (grant_type / client_id / client_secret / token_url), `Auth type api_key requires "key"`, `Auth type api_key requires "header" or "query_param"`, `Auth type basic requires "<f>"` (username / password), `Auth type bearer requires "token"` — type-specific required fields.
 
-#### HTTP / auth usage
+#### Connection blocks
+
+- `Connection block name: <msg>` — name must match `^[a-zA-Z0-9_]+$`.
+- `Duplicate connection block name "<n>"` — two connection blocks share a name.
+- `Connection "<n>" requires a provider` — `provider:` is missing.
+- `Connection "<n>" provider "<p>" must be one of: slack, linear, discord, linkedin, microsoft` — unsupported provider.
+- Parser: `connection must declare provider` / `connection provider must be a name` / `Unknown connection property "<key>"` / `Expected connection name`.
+
+#### HTTP / auth / connection usage
 
 - `HTTP node references undefined auth block "<b>"` — Node's `auth:` value is not a declared auth block.
 - `"auth" is only valid on http nodes` — You put `auth:` on a non-http node (code, ai, etc.). Remove it.
+- `HTTP node references undefined connection "<n>"` — Node's `connection:` value is not a declared `connection` block.
+- `"connection" is only valid on http nodes` — You put `connection:` on a non-http node. Remove it.
+- `Node "<n>": set "auth" or "connection", not both. Use "auth" for your own credentials, "connection" for a Swirls-brokered grant.` — Drop one of the two.
 
 #### Stream nodes (read side)
 
@@ -6964,9 +7075,11 @@ Required keys: `stream`, `version`, `filter`.
 #### Channels
 
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
-- `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`.
+- `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`, or omit it (it defaults to `platform`).
+- `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
+- `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — The connection's `provider` differs from the channel's `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — Two enabled channels share the same `platform : mode : agent` tuple. Change `mode`, point one at a different agent, or set `enabled: false` on one.
-- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `channel must declare integration` / `Unknown channel property "<key>"`.
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `Unknown channel property "<key>"`. (`integration` is no longer required; it defaults to `platform`.)
 
 #### Output format (`format:` on nodes)
 

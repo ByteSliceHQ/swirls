@@ -42,16 +42,26 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 ### Auth blocks
 
-- `Auth block "<n>" requires type: oauth, api_key, basic, bearer, or cloud` — Missing or invalid `type:`.
+- `Auth block "<n>" requires type: oauth, api_key, basic, or bearer` — Missing or invalid `type:`. (The `cloud` type has been removed; use a `connection` block.)
 - `Auth "<n>" references undefined secret block "<s>"` — `secrets:` names a block that does not exist.
 - `Auth "<n>" field "<f>" must reference a var from secret block "<s>"` — A field like `client_id: FOO` but `FOO` is not in that secret block's `vars:`.
-- `Auth type oauth requires "<f>"` (grant_type / client_id / client_secret / token_url), `Auth type api_key requires "key"`, `Auth type api_key requires "header" or "query_param"`, `Auth type basic requires "<f>"` (username / password), `Auth type bearer requires "token"`, `Auth block "<n>" (cloud): missing required field "provider"` / `"connection_id"` — type-specific required fields.
-- Warning: `Auth block "<n>" (cloud): cloud auth uses managed credentials and should not reference a secrets block`.
+- `Auth type oauth requires "<f>"` (grant_type / client_id / client_secret / token_url), `Auth type api_key requires "key"`, `Auth type api_key requires "header" or "query_param"`, `Auth type basic requires "<f>"` (username / password), `Auth type bearer requires "token"` — type-specific required fields.
 
-### HTTP / auth usage
+### Connection blocks
+
+- `Connection block name: <msg>` — name must match `^[a-zA-Z0-9_]+$`.
+- `Duplicate connection block name "<n>"` — two connection blocks share a name.
+- `Connection "<n>" requires a provider` — `provider:` is missing.
+- `Connection "<n>" provider "<p>" must be one of: slack, linear, discord, linkedin, microsoft` — unsupported provider.
+- Parser: `connection must declare provider` / `connection provider must be a name` / `Unknown connection property "<key>"` / `Expected connection name`.
+
+### HTTP / auth / connection usage
 
 - `HTTP node references undefined auth block "<b>"` — Node's `auth:` value is not a declared auth block.
 - `"auth" is only valid on http nodes` — You put `auth:` on a non-http node (code, ai, etc.). Remove it.
+- `HTTP node references undefined connection "<n>"` — Node's `connection:` value is not a declared `connection` block.
+- `"connection" is only valid on http nodes` — You put `connection:` on a non-http node. Remove it.
+- `Node "<n>": set "auth" or "connection", not both. Use "auth" for your own credentials, "connection" for a Swirls-brokered grant.` — Drop one of the two.
 
 ### Stream nodes (read side)
 
@@ -197,9 +207,11 @@ Required keys: `stream`, `version`, `filter`.
 ### Channels
 
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
-- `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`.
+- `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`, or omit it (it defaults to `platform`).
+- `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
+- `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — The connection's `provider` differs from the channel's `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — Two enabled channels share the same `platform : mode : agent` tuple. Change `mode`, point one at a different agent, or set `enabled: false` on one.
-- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `channel must declare integration` / `Unknown channel property "<key>"`.
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `Unknown channel property "<key>"`. (`integration` is no longer required; it defaults to `platform`.)
 
 ### Output format (`format:` on nodes)
 

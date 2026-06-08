@@ -1,12 +1,12 @@
 ---
 title: Top-Level Declarations
 impact: HIGH
-tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, access, role, policy
+tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, connection, access, role, policy
 ---
 
 ## Top-Level Declarations
 
-A `.swirls` file contains sixteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains seventeen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -118,6 +118,11 @@ channel concierge_web {
   enabled: true
 }
 
+connection acme_slack {
+  label: "Acme Slack"
+  provider: slack
+}
+
 access {
   default: deny
 }
@@ -133,7 +138,7 @@ policy {
 }
 ```
 
-### The sixteen valid top-level blocks
+### The seventeen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -148,6 +153,7 @@ policy {
 - `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
 - `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
+- `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
 - `access { }` — Nameless singleton; default access posture (`default: deny | allow`). See `resource-access-control`.
 - `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
 - `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. See `resource-access-control`.

@@ -81,7 +81,7 @@ node call_api {
 }
 ```
 
-Declare the vars your node needs in a top-level `secret` block, then reference that block in the node's `secrets:` map. HTTP nodes also support an `auth:` field that references a top-level `auth` block for OAuth, API key, basic, or bearer authentication. See `resource-secrets` and `resource-auth` rules.
+Declare the vars your node needs in a top-level `secret` block, then reference that block in the node's `secrets:` map. HTTP nodes also support an `auth:` field that references a top-level `auth` block for OAuth, API key, basic, or bearer authentication. For a Swirls-brokered OAuth grant (Slack, Linear, ...), use `connection:` referencing a top-level `connection` block instead. Set **either** `auth` **or** `connection` on a node, never both. See `resource-secrets`, `resource-auth`, and `resource-connection` rules.
 
 **Note:** Do not use HTTP nodes to call AI/LLM APIs directly. Use `ai` nodes instead — they handle model routing, authentication, and response parsing automatically.
 
@@ -94,4 +94,6 @@ HTTP node fields:
 | `method` | no | "GET", "POST", "PUT", "DELETE", "PATCH" (default: "GET") |
 | `headers` | no | `@ts` block returning an object (use string keys for hyphenated names) |
 | `body` | no | `@ts` block |
+| `auth` | no | bare identifier naming a top-level `auth` block (mutually exclusive with `connection`) |
+| `connection` | no | bare identifier naming a top-level `connection` block (mutually exclusive with `auth`) |
 | `schema` | no | `@json` block (use `outputSchema` only on root nodes) |

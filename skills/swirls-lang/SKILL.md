@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "5.1.1"
+  version: "5.2.0"
 ---
 
 # Swirls Language
@@ -16,7 +16,7 @@ metadata:
 > GitHub copy at `ByteSliceHQ/swirls` is a mirror; if your copy's version
 > trails the index, prefer the published one.
 
-Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / schema / disk / agent / channel blocks, access-control blocks (`access` / `role` / `policy`), agent subagent teams, reviews, failure policies, output `format:`, and known parser pitfalls.
+Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / schema / disk / agent / channel / connection blocks, access-control blocks (`access` / `role` / `policy`), agent subagent teams, reviews, failure policies, output `format:`, and known parser pitfalls.
 
 ## When to Apply
 
@@ -45,7 +45,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 | 5 | TypeScript Blocks | CRITICAL | `ts-` | @ts patterns, sandbox limits, safe code |
 | 6 | Schema & Typing | HIGH | `schema-` | JSON Schema, inputSchema/outputSchema/schema placement, bare-identifier refs to top-level `schema` blocks |
 | 7 | Context Object | HIGH | `context-` | context.nodes, context.reviews, context.secrets, context.meta, context.iteration |
-| 8 | Resources & Triggers | HIGH | `resource-` | Forms (incl. `visibility:` and `auth:`), webhooks (incl. `secret:`/`header:`), schedules, secrets, auth blocks, postgres blocks, agent blocks (incl. subagent `team`), channel blocks, access/role/policy blocks, top-level stream and schema blocks, trigger bindings |
+| 8 | Resources & Triggers | HIGH | `resource-` | Forms (incl. `visibility:` and `auth:`), webhooks (incl. `secret:`/`header:`), schedules, secrets, auth blocks, connection blocks (Swirls-brokered OAuth), postgres blocks, agent blocks (incl. subagent `team`), channel blocks, access/role/policy blocks, top-level stream and schema blocks, trigger bindings |
 | 9 | Streams | MEDIUM | `stream-` | Filter operators, field paths, migration from persistence |
 | 10 | Reviews | MEDIUM | `review-` | Human-in-the-loop review config |
 | 11 | Parser Pitfalls | CRITICAL | `parser-` | Lexer hazards that silently truncate files, cascade errors, validator diagnostics |
@@ -57,7 +57,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `spec-common-mistakes` - **The most common incorrect patterns with corrections. Check your output against these before returning any .swirls code.**
 
 ### 2. File Structure
-- `structure-top-level-declarations` - The sixteen valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, access, role, policy
+- `structure-top-level-declarations` - The seventeen valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, connection, access, role, policy
 - `structure-file-discovery` - File extensions, discovery rules, `.ts.swirls` files
 - `structure-comments` - Comment syntax and ASCII-only restriction
 
@@ -115,11 +115,12 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `resource-schema` - Top-level `schema <name> { }` blocks: reusable JSON Schemas referenced by bare identifier from forms / webhooks / root inputSchema / root outputSchema / non-root schema / review schema
 - `resource-trigger-binding` - Trigger syntax: `resourceType:name -> workflowName` (form / webhook / schedule only)
 - `resource-secrets` - Top-level `secret { vars: [...] }` blocks
-- `resource-auth` - Top-level `auth` blocks (oauth, api_key, basic, bearer, cloud) and http-node `auth:` references
+- `resource-auth` - Top-level `auth` blocks (oauth, api_key, basic, bearer) and http-node `auth:` references
+- `resource-connection` - Top-level `connection` blocks: Swirls-brokered outbound OAuth slots (`provider:` slack/linear/discord/linkedin/microsoft), referenced by http nodes and channels via `connection:` (replaces the removed `cloud` auth type)
 - `resource-postgres` - Top-level `postgres` blocks: connection, table schemas, secret references
 - `resource-disk` - Top-level `disk` blocks: Archil-backed remote disks (`id: "dsk-..."`, secrets)
 - `resource-agent` - Top-level `agent` blocks: required model + secrets, provider enum (default openrouter), tools (workflows-as-tools), subagent `team`, optional `sandbox { }` sizing/lifecycle, optional `profile` sub-blocks
-- `resource-channel` - Top-level `channel` blocks: bind an agent to a chat platform (`platform`/`integration` slack/linear/discord/web, `agent`, `mode` mention/dm/all, `enabled`); platform must equal integration
+- `resource-channel` - Top-level `channel` blocks: bind an agent to a chat platform (`platform` slack/linear/discord/web, `agent`, `mode` mention/dm/all, `enabled`); optional `integration` defaults to platform; optional `connection` names a `connection` block whose provider must match platform
 - `resource-access-control` - Top-level `access { default: deny|allow }`, `role <name> { match { claim: value } }`, and `policy { allow|deny <role> -> agent <name>|* }` blocks
 
 ### 9. Streams

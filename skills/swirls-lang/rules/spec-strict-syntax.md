@@ -14,7 +14,7 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, schema,
-disk, agent, channel, profile, tools,
+disk, agent, channel, connection, profile, tools,
 role, access, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
@@ -44,16 +44,17 @@ postgres <name> { }
 disk <name> { }
 agent <name> { }
 channel <name> { }
+connection <name> { }
 access { }
 role <name> { }
 policy { }
 ```
 
-There are **16** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control trio — `access { }` (nameless; default posture), `role <name> { }` (claim matching), and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants) — is covered in `resource-access-control`.
+There are **17** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control trio — `access { }` (nameless; default posture), `role <name> { }` (claim matching), and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants) — is covered in `resource-access-control`.
 
 ### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, connections, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -135,10 +136,10 @@ Only three resource types are valid in triggers: `form`, `webhook`, `schedule`. 
 Inside an `auth <name> { }` block, `type:` must be one of:
 
 ```
-oauth, api_key, basic, bearer, cloud
+oauth, api_key, basic, bearer
 ```
 
-No other types exist. `jwt`, `mtls`, `session`, `cookie`, `saml`, `digest`, `ntlm` are not valid.
+No other types exist. `jwt`, `mtls`, `session`, `cookie`, `saml`, `digest`, `ntlm` are not valid. The `cloud` type has been removed; for a Swirls-brokered OAuth grant use a top-level `connection` block (see below).
 
 ### Form visibility and auth fields
 
@@ -170,14 +171,26 @@ header: "Header-Name"
 
 ```
 platform: slack | linear | discord | web      // required
-integration: slack | linear | discord | web    // required; must equal platform
+integration: slack | linear | discord | web    // optional; defaults to platform; must equal platform
+connection: <connectionName>                   // optional; bare name of a top-level connection block
 agent: <agentName>                             // required; bare identifier of a top-level agent block
 mode: mention | dm | all                       // optional; defaults to mention
 enabled: true | false                          // optional; defaults to enabled
 label: "..."   description: "..."              // optional
 ```
 
-`platform`, `integration`, and `mode` are conventionally bare values (the parser also accepts quoted strings). `integration` must equal `platform` or it is a validator error. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"`. See `resource-channel`.
+`platform`, `integration`, and `mode` are conventionally bare values (the parser also accepts quoted strings). `integration` is optional and defaults to `platform`; when set it must equal `platform` or it is a validator error. `connection` optionally names a top-level `connection` block supplying the OAuth credential; its `provider` must match `platform`. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"`. See `resource-channel`.
+
+### Connection block fields
+
+`connection <name> { }` declares a project-scoped, Swirls-brokered outbound OAuth slot. Fields:
+
+```
+provider: slack | linear | discord | linkedin | microsoft   // required; bare value
+label: "..."   description: "..."                            // optional
+```
+
+`provider` is the only required field and must be one of the five values. A connection is referenced by bare name from an `http` node (`connection: <name>`) or a channel (`connection: <name>`); a node sets either `auth` or `connection`, never both. See `resource-connection`.
 
 ### Access-control blocks
 
@@ -284,7 +297,7 @@ Only these fields have semantics for each node type. All types additionally acce
 
 **switch** — required: `cases` (non-empty array of alphanumeric+underscore strings), `router` (@ts returning one of the case strings).
 
-**http** — required: `url` (@ts or string). Other fields: `method` (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`), `headers` (@ts returning object), `body` (@ts), `auth` (bare identifier referencing an auth block; `auth` is only valid on http nodes).
+**http** — required: `url` (@ts or string). Other fields: `method` (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`), `headers` (@ts returning object), `body` (@ts), `auth` (bare identifier referencing an auth block) or `connection` (bare identifier referencing a `connection` block) — set one, not both. Both `auth` and `connection` are only valid on http nodes.
 
 **scrape** — required: `url`. Other fields: `onlyMainContent`, `formats` (array), `maxAge`, `parsers` (array). No user `schema:` — vendor-managed output shape. Backed by Firecrawl (`FIRECRAWL_API_KEY`).
 
