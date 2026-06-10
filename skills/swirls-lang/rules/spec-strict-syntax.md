@@ -15,7 +15,7 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, schema,
 disk, agent, channel, connection, profile, tools,
-role, access, match, policy, allow, deny,
+role, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
 subgraph, map, while, items, update, maxItems, maxIterations, concurrency
@@ -45,12 +45,11 @@ disk <name> { }
 agent <name> { }
 channel <name> { }
 connection <name> { }
-access { }
 role <name> { }
 policy { }
 ```
 
-There are **17** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control trio — `access { }` (nameless; default posture), `role <name> { }` (claim matching), and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants) — is covered in `resource-access-control`.
+There are **16** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 ### Resource name pattern
 
@@ -194,7 +193,7 @@ label: "..."   description: "..."                            // optional
 
 ### Access-control blocks
 
-`access { default: deny | allow }` sets the deployment's default posture. `role <name> { match { <claim>: <value> } }` derives a role from verified principal attributes (scalar value = equality, array value = membership). `policy { allow|deny <role> -> agent <name>|* { workflows: […], tools: […] } }` grants roles access to agents. See `resource-access-control`.
+`role <name> { match { <claim>: <value> } }` derives a role from verified principal attributes (scalar value = equality, array value = membership). `policy { allow|deny <role> -> agent <name>|* { workflows: […], tools: […] } }` grants roles access to agents; declaring any grant flips the project to deny-by-default. There is no `access { }` block. See `resource-access-control`.
 
 ### Agent subagent team
 

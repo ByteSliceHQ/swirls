@@ -38,7 +38,7 @@
 ## 8. Resources & Triggers (resource)
 
 **Impact:** HIGH
-**Description:** Declaring forms (with `visibility: public/internal` and HTTP Basic `auth:`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, secrets, auth, connection (Swirls-brokered OAuth slots), postgres, disk, agent, channel, access/role/policy, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
+**Description:** Declaring forms (with `visibility: public/internal` and HTTP Basic `auth:`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, secrets, auth, connection (Swirls-brokered OAuth slots), postgres, disk, agent, channel, role/policy, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
 
 ## 9. Streams (stream)
 

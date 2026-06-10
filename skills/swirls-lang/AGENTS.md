@@ -20,7 +20,7 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, schema,
 disk, agent, channel, connection, profile, tools,
-role, access, match, policy, allow, deny,
+role, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
 subgraph, map, while, items, update, maxItems, maxIterations, concurrency
@@ -50,12 +50,11 @@ disk <name> { }
 agent <name> { }
 channel <name> { }
 connection <name> { }
-access { }
 role <name> { }
 policy { }
 ```
 
-There are **17** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control trio — `access { }` (nameless; default posture), `role <name> { }` (claim matching), and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants) — is covered in `resource-access-control`.
+There are **16** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 #### Resource name pattern
 
@@ -199,7 +198,7 @@ label: "..."   description: "..."                            // optional
 
 #### Access-control blocks
 
-`access { default: deny | allow }` sets the deployment's default posture. `role <name> { match { <claim>: <value> } }` derives a role from verified principal attributes (scalar value = equality, array value = membership). `policy { allow|deny <role> -> agent <name>|* { workflows: […], tools: […] } }` grants roles access to agents. See `resource-access-control`.
+`role <name> { match { <claim>: <value> } }` derives a role from verified principal attributes (scalar value = equality, array value = membership). `policy { allow|deny <role> -> agent <name>|* { workflows: […], tools: […] } }` grants roles access to agents; declaring any grant flips the project to deny-by-default. There is no `access { }` block. See `resource-access-control`.
 
 #### Agent subagent team
 
@@ -1399,7 +1398,7 @@ Team members are bare identifiers, not quoted strings. See `resource-agent`.
 
 ### Top-Level Declarations
 
-A `.swirls` file contains seventeen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains sixteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -1516,10 +1515,6 @@ connection acme_slack {
   provider: slack
 }
 
-access {
-  default: deny
-}
-
 role admins {
   match {
     org_role: admin
@@ -1531,7 +1526,7 @@ policy {
 }
 ```
 
-#### The seventeen valid top-level blocks
+#### The sixteen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -1547,9 +1542,8 @@ policy {
 - `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 - `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
-- `access { }` — Nameless singleton; default access posture (`default: deny | allow`). See `resource-access-control`.
 - `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
-- `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. See `resource-access-control`.
+- `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. Declaring a grant flips the project to deny-by-default. See `resource-access-control`.
 
 #### Version line
 
@@ -6202,23 +6196,11 @@ Token exchange and header injection are platform concerns; the DSL validates ref
 
 ---
 
-### Access, Role, and Policy Blocks
+### Role and Policy Blocks
 
-Three top-level blocks define identity-scoped access control for agents: `access { }` (default posture), `role <name> { }` (derive a named role from verified principal attributes), and `policy { }` (grant or deny roles access to agents and their workflows/tools).
+Two top-level blocks define identity-scoped access control for agents: `role <name> { }` (derive a named role from verified principal attributes) and `policy { }` (grant or deny roles access to agents and their workflows/tools). There is no separate enforcement switch: **declaring a `policy` with at least one grant flips the project to deny-by-default**. A project with roles but no policy grants stays open within the organization.
 
-#### `access { }` — default posture
-
-A nameless singleton block. One field: `default:` with a bare value `deny` or `allow`.
-
-```swirls
-access {
-  default: deny
-}
-```
-
-- Absent: behavior is unchanged (open within the organization).
-- Present with `default: deny`: deny-by-default unless a `policy` grant allows.
-- Any other value errors: `access default: must be `deny` or `allow``.
+There is no `access { }` block. It was removed; writing one is a parse error.
 
 #### `role <name> { }` — claim matching
 
@@ -6265,13 +6247,15 @@ policy {
 - `<role>` is a bare identifier naming a `role` block.
 - The target is `agent <name>` (a declared `agent` block) or `agent *` (every agent).
 - An omitted body grants all of the agent's workflows and tools. `workflows: [ … ]` and `tools: [ … ]` are bare-identifier arrays that narrow the grant.
+- A grant flips the project to deny-by-default: principals matching no granting role are denied. `deny` wins over `allow` for the same agent; a principal matching multiple roles gets the union of their grants. An empty `policy { }` (no grants) enforces nothing.
 - Parse errors: `Expected role name after `allow``, `Expected `->` after role name`, `Expected `agent` after `->``, `Expected an agent name or `*``, `Expected `allow` or `deny` in policy block`.
 
 #### Notes
 
-- `role`, `access`, `match`, `policy`, `allow`, and `deny` are lexer keywords.
-- `access` and `policy` blocks take no name; `role` blocks are named.
+- `role`, `match`, `policy`, `allow`, and `deny` are lexer keywords. `access` is not a keyword.
+- `policy` blocks take no name; `role` blocks are named.
 - The arrow in a grant is the same `->` token used by flow edges and trigger bindings.
+- Top-level `role` (who may invoke an agent) is distinct from the agent-nested `profile` (what the agent may do when it runs).
 
 
 # 9. Streams
@@ -7086,10 +7070,10 @@ Required keys: `stream`, `version`, `filter`.
 - `Invalid output format "<f>". Use one of: markdown, html, text, image, video, audio, mixed, json.` — Fix the `format:` value (bare identifier).
 - `Output schema is incompatible with format "<f>" (expect top-level string, a { markdown | html | text | url } string field, or contentMediaType hint).` — The node's resolved output schema cannot be projected into the declared format. `json` and `mixed` are always compatible.
 
-#### Access control (`access` / `role` / `policy`)
+#### Access control (`role` / `policy`)
 
 - `Duplicate role name "<n>"` — Two `role` blocks share a name.
 - Warning: `Role "<n>" has an empty match { } and will match no principal` — Add at least one claim condition.
-- Parser: `access default: must be \`deny\` or \`allow\`` / `access default: expected \`deny\` or \`allow\``.
 - Parser: `Expected role name after \`allow\`` / `Expected \`->\` after role name` / `Expected \`agent\` after \`->\`` / `Expected an agent name or \`*\`` / `Expected \`allow\` or \`deny\` in policy block` — Grant lines are `allow|deny <role> -> agent <name>|*`.
+- There is no `access { }` block; writing one is a parse error (it is not a keyword).
 

@@ -218,9 +218,9 @@ Required keys: `stream`, `version`, `filter`.
 - `Invalid output format "<f>". Use one of: markdown, html, text, image, video, audio, mixed, json.` — Fix the `format:` value (bare identifier).
 - `Output schema is incompatible with format "<f>" (expect top-level string, a { markdown | html | text | url } string field, or contentMediaType hint).` — The node's resolved output schema cannot be projected into the declared format. `json` and `mixed` are always compatible.
 
-### Access control (`access` / `role` / `policy`)
+### Access control (`role` / `policy`)
 
 - `Duplicate role name "<n>"` — Two `role` blocks share a name.
 - Warning: `Role "<n>" has an empty match { } and will match no principal` — Add at least one claim condition.
-- Parser: `access default: must be \`deny\` or \`allow\`` / `access default: expected \`deny\` or \`allow\``.
 - Parser: `Expected role name after \`allow\`` / `Expected \`->\` after role name` / `Expected \`agent\` after \`->\`` / `Expected an agent name or \`*\`` / `Expected \`allow\` or \`deny\` in policy block` — Grant lines are `allow|deny <role> -> agent <name>|*`.
+- There is no `access { }` block; writing one is a parse error (it is not a keyword).

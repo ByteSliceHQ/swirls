@@ -1,26 +1,14 @@
 ---
-title: Access, Role, and Policy Blocks
+title: Role and Policy Blocks
 impact: HIGH
-tags: resource, access, role, policy, rbac, allow, deny, match, claims, top-level
+tags: resource, role, policy, rbac, allow, deny, match, claims, top-level
 ---
 
-## Access, Role, and Policy Blocks
+## Role and Policy Blocks
 
-Three top-level blocks define identity-scoped access control for agents: `access { }` (default posture), `role <name> { }` (derive a named role from verified principal attributes), and `policy { }` (grant or deny roles access to agents and their workflows/tools).
+Two top-level blocks define identity-scoped access control for agents: `role <name> { }` (derive a named role from verified principal attributes) and `policy { }` (grant or deny roles access to agents and their workflows/tools). There is no separate enforcement switch: **declaring a `policy` with at least one grant flips the project to deny-by-default**. A project with roles but no policy grants stays open within the organization.
 
-### `access { }` — default posture
-
-A nameless singleton block. One field: `default:` with a bare value `deny` or `allow`.
-
-```swirls
-access {
-  default: deny
-}
-```
-
-- Absent: behavior is unchanged (open within the organization).
-- Present with `default: deny`: deny-by-default unless a `policy` grant allows.
-- Any other value errors: `access default: must be `deny` or `allow``.
+There is no `access { }` block. It was removed; writing one is a parse error.
 
 ### `role <name> { }` — claim matching
 
@@ -67,10 +55,12 @@ policy {
 - `<role>` is a bare identifier naming a `role` block.
 - The target is `agent <name>` (a declared `agent` block) or `agent *` (every agent).
 - An omitted body grants all of the agent's workflows and tools. `workflows: [ … ]` and `tools: [ … ]` are bare-identifier arrays that narrow the grant.
+- A grant flips the project to deny-by-default: principals matching no granting role are denied. `deny` wins over `allow` for the same agent; a principal matching multiple roles gets the union of their grants. An empty `policy { }` (no grants) enforces nothing.
 - Parse errors: `Expected role name after `allow``, `Expected `->` after role name`, `Expected `agent` after `->``, `Expected an agent name or `*``, `Expected `allow` or `deny` in policy block`.
 
 ### Notes
 
-- `role`, `access`, `match`, `policy`, `allow`, and `deny` are lexer keywords.
-- `access` and `policy` blocks take no name; `role` blocks are named.
+- `role`, `match`, `policy`, `allow`, and `deny` are lexer keywords. `access` is not a keyword.
+- `policy` blocks take no name; `role` blocks are named.
 - The arrow in a grant is the same `->` token used by flow edges and trigger bindings.
+- Top-level `role` (who may invoke an agent) is distinct from the agent-nested `profile` (what the agent may do when it runs).

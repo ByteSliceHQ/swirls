@@ -1,12 +1,12 @@
 ---
 title: Top-Level Declarations
 impact: HIGH
-tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, connection, access, role, policy
+tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, connection, role, policy
 ---
 
 ## Top-Level Declarations
 
-A `.swirls` file contains seventeen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains sixteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -123,10 +123,6 @@ connection acme_slack {
   provider: slack
 }
 
-access {
-  default: deny
-}
-
 role admins {
   match {
     org_role: admin
@@ -138,7 +134,7 @@ policy {
 }
 ```
 
-### The seventeen valid top-level blocks
+### The sixteen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -154,9 +150,8 @@ policy {
 - `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 - `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
-- `access { }` — Nameless singleton; default access posture (`default: deny | allow`). See `resource-access-control`.
 - `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
-- `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. See `resource-access-control`.
+- `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. Declaring a grant flips the project to deny-by-default. See `resource-access-control`.
 
 ### Version line
 
