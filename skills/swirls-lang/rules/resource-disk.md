@@ -1,12 +1,12 @@
 ---
 title: Disk Block Declaration
 impact: HIGH
-tags: resource, disk, archil, top-level, mount, secrets, region
+tags: resource, disk, archil, top-level, mount, shared
 ---
 
 ## Disk Block Declaration
 
-Top-level `disk <name> { }` blocks declare an Archil-backed remote disk that `type: disk` nodes mount and exec on. Each block carries the provider disk id, an optional region, and a reference to a `secret` block holding `ARCHIL_API_KEY`.
+Top-level `disk <name> { }` blocks declare a **platform-managed shared disk**. Swirls provisions the Archil backing store at deploy time — authors do not set provider disk ids or `ARCHIL_API_KEY` in DSL.
 
 **There is no `type:` field on a disk block** — the keyword `disk` identifies the block.
 
@@ -16,32 +16,33 @@ Top-level `disk <name> { }` blocks declare an Archil-backed remote disk that `ty
 disk <name> {
   label: "<optional label>"
   region: "<optional region>"
-  id: "dsk-..."             // required; Archil disk id (dsk- + 16 hex chars)
-  secrets: <secret_block>   // required; the block must declare ARCHIL_API_KEY
 }
 ```
 
-### Required vs optional fields
+Empty blocks are valid: `disk shared_a { }`.
+
+### Fields
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `id` | yes | Quoted string literal. Archil-issued disk identifier matching `^dsk-[0-9a-f]{16}$` exactly. |
-| `secrets` | yes | Bare identifier naming a top-level `secret` block that declares `ARCHIL_API_KEY` in its `vars`. |
 | `label` | no | Display string. Defaults to the disk's name. |
-| `region` | no | Quoted string (e.g. `"aws-us-east-1"`). |
+| `region` | no | Quoted string (e.g. `"aws-us-east-1"`). Optional Archil region hint at provision time. |
+
+### Removed fields (breaking)
+
+`id:` and `secrets:` are **no longer valid**. The parser errors:
+
+```
+Disk block no longer accepts "id:" — the platform provisions Archil disks at deploy time
+Disk block no longer accepts "secrets:" — the platform provisions Archil disks at deploy time
+```
 
 ### Complete example
 
 ```swirls
-secret disk_creds {
-  vars: [ARCHIL_API_KEY]
-}
-
 disk proj {
-  label: "Project disk"
-  id: "dsk-0123456789abcdef"
+  label: "Project shared disk"
   region: "aws-us-east-1"
-  secrets: disk_creds
 }
 
 workflow backup {
@@ -52,17 +53,32 @@ workflow backup {
     disk: proj
     command: @ts {
       const date = new Date().toISOString().slice(0, 10)
-      return "tar czf /mnt/proj/backups/logs-" + date + ".tar.gz /mnt/proj/logs"
+      return "tar czf /tmp/backups/logs-" + date + ".tar.gz /data"
     }
   }
 }
 ```
 
+### Agent shared disks
+
+Mount a shared disk into an agent sandbox with `disks:` on the agent block:
+
+```swirls
+disk kb {}
+
+agent helper {
+  secrets: ai_creds
+  model: "gpt-4o"
+  disks: [ kb ]
+}
+```
+
+Every deployed agent also receives a **dedicated** platform-managed disk (not declared as a `disk` block). In sandboxes it mounts at `/mnt/agent`; shared disks mount at `/mnt/disks/<diskName>`.
+
 ### Validation rules
 
 - Disk names must match `^[a-zA-Z0-9_]+$`. Duplicate names error: `Duplicate disk block name "<n>"`.
-- `id:` is required (`Disk block requires an id field (provider disk id)`) and must match `dsk-` + 16 hex characters (`Disk id must match pattern dsk- followed by 16 hex characters`).
-- `secrets:` is required: `Disk block requires secrets: pointing to a secret block that declares ARCHIL_API_KEY`. The referenced block must exist (`Disk "<n>" references undefined secret block "<s>"`) and must declare the var (`Secret block "<s>" must declare var "ARCHIL_API_KEY" for disk runtime API access`).
 - The `disk` node's `disk:` field must match a declared disk block by bare identifier (file-local or workspace).
+- Agent `disks:` entries must reference declared `disk` blocks; duplicates error.
 
-See `node-disk` for the read/exec side.
+See `node-disk` for the workflow exec side and `resource-agent` for agent mounting.

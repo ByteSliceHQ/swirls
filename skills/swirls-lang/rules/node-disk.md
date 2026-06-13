@@ -6,9 +6,9 @@ tags: node, disk, archil, exec, command, filesystem
 
 ## Disk Nodes
 
-Disk nodes execute bash commands on a remote disk mounted via a top-level `disk` block. Archil is the underlying vendor (`ARCHIL_API_KEY`). Every disk node binds to a `disk` block by bare identifier and runs one shell command.
+Disk nodes execute bash commands on a platform-managed Archil disk. Every disk node binds to a top-level `disk <name> { }` block by bare identifier and runs one shell command.
 
-**Required fields:** `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (string literal or `@ts` returning a shell command).
+**Required fields:** `disk`, `command`.
 
 ### Incorrect (missing required fields)
 
@@ -23,24 +23,17 @@ The validator errors: `Node type "disk" requires "disk"` and `Node type "disk" r
 ### Correct (literal command)
 
 ```swirls
-secret disk_creds {
-  vars: [ARCHIL_API_KEY]
-}
-
 disk proj {
   label: "Project disk"
-  id: "dsk-0123456789abcdef"
-  region: "aws-us-east-1"
-  secrets: disk_creds
 }
 
 workflow audit {
   label: "Audit disk contents"
   root {
     type: disk
-    label: "List mount"
+    label: "List root"
     disk: proj
-    command: "ls -la /mnt/proj"
+    command: "ls -la"
   }
 }
 ```
@@ -54,7 +47,7 @@ node fetch_report {
   disk: proj
   command: @ts {
     const id = context.nodes.root.output.reportId
-    return "cat /mnt/proj/reports/" + id + ".md"
+    return "cat reports/" + id + ".md"
   }
 }
 ```
@@ -64,11 +57,11 @@ node fetch_report {
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
 | `disk` | yes | Bare identifier | Names a top-level `disk <name> { }` block. |
-| `command` | yes | String or `@ts` block | Single shell command to execute on the disk. |
+| `command` | yes | String or `@ts` block | Single shell command executed via Archil `disk.exec`. |
 | `schema` | no | `@json` block, object literal, or bare schema name | Types the command output for downstream `@ts` code. |
 
 Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
 
-### API key
+### Platform credentials
 
-`ARCHIL_API_KEY` is resolved by the runtime via the referenced `disk` block's `secrets:` reference. See `resource-disk`.
+`ARCHIL_API_KEY` is resolved by the platform at runtime — do not declare it in DSL `secrets:` on disk blocks. See `resource-disk`.

@@ -8,7 +8,7 @@
 ## 2. File Structure (structure)
 
 **Impact:** HIGH
-**Description:** The seventeen top-level declarations, file discovery, and comment syntax. The foundation for every .swirls file.
+**Description:** The seventeen top-level declarations (including `view`, which composes streams into a spreadsheet), file discovery, and comment syntax. The foundation for every .swirls file.
 
 ## 3. Workflow & Node Basics (workflow)
 
@@ -38,12 +38,12 @@
 ## 8. Resources & Triggers (resource)
 
 **Impact:** HIGH
-**Description:** Declaring forms (with `visibility: public/internal` and HTTP Basic `auth:`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, secrets, auth, connection (Swirls-brokered OAuth slots), postgres, disk, agent, channel, role/policy, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
+**Description:** Declaring forms (with `visibility: public/internal` and HTTP Basic `auth:`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, views (spreadsheets over streams with `computed` graph columns), secrets, auth, connection (Swirls-brokered OAuth slots), postgres, disk, agent, channel, role/policy, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
 
 ## 9. Streams (stream)
 
 **Impact:** MEDIUM
-**Description:** Persisting workflow output via versioned top-level `stream { }` blocks (a `version` pointer plus a `versions:` map) and reading it with version-pinned `type: stream` nodes using `filter: @ts` returning a StreamFilter. Covers migration from the removed `persistence { }` block.
+**Description:** Persisting workflow output via versioned top-level `stream { }` blocks (a `version` pointer plus a `versions:` map) and reading it with version-pinned `type: stream` nodes using `filter: @ts` returning a StreamFilter. Covers migration from the removed `persistence { }` block, and top-level `view { }` blocks that compose streams into a spreadsheet with `columns` mappings and per-row `computed` graph columns.
 
 ## 10. Reviews (review)
 

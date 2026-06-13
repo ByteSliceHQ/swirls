@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "5.4.0"
+  version: "5.5.0"
 ---
 
 # Swirls Language
@@ -16,7 +16,7 @@ metadata:
 > GitHub copy at `ByteSliceHQ/swirls` is a mirror; if your copy's version
 > trails the index, prefer the published one.
 
-Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / schema / disk / agent / channel / connection blocks, access-control blocks (`role` / `policy`; declaring policy grants flips the project to deny-by-default), agent subagent teams, reviews, failure policies, output `format:`, and known parser pitfalls.
+Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / view / schema / disk / agent / channel / connection blocks, access-control blocks (`role` / `policy`; declaring policy grants flips the project to deny-by-default), agent subagent teams, reviews, failure policies, output `format:`, and known parser pitfalls.
 
 ## When to Apply
 
@@ -30,6 +30,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - Declaring identity-scoped access control with `role` and `policy` blocks.
 - Building per-item iteration with `map` nodes or counter/condition loops with `while` nodes (inline `subgraph { }` or referenced `workflow: <name>`).
 - Persisting workflow output with versioned top-level `stream { }` blocks and reading it with version-pinned `type: stream` nodes.
+- Composing streams into a spreadsheet with top-level `view { }` blocks, including per-row `computed` columns that run a graph for each row.
 - Declaring `agent` blocks (with tools, profiles, and subagent `team`) and binding them to chat platforms with `channel` blocks.
 - Configuring human-in-the-loop review blocks.
 - Declaring external Postgres databases and writing parameterized SQL nodes.
@@ -45,7 +46,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 | 5 | TypeScript Blocks | CRITICAL | `ts-` | @ts patterns, sandbox limits, safe code |
 | 6 | Schema & Typing | HIGH | `schema-` | JSON Schema, inputSchema/outputSchema/schema placement, bare-identifier refs to top-level `schema` blocks |
 | 7 | Context Object | HIGH | `context-` | context.nodes, context.reviews, context.secrets, context.meta, context.iteration |
-| 8 | Resources & Triggers | HIGH | `resource-` | Forms (incl. `visibility:` and `auth:`), webhooks (incl. `secret:`/`header:`), schedules, secrets, auth blocks, connection blocks (Swirls-brokered OAuth), postgres blocks, agent blocks (incl. subagent `team`), channel blocks, role/policy blocks, top-level stream and schema blocks, trigger bindings |
+| 8 | Resources & Triggers | HIGH | `resource-` | Forms (incl. `visibility:` and `auth:`), webhooks (incl. `secret:`/`header:`), schedules, secrets, auth blocks, connection blocks (Swirls-brokered OAuth), postgres blocks, agent blocks (incl. subagent `team`), channel blocks, role/policy blocks, top-level stream / view / schema blocks, trigger bindings |
 | 9 | Streams | MEDIUM | `stream-` | Filter operators, field paths, migration from persistence |
 | 10 | Reviews | MEDIUM | `review-` | Human-in-the-loop review config |
 | 11 | Parser Pitfalls | CRITICAL | `parser-` | Lexer hazards that silently truncate files, cascade errors, validator diagnostics |
@@ -58,7 +59,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `spec-primitive-map` - Map natural-language intents to primitives before writing syntax: the five categories (Agents, Workflows, Memory, Connections, Access) and the common-intent lookup table.
 
 ### 2. File Structure
-- `structure-top-level-declarations` - The sixteen valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, connection, role, policy
+- `structure-top-level-declarations` - The seventeen valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, disk, agent, channel, connection, role, policy
 - `structure-file-discovery` - File extensions, discovery rules, `.ts.swirls` files
 - `structure-comments` - Comment syntax and ASCII-only restriction
 
@@ -113,6 +114,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `resource-webhook` - Webhook declarations with shared-secret `secret: <block>.<VAR>` + `header: "X-..."` verification (paired); reserved-headers list
 - `resource-schedule` - Schedule declarations with cron and timezone
 - `resource-stream` - Top-level `stream { }` blocks: `workflow`, `version` pointer, and a `versions:` map with per-version schema/condition/prepare
+- `resource-view` - Top-level `view { }` blocks: compose `streams`, map each source row via `columns`, add per-row `computed` columns that run a `graph` (with `input`/optional `output` @ts); spreadsheet surface, execution-loop guard
 - `resource-schema` - Top-level `schema <name> { }` blocks: reusable JSON Schemas referenced by bare identifier from forms / webhooks / root inputSchema / root outputSchema / non-root schema / review schema
 - `resource-trigger-binding` - Trigger syntax: `resourceType:name -> workflowName` (form / webhook / schedule only)
 - `resource-secrets` - Top-level `secret { vars: [...] }` blocks

@@ -90,6 +90,6 @@ Some node types auto-resolve their API keys without appearing in `secrets:`:
 - `email` → `RESEND_API_KEY`
 - `scrape` → `FIRECRAWL_API_KEY`
 - `parallel` → `PARALLEL_API_KEY`
-- `disk` → `ARCHIL_API_KEY` (resolved via the bound `disk` block's `secrets:` reference)
+- `disk` → `ARCHIL_API_KEY` (platform-managed; resolved at runtime for `type: disk` nodes — not declared in DSL)
 
 Do not list these in a `secret` block unless you also want them accessible from `@ts` code.

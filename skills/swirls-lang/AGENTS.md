@@ -18,7 +18,7 @@ The Swirls DSL is a declarative configuration language. It is not TypeScript, YA
 These are the only keywords recognized by the lexer (`packages/language/src/lexer.ts`). Any other word is parsed as an identifier or a quoted string.
 
 ```
-form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, schema,
+form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, view, schema,
 disk, agent, channel, connection, profile, tools,
 role, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
@@ -42,6 +42,7 @@ webhook <name> { }
 schedule <name> { }
 workflow <name> { }
 stream <name> { }
+view <name> { }
 trigger <name> { }
 secret <name> { }
 auth <name> { }
@@ -54,11 +55,11 @@ role <name> { }
 policy { }
 ```
 
-There are **16** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
+There are **17** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, triggers, secrets, auth, postgres, schemas, agents, channels, connections, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, schemas, agents, channels, connections, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -1397,13 +1398,13 @@ Team members are bare identifiers, not quoted strings. See `resource-agent`.
 
 ### Intent to Primitive Map
 
-Before writing syntax, map the user's request to primitives. The sixteen top-level blocks organize into five categories; pick blocks by category, then look up exact syntax in the other rules.
+Before writing syntax, map the user's request to primitives. The seventeen top-level blocks organize into five categories; pick blocks by category, then look up exact syntax in the other rules.
 
 | Category | Blocks | One-line job |
 |---|---|---|
 | Agents | `agent`, `channel` | Actors that reason; channels bind them to chat surfaces |
 | Workflows | `workflow`, `trigger`, `form`, `webhook`, `schedule`, `schema` | Deterministic procedures and what starts them |
-| Memory | `stream`, `disk`, `postgres` | Structured output, files, the user's existing database |
+| Memory | `stream`, `view`, `disk`, `postgres` | Structured output, spreadsheet views over it, files, the user's existing database |
 | Connections | `secret`, `auth`, `connection` | Outbound credentials, least-managed to most-managed |
 | Access | `role`, `policy` | Inbound permission: who may invoke agents/workflows |
 
@@ -1422,6 +1423,8 @@ Before writing syntax, map the user's request to primitives. The sixteen top-lev
 | "answer in Slack / Linear / Discord / our site" | `channel` block bound to the agent (+ `connection` for the platform) |
 | "restrict the agent's tools for this step" | `profile` inside the agent block, selected via `profile:` on the node |
 | "save the results / reuse output later" | top-level `stream` block + `type: stream` reader node |
+| "see the data as a spreadsheet / table" | top-level `view` block over the stream(s) |
+| "a column that runs AI / a graph for each row" | `computed { }` column in a `view` block |
 | "shared files / give the agent a workspace" | `disk` block + `type: disk` nodes |
 | "query/update our database" | `postgres` block + `type: postgres` nodes |
 | "call an API with our key" | `secret` + `auth` + `http` node |
@@ -1437,7 +1440,7 @@ Before writing syntax, map the user's request to primitives. The sixteen top-lev
 - Fuzzy task → `agent`; exact repeatable procedure → `workflow`. Agents call workflows as tools, so "an assistant that follows our process" is both.
 - One LLM call with a typed answer → `ai` node; multi-step reasoning with tools → `agent`.
 - Outbound credentials (`secret`/`auth`/`connection`) are not inbound permission (`role`/`policy`). "Connect to Slack" is a connection; "only support can use the Slack bot" is access.
-- Structured reusable output → `stream`; files → `disk`; the user's own data → `postgres`.
+- Structured reusable output → `stream`; a spreadsheet over that output (with per-row computed columns) → `view`; files → `disk`; the user's own data → `postgres`.
 - `role` (top-level, who may invoke) is not `profile` (inside `agent`, what it may do).
 
 
@@ -1445,7 +1448,7 @@ Before writing syntax, map the user's request to primitives. The sixteen top-lev
 
 ### Top-Level Declarations
 
-A `.swirls` file contains sixteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains seventeen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -1512,6 +1515,13 @@ stream process_log {
   }
 }
 
+view process_log_table {
+  label: "Process log table"
+  streams: [process_log]
+  schema: @json { { "type": "object" } }
+  columns: @ts { return { ...context.streams.process_log.output } }
+}
+
 secret api_creds {
   vars: [API_KEY, SHARED_SECRET]
 }
@@ -1573,7 +1583,7 @@ policy {
 }
 ```
 
-#### The sixteen valid top-level blocks
+#### The seventeen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -1581,6 +1591,7 @@ policy {
 - `schedule <name> { }` — Cron-based triggers. See `resource-schedule`.
 - `workflow <name> { }` — Workflow DAGs (legacy keyword: `graph`). See `workflow-anatomy`.
 - `stream <name> { }` — Persist a workflow's output as typed records. See `resource-stream`.
+- `view <name> { }` — Compose stream blocks into a spreadsheet: map each source row through `columns`, optionally add `computed` columns that run a graph per row. See `resource-view`.
 - `trigger <name> { }` — Binds resources to workflows. See `resource-trigger-binding`.
 - `secret <name> { }` — Named groups of secret var identifiers. See `resource-secrets`.
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.
@@ -3498,9 +3509,9 @@ node load_file {
 
 ### Disk Nodes
 
-Disk nodes execute bash commands on a remote disk mounted via a top-level `disk` block. Archil is the underlying vendor (`ARCHIL_API_KEY`). Every disk node binds to a `disk` block by bare identifier and runs one shell command.
+Disk nodes execute bash commands on a platform-managed Archil disk. Every disk node binds to a top-level `disk <name> { }` block by bare identifier and runs one shell command.
 
-**Required fields:** `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (string literal or `@ts` returning a shell command).
+**Required fields:** `disk`, `command`.
 
 #### Incorrect (missing required fields)
 
@@ -3515,24 +3526,17 @@ The validator errors: `Node type "disk" requires "disk"` and `Node type "disk" r
 #### Correct (literal command)
 
 ```swirls
-secret disk_creds {
-  vars: [ARCHIL_API_KEY]
-}
-
 disk proj {
   label: "Project disk"
-  id: "dsk-0123456789abcdef"
-  region: "aws-us-east-1"
-  secrets: disk_creds
 }
 
 workflow audit {
   label: "Audit disk contents"
   root {
     type: disk
-    label: "List mount"
+    label: "List root"
     disk: proj
-    command: "ls -la /mnt/proj"
+    command: "ls -la"
   }
 }
 ```
@@ -3546,7 +3550,7 @@ node fetch_report {
   disk: proj
   command: @ts {
     const id = context.nodes.root.output.reportId
-    return "cat /mnt/proj/reports/" + id + ".md"
+    return "cat reports/" + id + ".md"
   }
 }
 ```
@@ -3556,14 +3560,14 @@ node fetch_report {
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
 | `disk` | yes | Bare identifier | Names a top-level `disk <name> { }` block. |
-| `command` | yes | String or `@ts` block | Single shell command to execute on the disk. |
+| `command` | yes | String or `@ts` block | Single shell command executed via Archil `disk.exec`. |
 | `schema` | no | `@json` block, object literal, or bare schema name | Types the command output for downstream `@ts` code. |
 
 Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
 
-#### API key
+#### Platform credentials
 
-`ARCHIL_API_KEY` is resolved by the runtime via the referenced `disk` block's `secrets:` reference. See `resource-disk`.
+`ARCHIL_API_KEY` is resolved by the platform at runtime — do not declare it in DSL `secrets:` on disk blocks. See `resource-disk`.
 
 ---
 
@@ -5536,7 +5540,7 @@ Some node types auto-resolve their API keys without appearing in `secrets:`:
 - `email` → `RESEND_API_KEY`
 - `scrape` → `FIRECRAWL_API_KEY`
 - `parallel` → `PARALLEL_API_KEY`
-- `disk` → `ARCHIL_API_KEY` (resolved via the bound `disk` block's `secrets:` reference)
+- `disk` → `ARCHIL_API_KEY` (platform-managed; resolved at runtime for `type: disk` nodes — not declared in DSL)
 
 Do not list these in a `secret` block unless you also want them accessible from `@ts` code.
 
@@ -5712,7 +5716,7 @@ postgres my_db {
 
 ### Disk Block Declaration
 
-Top-level `disk <name> { }` blocks declare an Archil-backed remote disk that `type: disk` nodes mount and exec on. Each block carries the provider disk id, an optional region, and a reference to a `secret` block holding `ARCHIL_API_KEY`.
+Top-level `disk <name> { }` blocks declare a **platform-managed shared disk**. Swirls provisions the Archil backing store at deploy time — authors do not set provider disk ids or `ARCHIL_API_KEY` in DSL.
 
 **There is no `type:` field on a disk block** — the keyword `disk` identifies the block.
 
@@ -5722,32 +5726,33 @@ Top-level `disk <name> { }` blocks declare an Archil-backed remote disk that `ty
 disk <name> {
   label: "<optional label>"
   region: "<optional region>"
-  id: "dsk-..."             // required; Archil disk id (dsk- + 16 hex chars)
-  secrets: <secret_block>   // required; the block must declare ARCHIL_API_KEY
 }
 ```
 
-#### Required vs optional fields
+Empty blocks are valid: `disk shared_a { }`.
+
+#### Fields
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `id` | yes | Quoted string literal. Archil-issued disk identifier matching `^dsk-[0-9a-f]{16}$` exactly. |
-| `secrets` | yes | Bare identifier naming a top-level `secret` block that declares `ARCHIL_API_KEY` in its `vars`. |
 | `label` | no | Display string. Defaults to the disk's name. |
-| `region` | no | Quoted string (e.g. `"aws-us-east-1"`). |
+| `region` | no | Quoted string (e.g. `"aws-us-east-1"`). Optional Archil region hint at provision time. |
+
+#### Removed fields (breaking)
+
+`id:` and `secrets:` are **no longer valid**. The parser errors:
+
+```
+Disk block no longer accepts "id:" — the platform provisions Archil disks at deploy time
+Disk block no longer accepts "secrets:" — the platform provisions Archil disks at deploy time
+```
 
 #### Complete example
 
 ```swirls
-secret disk_creds {
-  vars: [ARCHIL_API_KEY]
-}
-
 disk proj {
-  label: "Project disk"
-  id: "dsk-0123456789abcdef"
+  label: "Project shared disk"
   region: "aws-us-east-1"
-  secrets: disk_creds
 }
 
 workflow backup {
@@ -5758,20 +5763,35 @@ workflow backup {
     disk: proj
     command: @ts {
       const date = new Date().toISOString().slice(0, 10)
-      return "tar czf /mnt/proj/backups/logs-" + date + ".tar.gz /mnt/proj/logs"
+      return "tar czf /tmp/backups/logs-" + date + ".tar.gz /data"
     }
   }
 }
 ```
 
+#### Agent shared disks
+
+Mount a shared disk into an agent sandbox with `disks:` on the agent block:
+
+```swirls
+disk kb {}
+
+agent helper {
+  secrets: ai_creds
+  model: "gpt-4o"
+  disks: [ kb ]
+}
+```
+
+Every deployed agent also receives a **dedicated** platform-managed disk (not declared as a `disk` block). In sandboxes it mounts at `/mnt/agent`; shared disks mount at `/mnt/disks/<diskName>`.
+
 #### Validation rules
 
 - Disk names must match `^[a-zA-Z0-9_]+$`. Duplicate names error: `Duplicate disk block name "<n>"`.
-- `id:` is required (`Disk block requires an id field (provider disk id)`) and must match `dsk-` + 16 hex characters (`Disk id must match pattern dsk- followed by 16 hex characters`).
-- `secrets:` is required: `Disk block requires secrets: pointing to a secret block that declares ARCHIL_API_KEY`. The referenced block must exist (`Disk "<n>" references undefined secret block "<s>"`) and must declare the var (`Secret block "<s>" must declare var "ARCHIL_API_KEY" for disk runtime API access`).
 - The `disk` node's `disk:` field must match a declared disk block by bare identifier (file-local or workspace).
+- Agent `disks:` entries must reference declared `disk` blocks; duplicates error.
 
-See `node-disk` for the read/exec side.
+See `node-disk` for the workflow exec side and `resource-agent` for agent mounting.
 
 ---
 
@@ -6303,6 +6323,198 @@ policy {
 - `policy` blocks take no name; `role` blocks are named.
 - The arrow in a grant is the same `->` token used by flow edges and trigger bindings.
 - Top-level `role` (who may invoke an agent) is distinct from the agent-nested `profile` (what the agent may do when it runs).
+
+---
+
+### View Block Declaration
+
+Top-level `view <name> { }` blocks compose one or more `stream` blocks into a spreadsheet-shaped table. A view maps each source stream row into a typed row (the `columns` mapping), and may add **computed columns** whose values come from running a workflow (graph) once per row. The cloud UI renders a view as a virtualized spreadsheet with per-cell loading states while computed columns run.
+
+**There is no `type:` field on a view block** — the keyword `view` identifies the block. A view is read/derived data: it does not start workflows from triggers, and nothing reads *from* a view inside the DSL (it is surfaced in the cloud UI and via the API, not consumed by nodes).
+
+A view is built from three things:
+
+1. `streams:` — the source `stream` blocks it composes. Their rows become the view's rows.
+2. `columns:` — a `@ts` mapping from a source stream row into the view's row shape (validated against `schema`).
+3. `computed { }` — optional named columns, each running a `graph` per row to produce a cell value.
+
+#### Syntax
+
+```swirls
+view <name> {
+  label: "<optional label>"            // defaults to <name>
+  description: "<optional string>"
+  enabled: <boolean>                    // optional; default treated as true
+  streams: [<stream_name>, ...]         // required; non-empty list of stream block names
+
+  schema: @json {                       // required; shape of one mapped (non-computed) row
+    { ... JSON Schema ... }
+  }
+
+  columns: @ts {                        // required; map a source stream row into the row shape
+    return { ... }
+  }
+
+  computed {                            // optional; zero or more computed columns
+    <column_name> {                     // column_name matches ^[a-zA-Z0-9_]+$
+      graph: <workflow_name>            // required; workflow run once per row
+      input: @ts {                      // required; map the row into the graph's trigger input
+        return { ... }
+      }
+      output: @ts {                     // optional; map the graph output into the cell value
+        return ...
+      }
+    }
+    ...
+  }
+}
+```
+
+`columns`, and each computed `input` / `output`, may also be `@ts "path.ts.swirls"` file references. `schema` may instead be a bare-identifier reference to a top-level `schema` block: `schema: my_row_schema`.
+
+**`computed` is a block, not a `key: value` field** — write `computed { ... }` with no colon, the same way `versions { }` is written inside a `stream` block. Inside it, each entry is `<column_name> { graph, input, output? }`.
+
+#### Required vs optional fields
+
+Block-level:
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `streams` | yes | Non-empty list of `stream` block names declared in the same file or merged workspace. Each must exist; duplicates in the list error. |
+| `schema` | yes | `@json { }` literal or `schema: <name>` reference. Shape of one mapped row (computed columns are appended on top of it). |
+| `columns` | yes | Non-empty `@ts { }` or `@ts "…"`. Returns the mapped row object for one source stream row. |
+| `label` | no | Defaults to the view's name. |
+| `description` | no | Free-form description. |
+| `enabled` | no | When false, the view stays in the AST and deployment but is not materialized. |
+| `computed` | no | Block of named computed columns. Omit it for a plain mapped view. |
+
+Per computed column (inside `computed { }`):
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `graph` | yes | Bare identifier (or quoted string) naming a workflow in the same file or merged workspace. `workflow:` is an accepted alias. |
+| `input` | yes | Non-empty `@ts { }` or `@ts "…"`. Maps the mapped row into the graph's trigger input; must return a plain object. |
+| `output` | no | `@ts` mapping the graph's result into the cell value. Omit it to store the graph output directly. |
+
+#### Context shape inside `columns`
+
+`columns` runs once per source stream row. The originating row is exposed under `context.streams`:
+
+- `context.streams.<streamName>.output` — the source stream row's persisted record.
+- `context.streams.<streamName>.<versionId>.output` — the same record under the row's version key (e.g. `.v2.output`).
+
+Only the stream that produced the current row is present; sibling streams of the view are absent for that row. Return the mapped row object — it is validated against the view `schema` exactly like a stream `prepare` is validated against its version schema.
+
+#### Context shape inside computed `input` and `output`
+
+- `input` gets `context.row` — the mapped row object produced by `columns` — plus the same `context.streams.<name>` as `columns`. Return the object passed to the graph as its trigger input.
+- `output` gets `context.output` — the completed graph's **leaf** node outputs, keyed by leaf node name (same shape stream `prepare` sees) — plus `context.row`. Return the cell value. Without `output`, the cell value is the graph's output directly.
+
+#### Complete example
+
+```swirls
+workflow count_topic_tokens {
+  label: "Count topic tokens"
+  root {
+    type: code
+    label: "Count"
+    code: @ts {
+      return { topic: context.nodes.root.input.topic, tokens: 42 }
+    }
+  }
+}
+
+workflow enrich_topic {
+  label: "Enrich topic"
+  root {
+    type: code
+    label: "Enrich"
+    code: @ts {
+      return { sentiment: "positive" }
+    }
+  }
+}
+
+stream store_topic_tokens {
+  label: "Topic tokens"
+  workflow: count_topic_tokens
+  version: v1
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["topic", "tokens"],
+          "properties": {
+            "topic": { "type": "string" },
+            "tokens": { "type": "number" }
+          }
+        }
+      }
+      prepare: @ts {
+        return { topic: context.output.root.topic, tokens: context.output.root.tokens }
+      }
+    }
+  }
+}
+
+view topic_dashboard {
+  label: "Topic dashboard"
+  description: "One row per stored topic, enriched with sentiment"
+  streams: [store_topic_tokens]
+
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["topic", "tokens"],
+      "properties": {
+        "topic": { "type": "string" },
+        "tokens": { "type": "number" }
+      }
+    }
+  }
+
+  columns: @ts {
+    return {
+      topic: context.streams.store_topic_tokens.output.topic,
+      tokens: context.streams.store_topic_tokens.output.tokens
+    }
+  }
+
+  computed {
+    sentiment {
+      graph: enrich_topic
+      input: @ts {
+        return { topic: context.row.topic }
+      }
+      output: @ts {
+        return context.output.root.sentiment
+      }
+    }
+  }
+}
+```
+
+#### Runtime behavior
+
+- A view is materialized **only in a deployed project** (hosted on Swirls Cloud); the local CLI worker does not build views.
+- Each source stream row becomes one view row (the `columns` mapping). New stream rows materialize as the source workflow completes; deploying a view backfills existing stream rows.
+- Each computed column runs `graph` **once per row** as a normal workflow execution. Those executions are billed against `execution_credits` exactly like trigger-started runs — an over-quota org gets a failed cell, not a free run. A view over a busy stream with computed columns can launch a large number of graph executions, so reach for computed columns deliberately.
+- Cells move through `pending → running → completed | failed`; the spreadsheet shows a loading state until each settles.
+- Recompute is available from the cloud UI; it re-materializes existing rows and re-runs computed columns (idempotent per row).
+
+#### Validation rules
+
+- View names must match `^[a-zA-Z0-9_]+$`. Duplicate names error with `Duplicate view name "X"`.
+- `streams` is required and non-empty (`View "X" requires "streams" (non-empty list of stream names)`). Each entry must reference a declared stream (`View references stream "Y" which is not defined`); listing a stream twice errors (`View "X" lists stream "Y" more than once`).
+- `schema` is required (`View "X" has no schema; add schema: @json { … } or schema: <name>`).
+- `columns` is required and must be a non-empty `@ts` block or `@ts "…"` (`View "X" requires "columns" …`, `View "X": columns requires a non-empty @ts block …`).
+- Each computed column requires `graph` naming a declared workflow (`… computed column "C" requires "graph"`, `… references workflow "G" which is not defined`) and a non-empty `input` (`… requires "input" …`). A present-but-empty `output` errors. Duplicate computed column names error (`… declares duplicate computed column "C"`).
+- **Execution-loop guard:** a view whose computed column runs a graph that writes a stream the same view (or a view it feeds, transitively) composes is rejected — `View "X" creates an infinite execution loop: a computed column runs a graph that writes a stream this view (or a view it feeds) composes.` Each materialized row would otherwise enqueue another graph run forever. Point computed columns at graphs that do **not** write back into the view's source streams.
+
+#### Top-level keyword — disambiguation
+
+The lexer treats `view` as a keyword. At the top level, `view <name> { }` declares a view block. There is no `view` node type and no `view:` config field — a view is not referenced from inside a workflow.
 
 
 # 9. Streams

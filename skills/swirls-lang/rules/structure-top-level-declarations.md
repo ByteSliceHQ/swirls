@@ -1,12 +1,12 @@
 ---
 title: Top-Level Declarations
 impact: HIGH
-tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, connection, role, policy
+tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, disk, agent, channel, connection, role, policy
 ---
 
 ## Top-Level Declarations
 
-A `.swirls` file contains sixteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains seventeen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -73,6 +73,13 @@ stream process_log {
   }
 }
 
+view process_log_table {
+  label: "Process log table"
+  streams: [process_log]
+  schema: @json { { "type": "object" } }
+  columns: @ts { return { ...context.streams.process_log.output } }
+}
+
 secret api_creds {
   vars: [API_KEY, SHARED_SECRET]
 }
@@ -134,7 +141,7 @@ policy {
 }
 ```
 
-### The sixteen valid top-level blocks
+### The seventeen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -142,6 +149,7 @@ policy {
 - `schedule <name> { }` — Cron-based triggers. See `resource-schedule`.
 - `workflow <name> { }` — Workflow DAGs (legacy keyword: `graph`). See `workflow-anatomy`.
 - `stream <name> { }` — Persist a workflow's output as typed records. See `resource-stream`.
+- `view <name> { }` — Compose stream blocks into a spreadsheet: map each source row through `columns`, optionally add `computed` columns that run a graph per row. See `resource-view`.
 - `trigger <name> { }` — Binds resources to workflows. See `resource-trigger-binding`.
 - `secret <name> { }` — Named groups of secret var identifiers. See `resource-secrets`.
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.

@@ -6,13 +6,13 @@ tags: spec, primitives, taxonomy, intent, natural-language, categories
 
 ## Intent to Primitive Map
 
-Before writing syntax, map the user's request to primitives. The sixteen top-level blocks organize into five categories; pick blocks by category, then look up exact syntax in the other rules.
+Before writing syntax, map the user's request to primitives. The seventeen top-level blocks organize into five categories; pick blocks by category, then look up exact syntax in the other rules.
 
 | Category | Blocks | One-line job |
 |---|---|---|
 | Agents | `agent`, `channel` | Actors that reason; channels bind them to chat surfaces |
 | Workflows | `workflow`, `trigger`, `form`, `webhook`, `schedule`, `schema` | Deterministic procedures and what starts them |
-| Memory | `stream`, `disk`, `postgres` | Structured output, files, the user's existing database |
+| Memory | `stream`, `view`, `disk`, `postgres` | Structured output, spreadsheet views over it, files, the user's existing database |
 | Connections | `secret`, `auth`, `connection` | Outbound credentials, least-managed to most-managed |
 | Access | `role`, `policy` | Inbound permission: who may invoke agents/workflows |
 
@@ -31,6 +31,8 @@ Before writing syntax, map the user's request to primitives. The sixteen top-lev
 | "answer in Slack / Linear / Discord / our site" | `channel` block bound to the agent (+ `connection` for the platform) |
 | "restrict the agent's tools for this step" | `profile` inside the agent block, selected via `profile:` on the node |
 | "save the results / reuse output later" | top-level `stream` block + `type: stream` reader node |
+| "see the data as a spreadsheet / table" | top-level `view` block over the stream(s) |
+| "a column that runs AI / a graph for each row" | `computed { }` column in a `view` block |
 | "shared files / give the agent a workspace" | `disk` block + `type: disk` nodes |
 | "query/update our database" | `postgres` block + `type: postgres` nodes |
 | "call an API with our key" | `secret` + `auth` + `http` node |
@@ -46,5 +48,5 @@ Before writing syntax, map the user's request to primitives. The sixteen top-lev
 - Fuzzy task → `agent`; exact repeatable procedure → `workflow`. Agents call workflows as tools, so "an assistant that follows our process" is both.
 - One LLM call with a typed answer → `ai` node; multi-step reasoning with tools → `agent`.
 - Outbound credentials (`secret`/`auth`/`connection`) are not inbound permission (`role`/`policy`). "Connect to Slack" is a connection; "only support can use the Slack bot" is access.
-- Structured reusable output → `stream`; files → `disk`; the user's own data → `postgres`.
+- Structured reusable output → `stream`; a spreadsheet over that output (with per-row computed columns) → `view`; files → `disk`; the user's own data → `postgres`.
 - `role` (top-level, who may invoke) is not `profile` (inside `agent`, what it may do).
