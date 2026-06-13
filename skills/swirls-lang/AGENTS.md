@@ -205,6 +205,18 @@ label: "..."   description: "..."                            // optional
 
 `agent <name> { }` accepts `team: [ agentName, ... ]` — a bare-identifier array of other agent blocks this agent may delegate to. Each team member becomes a callable tool. An agent cannot list itself, and a team member name cannot collide with a workflow name in the same agent's `tools`. See `resource-agent`.
 
+#### Agent wallet (Zero tool spend)
+
+`agent <name> { }` accepts an optional `wallet: { }` block for a virtual per-agent Zero tool-spend budget:
+
+```
+budget: <positive number>          // USD cap for the cadence window
+cadence: daily | weekly | monthly // bare identifier
+maxPerCall: <positive number>      // optional; per-call USD ceiling, must be <= budget
+```
+
+When present, the runtime registers `zero_search`, `zero_get`, `zero_fetch`, and `zero_wallet_status` (platform wallet required). There is no profile-level wallet override. See `resource-agent`.
+
 #### Inline `subgraph { }` block (map / while only)
 
 `map` and `while` nodes accept an inline `subgraph { ... }` block instead of a `workflow: <name>` reference. The keyword takes **no colon**:
@@ -1432,6 +1444,7 @@ Before writing syntax, map the user's request to primitives. The seventeen top-l
 | "send an email" | `email` node |
 | "scrape a page" | `scrape` node |
 | "only team X can use agent Y" / "map our org chart" | `role` blocks + `policy` grants (grants flip the project to deny-by-default) |
+| "call paid external capabilities / API marketplace" | optional `wallet: { }` on an `agent` block (enables Zero tools) |
 | "password-protect the form" | `basic` auth block + form `auth:` |
 | "verify webhook callers" | webhook `secret:` + `header:` |
 
@@ -5449,7 +5462,7 @@ view topic_dashboard {
 - `schema` is required (`View "X" has no schema; add schema: @json { … } or schema: <name>`).
 - `columns` is required and must be a non-empty `@ts` block or `@ts "…"` (`View "X" requires "columns" …`, `View "X": columns requires a non-empty @ts block …`).
 - Each computed column requires `graph` naming a declared workflow (`… computed column "C" requires "graph"`, `… references workflow "G" which is not defined`) and a non-empty `input` (`… requires "input" …`). A present-but-empty `output` errors. Duplicate computed column names error (`… declares duplicate computed column "C"`).
-- **Execution-loop guard:** a view whose computed column runs a graph that writes a stream the same view (or a view it feeds, transitively) composes is rejected — `View "X" creates an infinite execution loop: a computed column runs a graph that writes a stream this view (or a view it feeds) composes.` Each materialized row would otherwise enqueue another graph run forever. Point computed columns at graphs that do **not** write back into the view's source streams.
+- **Execution-loop guard:** a view whose computed column runs a graph that writes a stream the same view (or a view it feeds, transitively) composes is rejected — `View "X" creates an infinite execution loop: a computed column runs a graph that writes a stream this view (or a view it feeds) composes.` Each materialized row would otherwise enqueue another graph run forever. Point computed columns at graphs that do **not** write back into the view's source streams. Per-file validation (`swirls doctor`) checks loops among resources in that file; **deploy** merges the workspace AST and runs the same check so cross-file view → workflow → stream loops cannot ship.
 
 #### Top-level keyword — disambiguation
 
@@ -6025,6 +6038,12 @@ agent <name> {
     ephemeral: false
   }
 
+  wallet: {                           // optional; enables Zero tool spend (zero_search, zero_get, zero_fetch, zero_wallet_status)
+    budget: 50                         // USD per cadence window, > 0
+    cadence: daily                     // daily | weekly | monthly (bare identifier)
+    maxPerCall: 2                      // optional; per-call ceiling in USD
+  }
+
   profile <profile_name> {                  // zero or more profiles
     description: "<optional>"
     tools: [workflow_a]                  // optional; SUBSET of agent.tools
@@ -6048,6 +6067,7 @@ agent <name> {
 | `tools` | no | Array of bare identifiers naming tool workflows in the workspace. |
 | `team` | no | Array of bare identifiers naming other `agent` blocks this agent may delegate to as subagents. See below. |
 | `sandbox: { }` | no | Workspace sizing and lifecycle. See below. |
+| `wallet: { }` | no | Virtual tool-spend budget for Zero capabilities. See below. |
 | `profile <name> { }` | no | Zero or more named profiles. Each may override `system`, `sandbox`, and narrow `tools`. |
 | `label` | no | Display string. |
 | `description` | no | Free-form description. |
@@ -6078,6 +6098,41 @@ The optional `sandbox: { }` block sizes and governs the per-agent persistent wor
 | `ephemeral` | boolean | Discard workspace after the turn. |
 
 Out-of-bounds values error with `Agent "<name>": sandbox.<field> must be ...`.
+
+#### Wallet block (Zero tool spend)
+
+The optional `wallet: { }` block opts the agent into hosted **Zero** tools (`zero_search`, `zero_get`, `zero_fetch`, `zero_wallet_status`) at runtime. Swirls uses a shared platform wallet (`ZERO_PRIVATE_KEY`); the DSL wallet is a **virtual per-agent budget** enforced per UTC calendar window.
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `budget` | yes | Positive number. USD cap for the cadence window. |
+| `cadence` | yes | Bare identifier: `daily`, `weekly`, or `monthly`. |
+| `maxPerCall` | no | Positive USD ceiling for a single paid `zero_fetch`. Must be `<= budget`. Defaults to a platform cap when omitted. |
+
+When `wallet:` is present and the platform wallet is configured, the runtime registers `zero_search` (free catalog search), `zero_get` (inspect capability schema before calling), `zero_fetch` (paid capability calls with method/body and reserve-then-settle accounting), and `zero_wallet_status` (remaining budget for the current cadence window). Org-level prepaid budget is purchased via Autumn `tool_spend` (see billing); the agent wallet caps how fast each agent draws it down. The system prompt appendix guides the model to describe catalog search and automatic tool invocation when users ask about capabilities.
+
+Validator diagnostics:
+
+- `Agent "<n>": wallet requires budget as a positive number`
+- `Agent "<n>": wallet.budget must be a positive number`
+- `Agent "<n>": wallet requires cadence (daily, weekly, or monthly)`
+- `Agent "<n>": wallet.cadence must be daily, weekly, or monthly`
+- `Agent "<n>": wallet.maxPerCall must be a positive number`
+- `Agent "<n>": wallet.maxPerCall must be less than or equal to wallet.budget`
+
+There is no profile-level wallet override in v1.
+
+```swirls
+agent researcher {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  wallet: {
+    budget: 50
+    cadence: daily
+    maxPerCall: 2
+  }
+}
+```
 
 #### Complete example
 
@@ -7314,6 +7369,12 @@ Required keys: `stream`, `version`, `filter`.
 - `Agent "<n>" team member "<m>" is not defined in the workspace` — `team:` must name declared `agent` blocks.
 - `Agent "<n>" team member "<m>" conflicts with a workflow tool of the same name` — A `team` member and a `tools` workflow share a name; rename one.
 - `Agent team contains a cycle: a -> b -> a` — Subagent delegation must not form a loop.
+- `Agent "<n>": wallet requires budget as a positive number` — Add `budget:` with a value `> 0`.
+- `Agent "<n>": wallet.budget must be a positive number` — Fix the budget value.
+- `Agent "<n>": wallet requires cadence (daily, weekly, or monthly)` — Add `cadence:`.
+- `Agent "<n>": wallet.cadence must be daily, weekly, or monthly` — Fix the cadence value.
+- `Agent "<n>": wallet.maxPerCall must be a positive number` — Fix `maxPerCall` when set.
+- `Agent "<n>": wallet.maxPerCall must be less than or equal to wallet.budget` — Lower `maxPerCall` or raise `budget`.
 
 #### Channels
 

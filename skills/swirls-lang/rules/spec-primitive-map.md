@@ -40,6 +40,7 @@ Before writing syntax, map the user's request to primitives. The seventeen top-l
 | "send an email" | `email` node |
 | "scrape a page" | `scrape` node |
 | "only team X can use agent Y" / "map our org chart" | `role` blocks + `policy` grants (grants flip the project to deny-by-default) |
+| "call paid external capabilities / API marketplace" | optional `wallet: { }` on an `agent` block (enables Zero tools) |
 | "password-protect the form" | `basic` auth block + form `auth:` |
 | "verify webhook callers" | webhook `secret:` + `header:` |
 

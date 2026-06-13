@@ -203,6 +203,12 @@ Required keys: `stream`, `version`, `filter`.
 - `Agent "<n>" team member "<m>" is not defined in the workspace` — `team:` must name declared `agent` blocks.
 - `Agent "<n>" team member "<m>" conflicts with a workflow tool of the same name` — A `team` member and a `tools` workflow share a name; rename one.
 - `Agent team contains a cycle: a -> b -> a` — Subagent delegation must not form a loop.
+- `Agent "<n>": wallet requires budget as a positive number` — Add `budget:` with a value `> 0`.
+- `Agent "<n>": wallet.budget must be a positive number` — Fix the budget value.
+- `Agent "<n>": wallet requires cadence (daily, weekly, or monthly)` — Add `cadence:`.
+- `Agent "<n>": wallet.cadence must be daily, weekly, or monthly` — Fix the cadence value.
+- `Agent "<n>": wallet.maxPerCall must be a positive number` — Fix `maxPerCall` when set.
+- `Agent "<n>": wallet.maxPerCall must be less than or equal to wallet.budget` — Lower `maxPerCall` or raise `budget`.
 
 ### Channels
 

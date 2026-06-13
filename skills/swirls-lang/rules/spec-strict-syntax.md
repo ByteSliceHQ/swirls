@@ -200,6 +200,18 @@ label: "..."   description: "..."                            // optional
 
 `agent <name> { }` accepts `team: [ agentName, ... ]` — a bare-identifier array of other agent blocks this agent may delegate to. Each team member becomes a callable tool. An agent cannot list itself, and a team member name cannot collide with a workflow name in the same agent's `tools`. See `resource-agent`.
 
+### Agent wallet (Zero tool spend)
+
+`agent <name> { }` accepts an optional `wallet: { }` block for a virtual per-agent Zero tool-spend budget:
+
+```
+budget: <positive number>          // USD cap for the cadence window
+cadence: daily | weekly | monthly // bare identifier
+maxPerCall: <positive number>      // optional; per-call USD ceiling, must be <= budget
+```
+
+When present, the runtime registers `zero_search`, `zero_get`, `zero_fetch`, and `zero_wallet_status` (platform wallet required). There is no profile-level wallet override. See `resource-agent`.
+
 ### Inline `subgraph { }` block (map / while only)
 
 `map` and `while` nodes accept an inline `subgraph { ... }` block instead of a `workflow: <name>` reference. The keyword takes **no colon**:

@@ -1,7 +1,7 @@
 ---
 title: Agent Block Declaration
 impact: HIGH
-tags: resource, agent, llm, provider, model, profile, tools, sandbox, secrets, top-level
+tags: resource, agent, llm, provider, model, profile, tools, sandbox, wallet, secrets, top-level
 ---
 
 ## Agent Block Declaration
@@ -42,6 +42,12 @@ agent <name> {
     ephemeral: false
   }
 
+  wallet: {                           // optional; enables Zero tool spend (zero_search, zero_get, zero_fetch, zero_wallet_status)
+    budget: 50                         // USD per cadence window, > 0
+    cadence: daily                     // daily | weekly | monthly (bare identifier)
+    maxPerCall: 2                      // optional; per-call ceiling in USD
+  }
+
   profile <profile_name> {                  // zero or more profiles
     description: "<optional>"
     tools: [workflow_a]                  // optional; SUBSET of agent.tools
@@ -65,6 +71,7 @@ agent <name> {
 | `tools` | no | Array of bare identifiers naming tool workflows in the workspace. |
 | `team` | no | Array of bare identifiers naming other `agent` blocks this agent may delegate to as subagents. See below. |
 | `sandbox: { }` | no | Workspace sizing and lifecycle. See below. |
+| `wallet: { }` | no | Virtual tool-spend budget for Zero capabilities. See below. |
 | `profile <name> { }` | no | Zero or more named profiles. Each may override `system`, `sandbox`, and narrow `tools`. |
 | `label` | no | Display string. |
 | `description` | no | Free-form description. |
@@ -95,6 +102,41 @@ The optional `sandbox: { }` block sizes and governs the per-agent persistent wor
 | `ephemeral` | boolean | Discard workspace after the turn. |
 
 Out-of-bounds values error with `Agent "<name>": sandbox.<field> must be ...`.
+
+### Wallet block (Zero tool spend)
+
+The optional `wallet: { }` block opts the agent into hosted **Zero** tools (`zero_search`, `zero_get`, `zero_fetch`, `zero_wallet_status`) at runtime. Swirls uses a shared platform wallet (`ZERO_PRIVATE_KEY`); the DSL wallet is a **virtual per-agent budget** enforced per UTC calendar window.
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `budget` | yes | Positive number. USD cap for the cadence window. |
+| `cadence` | yes | Bare identifier: `daily`, `weekly`, or `monthly`. |
+| `maxPerCall` | no | Positive USD ceiling for a single paid `zero_fetch`. Must be `<= budget`. Defaults to a platform cap when omitted. |
+
+When `wallet:` is present and the platform wallet is configured, the runtime registers `zero_search` (free catalog search), `zero_get` (inspect capability schema before calling), `zero_fetch` (paid capability calls with method/body and reserve-then-settle accounting), and `zero_wallet_status` (remaining budget for the current cadence window). Org-level prepaid budget is purchased via Autumn `tool_spend` (see billing); the agent wallet caps how fast each agent draws it down. The system prompt appendix guides the model to describe catalog search and automatic tool invocation when users ask about capabilities.
+
+Validator diagnostics:
+
+- `Agent "<n>": wallet requires budget as a positive number`
+- `Agent "<n>": wallet.budget must be a positive number`
+- `Agent "<n>": wallet requires cadence (daily, weekly, or monthly)`
+- `Agent "<n>": wallet.cadence must be daily, weekly, or monthly`
+- `Agent "<n>": wallet.maxPerCall must be a positive number`
+- `Agent "<n>": wallet.maxPerCall must be less than or equal to wallet.budget`
+
+There is no profile-level wallet override in v1.
+
+```swirls
+agent researcher {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  wallet: {
+    budget: 50
+    cadence: daily
+    maxPerCall: 2
+  }
+}
+```
 
 ### Complete example
 
