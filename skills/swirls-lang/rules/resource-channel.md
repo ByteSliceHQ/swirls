@@ -45,7 +45,7 @@ channel <name> {
 | `slack` | Slack channels and DMs. |
 | `linear` | Linear issues and comments. |
 | `discord` | Discord servers and DMs. |
-| `web` | The embedded web chat surface. |
+| `web` | Standalone authenticated chatbox at `/chat/web/:projectId/:channelName` and embed/API surface. |
 
 | `mode` | The agent responds to |
 |--------|-----------------------|
@@ -53,7 +53,9 @@ channel <name> {
 | `dm` | Only direct messages. |
 | `all` | Both mentions and direct messages. |
 
-The `web` surface typically uses `mode: dm`. For OAuth-backed platforms (`slack`, `linear`, `discord`), set `connection:` to name a `connection` block whose `provider` matches `platform`.
+For `platform: web`, `mode` is optional and ignored by the chat service — web channels are keyed by **channel name**, not `platform:mode:agent`. You can declare multiple web channels for the same agent (for example separate chatbox links). For OAuth-backed platforms (`slack`, `linear`, `discord`), set `connection:` to name a `connection` block whose `provider` matches `platform`.
+
+Cloud in-app chat lists **all deployed agents** and posts to `/chat/agent/:projectId/:agentName` — no web channel required. Use a `platform: web` channel when you want a dedicated standalone chatbox link or SDK embed keyed by channel name.
 
 **Correct (one agent, two surfaces):**
 
@@ -85,14 +87,15 @@ channel web_concierge {
   label: "Concierge (Web)"
   platform: web
   agent: concierge
-  mode: dm
   enabled: true
 }
 ```
 
 ### Routing uniqueness
 
-The runtime routes an inbound event by the tuple `platform : mode : agent`. **Two enabled channels cannot share the same tuple** — the runtime would not know which binding wins. A disabled channel (`enabled: false`) does not count, so an inactive duplicate is allowed.
+For **Slack, Linear, and Discord**, the runtime routes inbound events by the tuple `platform : mode : agent`. Two enabled channels cannot share the same tuple.
+
+For **`platform: web`**, enabled channels are keyed by **channel block name**. Two enabled web channels cannot share the same name. Multiple web channels may bind the same agent.
 
 ```swirls
 // Valid: same platform + mode, different agents.
@@ -120,7 +123,8 @@ channel good { platform: web  agent: concierge }
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
 - `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
 - `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — the connection's `provider` differs from the channel's `platform`.
-- `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — change `mode`, point one at a different agent, or disable one.
+- `Duplicate channel name: multiple enabled web channels named "<n>"` — rename one web channel or disable it.
+- `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — for non-web platforms; change `mode`, point one at a different agent, or disable one.
 - Parser: `channel platform must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
 - Parser: `channel must declare platform` / `channel must declare agent` — required field missing.
 - Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set (including removed `integration:`).

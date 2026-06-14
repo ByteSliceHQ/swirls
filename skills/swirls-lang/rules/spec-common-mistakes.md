@@ -940,7 +940,7 @@ node send_email {
 }
 ```
 
-The validator errors: `"email" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` This applies to `scrape`, `parallel`, and `email` — their output shape is fixed by the vendor.
+The validator errors: `"email" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` This applies to `scrape`, `parallel`, `email`, and `disk` — their output shape is fixed by the platform.
 
 ### 31. Using `kind: text` with a `schema:` on an AI node
 

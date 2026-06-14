@@ -102,7 +102,7 @@ Required keys: `stream`, `version`, `filter`.
 
 ### Vendor-managed schemas
 
-- `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` — You set `schema:` on `scrape`, `parallel`, or `email`. Remove it.
+- `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` — You set `schema:` on `scrape`, `parallel`, `email`, or `disk`. Remove it.
 
 ### AI nodes
 

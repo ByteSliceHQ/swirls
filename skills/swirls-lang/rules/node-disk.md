@@ -20,7 +20,9 @@ node run_ls {
 
 The validator errors: `Node type "disk" requires "disk"` and `Node type "disk" requires "command"`.
 
-### Correct (literal command)
+#### Correct (literal command)
+
+Plain quoted strings run directly as shell — no sandbox. Use this for static commands.
 
 ```swirls
 disk proj {
@@ -38,7 +40,9 @@ workflow audit {
 }
 ```
 
-### Correct (dynamic command via @ts)
+#### Correct (dynamic command via @ts)
+
+Use `@ts` when the command depends on upstream outputs or `context`.
 
 ```swirls
 node fetch_report {
@@ -57,10 +61,9 @@ node fetch_report {
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
 | `disk` | yes | Bare identifier | Names a top-level `disk <name> { }` block. |
-| `command` | yes | String or `@ts` block | Single shell command executed via Archil `disk.exec`. |
-| `schema` | no | `@json` block, object literal, or bare schema name | Types the command output for downstream `@ts` code. |
+| `command` | yes | String or `@ts` block | Shell command. Plain strings run as-is; `@ts` runs in the sandbox and must return a command string. |
 
-Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
+Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply. Do not set `schema:` — disk nodes have a vendor-managed output envelope (`stdout`, `stderr`, `exitCode`, `timing`).
 
 ### Platform credentials
 

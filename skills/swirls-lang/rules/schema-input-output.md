@@ -130,8 +130,9 @@ Vendor-managed types:
 - `scrape`
 - `parallel`
 - `email`
+- `disk`
 
-These types provide their own runtime type shape; the LSP uses it automatically. (`disk` is NOT vendor-managed — a `schema:` on a disk node is allowed and types the command output.)
+These types provide their own runtime type shape; the LSP uses it automatically.
 
 ### AI text + schema warning
 

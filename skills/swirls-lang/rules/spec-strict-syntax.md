@@ -332,7 +332,7 @@ No user `schema:` — vendor-managed output shape.
 
 **bucket** — required: `operation` (`download` or `upload`). Optional: `path`.
 
-**disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). Optional: `schema` (typing the command output). See `node-disk` and `resource-disk`.
+**disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts block, `@ts "file.ts.swirls"`, or string literal shell command). Backed by Archil (`ARCHIL_API_KEY`). No user `schema:` — vendor-managed output shape (`stdout`, `stderr`, `exitCode`, `timing`). Plain strings run directly as shell; `@ts` runs in the sandbox with `context`. See `node-disk` and `resource-disk`.
 
 **agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `profile` (bare identifier naming a profile inside the agent block), `tools` (array of bare identifiers narrowing within the effective tool set), `system` (@ts; per-call system-prompt override), `schema` (structured-output constraint; use `schema`, never `outputSchema`). See `node-agent` and `resource-agent`.
 

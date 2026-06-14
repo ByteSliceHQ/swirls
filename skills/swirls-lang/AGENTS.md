@@ -337,7 +337,7 @@ No user `schema:` — vendor-managed output shape.
 
 **bucket** — required: `operation` (`download` or `upload`). Optional: `path`.
 
-**disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts returning a shell command string, or a string literal). Backed by Archil (`ARCHIL_API_KEY`). Optional: `schema` (typing the command output). See `node-disk` and `resource-disk`.
+**disk** — required: `disk` (bare identifier naming a top-level `disk <name> { }` block), `command` (@ts block, `@ts "file.ts.swirls"`, or string literal shell command). Backed by Archil (`ARCHIL_API_KEY`). No user `schema:` — vendor-managed output shape (`stdout`, `stderr`, `exitCode`, `timing`). Plain strings run directly as shell; `@ts` runs in the sandbox with `context`. See `node-disk` and `resource-disk`.
 
 **agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `profile` (bare identifier naming a profile inside the agent block), `tools` (array of bare identifiers narrowing within the effective tool set), `system` (@ts; per-call system-prompt override), `schema` (structured-output constraint; use `schema`, never `outputSchema`). See `node-agent` and `resource-agent`.
 
@@ -1302,7 +1302,7 @@ node send_email {
 }
 ```
 
-The validator errors: `"email" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` This applies to `scrape`, `parallel`, and `email` — their output shape is fixed by the vendor.
+The validator errors: `"email" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` This applies to `scrape`, `parallel`, `email`, and `disk` — their output shape is fixed by the platform.
 
 #### 31. Using `kind: text` with a `schema:` on an AI node
 
@@ -3560,7 +3560,9 @@ node run_ls {
 
 The validator errors: `Node type "disk" requires "disk"` and `Node type "disk" requires "command"`.
 
-#### Correct (literal command)
+##### Correct (literal command)
+
+Plain quoted strings run directly as shell — no sandbox. Use this for static commands.
 
 ```swirls
 disk proj {
@@ -3578,7 +3580,9 @@ workflow audit {
 }
 ```
 
-#### Correct (dynamic command via @ts)
+##### Correct (dynamic command via @ts)
+
+Use `@ts` when the command depends on upstream outputs or `context`.
 
 ```swirls
 node fetch_report {
@@ -3597,10 +3601,9 @@ node fetch_report {
 | Field | Required | Type | Notes |
 |-------|----------|------|-------|
 | `disk` | yes | Bare identifier | Names a top-level `disk <name> { }` block. |
-| `command` | yes | String or `@ts` block | Single shell command executed via Archil `disk.exec`. |
-| `schema` | no | `@json` block, object literal, or bare schema name | Types the command output for downstream `@ts` code. |
+| `command` | yes | String or `@ts` block | Shell command. Plain strings run as-is; `@ts` runs in the sandbox and must return a command string. |
 
-Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply.
+Standard shared fields (`label`, `description`, `secrets`, `review`, `failurePolicy`) also apply. Do not set `schema:` — disk nodes have a vendor-managed output envelope (`stdout`, `stderr`, `exitCode`, `timing`).
 
 #### Platform credentials
 
@@ -4362,8 +4365,9 @@ Vendor-managed types:
 - `scrape`
 - `parallel`
 - `email`
+- `disk`
 
-These types provide their own runtime type shape; the LSP uses it automatically. (`disk` is NOT vendor-managed — a `schema:` on a disk node is allowed and types the command output.)
+These types provide their own runtime type shape; the LSP uses it automatically.
 
 #### AI text + schema warning
 
@@ -6346,7 +6350,7 @@ channel <name> {
 | `slack` | Slack channels and DMs. |
 | `linear` | Linear issues and comments. |
 | `discord` | Discord servers and DMs. |
-| `web` | The embedded web chat surface. |
+| `web` | Standalone authenticated chatbox at `/chat/web/:projectId/:channelName` and embed/API surface. |
 
 | `mode` | The agent responds to |
 |--------|-----------------------|
@@ -6354,7 +6358,9 @@ channel <name> {
 | `dm` | Only direct messages. |
 | `all` | Both mentions and direct messages. |
 
-The `web` surface typically uses `mode: dm`. For OAuth-backed platforms (`slack`, `linear`, `discord`), set `connection:` to name a `connection` block whose `provider` matches `platform`.
+For `platform: web`, `mode` is optional and ignored by the chat service — web channels are keyed by **channel name**, not `platform:mode:agent`. You can declare multiple web channels for the same agent (for example separate chatbox links). For OAuth-backed platforms (`slack`, `linear`, `discord`), set `connection:` to name a `connection` block whose `provider` matches `platform`.
+
+Cloud in-app chat lists **all deployed agents** and posts to `/chat/agent/:projectId/:agentName` — no web channel required. Use a `platform: web` channel when you want a dedicated standalone chatbox link or SDK embed keyed by channel name.
 
 **Correct (one agent, two surfaces):**
 
@@ -6386,14 +6392,15 @@ channel web_concierge {
   label: "Concierge (Web)"
   platform: web
   agent: concierge
-  mode: dm
   enabled: true
 }
 ```
 
 #### Routing uniqueness
 
-The runtime routes an inbound event by the tuple `platform : mode : agent`. **Two enabled channels cannot share the same tuple** — the runtime would not know which binding wins. A disabled channel (`enabled: false`) does not count, so an inactive duplicate is allowed.
+For **Slack, Linear, and Discord**, the runtime routes inbound events by the tuple `platform : mode : agent`. Two enabled channels cannot share the same tuple.
+
+For **`platform: web`**, enabled channels are keyed by **channel block name**. Two enabled web channels cannot share the same name. Multiple web channels may bind the same agent.
 
 ```swirls
 // Valid: same platform + mode, different agents.
@@ -6421,7 +6428,8 @@ channel good { platform: web  agent: concierge }
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
 - `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
 - `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — the connection's `provider` differs from the channel's `platform`.
-- `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — change `mode`, point one at a different agent, or disable one.
+- `Duplicate channel name: multiple enabled web channels named "<n>"` — rename one web channel or disable it.
+- `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — for non-web platforms; change `mode`, point one at a different agent, or disable one.
 - Parser: `channel platform must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
 - Parser: `channel must declare platform` / `channel must declare agent` — required field missing.
 - Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set (including removed `integration:`).
@@ -7275,7 +7283,7 @@ Required keys: `stream`, `version`, `filter`.
 
 #### Vendor-managed schemas
 
-- `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` — You set `schema:` on `scrape`, `parallel`, or `email`. Remove it.
+- `"<type>" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.` — You set `schema:` on `scrape`, `parallel`, `email`, or `disk`. Remove it.
 
 #### AI nodes
 
