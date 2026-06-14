@@ -23,8 +23,8 @@ Before writing syntax, map the user's request to primitives. The seventeen top-l
 | "run X every Monday" / "daily report" | `schedule` + `trigger` + `workflow` |
 | "when someone submits the form" | `form` + `trigger` + `workflow` |
 | "when service Y calls us" / "on event" | `webhook` + `trigger` + `workflow` |
-| "for each item" / "until done" | `map` / `while` node (inline `subgraph { }` or `workflow:` ref) |
-| "at the same time" / "in parallel" | `parallel` node |
+| "for each item" / "until done" / run the same step over many items concurrently | `map` / `while` node (inline `subgraph { }` or `workflow:` ref; `map` accepts `concurrency:`) |
+| "research the web with AI" / "multi-query search" / "find entities online" | `parallel` node (Parallel.ai API — not for workflow parallelism) |
 | "needs human approval first" | `review: { enabled: true }` on the node |
 | "summarize / classify / extract with AI" | `ai` node (single call, typed output) |
 | "an assistant that can decide / multi-step reasoning" | `agent` block + `agent` node |
@@ -51,3 +51,4 @@ Before writing syntax, map the user's request to primitives. The seventeen top-l
 - Outbound credentials (`secret`/`auth`/`connection`) are not inbound permission (`role`/`policy`). "Connect to Slack" is a connection; "only support can use the Slack bot" is access.
 - Structured reusable output → `stream`; a spreadsheet over that output (with per-row computed columns) → `view`; files → `disk`; the user's own data → `postgres`.
 - `role` (top-level, who may invoke) is not `profile` (inside `agent`, what it may do).
+- `parallel` node is Parallel.ai web research (`search`, `extract`, `findall`), not workflow concurrency. Use `map`/`while` for iteration; independent branches in a DAG are just multiple edges from one node in `flow { }`.

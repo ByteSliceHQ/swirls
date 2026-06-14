@@ -120,7 +120,6 @@ channel concierge_web {
   label: "Concierge (Web)"
   platform: web
   agent: concierge
-  integration: web
   mode: dm
   enabled: true
 }

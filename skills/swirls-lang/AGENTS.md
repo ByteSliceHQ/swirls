@@ -176,7 +176,6 @@ header: "Header-Name"
 
 ```
 platform: slack | linear | discord | web      // required
-integration: slack | linear | discord | web    // optional; defaults to platform; must equal platform
 connection: <connectionName>                   // optional; bare name of a top-level connection block
 agent: <agentName>                             // required; bare identifier of a top-level agent block
 mode: mention | dm | all                       // optional; defaults to mention
@@ -184,7 +183,7 @@ enabled: true | false                          // optional; defaults to enabled
 label: "..."   description: "..."              // optional
 ```
 
-`platform`, `integration`, and `mode` are conventionally bare values (the parser also accepts quoted strings). `integration` is optional and defaults to `platform`; when set it must equal `platform` or it is a validator error. `connection` optionally names a top-level `connection` block supplying the OAuth credential; its `provider` must match `platform`. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"`. See `resource-channel`.
+`platform` and `mode` are conventionally bare values (the parser also accepts quoted strings). `connection` optionally names a top-level `connection` block supplying the OAuth credential; its `provider` must match `platform`. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"` (including removed `integration:`). See `resource-channel`.
 
 #### Connection block fields
 
@@ -705,7 +704,59 @@ node per_item {
 }
 ```
 
-There are exactly 16 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
+There are exactly 16 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes; Parallel.ai web research belongs in `parallel` nodes — not workflow concurrency.
+
+#### 11b. Using `type: parallel` for workflow concurrency
+
+**Incorrect (treating parallel as fan-out):**
+
+```swirls
+node run_steps {
+  type: parallel
+  label: "Run all steps"
+}
+```
+
+`parallel` is the Parallel.ai vendor node (`operation: search`, `extract`, or `findall`). It does not fan out workflow steps or run DAG branches concurrently.
+
+**Correct (per-item iteration with optional concurrency):**
+
+```swirls
+node per_item {
+  type: map
+  label: "Process each"
+  items: @ts { return context.nodes.root.output.items }
+  maxItems: 100
+  concurrency: 4
+  workflow: process_one
+}
+```
+
+**Correct (independent DAG branches — no special node):**
+
+```swirls
+flow {
+  root -> enrich
+  root -> validate
+  enrich -> combine
+  validate -> combine
+}
+```
+
+**Correct (Parallel.ai web research):**
+
+```swirls
+node research {
+  type: parallel
+  label: "Research topic"
+  operation: search
+  objective: @ts { return "Find recent articles about " + context.nodes.root.output.topic }
+  searchQueries: @ts {
+    const topic = context.nodes.root.output.topic
+    return [topic + " overview", topic + " trends"]
+  }
+}
+```
 
 #### 12. Missing label on workflow or node
 
@@ -1349,36 +1400,7 @@ root {
 }
 ```
 
-#### 34. Channel `platform` and `integration` mismatch
-
-A `channel` block's `integration` must equal its `platform`. They are separate fields (surface vs credential source) but a mismatch is rejected.
-
-**Incorrect:**
-
-```swirls
-channel concierge_slack {
-  platform: slack
-  integration: web      // mismatch
-  agent: concierge
-}
-```
-
-Error: `Channel "concierge_slack" platform "slack" must match integration "web"`.
-
-**Correct:**
-
-```swirls
-channel concierge_slack {
-  platform: slack
-  integration: slack
-  agent: concierge
-  mode: mention
-}
-```
-
-Also: `platform`, `integration`, and `mode` are bare keyword values, and `agent:` is a bare identifier naming an `agent` block (not a quoted string). Two enabled channels cannot share the same `platform : mode : agent` tuple. See `resource-channel`.
-
-#### 35. Agent `team` that references itself or forms a cycle
+#### 34. Agent `team` that references itself or forms a cycle
 
 `team: [ … ]` names other `agent` blocks as subagents. An agent cannot list itself, a team member cannot collide with one of the agent's `tools:` workflow names, and the delegation chain cannot contain a cycle.
 
@@ -1427,8 +1449,8 @@ Before writing syntax, map the user's request to primitives. The seventeen top-l
 | "run X every Monday" / "daily report" | `schedule` + `trigger` + `workflow` |
 | "when someone submits the form" | `form` + `trigger` + `workflow` |
 | "when service Y calls us" / "on event" | `webhook` + `trigger` + `workflow` |
-| "for each item" / "until done" | `map` / `while` node (inline `subgraph { }` or `workflow:` ref) |
-| "at the same time" / "in parallel" | `parallel` node |
+| "for each item" / "until done" / run the same step over many items concurrently | `map` / `while` node (inline `subgraph { }` or `workflow:` ref; `map` accepts `concurrency:`) |
+| "research the web with AI" / "multi-query search" / "find entities online" | `parallel` node (Parallel.ai API — not for workflow parallelism) |
 | "needs human approval first" | `review: { enabled: true }` on the node |
 | "summarize / classify / extract with AI" | `ai` node (single call, typed output) |
 | "an assistant that can decide / multi-step reasoning" | `agent` block + `agent` node |
@@ -1455,6 +1477,7 @@ Before writing syntax, map the user's request to primitives. The seventeen top-l
 - Outbound credentials (`secret`/`auth`/`connection`) are not inbound permission (`role`/`policy`). "Connect to Slack" is a connection; "only support can use the Slack bot" is access.
 - Structured reusable output → `stream`; a spreadsheet over that output (with per-row computed columns) → `view`; files → `disk`; the user's own data → `postgres`.
 - `role` (top-level, who may invoke) is not `profile` (inside `agent`, what it may do).
+- `parallel` node is Parallel.ai web research (`search`, `extract`, `findall`), not workflow concurrency. Use `map`/`while` for iteration; independent branches in a DAG are just multiple edges from one node in `flow { }`.
 
 
 # 2. File Structure
@@ -1575,7 +1598,6 @@ channel concierge_web {
   label: "Concierge (Web)"
   platform: web
   agent: concierge
-  integration: web
   mode: dm
   enabled: true
 }
@@ -2818,7 +2840,9 @@ node scrape_article {
 
 ### Parallel Nodes
 
-Parallel nodes call the Parallel API for parallelized web research tasks. The `operation` field selects one of three modes with different required fields. The response shape is **vendor-managed** — do not set `schema:` on a parallel node; the validator errors if you do.
+Parallel nodes call the [Parallel.ai](https://parallel.ai) API for AI-powered web research. The `operation` field selects one of three modes with different required fields. The response shape is **vendor-managed** — do not set `schema:` on a parallel node; the validator errors if you do.
+
+Despite the name, `type: parallel` is **not** for running workflow steps concurrently. Use `map` (with optional `concurrency:`) or `while` for per-item or repeat-until work. Independent branches in a DAG need no special node — declare multiple edges from the same source in `flow { }`.
 
 **Required fields:** `operation`, `objective` (plus operation-specific fields).
 
@@ -2929,7 +2953,7 @@ node discover_posts {
 
 #### Key rules
 
-- Parallel nodes are the **only** supported fan-out primitive for web research. There is no generic `map`, `fanout`, or `workers` node.
+- The `parallel` node type is for Parallel.ai web research only — not workflow parallelism. There is no `fanout` or `workers` node type; use `map` for per-item iteration.
 - `schema` is vendor-managed — setting it emits: `"parallel" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
 - `generator` for `findall` selects the compute tier; `core` is the usual default, `pro`/`preview` for larger / newer models.
 - `matchLimit` must be in the API's supported range (5–1000).
@@ -6292,7 +6316,6 @@ Top-level `channel <name> { }` blocks bind an `agent` block to a chat platform. 
 ```swirls
 channel <name> {
   platform: slack | linear | discord | web    // required
-  integration: slack | linear | discord | web  // optional; defaults to platform; must equal platform
   connection: <connection_name>                 // optional; bare name of a top-level connection block
   agent: <agent_name>                           // required; bare identifier
   mode: mention | dm | all                      // optional; defaults to mention
@@ -6302,14 +6325,13 @@ channel <name> {
 }
 ```
 
-`platform`, `integration`, and `mode` take **bare values** by convention (the parser also accepts quoted strings). `agent` is a bare identifier naming a top-level `agent` block (a quoted string also parses). Unlike most blocks, channels reject unknown keys: `Unknown channel property "<key>"`.
+`platform` and `mode` take **bare values** by convention (the parser also accepts quoted strings). `agent` is a bare identifier naming a top-level `agent` block (a quoted string also parses). Unlike most blocks, channels reject unknown keys: `Unknown channel property "<key>"`.
 
 #### Required vs optional fields
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `platform` | yes | Bare value. One of `slack`, `linear`, `discord`, `web`. Where messages are delivered. |
-| `integration` | no | Bare value. Credential source for the binding. Defaults to `platform`; when set, **must equal `platform`.** |
+| `platform` | yes | Bare value. One of `slack`, `linear`, `discord`, `web`. Where messages are delivered and how inbound events are routed. |
 | `connection` | no | Bare name of a top-level `connection` block supplying the OAuth credential. Its `provider` must match `platform`. Lets one project bind multiple connections of the same provider. See `resource-connection`. |
 | `agent` | yes | Bare identifier naming an `agent` block (same file or another file in the workspace). |
 | `mode` | no | Bare value `mention` (default), `dm`, or `all`. Controls which inbound events reach the agent. |
@@ -6332,7 +6354,7 @@ channel <name> {
 | `dm` | Only direct messages. |
 | `all` | Both mentions and direct messages. |
 
-The `web` surface typically uses `mode: dm`.
+The `web` surface typically uses `mode: dm`. For OAuth-backed platforms (`slack`, `linear`, `discord`), set `connection:` to name a `connection` block whose `provider` matches `platform`.
 
 **Correct (one agent, two surfaces):**
 
@@ -6355,7 +6377,6 @@ agent concierge {
 channel slack_concierge {
   label: "Concierge (Slack)"
   platform: slack
-  integration: slack
   agent: concierge
   mode: mention
   enabled: true
@@ -6364,7 +6385,6 @@ channel slack_concierge {
 channel web_concierge {
   label: "Concierge (Web)"
   platform: web
-  integration: web
   agent: concierge
   mode: dm
   enabled: true
@@ -6377,47 +6397,34 @@ The runtime routes an inbound event by the tuple `platform : mode : agent`. **Tw
 
 ```swirls
 // Valid: same platform + mode, different agents.
-channel slack_concierge { platform: slack  integration: slack  agent: concierge  mode: mention }
-channel slack_researcher { platform: slack  integration: slack  agent: researcher  mode: mention }
+channel slack_concierge { platform: slack  agent: concierge  mode: mention }
+channel slack_researcher { platform: slack  agent: researcher  mode: mention }
 ```
 
 ```swirls
 // Invalid: two enabled bindings for slack:mention:concierge.
-channel a { platform: slack  integration: slack  agent: concierge  mode: mention }
-channel b { platform: slack  integration: slack  agent: concierge  mode: mention }
+channel a { platform: slack  agent: concierge  mode: mention }
+channel b { platform: slack  agent: concierge  mode: mention }
 ```
 
 #### Common mistakes
-
-**`platform` and `integration` mismatch.** The two fields must be equal.
-
-```swirls
-// Incorrect
-channel bad { platform: slack  integration: web  agent: concierge }
-```
-
-```swirls
-// Correct
-channel good { platform: slack  integration: slack  agent: concierge }
-```
 
 **`agent` as a quoted string.** Convention is a bare identifier naming an `agent` block (a quoted string parses to the same value, but write it bare).
 
 ```swirls
 // Convention
-channel good { platform: web  integration: web  agent: concierge }
+channel good { platform: web  agent: concierge }
 ```
 
 #### Validation diagnostics
 
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
-- `Channel "<n>" platform "<p>" must match integration "<i>"` — set `integration` equal to `platform` (or omit it; it defaults to `platform`).
 - `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
 - `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — the connection's `provider` differs from the channel's `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — change `mode`, point one at a different agent, or disable one.
-- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
-- Parser: `channel must declare platform` / `channel must declare agent` — required field missing. (`integration` is no longer required; it defaults to `platform`.)
-- Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set.
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
+- Parser: `channel must declare platform` / `channel must declare agent` — required field missing.
+- Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set (including removed `integration:`).
 
 See `resource-agent` for the `agent` block (including subagent `team`).
 
@@ -7379,11 +7386,10 @@ Required keys: `stream`, `version`, `filter`.
 #### Channels
 
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
-- `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`, or omit it (it defaults to `platform`).
 - `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
 - `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — The connection's `provider` differs from the channel's `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — Two enabled channels share the same `platform : mode : agent` tuple. Change `mode`, point one at a different agent, or set `enabled: false` on one.
-- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `Unknown channel property "<key>"`. (`integration` is no longer required; it defaults to `platform`.)
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `Unknown channel property "<key>"` — invalid field or removed `integration:`.
 
 #### Output format (`format:` on nodes)
 

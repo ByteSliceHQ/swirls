@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "5.6.0"
+  version: "5.6.1"
 ---
 
 # Swirls Language
@@ -123,7 +123,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `resource-postgres` - Top-level `postgres` blocks: connection, table schemas, secret references
 - `resource-disk` - Top-level `disk` blocks: Archil-backed remote disks (`id: "dsk-..."`, secrets)
 - `resource-agent` - Top-level `agent` blocks: required model + secrets, provider enum (default openrouter), tools (workflows-as-tools), subagent `team`, optional `sandbox { }` sizing/lifecycle, optional `profile` sub-blocks
-- `resource-channel` - Top-level `channel` blocks: bind an agent to a chat platform (`platform` slack/linear/discord/web, `agent`, `mode` mention/dm/all, `enabled`); optional `integration` defaults to platform; optional `connection` names a `connection` block whose provider must match platform
+- `resource-channel` - Top-level `channel` blocks: bind an agent to a chat platform (`platform` slack/linear/discord/web, `agent`, `mode` mention/dm/all, `enabled`); optional `connection` names a `connection` block whose provider must match platform
 - `resource-access-control` - Top-level `role <name> { match { claim: value } }` and `policy { allow|deny <role> -> agent <name>|* }` blocks; declaring grants flips the project to deny-by-default (no `access` block)
 
 ### 9. Streams

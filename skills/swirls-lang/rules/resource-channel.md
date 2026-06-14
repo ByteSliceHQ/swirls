@@ -1,7 +1,7 @@
 ---
 title: Channel Block Declaration
 impact: MEDIUM
-tags: resource, channel, top-level, agent, slack, linear, discord, web, platform, integration, connection, mode
+tags: resource, channel, top-level, agent, slack, linear, discord, web, platform, connection, mode
 ---
 
 ## Channel Block Declaration
@@ -15,7 +15,6 @@ Top-level `channel <name> { }` blocks bind an `agent` block to a chat platform. 
 ```swirls
 channel <name> {
   platform: slack | linear | discord | web    // required
-  integration: slack | linear | discord | web  // optional; defaults to platform; must equal platform
   connection: <connection_name>                 // optional; bare name of a top-level connection block
   agent: <agent_name>                           // required; bare identifier
   mode: mention | dm | all                      // optional; defaults to mention
@@ -25,14 +24,13 @@ channel <name> {
 }
 ```
 
-`platform`, `integration`, and `mode` take **bare values** by convention (the parser also accepts quoted strings). `agent` is a bare identifier naming a top-level `agent` block (a quoted string also parses). Unlike most blocks, channels reject unknown keys: `Unknown channel property "<key>"`.
+`platform` and `mode` take **bare values** by convention (the parser also accepts quoted strings). `agent` is a bare identifier naming a top-level `agent` block (a quoted string also parses). Unlike most blocks, channels reject unknown keys: `Unknown channel property "<key>"`.
 
 ### Required vs optional fields
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `platform` | yes | Bare value. One of `slack`, `linear`, `discord`, `web`. Where messages are delivered. |
-| `integration` | no | Bare value. Credential source for the binding. Defaults to `platform`; when set, **must equal `platform`.** |
+| `platform` | yes | Bare value. One of `slack`, `linear`, `discord`, `web`. Where messages are delivered and how inbound events are routed. |
 | `connection` | no | Bare name of a top-level `connection` block supplying the OAuth credential. Its `provider` must match `platform`. Lets one project bind multiple connections of the same provider. See `resource-connection`. |
 | `agent` | yes | Bare identifier naming an `agent` block (same file or another file in the workspace). |
 | `mode` | no | Bare value `mention` (default), `dm`, or `all`. Controls which inbound events reach the agent. |
@@ -55,7 +53,7 @@ channel <name> {
 | `dm` | Only direct messages. |
 | `all` | Both mentions and direct messages. |
 
-The `web` surface typically uses `mode: dm`.
+The `web` surface typically uses `mode: dm`. For OAuth-backed platforms (`slack`, `linear`, `discord`), set `connection:` to name a `connection` block whose `provider` matches `platform`.
 
 **Correct (one agent, two surfaces):**
 
@@ -78,7 +76,6 @@ agent concierge {
 channel slack_concierge {
   label: "Concierge (Slack)"
   platform: slack
-  integration: slack
   agent: concierge
   mode: mention
   enabled: true
@@ -87,7 +84,6 @@ channel slack_concierge {
 channel web_concierge {
   label: "Concierge (Web)"
   platform: web
-  integration: web
   agent: concierge
   mode: dm
   enabled: true
@@ -100,46 +96,33 @@ The runtime routes an inbound event by the tuple `platform : mode : agent`. **Tw
 
 ```swirls
 // Valid: same platform + mode, different agents.
-channel slack_concierge { platform: slack  integration: slack  agent: concierge  mode: mention }
-channel slack_researcher { platform: slack  integration: slack  agent: researcher  mode: mention }
+channel slack_concierge { platform: slack  agent: concierge  mode: mention }
+channel slack_researcher { platform: slack  agent: researcher  mode: mention }
 ```
 
 ```swirls
 // Invalid: two enabled bindings for slack:mention:concierge.
-channel a { platform: slack  integration: slack  agent: concierge  mode: mention }
-channel b { platform: slack  integration: slack  agent: concierge  mode: mention }
+channel a { platform: slack  agent: concierge  mode: mention }
+channel b { platform: slack  agent: concierge  mode: mention }
 ```
 
 ### Common mistakes
-
-**`platform` and `integration` mismatch.** The two fields must be equal.
-
-```swirls
-// Incorrect
-channel bad { platform: slack  integration: web  agent: concierge }
-```
-
-```swirls
-// Correct
-channel good { platform: slack  integration: slack  agent: concierge }
-```
 
 **`agent` as a quoted string.** Convention is a bare identifier naming an `agent` block (a quoted string parses to the same value, but write it bare).
 
 ```swirls
 // Convention
-channel good { platform: web  integration: web  agent: concierge }
+channel good { platform: web  agent: concierge }
 ```
 
 ### Validation diagnostics
 
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
-- `Channel "<n>" platform "<p>" must match integration "<i>"` — set `integration` equal to `platform` (or omit it; it defaults to `platform`).
 - `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
 - `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — the connection's `provider` differs from the channel's `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — change `mode`, point one at a different agent, or disable one.
-- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
-- Parser: `channel must declare platform` / `channel must declare agent` — required field missing. (`integration` is no longer required; it defaults to `platform`.)
-- Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set.
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` — invalid enum value.
+- Parser: `channel must declare platform` / `channel must declare agent` — required field missing.
+- Parser: `Unknown channel property "<key>"` — channels reject keys outside the documented set (including removed `integration:`).
 
 See `resource-agent` for the `agent` block (including subagent `team`).

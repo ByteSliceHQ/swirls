@@ -342,7 +342,59 @@ node per_item {
 }
 ```
 
-There are exactly 16 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes.
+There are exactly 16 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes; Parallel.ai web research belongs in `parallel` nodes — not workflow concurrency.
+
+### 11b. Using `type: parallel` for workflow concurrency
+
+**Incorrect (treating parallel as fan-out):**
+
+```swirls
+node run_steps {
+  type: parallel
+  label: "Run all steps"
+}
+```
+
+`parallel` is the Parallel.ai vendor node (`operation: search`, `extract`, or `findall`). It does not fan out workflow steps or run DAG branches concurrently.
+
+**Correct (per-item iteration with optional concurrency):**
+
+```swirls
+node per_item {
+  type: map
+  label: "Process each"
+  items: @ts { return context.nodes.root.output.items }
+  maxItems: 100
+  concurrency: 4
+  workflow: process_one
+}
+```
+
+**Correct (independent DAG branches — no special node):**
+
+```swirls
+flow {
+  root -> enrich
+  root -> validate
+  enrich -> combine
+  validate -> combine
+}
+```
+
+**Correct (Parallel.ai web research):**
+
+```swirls
+node research {
+  type: parallel
+  label: "Research topic"
+  operation: search
+  objective: @ts { return "Find recent articles about " + context.nodes.root.output.topic }
+  searchQueries: @ts {
+    const topic = context.nodes.root.output.topic
+    return [topic + " overview", topic + " trends"]
+  }
+}
+```
 
 ### 12. Missing label on workflow or node
 
@@ -986,36 +1038,7 @@ root {
 }
 ```
 
-### 34. Channel `platform` and `integration` mismatch
-
-A `channel` block's `integration` must equal its `platform`. They are separate fields (surface vs credential source) but a mismatch is rejected.
-
-**Incorrect:**
-
-```swirls
-channel concierge_slack {
-  platform: slack
-  integration: web      // mismatch
-  agent: concierge
-}
-```
-
-Error: `Channel "concierge_slack" platform "slack" must match integration "web"`.
-
-**Correct:**
-
-```swirls
-channel concierge_slack {
-  platform: slack
-  integration: slack
-  agent: concierge
-  mode: mention
-}
-```
-
-Also: `platform`, `integration`, and `mode` are bare keyword values, and `agent:` is a bare identifier naming an `agent` block (not a quoted string). Two enabled channels cannot share the same `platform : mode : agent` tuple. See `resource-channel`.
-
-### 35. Agent `team` that references itself or forms a cycle
+### 34. Agent `team` that references itself or forms a cycle
 
 `team: [ … ]` names other `agent` blocks as subagents. An agent cannot list itself, a team member cannot collide with one of the agent's `tools:` workflow names, and the delegation chain cannot contain a cycle.
 

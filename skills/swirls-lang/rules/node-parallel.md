@@ -6,7 +6,9 @@ tags: node, parallel, search, extract, findall, research, crawl
 
 ## Parallel Nodes
 
-Parallel nodes call the Parallel API for parallelized web research tasks. The `operation` field selects one of three modes with different required fields. The response shape is **vendor-managed** — do not set `schema:` on a parallel node; the validator errors if you do.
+Parallel nodes call the [Parallel.ai](https://parallel.ai) API for AI-powered web research. The `operation` field selects one of three modes with different required fields. The response shape is **vendor-managed** — do not set `schema:` on a parallel node; the validator errors if you do.
+
+Despite the name, `type: parallel` is **not** for running workflow steps concurrently. Use `map` (with optional `concurrency:`) or `while` for per-item or repeat-until work. Independent branches in a DAG need no special node — declare multiple edges from the same source in `flow { }`.
 
 **Required fields:** `operation`, `objective` (plus operation-specific fields).
 
@@ -117,7 +119,7 @@ node discover_posts {
 
 ### Key rules
 
-- Parallel nodes are the **only** supported fan-out primitive for web research. There is no generic `map`, `fanout`, or `workers` node.
+- The `parallel` node type is for Parallel.ai web research only — not workflow parallelism. There is no `fanout` or `workers` node type; use `map` for per-item iteration.
 - `schema` is vendor-managed — setting it emits: `"parallel" nodes have a vendor-managed output schema; remove "schema" to use the built-in type.`
 - `generator` for `findall` selects the compute tier; `core` is the usual default, `pro`/`preview` for larger / newer models.
 - `matchLimit` must be in the API's supported range (5–1000).

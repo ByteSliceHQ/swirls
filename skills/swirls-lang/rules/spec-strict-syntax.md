@@ -171,7 +171,6 @@ header: "Header-Name"
 
 ```
 platform: slack | linear | discord | web      // required
-integration: slack | linear | discord | web    // optional; defaults to platform; must equal platform
 connection: <connectionName>                   // optional; bare name of a top-level connection block
 agent: <agentName>                             // required; bare identifier of a top-level agent block
 mode: mention | dm | all                       // optional; defaults to mention
@@ -179,7 +178,7 @@ enabled: true | false                          // optional; defaults to enabled
 label: "..."   description: "..."              // optional
 ```
 
-`platform`, `integration`, and `mode` are conventionally bare values (the parser also accepts quoted strings). `integration` is optional and defaults to `platform`; when set it must equal `platform` or it is a validator error. `connection` optionally names a top-level `connection` block supplying the OAuth credential; its `provider` must match `platform`. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"`. See `resource-channel`.
+`platform` and `mode` are conventionally bare values (the parser also accepts quoted strings). `connection` optionally names a top-level `connection` block supplying the OAuth credential; its `provider` must match `platform`. Two enabled channels cannot share the same `platform : mode : agent` tuple. `agent` must name a declared `agent` block. Channel blocks reject unknown keys with `Unknown channel property "<key>"` (including removed `integration:`). See `resource-channel`.
 
 ### Connection block fields
 

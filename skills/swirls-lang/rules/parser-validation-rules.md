@@ -213,11 +213,10 @@ Required keys: `stream`, `version`, `filter`.
 ### Channels
 
 - `Channel "<n>" references unknown agent "<a>"` — `agent:` must name a declared `agent` block.
-- `Channel "<n>" platform "<p>" must match integration "<i>"` — Set `integration` equal to `platform`, or omit it (it defaults to `platform`).
 - `Channel "<n>" references unknown connection "<c>"` — `connection:` must name a declared `connection` block.
 - `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — The connection's `provider` differs from the channel's `platform`.
 - `Duplicate channel routing: multiple enabled bindings for <platform>:<mode>:<agent> (including "<n>")` — Two enabled channels share the same `platform : mode : agent` tuple. Change `mode`, point one at a different agent, or set `enabled: false` on one.
-- Parser: `channel platform must be slack, linear, discord, or web` / `channel integration must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `Unknown channel property "<key>"`. (`integration` is no longer required; it defaults to `platform`.)
+- Parser: `channel platform must be slack, linear, discord, or web` / `channel mode must be mention, dm, or all` / `channel must declare platform` / `channel must declare agent` / `Unknown channel property "<key>"` — invalid field or removed `integration:`.
 
 ### Output format (`format:` on nodes)
 
