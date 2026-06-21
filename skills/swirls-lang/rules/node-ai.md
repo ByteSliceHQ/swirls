@@ -96,6 +96,8 @@ AI kinds: `text`, `object`, `image`, `video`, `embed`
 
 **Validator warning** when `kind: text` and `schema:` are both set: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` Either drop the schema or change `kind` to `object`.
 
+When an AI node is the **leaf of a workflow used as an agent tool**, you do **not** need to add a schema to satisfy the tool's output-schema contract. Any `kind` other than `object` (`text`, `embed`, `image`, `video`) has an inferred output shape and is exempt from that requirement, so a bare `kind: text` leaf is valid. Adding `schema: @json { { "type": "string" } }` to force it would only trip the warning above. See `resource-agent`.
+
 AI node fields:
 | Field | Required | Type |
 |-------|----------|------|

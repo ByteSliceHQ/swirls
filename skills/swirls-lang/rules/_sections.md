@@ -18,7 +18,7 @@
 ## 4. Node Types (node)
 
 **Impact:** CRITICAL
-**Description:** All 16 node types (ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while) with required and optional fields. `map` and `while` accept either an inline `subgraph { }` block or a `workflow: <name>` reference. Also covers shared fields: `secrets:` map, `failurePolicy:`, review.
+**Description:** All 17 node types (ai, agent, bucket, code, disk, email, workflow, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while) with required and optional fields. `map` and `while` accept either an inline `subgraph { }` block or a `workflow: <name>` reference. Also covers shared fields: `secrets:` map, `failurePolicy:`, review.
 
 ## 5. TypeScript Blocks (ts)
 

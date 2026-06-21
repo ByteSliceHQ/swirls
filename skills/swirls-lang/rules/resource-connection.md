@@ -42,9 +42,22 @@ No other providers exist. The set mirrors Fabric's integration providers.
 
 ### Referencing a connection
 
-A connection is referenced by bare name from two places:
+A connection is referenced by bare name from three places:
 
-**HTTP nodes** via `connection: <name>`. The token is injected into the request at execution time. `connection` is only valid on `http` nodes. A node sets **either** `auth` **or** `connection`, never both.
+**Integration nodes** (Fabric + provider proxy) via `connection: <name>`. Prefer `action: <actionBlock>` (typed transport from a top-level `action` block); otherwise set `path:` and optional `method` / `params`. Never set `auth:` on integration nodes. See `node-integration` and `resource-action`.
+
+```swirls
+node post_slack {
+  type: integration
+  connection: slack_workspace
+  action: slack_post_message
+  params: @ts {
+    return { channel: "C123", text: "done" }
+  }
+}
+```
+
+**HTTP nodes** via `connection: <name>`. The token is injected into the request at execution time. A node sets **either** `auth` **or** `connection`, never both. Same Fabric binding store as integration nodes.
 
 ```swirls
 connection slack_workspace {
@@ -82,7 +95,7 @@ channel slack_concierge {
 - `Connection "<n>" provider "<p>" must be one of: slack, linear, discord, linkedin, microsoft` — unsupported provider.
 - Parser: `connection must declare provider` / `connection provider must be a name` / `Unknown connection property "<key>"` / `Expected connection name`.
 - `HTTP node references undefined connection "<n>"` — a node's `connection:` value is not a declared connection block.
-- `"connection" is only valid on http nodes` — `connection:` appears on a non-http node.
+- `"connection" is only valid on http and integration nodes` — `connection:` appears on an unsupported node type.
 - `Node "<n>": set "auth" or "connection", not both. Use "auth" for your own credentials, "connection" for a Swirls-brokered grant.` — a node set both fields.
 - `Channel "<n>" references unknown connection "<c>"` — a channel's `connection:` value is not a declared connection block.
 - `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — the connection provider differs from the channel platform.

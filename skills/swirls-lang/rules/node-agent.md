@@ -97,7 +97,7 @@ System prompt pieces apply low to high: agent `system` (lowest) -> profile `syst
 
 ### Tools (workflows-as-tools only)
 
-Tools are workflows exposed to the LLM. There is no MCP, HTTP, or builtin tool syntax. Each tool workflow must have a non-empty workflow-level `description`, a root-node `inputSchema`, and an output schema on every leaf node. See `resource-agent` for the tool-workflow contract.
+Tools are workflows exposed to the LLM. There is no MCP, HTTP, or builtin tool syntax. Each tool workflow must have a non-empty workflow-level `description`, a root-node `inputSchema`, and an output schema on every leaf node. An AI leaf with `kind` other than `object` is exempt — its output shape is inferred from the kind. See `resource-agent` for the tool-workflow contract.
 
 Node `tools:` may only narrow within the effective set: the profile's tools when a profile is chosen and declares `tools:`, otherwise the agent block's `tools:`. It cannot add tools beyond that set.
 

@@ -14,7 +14,7 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, view, schema,
-disk, agent, channel, connection, profile, tools,
+disk, agent, channel, connection, action, profile, tools,
 role, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
@@ -46,15 +46,16 @@ disk <name> { }
 agent <name> { }
 channel <name> { }
 connection <name> { }
+action <name> { }
 role <name> { }
 policy { }
 ```
 
-There are **17** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
+There are **18** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 ### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, schemas, agents, channels, connections, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, schemas, agents, channels, connections, actions, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -64,14 +65,14 @@ Names may start with a digit. Hyphens, dots, spaces, and other characters are no
 
 ### Complete node type list
 
-These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `@swirls/schemas` (`packages/schemas/src/schemas.ts`).
+These are the only valid values for `type:` inside a node or root block. There are **17** node types. The canonical names come from `nodeTypeMap` in `@swirls/schemas` (`packages/schemas/src/schemas.ts`).
 
 ```
-agent, ai, bucket, code, disk, email, http, map,
+agent, ai, bucket, code, disk, email, http, integration, map,
 parallel, postgres, scrape, stream, switch, wait, while, workflow
 ```
 
-The subworkflow node is `type: workflow` (legacy alias `type: graph`, which the validator normalizes to `workflow`). When `swirls doctor` rejects an unknown type it lists the valid set sorted: `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`.
+The subworkflow node is `type: workflow` (legacy alias `type: graph`, which the validator normalizes to `workflow`). When `swirls doctor` rejects an unknown type it lists the valid set sorted: `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`.
 
 Notes on aliases that do NOT exist:
 - `email` is the type name, not `resend`, `mail`, or `mailer`. (The Resend vendor backs it; the DSL type is `email`.)
@@ -308,7 +309,9 @@ Only these fields have semantics for each node type. All types additionally acce
 
 **switch** — required: `cases` (non-empty array of alphanumeric+underscore strings), `router` (@ts returning one of the case strings).
 
-**http** — required: `url` (@ts or string). Other fields: `method` (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`), `headers` (@ts returning object), `body` (@ts), `auth` (bare identifier referencing an auth block) or `connection` (bare identifier referencing a `connection` block) — set one, not both. Both `auth` and `connection` are only valid on http nodes.
+**http** — required: `url` (@ts or string). Other fields: `method`, `headers` (@ts), `body` (@ts), `auth` or `connection` — set one, not both. Both only valid on http nodes.
+
+**integration** — required: `connection` (bare identifier naming a `connection` block), and exactly one of `action:` (bare identifier naming a top-level `action` block; preferred — transport and schemas come from the block at deploy) or `path` (provider API path; untyped). Other fields: `method` (`GET`/`POST`/…, default `GET`; forbidden when `action:` is set), `params` (@ts returning object). Fabric OAuth + provider proxy; requires `FABRIC_URL` at runtime. Never `auth:`.
 
 **scrape** — required: `url`. Other fields: `onlyMainContent`, `formats` (array), `maxAge`, `parsers` (array). No user `schema:` — vendor-managed output shape. Backed by Firecrawl (`FIRECRAWL_API_KEY`).
 

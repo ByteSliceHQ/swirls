@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "5.6.2"
+  version: "5.7.0"
 ---
 
 # Swirls Language
@@ -86,6 +86,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `node-wait` - Wait nodes: pausing execution
 - `node-bucket` - Bucket nodes: object storage upload/download
 - `node-disk` - Disk nodes: bash exec on a top-level `disk` block (Archil-backed)
+- `node-integration` - Integration nodes: Fabric proxy via `connection:` + typed `action:` (preferred) or raw `path:`
 - `node-postgres` - Postgres nodes: parameterized SELECT and INSERT against external databases
 - `node-secrets-map` - `secrets: { block: [VAR] }` object-literal syntax (shared across types)
 - `node-failure-policy` - Optional `failurePolicy:` for retry / skip / fallback behavior
@@ -120,6 +121,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `resource-secrets` - Top-level `secret { vars: [...] }` blocks
 - `resource-auth` - Top-level `auth` blocks (oauth, api_key, basic, bearer) and http-node `auth:` references
 - `resource-connection` - Top-level `connection` blocks: Swirls-brokered outbound OAuth slots (`provider:` slack/linear/discord/linkedin/microsoft), referenced by http nodes and channels via `connection:` (replaces the removed `cloud` auth type)
+- `resource-action` - Top-level `action` blocks: typed integration operations (`provider`, `method`, `path`, input/output schemas); referenced by integration nodes via `action:`; install prebuilt actions with `swirls add`
 - `resource-postgres` - Top-level `postgres` blocks: connection, table schemas, secret references
 - `resource-disk` - Top-level `disk` blocks: Archil-backed remote disks (`id: "dsk-..."`, secrets)
 - `resource-agent` - Top-level `agent` blocks: required model + secrets, provider enum (default openrouter), tools (workflows-as-tools), subagent `team`, optional `sandbox { }` sizing/lifecycle, optional `profile` sub-blocks

@@ -198,7 +198,7 @@ Required keys: `stream`, `version`, `filter`.
 - `Workflow "<n>" is used as an agent tool but the workflow-level description field is missing or empty` — A tool workflow needs a non-empty top-level `description:`.
 - `Agent tool workflow "<n>" must declare inputSchema on the root node` — Add `inputSchema` to the tool workflow's `root`.
 - `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object. Add at least one input property so the agent can call the tool.` — Tool input schemas need at least one property.
-- `Agent tool workflow "<n>" requires output schema on leaf node "<leaf>"` — Every leaf node of a tool workflow needs a `schema`/`outputSchema`.
+- `Agent tool workflow "<n>" requires output schema on leaf node "<leaf>"` — Every leaf node of a tool workflow needs a `schema`/`outputSchema`. AI leaves with `kind` other than `object` (`text`, `embed`, `image`, `video`) are exempt: their output is inferred from the kind, so they need no schema.
 - `Agent "<n>" cannot include itself in team:` — Remove the self-reference.
 - `Agent "<n>" team member "<m>" is not defined in the workspace` — `team:` must name declared `agent` blocks.
 - `Agent "<n>" team member "<m>" conflicts with a workflow tool of the same name` — A `team` member and a `tools` workflow share a name; rename one.

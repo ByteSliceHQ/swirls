@@ -231,7 +231,7 @@ Tools are workflows exposed to the model. There is no MCP, HTTP, or builtin tool
 
 - Has a non-empty workflow-level `description:` (fed to the model as tool help text).
 - Has a root node with JSON `inputSchema` that declares a **non-empty `properties` object** (defines the tool call arguments — a tool with zero input properties is rejected: `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object`).
-- Has an output schema on **every leaf node** (`outputSchema` on the root if it is a leaf, or `schema` on non-root leaves).
+- Has an output schema on **every leaf node** (`outputSchema` on the root if it is a leaf, or `schema` on non-root leaves). **Exception:** an AI leaf whose `kind` is anything other than `object` (`text`, `embed`, `image`, `video`) needs no schema — its output shape is fixed by the kind (`text` → string, `embed` → number array, `image`/`video` → media) and is inferred. Only `kind: object` AI leaves still need a `schema` (already required by the AI-node validator). Do not add `schema: @json { { "type": "string" } }` to a `kind: text` leaf to satisfy this — it triggers the AI-node warning instead.
 
 Built-in workspace tools (read, write, edit, bash, grep, find, ls) are always available inside the sandbox and are not declared in `tools:`.
 

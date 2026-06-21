@@ -19,7 +19,7 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, view, schema,
-disk, agent, channel, connection, profile, tools,
+disk, agent, channel, connection, action, profile, tools,
 role, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
@@ -51,15 +51,16 @@ disk <name> { }
 agent <name> { }
 channel <name> { }
 connection <name> { }
+action <name> { }
 role <name> { }
 policy { }
 ```
 
-There are **17** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
+There are **18** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, schemas, agents, channels, connections, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, schemas, agents, channels, connections, actions, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -69,14 +70,14 @@ Names may start with a digit. Hyphens, dots, spaces, and other characters are no
 
 #### Complete node type list
 
-These are the only valid values for `type:` inside a node or root block. There are **16** node types. The canonical names come from `nodeTypeMap` in `@swirls/schemas` (`packages/schemas/src/schemas.ts`).
+These are the only valid values for `type:` inside a node or root block. There are **17** node types. The canonical names come from `nodeTypeMap` in `@swirls/schemas` (`packages/schemas/src/schemas.ts`).
 
 ```
-agent, ai, bucket, code, disk, email, http, map,
+agent, ai, bucket, code, disk, email, http, integration, map,
 parallel, postgres, scrape, stream, switch, wait, while, workflow
 ```
 
-The subworkflow node is `type: workflow` (legacy alias `type: graph`, which the validator normalizes to `workflow`). When `swirls doctor` rejects an unknown type it lists the valid set sorted: `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`.
+The subworkflow node is `type: workflow` (legacy alias `type: graph`, which the validator normalizes to `workflow`). When `swirls doctor` rejects an unknown type it lists the valid set sorted: `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`.
 
 Notes on aliases that do NOT exist:
 - `email` is the type name, not `resend`, `mail`, or `mailer`. (The Resend vendor backs it; the DSL type is `email`.)
@@ -313,7 +314,9 @@ Only these fields have semantics for each node type. All types additionally acce
 
 **switch** — required: `cases` (non-empty array of alphanumeric+underscore strings), `router` (@ts returning one of the case strings).
 
-**http** — required: `url` (@ts or string). Other fields: `method` (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`), `headers` (@ts returning object), `body` (@ts), `auth` (bare identifier referencing an auth block) or `connection` (bare identifier referencing a `connection` block) — set one, not both. Both `auth` and `connection` are only valid on http nodes.
+**http** — required: `url` (@ts or string). Other fields: `method`, `headers` (@ts), `body` (@ts), `auth` or `connection` — set one, not both. Both only valid on http nodes.
+
+**integration** — required: `connection` (bare identifier naming a `connection` block), and exactly one of `action:` (bare identifier naming a top-level `action` block; preferred — transport and schemas come from the block at deploy) or `path` (provider API path; untyped). Other fields: `method` (`GET`/`POST`/…, default `GET`; forbidden when `action:` is set), `params` (@ts returning object). Fabric OAuth + provider proxy; requires `FABRIC_URL` at runtime. Never `auth:`.
 
 **scrape** — required: `url`. Other fields: `onlyMainContent`, `formats` (array), `maxAge`, `parsers` (array). No user `schema:` — vendor-managed output shape. Backed by Firecrawl (`FIRECRAWL_API_KEY`).
 
@@ -2378,6 +2381,8 @@ AI kinds: `text`, `object`, `image`, `video`, `embed`
 
 **Validator warning** when `kind: text` and `schema:` are both set: `AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.` Either drop the schema or change `kind` to `object`.
 
+When an AI node is the **leaf of a workflow used as an agent tool**, you do **not** need to add a schema to satisfy the tool's output-schema contract. Any `kind` other than `object` (`text`, `embed`, `image`, `video`) has an inferred output shape and is exempt from that requirement, so a bare `kind: text` leaf is valid. Adding `schema: @json { { "type": "string" } }` to force it would only trip the warning above. See `resource-agent`.
+
 AI node fields:
 | Field | Required | Type |
 |-------|----------|------|
@@ -2487,7 +2492,7 @@ System prompt pieces apply low to high: agent `system` (lowest) -> profile `syst
 
 #### Tools (workflows-as-tools only)
 
-Tools are workflows exposed to the LLM. There is no MCP, HTTP, or builtin tool syntax. Each tool workflow must have a non-empty workflow-level `description`, a root-node `inputSchema`, and an output schema on every leaf node. See `resource-agent` for the tool-workflow contract.
+Tools are workflows exposed to the LLM. There is no MCP, HTTP, or builtin tool syntax. Each tool workflow must have a non-empty workflow-level `description`, a root-node `inputSchema`, and an output schema on every leaf node. An AI leaf with `kind` other than `object` is exempt — its output shape is inferred from the kind. See `resource-agent` for the tool-workflow contract.
 
 Node `tools:` may only narrow within the effective set: the profile's tools when a profile is chosen and declares `tools:`, otherwise the agent block's `tools:`. It cannot add tools beyond that set.
 
@@ -3864,6 +3869,122 @@ node optional_step {
 - The policy lives alongside other config fields on a node; it is not a separate block.
 - Downstream nodes still see `context.nodes.<name>.output` for skipped/fallback cases; `skip` sets it to `undefined` (or absent), `fallback` sets it to `fallbackValue`.
 - `failurePolicy` is optional and can be omitted on any node.
+
+---
+
+### Integration Nodes
+
+Integration nodes call third-party APIs through a project **connection** slot using the Fabric token broker and provider proxy. Bind the slot in Cloud **Connections** (Fabric OAuth). `http` nodes with `connection:` use the same binding store and macaroon path.
+
+**Required fields:** `connection`, and either `action:` (preferred) or `path`
+
+**Incorrect (using fetch in a code node):**
+
+```swirls
+node post_slack {
+  type: code
+  code: @ts {
+    const res = await fetch("https://slack.com/api/chat.postMessage", { method: "POST" })
+    return await res.json()
+  }
+}
+```
+
+**Incorrect (`auth:` on integration — connection only):**
+
+```swirls
+node post_slack {
+  type: integration
+  auth: my_auth
+  path: "/chat.postMessage"
+}
+```
+
+**Correct (typed action block — preferred):**
+
+```swirls
+connection team_slack {
+  label: "Team Slack"
+  provider: slack
+}
+
+action slack_post_message {
+  provider: slack
+  method: POST
+  path: "/chat.postMessage"
+  encoding: form
+  input: @json { { "type": "object", "required": ["channel", "text"], "properties": { "channel": { "type": "string" }, "text": { "type": "string" } } } }
+  output: @json { { "type": "object", "required": ["ok"], "properties": { "ok": { "type": "boolean" } } } }
+}
+
+workflow notify {
+  label: "Notify"
+  root {
+    type: code
+    label: "Entry"
+    code: @ts { return context.nodes.root.input }
+  }
+  node post_slack {
+    type: integration
+    label: "Post to Slack"
+    connection: team_slack
+    action: slack_post_message
+    params: @ts {
+      return {
+        channel: context.nodes.root.output.channel,
+        text: context.nodes.root.output.text,
+      }
+    }
+  }
+  flow {
+    root -> post_slack
+  }
+}
+```
+
+Install prebuilt actions with `swirls add slack` (writes to `swirls/integrations/` and records `swirls.lock.json`). See `resource-action`.
+
+**Correct (raw path — untyped legacy):**
+
+```swirls
+node post_slack {
+  type: integration
+  label: "Post to Slack"
+  connection: team_slack
+  method: POST
+  path: /chat.postMessage
+  params: @ts {
+    return {
+      channel: context.nodes.root.output.channel,
+      text: context.nodes.root.output.text,
+    }
+  }
+}
+```
+
+Bind the connection in Cloud **Connections** before running the workflow. The runtime verifies the execution macaroon, loads the Fabric project binding, issues a short-lived access token, and proxies the request via `@swirls/integrations/proxy`.
+
+##### Fields
+
+| Field | Required | Type |
+|-------|----------|------|
+| `connection` | yes | Bare identifier naming a top-level `connection` block |
+| `action` | preferred | Bare identifier naming a top-level `action` block; do not set `method`/`path` on the node |
+| `path` | legacy | Provider API path when `action:` is omitted (untyped `params`/output) |
+| `method` | no | `GET`, `POST`, `PUT`, `DELETE`, `PATCH` (default: `GET`; only when using raw `path:`) |
+| `params` | no | `@ts` block returning a JSON object (request body for POST/PUT/PATCH; query params for GET) |
+| `schema` | no | `@json` block to type the proxy response (raw `path:` only; action blocks supply output schema) |
+
+##### vs `http` + `connection:`
+
+| | `type: integration` | `type: http` + `connection:` |
+|--|---------------------|------------------------------|
+| Backend | Fabric token + provider proxy | Fabric token broker |
+| URL | Derived from provider + `path` (or action block) | You set full `url` |
+| Auth | `connection:` only | `connection:` or `auth:` |
+| Runtime | Requires `FABRIC_URL` on executor | Requires `FABRIC_URL` |
+
+Both node styles share the same Fabric binding store. Prefer `integration` + `action:` for typed provider operations; use `http` + `connection:` when you need full URL control.
 
 
 # 5. TypeScript Blocks
@@ -6255,7 +6376,7 @@ Tools are workflows exposed to the model. There is no MCP, HTTP, or builtin tool
 
 - Has a non-empty workflow-level `description:` (fed to the model as tool help text).
 - Has a root node with JSON `inputSchema` that declares a **non-empty `properties` object** (defines the tool call arguments — a tool with zero input properties is rejected: `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object`).
-- Has an output schema on **every leaf node** (`outputSchema` on the root if it is a leaf, or `schema` on non-root leaves).
+- Has an output schema on **every leaf node** (`outputSchema` on the root if it is a leaf, or `schema` on non-root leaves). **Exception:** an AI leaf whose `kind` is anything other than `object` (`text`, `embed`, `image`, `video`) needs no schema — its output shape is fixed by the kind (`text` → string, `embed` → number array, `image`/`video` → media) and is inferred. Only `kind: object` AI leaves still need a `schema` (already required by the AI-node validator). Do not add `schema: @json { { "type": "string" } }` to a `kind: text` leaf to satisfy this — it triggers the AI-node warning instead.
 
 Built-in workspace tools (read, write, edit, bash, grep, find, ls) are always available inside the sandbox and are not declared in `tools:`.
 
@@ -6476,9 +6597,22 @@ No other providers exist. The set mirrors Fabric's integration providers.
 
 #### Referencing a connection
 
-A connection is referenced by bare name from two places:
+A connection is referenced by bare name from three places:
 
-**HTTP nodes** via `connection: <name>`. The token is injected into the request at execution time. `connection` is only valid on `http` nodes. A node sets **either** `auth` **or** `connection`, never both.
+**Integration nodes** (Fabric + provider proxy) via `connection: <name>`. Prefer `action: <actionBlock>` (typed transport from a top-level `action` block); otherwise set `path:` and optional `method` / `params`. Never set `auth:` on integration nodes. See `node-integration` and `resource-action`.
+
+```swirls
+node post_slack {
+  type: integration
+  connection: slack_workspace
+  action: slack_post_message
+  params: @ts {
+    return { channel: "C123", text: "done" }
+  }
+}
+```
+
+**HTTP nodes** via `connection: <name>`. The token is injected into the request at execution time. A node sets **either** `auth` **or** `connection`, never both. Same Fabric binding store as integration nodes.
 
 ```swirls
 connection slack_workspace {
@@ -6516,7 +6650,7 @@ channel slack_concierge {
 - `Connection "<n>" provider "<p>" must be one of: slack, linear, discord, linkedin, microsoft` — unsupported provider.
 - Parser: `connection must declare provider` / `connection provider must be a name` / `Unknown connection property "<key>"` / `Expected connection name`.
 - `HTTP node references undefined connection "<n>"` — a node's `connection:` value is not a declared connection block.
-- `"connection" is only valid on http nodes` — `connection:` appears on a non-http node.
+- `"connection" is only valid on http and integration nodes` — `connection:` appears on an unsupported node type.
 - `Node "<n>": set "auth" or "connection", not both. Use "auth" for your own credentials, "connection" for a Swirls-brokered grant.` — a node set both fields.
 - `Channel "<n>" references unknown connection "<c>"` — a channel's `connection:` value is not a declared connection block.
 - `Channel "<n>" connection "<c>" provider "<p>" must match platform "<pl>"` — the connection provider differs from the channel platform.
@@ -6585,6 +6719,62 @@ policy {
 - `policy` blocks take no name; `role` blocks are named.
 - The arrow in a grant is the same `->` token used by flow edges and trigger bindings.
 - Top-level `role` (who may invoke an agent) is distinct from the agent-nested `profile` (what the agent may do when it runs).
+
+---
+
+### Action Block Declaration
+
+Top-level `action <name> { }` blocks declare a typed integration operation: provider, HTTP transport, and optional input/output JSON schemas. Integration nodes reference an action by bare identifier and inherit transport + typing from the block at deploy time.
+
+Use `swirls add <provider> [items...]` to pull prebuilt action blocks from the registry into `swirls/integrations/<provider>/`. Installed actions are tracked in `swirls.lock.json` (source, version, sha256).
+
+#### Syntax
+
+```swirls
+action slack_post_message {
+  provider: slack
+  method: POST
+  path: "/chat.postMessage"
+  encoding: form
+  description: "Post a message to a channel"
+  scopes: ["chat:write"]
+  input: @json { { "type": "object", "required": ["channel", "text"], "properties": { ... } } }
+  output: @json { { "type": "object", "required": ["ok"], "properties": { ... } } }
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `provider` | yes | Must match a Fabric provider (`slack`, `linear`, …) and the bound connection's `provider`. |
+| `method` | yes | `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`. |
+| `path` | yes | Provider API path (leading `/` optional). |
+| `encoding` | no | `json` (default), `form`, or `query`. |
+| `input` / `output` | no | Inline `@json`, object literal, or bare `schema` name. |
+| `scopes` | no | OAuth scopes required by the action. |
+| `label`, `description` | no | Display metadata. |
+
+#### Integration node reference
+
+```swirls
+connection team_slack { provider: slack }
+
+node post_slack {
+  type: integration
+  connection: team_slack
+  action: slack_post_message
+  params: @ts { return { channel: "C1", text: "hi" } }
+}
+```
+
+When `action:` is set, do **not** set `method` or `path` on the node — deploy inlines transport from the action block. Prefer `action:` over raw `path:` for typed `params` and output.
+
+#### Registry
+
+- In-repo seed: `registry/index.json` + provider action files.
+- CLI: `swirls add slack` (all items) or `swirls add slack post_message`.
+- Override registry URL: `--registry` or `SWIRLS_REGISTRY_URL`.
+
+See `node-integration` and `resource-connection`.
 
 
 # 9. Streams
@@ -7379,7 +7569,7 @@ Required keys: `stream`, `version`, `filter`.
 - `Workflow "<n>" is used as an agent tool but the workflow-level description field is missing or empty` — A tool workflow needs a non-empty top-level `description:`.
 - `Agent tool workflow "<n>" must declare inputSchema on the root node` — Add `inputSchema` to the tool workflow's `root`.
 - `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object. Add at least one input property so the agent can call the tool.` — Tool input schemas need at least one property.
-- `Agent tool workflow "<n>" requires output schema on leaf node "<leaf>"` — Every leaf node of a tool workflow needs a `schema`/`outputSchema`.
+- `Agent tool workflow "<n>" requires output schema on leaf node "<leaf>"` — Every leaf node of a tool workflow needs a `schema`/`outputSchema`. AI leaves with `kind` other than `object` (`text`, `embed`, `image`, `video`) are exempt: their output is inferred from the kind, so they need no schema.
 - `Agent "<n>" cannot include itself in team:` — Remove the self-reference.
 - `Agent "<n>" team member "<m>" is not defined in the workspace` — `team:` must name declared `agent` blocks.
 - `Agent "<n>" team member "<m>" conflicts with a workflow tool of the same name` — A `team` member and a `tools` workflow share a name; rename one.
