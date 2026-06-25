@@ -14,8 +14,10 @@ Inside a `map` or `while` node's child graph (inline `subgraph { }` or reference
 |-------|------|-------|
 | `context.iteration.item` | The current element from `items: @ts { return [...] }`. Typed by the subgraph root's `inputSchema`. | Available on every iteration. |
 | `context.iteration.index` | Number | Zero-based iteration counter. |
+| `context.iteration.total` | Number | Length of the `items` array. |
+| `context.iteration.previous` | The prior iteration's leaf outputs (or `undefined` at index 0). | Populated because map runs sequentially. |
 
-`map` runs all iterations in parallel up to `concurrency`. Each iteration's `context.iteration.item` is independent.
+`map` runs its iterations **sequentially**, in `items` order — each iteration can see the one before via `context.iteration.previous`. The `concurrency` field is accepted by the parser but is **not yet honored by the engine** (iterations do not actually run in parallel); do not rely on it for speed or assume isolation from ordering.
 
 ```swirls
 node per_ticket {

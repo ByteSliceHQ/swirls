@@ -97,3 +97,27 @@ HTTP node fields:
 | `auth` | no | bare identifier naming a top-level `auth` block (mutually exclusive with `connection`) |
 | `connection` | no | bare identifier naming a top-level `connection` block (mutually exclusive with `auth`) |
 | `schema` | no | `@json` block (use `outputSchema` only on root nodes) |
+
+### Output shape
+
+`context.nodes.<n>.output` is the **parsed response body directly** — the JSON value if the body parses as JSON, otherwise the raw text string. There is **no `{ status, headers, body }` envelope**: do not read `output.status` or `output.body`. The HTTP status, statusText, content-type, and duration are on a separate `context.nodes.<n>.meta`, not on `output`.
+
+```swirls
+node read_api {
+  type: ai
+  label: "Use the response"
+  kind: object
+  schema: @json { { "type": "object", "properties": { "ok": { "type": "boolean" } } } }
+  prompt: @ts {
+    // The fetched JSON body is the node output itself, not output.body.
+    const body = context.nodes.call_api.output
+    return "Summarize: " + JSON.stringify(body).slice(0, 4000)
+  }
+}
+```
+
+### Runtime limits (not validated, they bite at execution)
+
+- **30-second timeout** per request — a long poll past 30s fails with `HTTP request timeout (30s)`. For slow upstreams, poll in shorter calls rather than one long request.
+- **Internal/private addresses are blocked** (SSRF guard), re-checked on every redirect. You cannot call a private/internal host from an http node.
+- At most **5 redirects** are followed, and the `Authorization` header is stripped on cross-origin redirects.

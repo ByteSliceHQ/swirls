@@ -38,7 +38,7 @@ connection <name> {
 slack, linear, discord, linkedin, microsoft
 ```
 
-No other providers exist. The set mirrors Fabric's integration providers.
+Providers are drawn from the Swirls integration catalog (currently `slack`, `linear`, `discord`, `linkedin`, `microsoft`), not a fixed DSL enum. A provider whose name is a valid key (letters, digits, underscore, hyphen) but is not yet in the catalog is **not a hard error** — it is a warning. Because `swirls doctor` does not surface warnings, such a connection **passes `swirls doctor` and then fails at deploy**. Use the Connections page to request an unsupported provider.
 
 ### Referencing a connection
 
@@ -92,8 +92,9 @@ channel slack_concierge {
 - `Connection block name: <msg>` — name must match `^[a-zA-Z0-9_]+$`.
 - `Duplicate connection block name "<n>"` — two connection blocks share a name.
 - `Connection "<n>" requires a provider` — `provider:` is missing.
-- `Connection "<n>" provider "<p>" must be one of: slack, linear, discord, linkedin, microsoft` — unsupported provider.
-- Parser: `connection must declare provider` / `connection provider must be a name` / `Unknown connection property "<key>"` / `Expected connection name`.
+- `Connection "<n>" provider "<p>" must be a valid integration provider key (letters, digits, underscore, hyphen) or one of: slack, linear, discord, linkedin, microsoft` — the provider value has an invalid shape (error severity).
+- `Connection "<n>" uses provider "<p>" which is not in the Swirls integration catalog. Deploy will fail until this provider is supported — use the Connections page to request it.` — valid key shape but unsupported provider. This is a **warning**, so `swirls doctor` stays green and deploy is where it fails.
+- Parser: `connection provider must be a name` / `Unknown connection property "<key>"` / `Expected connection name`.
 - `HTTP node references undefined connection "<n>"` — a node's `connection:` value is not a declared connection block.
 - `"connection" is only valid on http and integration nodes` — `connection:` appears on an unsupported node type.
 - `Node "<n>": set "auth" or "connection", not both. Use "auth" for your own credentials, "connection" for a Swirls-brokered grant.` — a node set both fields.

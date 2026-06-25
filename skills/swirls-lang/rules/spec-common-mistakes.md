@@ -342,7 +342,7 @@ node per_item {
 }
 ```
 
-There are exactly 16 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes; Parallel.ai web research belongs in `parallel` nodes — not workflow concurrency.
+There are exactly 17 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `integration`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes; Parallel.ai web research belongs in `parallel` nodes — not workflow concurrency.
 
 ### 11b. Using `type: parallel` for workflow concurrency
 

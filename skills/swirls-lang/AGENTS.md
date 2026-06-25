@@ -4,7 +4,7 @@
 >
 > **Source of truth lives in `rules/`.** This file is regenerated from those rules by `apps/web/skills/regen-agents.ts`. When in doubt, defer to `rules/spec-strict-syntax.md` and `rules/spec-common-mistakes.md`.
 >
-> Current scope: **16 node types** (`agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`; `graph` is a legacy alias for `workflow`), **17 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, disk, agent, channel, connection, role, policy`), inline `subgraph { }` for map/while, form `visibility: public | internal` and HTTP Basic `auth:`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, top-level `view <name> { }` blocks composing streams into a spreadsheet with per-row `computed` graph columns, `context.iteration.*` (item/index/input/previous) for map/while subgraphs, agent subagent `team`, `channel` blocks binding an agent to Slack / Linear / Discord / web, `connection` blocks declaring Swirls-brokered outbound OAuth slots, and access-control `role` / `policy` blocks.
+> Current scope: **17 node types** (`agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`; `graph` is a legacy alias for `workflow`), **18 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, connection, action, postgres, disk, agent, channel, role, policy`), inline `subgraph { }` for map/while, form `visibility: public | internal` and HTTP Basic `auth:`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, top-level `view <name> { }` blocks composing streams into a spreadsheet with per-row `computed` graph columns, `context.iteration.*` (item/index/input/previous) for map/while subgraphs, agent subagent `team`, `channel` blocks binding an agent to Slack / Linear / Discord / web, `connection` blocks declaring Swirls-brokered outbound OAuth slots, and access-control `role` / `policy` blocks.
 
 
 # 1. Language Specification (READ FIRST)
@@ -707,7 +707,7 @@ node per_item {
 }
 ```
 
-There are exactly 16 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes; Parallel.ai web research belongs in `parallel` nodes — not workflow concurrency.
+There are exactly 17 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `integration`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes; Parallel.ai web research belongs in `parallel` nodes — not workflow concurrency.
 
 #### 11b. Using `type: parallel` for workflow concurrency
 
@@ -1435,14 +1435,14 @@ Team members are bare identifiers, not quoted strings. See `resource-agent`.
 
 ### Intent to Primitive Map
 
-Before writing syntax, map the user's request to primitives. The seventeen top-level blocks organize into five categories; pick blocks by category, then look up exact syntax in the other rules.
+Before writing syntax, map the user's request to primitives. The eighteen top-level blocks organize into five categories; pick blocks by category, then look up exact syntax in the other rules.
 
 | Category | Blocks | One-line job |
 |---|---|---|
 | Agents | `agent`, `channel` | Actors that reason; channels bind them to chat surfaces |
 | Workflows | `workflow`, `trigger`, `form`, `webhook`, `schedule`, `schema` | Deterministic procedures and what starts them |
 | Memory | `stream`, `view`, `disk`, `postgres` | Structured output, spreadsheet views over it, files, the user's existing database |
-| Connections | `secret`, `auth`, `connection` | Outbound credentials, least-managed to most-managed |
+| Connections | `secret`, `auth`, `connection`, `action` | Outbound credentials (least-managed to most-managed) and typed integration operations |
 | Access | `role`, `policy` | Inbound permission: who may invoke agents/workflows |
 
 #### Common intents
@@ -1487,7 +1487,7 @@ Before writing syntax, map the user's request to primitives. The seventeen top-l
 
 ### Top-Level Declarations
 
-A `.swirls` file contains seventeen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains eighteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -1499,7 +1499,7 @@ export workflow my_workflow {
 }
 ```
 
-The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, or schema`.
+The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, disk, agent, channel, schema, role, or policy`.
 
 **Correct (all top-level declarations demonstrated):**
 
@@ -1621,7 +1621,7 @@ policy {
 }
 ```
 
-#### The seventeen valid top-level blocks
+#### The eighteen valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -1638,6 +1638,7 @@ policy {
 - `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 - `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
+- `action <name> { }` — Typed integration operation (provider/method/path) referenced by `type: integration` nodes via `action:`. See `resource-action`.
 - `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
 - `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. Declaring a grant flips the project to deny-by-default. See `resource-access-control`.
 
@@ -1910,6 +1911,8 @@ Root node rules:
 - Must have no incoming edges in the flow block
 - Only node where `inputSchema` is meaningful (defines trigger payload shape)
 - Can be any node type (code, ai, switch, etc.)
+
+**Watch for accidental extra roots.** "Exactly one root" is enforced as "exactly one node with no incoming edge." Any source node you leave parentless — most often a `type: stream` read, but also a `type: parallel` or `type: http` fetch — counts as a second root and fails validation with `Workflow must have exactly one root node, but found N`. When a workflow pulls from several sources (a merge, dedupe, or join), make the single `root { }` an entry node that fans out to each source, then fan the sources back into a downstream node. See `node-stream` for the multi-stream example.
 
 ---
 
@@ -2309,7 +2312,7 @@ node classify {
 }
 ```
 
-Error: AI nodes with `kind: object` require a `schema` to define the structured output.
+This call fails **at runtime**: `kind: object` needs a `schema` to define the structured output. The validator does NOT catch this for a standalone node — `swirls doctor` passes — so it only surfaces when the node runs. (The schema is validator-enforced in one case: when the AI node is the leaf of an agent-tool workflow, which errors with `Agent tool workflow "<w>" requires output schema on leaf node "<n>"`.) Always set a `schema` on `kind: object`.
 
 **Correct (object kind with schema):**
 
@@ -2703,6 +2706,30 @@ HTTP node fields:
 | `connection` | no | bare identifier naming a top-level `connection` block (mutually exclusive with `auth`) |
 | `schema` | no | `@json` block (use `outputSchema` only on root nodes) |
 
+#### Output shape
+
+`context.nodes.<n>.output` is the **parsed response body directly** — the JSON value if the body parses as JSON, otherwise the raw text string. There is **no `{ status, headers, body }` envelope**: do not read `output.status` or `output.body`. The HTTP status, statusText, content-type, and duration are on a separate `context.nodes.<n>.meta`, not on `output`.
+
+```swirls
+node read_api {
+  type: ai
+  label: "Use the response"
+  kind: object
+  schema: @json { { "type": "object", "properties": { "ok": { "type": "boolean" } } } }
+  prompt: @ts {
+    // The fetched JSON body is the node output itself, not output.body.
+    const body = context.nodes.call_api.output
+    return "Summarize: " + JSON.stringify(body).slice(0, 4000)
+  }
+}
+```
+
+#### Runtime limits (not validated, they bite at execution)
+
+- **30-second timeout** per request — a long poll past 30s fails with `HTTP request timeout (30s)`. For slow upstreams, poll in shorter calls rather than one long request.
+- **Internal/private addresses are blocked** (SSRF guard), re-checked on every redirect. You cannot call a private/internal host from an http node.
+- At most **5 redirects** are followed, and the `Authorization` header is stripped on cross-origin redirects.
+
 ---
 
 ### Email Nodes
@@ -2725,7 +2752,7 @@ node notify {
 }
 ```
 
-`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`. The validator errors: `Invalid node type "resend". Must be one of: ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while`.
+`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`. The validator errors: `Invalid node type "resend". Must be one of: agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`.
 
 #### Correct (complete email node)
 
@@ -3044,6 +3071,74 @@ The node's output is `SchemaShape[]` — an array of records matching the **pinn
 
 When `versions[<version>].schema` resolves, the LSP types `context.nodes.<stream_node>.output` as the matching TypeScript array. If the version has no schema or the reference is missing, the LSP types it as `unknown[]`.
 
+#### Reading multiple streams in one workflow
+
+A `type: stream` node has **no incoming edge**, so it is a root candidate. A workflow that reads several streams (a merge, dedupe, or join) therefore needs one real `root { }` that fans out to each stream node. Leave the stream nodes parentless and every one of them counts as a root — validation fails with `Workflow must have exactly one root node, but found N`.
+
+Drive the reads from a single entry node, then fan them back into a merge:
+
+```swirls
+workflow merge_sources {
+  label: "Merge investor sources"
+
+  root {
+    type: code
+    label: "Start"
+    code: @ts { return { runAt: new Date().toISOString() } }
+  }
+
+  node from_search {
+    type: stream
+    stream: investors_search
+    version: v1
+    filter: @ts { return {} }
+  }
+
+  node from_findall {
+    type: stream
+    stream: investors_findall
+    version: v1
+    filter: @ts { return {} }
+  }
+
+  node merge {
+    type: code
+    label: "Dedupe across sources"
+    code: @ts {
+      // Each stream node returns ALL matching rows (newest first), not one record.
+      const sources = [
+        context.nodes.from_search.output,
+        context.nodes.from_findall.output,
+      ]
+      const out = []
+      for (const rows of sources) {
+        if (!Array.isArray(rows)) continue
+        for (const row of rows) {
+          // If your writer persists one batch row per run (a row holding an
+          // array), flatten that array here; otherwise use the row directly.
+          out.push(row)
+        }
+      }
+      return { count: out.length, merged: out }
+    }
+  }
+
+  flow {
+    root -> from_search
+    root -> from_findall
+    from_search -> merge
+    from_findall -> merge
+  }
+}
+```
+
+(`investors_search` and `investors_findall` are top-level `stream { }` blocks declared elsewhere in the workspace — declare them, or this workflow errors with `Stream node references stream block "..." which is not defined`.)
+
+Two things bite agents here:
+
+- **Every stream read is a root candidate.** Fan out from one `root { }`; never leave a stream node parentless.
+- **A stream node returns an array of rows, not one record.** Reads come back newest-first (`created_at DESC`). If each run persisted a batch (one row holding an array), iterate rows and flatten. To read just the most recent set, take the first non-empty row.
+
 #### Pagination and sorting
 
 Not implemented yet. All queries return all matching rows ordered by `created_at DESC` (newest first). Pagination / sort will be added as optional fields later.
@@ -3215,7 +3310,9 @@ workflow main_workflow {
 }
 ```
 
-Subworkflow output is accessed as `context.nodes.<workflowNodeName>.output.<leafNodeName>`. The leaf node names come from the child workflow.
+Subworkflow output is accessed as `context.nodes.<workflowNodeName>.output.<leafNodeName>`. The leaf node names come from the child workflow — the node(s) with no outgoing edges, **not** the literal string `output`, and usually **not** `root`.
+
+The example child above is a single node, so its only leaf is `root` and the parent reads `context.nodes.run_helper.output.root`. A real child ends elsewhere: a child whose last node is `node pack { ... }` is read as `context.nodes.run_helper.output.pack`. If a child has several leaves (parallel branches that never rejoin), each leaf is its own key under `.output`. Look at the child's `flow { }` to find the leaf name before reading it.
 
 Workflow node fields:
 | Field | Required | Type |
@@ -3467,10 +3564,12 @@ node done {
 
 #### Loop semantics
 
-1. **Iteration 0**: `input` runs; result becomes `context.iteration.input`. Subgraph runs.
-2. After each iteration: `update` runs; result becomes the next `context.iteration.input`. Then `condition` runs; if false, the loop stops.
-3. **maxIterations**: even if `condition` keeps returning true, the loop stops at this count. The last iteration's leaf outputs become `output.lastOutput`.
-4. If `condition` returns false on iteration 0 (after `input`), the loop runs zero times and `lastOutput` is undefined.
+`while` is a **do-while (post-check) loop**: the subgraph always runs at least once, then `condition` decides whether to run another iteration. There is no pre-loop condition check.
+
+1. **Iteration 0**: `input` runs; result becomes `context.iteration.input`. The subgraph runs (unconditionally — `condition` has not been consulted yet).
+2. After each iteration the engine evaluates **`condition` first** — it sees this iteration's input and its leaf outputs (`context.iteration.previous`). If `condition` is false, the loop stops here and `update` does **not** run. Only if `condition` is true does `update` run to compute the next iteration's `context.iteration.input`.
+3. **maxIterations**: even if `condition` keeps returning true, the loop stops at this count (and `condition`/`update` are skipped on that final iteration). The last iteration's leaf outputs become `output.lastOutput`.
+4. Because it is post-check, the subgraph runs at least once whenever `maxIterations >= 1` (which the validator requires). To "skip" work, branch inside the subgraph; you cannot make a `while` run zero times.
 
 #### Validator errors
 
@@ -3711,7 +3810,7 @@ node upsert_lead {
 - `postgres:` must reference a top-level `postgres` block declared in the workspace (same file or another `.swirls` file).
 - `select:` SQL must be a SELECT statement. `insert:` SQL must be INSERT (upsert with ON CONFLICT is allowed).
 - `{{key}}` placeholders are replaced with positional `$N` parameters at runtime. Values come from the `params:` return object. No SQL injection is possible.
-- Placeholder names do not need to match column names. They match by position in the INSERT column list, or by the SQL expression context on SELECT.
+- Placeholder names do not need to match column names. Each `{{key}}` becomes a positional `$N`, but its value is looked up **by name** from the `params:` return object (`params.key`). So every placeholder name must match a key you return from `params:`, not a column name or position.
 - Table names in SQL must appear in the referenced `postgres` block's `table` declarations.
 - Insert nodes produce no row output by default. Select nodes return an array of row objects.
 
@@ -4121,6 +4220,16 @@ node process {
 | Access secrets | `context.secrets.<block>.<VAR>` in @ts block |
 
 Code nodes are strictly for reshaping inputs, normalizing strings, computing derived values, and structuring outputs. Break your workflow into multiple nodes with the right types.
+
+#### What actually happens (the silent trap)
+
+The sandbox denies I/O by capability — it does not hard-block these APIs, so they fail **quietly** instead of throwing:
+
+- `require(...)` and Node built-ins resolve to **sandbox stubs**, not the real modules. `require("fs")` returns a working-looking `fs` over a **throwaway virtual filesystem**: a write succeeds and then vanishes, and reads never see what you wrote. Nothing throws — the data just disappears.
+- `process.env` is an **empty object** (`{}`), not undefined. `process.env.API_KEY` returns `undefined` with no error. Read secrets via `context.secrets.<block>.<VAR>`.
+- Network is genuinely unavailable.
+
+So if `fs.writeFileSync` or a `require`-d module appears to "work" but nothing persists, that is expected. Move the work to the right node type (`http`, `stream`, `bucket`, `disk`). Pure-compute globals (`Date`, `Math`, `JSON`, `URL`, `RegExp`, `structuredClone`, etc.) are fully available — do not avoid them.
 
 ---
 
@@ -4631,8 +4740,10 @@ Inside a `map` or `while` node's child graph (inline `subgraph { }` or reference
 |-------|------|-------|
 | `context.iteration.item` | The current element from `items: @ts { return [...] }`. Typed by the subgraph root's `inputSchema`. | Available on every iteration. |
 | `context.iteration.index` | Number | Zero-based iteration counter. |
+| `context.iteration.total` | Number | Length of the `items` array. |
+| `context.iteration.previous` | The prior iteration's leaf outputs (or `undefined` at index 0). | Populated because map runs sequentially. |
 
-`map` runs all iterations in parallel up to `concurrency`. Each iteration's `context.iteration.item` is independent.
+`map` runs its iterations **sequentially**, in `items` order — each iteration can see the one before via `context.iteration.previous`. The `concurrency` field is accepted by the parser but is **not yet honored by the engine** (iterations do not actually run in parallel); do not rely on it for speed or assume isolation from ordering.
 
 ```swirls
 node per_ticket {
@@ -4781,7 +4892,7 @@ code: @ts {
 }
 ```
 
-Code nodes have no access to `process.env`.
+Code nodes have no access to `process.env` — it is an empty object (`{}`) in the sandbox, so `process.env.API_KEY` returns `undefined` with no error rather than your secret. Use `context.secrets.<block>.<VAR>` instead.
 
 **Correct (secret block + map + nested access):**
 
@@ -6216,6 +6327,7 @@ agent <name> {
 | `tools` | no | Array of bare identifiers naming tool workflows in the workspace. |
 | `team` | no | Array of bare identifiers naming other `agent` blocks this agent may delegate to as subagents. See below. |
 | `sandbox: { }` | no | Workspace sizing and lifecycle. See below. |
+| `disks` | no | Array of bare identifiers naming top-level `disk` blocks to mount for the agent. See `resource-disk`. |
 | `wallet: { }` | no | Virtual tool-spend budget for Zero capabilities. See below. |
 | `profile <name> { }` | no | Zero or more named profiles. Each may override `system`, `sandbox`, and narrow `tools`. |
 | `label` | no | Display string. |
@@ -6593,7 +6705,7 @@ connection <name> {
 slack, linear, discord, linkedin, microsoft
 ```
 
-No other providers exist. The set mirrors Fabric's integration providers.
+Providers are drawn from the Swirls integration catalog (currently `slack`, `linear`, `discord`, `linkedin`, `microsoft`), not a fixed DSL enum. A provider whose name is a valid key (letters, digits, underscore, hyphen) but is not yet in the catalog is **not a hard error** — it is a warning. Because `swirls doctor` does not surface warnings, such a connection **passes `swirls doctor` and then fails at deploy**. Use the Connections page to request an unsupported provider.
 
 #### Referencing a connection
 
@@ -6647,8 +6759,9 @@ channel slack_concierge {
 - `Connection block name: <msg>` — name must match `^[a-zA-Z0-9_]+$`.
 - `Duplicate connection block name "<n>"` — two connection blocks share a name.
 - `Connection "<n>" requires a provider` — `provider:` is missing.
-- `Connection "<n>" provider "<p>" must be one of: slack, linear, discord, linkedin, microsoft` — unsupported provider.
-- Parser: `connection must declare provider` / `connection provider must be a name` / `Unknown connection property "<key>"` / `Expected connection name`.
+- `Connection "<n>" provider "<p>" must be a valid integration provider key (letters, digits, underscore, hyphen) or one of: slack, linear, discord, linkedin, microsoft` — the provider value has an invalid shape (error severity).
+- `Connection "<n>" uses provider "<p>" which is not in the Swirls integration catalog. Deploy will fail until this provider is supported — use the Connections page to request it.` — valid key shape but unsupported provider. This is a **warning**, so `swirls doctor` stays green and deploy is where it fails.
+- Parser: `connection provider must be a name` / `Unknown connection property "<key>"` / `Expected connection name`.
 - `HTTP node references undefined connection "<n>"` — a node's `connection:` value is not a declared connection block.
 - `"connection" is only valid on http and integration nodes` — `connection:` appears on an unsupported node type.
 - `Node "<n>": set "auth" or "connection", not both. Use "auth" for your own credentials, "connection" for a Swirls-brokered grant.` — a node set both fields.
@@ -7292,7 +7405,7 @@ The issue is always in or before the first missing item, never after it.
 
 ### Parse Errors Cascade Past the Actual Problem
 
-A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "Unexpected token: expected form, webhook, schedule, graph, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, or schema", look above the reported line.
+A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, disk, agent, channel, schema, role, or policy", look above the reported line.
 
 **Common causes of cascading errors:**
 
@@ -7373,6 +7486,15 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 - [ ] Doctor summary counts match the number of forms/workflows/triggers you defined
 - [ ] No unexpected warnings about unused schemas or types
 
+**A clean `swirls doctor` is not a clean deploy.** `swirls doctor` reports only **error**-severity diagnostics; it does not print **warnings**. Several conditions are warnings, so they pass doctor and only fail (or silently misbehave) at deploy or in the editor LSP. Known warning-only cases to check by eye:
+
+- A `connection` whose `provider` is a valid name but not in the Swirls integration catalog (deploy fails).
+- A `postgres` block with a literal (non-secret) connection string.
+- A `webhook` declaring neither a shared `secret:` nor a `header:`.
+- An unused top-level `schema` block.
+
+When deploy fails but doctor was green, suspect a warning-level issue and check it in the LSP or deploy output.
+
 ---
 
 ### Validator Diagnostics Cheatsheet
@@ -7396,7 +7518,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 #### Nodes (general)
 
-- `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow` — Unknown type name. Use one of the 16. (`graph` is accepted as a legacy alias and normalized to `workflow`, so it never trips this error.)
+- `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow` — Unknown type name. Use one of the 17. (`graph` is accepted as a legacy alias and normalized to `workflow`, so it never trips this error.)
 - `Node type "<t>" requires "<field>"` — Missing required field. See the node-type rule for the required set.
 
 #### Secrets map

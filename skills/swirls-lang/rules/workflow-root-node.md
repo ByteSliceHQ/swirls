@@ -87,3 +87,5 @@ Root node rules:
 - Must have no incoming edges in the flow block
 - Only node where `inputSchema` is meaningful (defines trigger payload shape)
 - Can be any node type (code, ai, switch, etc.)
+
+**Watch for accidental extra roots.** "Exactly one root" is enforced as "exactly one node with no incoming edge." Any source node you leave parentless — most often a `type: stream` read, but also a `type: parallel` or `type: http` fetch — counts as a second root and fails validation with `Workflow must have exactly one root node, but found N`. When a workflow pulls from several sources (a merge, dedupe, or join), make the single `root { }` an entry node that fans out to each source, then fan the sources back into a downstream node. See `node-stream` for the multi-stream example.

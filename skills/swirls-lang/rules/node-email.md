@@ -24,7 +24,7 @@ node notify {
 }
 ```
 
-`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`. The validator errors: `Invalid node type "resend". Must be one of: ai, agent, bucket, code, disk, email, workflow, http, map, parallel, postgres, scrape, stream, switch, wait, while`.
+`resend` is not a valid node type. Resend is the underlying vendor; the DSL type name is `email`. The validator errors: `Invalid node type "resend". Must be one of: agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`.
 
 ### Correct (complete email node)
 

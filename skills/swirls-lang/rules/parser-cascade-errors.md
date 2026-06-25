@@ -6,7 +6,7 @@ tags: parser, error, cascade, line, number, debugging
 
 ## Parse Errors Cascade Past the Actual Problem
 
-A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "Unexpected token: expected form, webhook, schedule, graph, workflow, stream, trigger, secret, auth, postgres, disk, agent, channel, or schema", look above the reported line.
+A single syntax issue causes the parser to lose its place. The reported line number is often after the actual problem. When you see "Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, disk, agent, channel, schema, role, or policy", look above the reported line.
 
 **Common causes of cascading errors:**
 

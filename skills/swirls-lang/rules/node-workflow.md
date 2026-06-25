@@ -94,7 +94,9 @@ workflow main_workflow {
 }
 ```
 
-Subworkflow output is accessed as `context.nodes.<workflowNodeName>.output.<leafNodeName>`. The leaf node names come from the child workflow.
+Subworkflow output is accessed as `context.nodes.<workflowNodeName>.output.<leafNodeName>`. The leaf node names come from the child workflow — the node(s) with no outgoing edges, **not** the literal string `output`, and usually **not** `root`.
+
+The example child above is a single node, so its only leaf is `root` and the parent reads `context.nodes.run_helper.output.root`. A real child ends elsewhere: a child whose last node is `node pack { ... }` is read as `context.nodes.run_helper.output.pack`. If a child has several leaves (parallel branches that never rejoin), each leaf is its own key under `.output`. Look at the child's `flow { }` to find the leaf name before reading it.
 
 Workflow node fields:
 | Field | Required | Type |

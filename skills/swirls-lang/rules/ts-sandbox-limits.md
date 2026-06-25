@@ -75,3 +75,13 @@ node process {
 | Access secrets | `context.secrets.<block>.<VAR>` in @ts block |
 
 Code nodes are strictly for reshaping inputs, normalizing strings, computing derived values, and structuring outputs. Break your workflow into multiple nodes with the right types.
+
+### What actually happens (the silent trap)
+
+The sandbox denies I/O by capability — it does not hard-block these APIs, so they fail **quietly** instead of throwing:
+
+- `require(...)` and Node built-ins resolve to **sandbox stubs**, not the real modules. `require("fs")` returns a working-looking `fs` over a **throwaway virtual filesystem**: a write succeeds and then vanishes, and reads never see what you wrote. Nothing throws — the data just disappears.
+- `process.env` is an **empty object** (`{}`), not undefined. `process.env.API_KEY` returns `undefined` with no error. Read secrets via `context.secrets.<block>.<VAR>`.
+- Network is genuinely unavailable.
+
+So if `fs.writeFileSync` or a `require`-d module appears to "work" but nothing persists, that is expected. Move the work to the right node type (`http`, `stream`, `bucket`, `disk`). Pure-compute globals (`Date`, `Math`, `JSON`, `URL`, `RegExp`, `structuredClone`, etc.) are fully available — do not avoid them.

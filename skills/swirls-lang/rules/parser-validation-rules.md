@@ -25,7 +25,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 ### Nodes (general)
 
-- `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, map, parallel, postgres, scrape, stream, switch, wait, while, workflow` — Unknown type name. Use one of the 16. (`graph` is accepted as a legacy alias and normalized to `workflow`, so it never trips this error.)
+- `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow` — Unknown type name. Use one of the 17. (`graph` is accepted as a legacy alias and normalized to `workflow`, so it never trips this error.)
 - `Node type "<t>" requires "<field>"` — Missing required field. See the node-type rule for the required set.
 
 ### Secrets map

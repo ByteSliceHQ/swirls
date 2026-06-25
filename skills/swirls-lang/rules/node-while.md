@@ -103,10 +103,12 @@ node done {
 
 ### Loop semantics
 
-1. **Iteration 0**: `input` runs; result becomes `context.iteration.input`. Subgraph runs.
-2. After each iteration: `update` runs; result becomes the next `context.iteration.input`. Then `condition` runs; if false, the loop stops.
-3. **maxIterations**: even if `condition` keeps returning true, the loop stops at this count. The last iteration's leaf outputs become `output.lastOutput`.
-4. If `condition` returns false on iteration 0 (after `input`), the loop runs zero times and `lastOutput` is undefined.
+`while` is a **do-while (post-check) loop**: the subgraph always runs at least once, then `condition` decides whether to run another iteration. There is no pre-loop condition check.
+
+1. **Iteration 0**: `input` runs; result becomes `context.iteration.input`. The subgraph runs (unconditionally — `condition` has not been consulted yet).
+2. After each iteration the engine evaluates **`condition` first** — it sees this iteration's input and its leaf outputs (`context.iteration.previous`). If `condition` is false, the loop stops here and `update` does **not** run. Only if `condition` is true does `update` run to compute the next iteration's `context.iteration.input`.
+3. **maxIterations**: even if `condition` keeps returning true, the loop stops at this count (and `condition`/`update` are skipped on that final iteration). The last iteration's leaf outputs become `output.lastOutput`.
+4. Because it is post-check, the subgraph runs at least once whenever `maxIterations >= 1` (which the validator requires). To "skip" work, branch inside the subgraph; you cannot make a `while` run zero times.
 
 ### Validator errors
 

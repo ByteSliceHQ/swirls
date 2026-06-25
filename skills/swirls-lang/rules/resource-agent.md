@@ -71,6 +71,7 @@ agent <name> {
 | `tools` | no | Array of bare identifiers naming tool workflows in the workspace. |
 | `team` | no | Array of bare identifiers naming other `agent` blocks this agent may delegate to as subagents. See below. |
 | `sandbox: { }` | no | Workspace sizing and lifecycle. See below. |
+| `disks` | no | Array of bare identifiers naming top-level `disk` blocks to mount for the agent. See `resource-disk`. |
 | `wallet: { }` | no | Virtual tool-spend budget for Zero capabilities. See below. |
 | `profile <name> { }` | no | Zero or more named profiles. Each may override `system`, `sandbox`, and narrow `tools`. |
 | `label` | no | Display string. |

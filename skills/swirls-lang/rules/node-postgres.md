@@ -99,6 +99,6 @@ node upsert_lead {
 - `postgres:` must reference a top-level `postgres` block declared in the workspace (same file or another `.swirls` file).
 - `select:` SQL must be a SELECT statement. `insert:` SQL must be INSERT (upsert with ON CONFLICT is allowed).
 - `{{key}}` placeholders are replaced with positional `$N` parameters at runtime. Values come from the `params:` return object. No SQL injection is possible.
-- Placeholder names do not need to match column names. They match by position in the INSERT column list, or by the SQL expression context on SELECT.
+- Placeholder names do not need to match column names. Each `{{key}}` becomes a positional `$N`, but its value is looked up **by name** from the `params:` return object (`params.key`). So every placeholder name must match a key you return from `params:`, not a column name or position.
 - Table names in SQL must appear in the referenced `postgres` block's `table` declarations.
 - Insert nodes produce no row output by default. Select nodes return an array of row objects.

@@ -82,6 +82,74 @@ The node's output is `SchemaShape[]` — an array of records matching the **pinn
 
 When `versions[<version>].schema` resolves, the LSP types `context.nodes.<stream_node>.output` as the matching TypeScript array. If the version has no schema or the reference is missing, the LSP types it as `unknown[]`.
 
+### Reading multiple streams in one workflow
+
+A `type: stream` node has **no incoming edge**, so it is a root candidate. A workflow that reads several streams (a merge, dedupe, or join) therefore needs one real `root { }` that fans out to each stream node. Leave the stream nodes parentless and every one of them counts as a root — validation fails with `Workflow must have exactly one root node, but found N`.
+
+Drive the reads from a single entry node, then fan them back into a merge:
+
+```swirls
+workflow merge_sources {
+  label: "Merge investor sources"
+
+  root {
+    type: code
+    label: "Start"
+    code: @ts { return { runAt: new Date().toISOString() } }
+  }
+
+  node from_search {
+    type: stream
+    stream: investors_search
+    version: v1
+    filter: @ts { return {} }
+  }
+
+  node from_findall {
+    type: stream
+    stream: investors_findall
+    version: v1
+    filter: @ts { return {} }
+  }
+
+  node merge {
+    type: code
+    label: "Dedupe across sources"
+    code: @ts {
+      // Each stream node returns ALL matching rows (newest first), not one record.
+      const sources = [
+        context.nodes.from_search.output,
+        context.nodes.from_findall.output,
+      ]
+      const out = []
+      for (const rows of sources) {
+        if (!Array.isArray(rows)) continue
+        for (const row of rows) {
+          // If your writer persists one batch row per run (a row holding an
+          // array), flatten that array here; otherwise use the row directly.
+          out.push(row)
+        }
+      }
+      return { count: out.length, merged: out }
+    }
+  }
+
+  flow {
+    root -> from_search
+    root -> from_findall
+    from_search -> merge
+    from_findall -> merge
+  }
+}
+```
+
+(`investors_search` and `investors_findall` are top-level `stream { }` blocks declared elsewhere in the workspace — declare them, or this workflow errors with `Stream node references stream block "..." which is not defined`.)
+
+Two things bite agents here:
+
+- **Every stream read is a root candidate.** Fan out from one `root { }`; never leave a stream node parentless.
+- **A stream node returns an array of rows, not one record.** Reads come back newest-first (`created_at DESC`). If each run persisted a batch (one row holding an array), iterate rows and flatten. To read just the most recent set, take the first non-empty row.
+
 ### Pagination and sorting
 
 Not implemented yet. All queries return all matching rows ordered by `created_at DESC` (newest first). Pagination / sort will be added as optional fields later.

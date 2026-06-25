@@ -6,14 +6,14 @@ tags: spec, primitives, taxonomy, intent, natural-language, categories
 
 ## Intent to Primitive Map
 
-Before writing syntax, map the user's request to primitives. The seventeen top-level blocks organize into five categories; pick blocks by category, then look up exact syntax in the other rules.
+Before writing syntax, map the user's request to primitives. The eighteen top-level blocks organize into five categories; pick blocks by category, then look up exact syntax in the other rules.
 
 | Category | Blocks | One-line job |
 |---|---|---|
 | Agents | `agent`, `channel` | Actors that reason; channels bind them to chat surfaces |
 | Workflows | `workflow`, `trigger`, `form`, `webhook`, `schedule`, `schema` | Deterministic procedures and what starts them |
 | Memory | `stream`, `view`, `disk`, `postgres` | Structured output, spreadsheet views over it, files, the user's existing database |
-| Connections | `secret`, `auth`, `connection` | Outbound credentials, least-managed to most-managed |
+| Connections | `secret`, `auth`, `connection`, `action` | Outbound credentials (least-managed to most-managed) and typed integration operations |
 | Access | `role`, `policy` | Inbound permission: who may invoke agents/workflows |
 
 ### Common intents

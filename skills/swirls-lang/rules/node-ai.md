@@ -24,7 +24,7 @@ node classify {
 }
 ```
 
-Error: AI nodes with `kind: object` require a `schema` to define the structured output.
+This call fails **at runtime**: `kind: object` needs a `schema` to define the structured output. The validator does NOT catch this for a standalone node — `swirls doctor` passes — so it only surfaces when the node runs. (The schema is validator-enforced in one case: when the AI node is the leaf of an agent-tool workflow, which errors with `Agent tool workflow "<w>" requires output schema on leaf node "<n>"`.) Always set a `schema` on `kind: object`.
 
 **Correct (object kind with schema):**
 

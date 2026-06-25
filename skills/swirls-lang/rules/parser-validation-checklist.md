@@ -63,3 +63,12 @@ Before running `swirls doctor`, verify every item on this checklist. Each item c
 
 - [ ] Doctor summary counts match the number of forms/workflows/triggers you defined
 - [ ] No unexpected warnings about unused schemas or types
+
+**A clean `swirls doctor` is not a clean deploy.** `swirls doctor` reports only **error**-severity diagnostics; it does not print **warnings**. Several conditions are warnings, so they pass doctor and only fail (or silently misbehave) at deploy or in the editor LSP. Known warning-only cases to check by eye:
+
+- A `connection` whose `provider` is a valid name but not in the Swirls integration catalog (deploy fails).
+- A `postgres` block with a literal (non-secret) connection string.
+- A `webhook` declaring neither a shared `secret:` nor a `header:`.
+- An unused top-level `schema` block.
+
+When deploy fails but doctor was green, suspect a warning-level issue and check it in the LSP or deploy output.

@@ -26,7 +26,7 @@ code: @ts {
 }
 ```
 
-Code nodes have no access to `process.env`.
+Code nodes have no access to `process.env` — it is an empty object (`{}`) in the sandbox, so `process.env.API_KEY` returns `undefined` with no error rather than your secret. Use `context.secrets.<block>.<VAR>` instead.
 
 **Correct (secret block + map + nested access):**
 
