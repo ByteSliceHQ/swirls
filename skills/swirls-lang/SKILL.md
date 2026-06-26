@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "5.7.1"
+  version: "5.7.2"
 ---
 
 # Swirls Language

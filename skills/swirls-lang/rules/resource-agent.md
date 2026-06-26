@@ -30,6 +30,7 @@ agent <name> {
   maxSteps: <number>                  // optional; default 20
 
   tools: [workflow_a, workflow_b]           // optional; workflows exposed as LLM-callable tools
+  skills: [skill_a, skill_b]                // optional; local knowledge skills (see resource-skill)
   team: [agent_b, agent_c]                  // optional; other agents this one may delegate to
 
   sandbox: {                          // optional; workspace sizing + lifecycle

@@ -4,7 +4,7 @@
 >
 > **Source of truth lives in `rules/`.** This file is regenerated from those rules by `apps/web/skills/regen-agents.ts`. When in doubt, defer to `rules/spec-strict-syntax.md` and `rules/spec-common-mistakes.md`.
 >
-> Current scope: **17 node types** (`agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`; `graph` is a legacy alias for `workflow`), **18 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, connection, action, postgres, disk, agent, channel, role, policy`), inline `subgraph { }` for map/while, form `visibility: public | internal` and HTTP Basic `auth:`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, top-level `view <name> { }` blocks composing streams into a spreadsheet with per-row `computed` graph columns, `context.iteration.*` (item/index/input/previous) for map/while subgraphs, agent subagent `team`, `channel` blocks binding an agent to Slack / Linear / Discord / web, `connection` blocks declaring Swirls-brokered outbound OAuth slots, and access-control `role` / `policy` blocks.
+> Current scope: **17 node types** (`agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`; `graph` is a legacy alias for `workflow`), **19 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, connection, action, postgres, disk, skill, agent, channel, role, policy`), inline `subgraph { }` for map/while, form `visibility: public | internal` and HTTP Basic `auth:`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, top-level `view <name> { }` blocks composing streams into a spreadsheet with per-row `computed` graph columns, `context.iteration.*` (item/index/input/previous) for map/while subgraphs, agent subagent `team`, agent knowledge `skills:` referencing top-level `skill` blocks, `channel` blocks binding an agent to Slack / Linear / Discord / web, `connection` blocks declaring Swirls-brokered outbound OAuth slots, and access-control `role` / `policy` blocks.
 
 
 # 1. Language Specification (READ FIRST)
@@ -19,7 +19,7 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, view, schema,
-disk, agent, channel, connection, action, profile, tools,
+disk, agent, channel, connection, action, skill, profile, tools,
 role, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
@@ -48,6 +48,7 @@ secret <name> { }
 auth <name> { }
 postgres <name> { }
 disk <name> { }
+skill <name> { }
 agent <name> { }
 channel <name> { }
 connection <name> { }
@@ -56,11 +57,11 @@ role <name> { }
 policy { }
 ```
 
-There are **18** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, and a subagent `team`, bound by `type: agent` nodes; `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
+There are **19** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, schemas, agents, channels, connections, actions, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, schemas, agents, channels, connections, actions, skills, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -197,9 +198,23 @@ label: "..."   description: "..."                            // optional
 
 `provider` is the only required field and must be one of the five values. A connection is referenced by bare name from an `http` node (`connection: <name>`) or a channel (`connection: <name>`); a node sets either `auth` or `connection`, never both. See `resource-connection`.
 
+##### Skill block fields
+
+`skill <name> { }` declares a local knowledge skill resolved from `.agents/skills/<name>/` at deploy time. Fields:
+
+```
+name: "<directory-slug>"   // required; quoted string; folder under .agents/skills/
+```
+
+The block name (`skill <name>`) is the Swirls handle referenced by `agent.skills:`; `name:` is the on-disk directory slug (may contain hyphens). The slug must be a single path segment — no `/`, `\`, or `..`. See `resource-skill`.
+
 #### Access-control blocks
 
 `role <name> { match { <claim>: <value> } }` derives a role from verified principal attributes (scalar value = equality, array value = membership). `policy { allow|deny <role> -> agent <name>|* { workflows: […], tools: […] } }` grants roles access to agents; declaring any grant flips the project to deny-by-default. There is no `access { }` block. See `resource-access-control`.
+
+#### Agent knowledge skills
+
+`agent <name> { }` accepts `skills: [ skillBlockName, ... ]` — a bare-identifier array of top-level `skill` blocks whose bodies are served at runtime via `open_skill` and `read_skill_file`. A `profile` may narrow `skills:` to a subset of the agent's list (same rule as `tools:`). See `resource-agent` and `resource-skill`.
 
 #### Agent subagent team
 
@@ -6260,6 +6275,99 @@ See `node-disk` for the workflow exec side and `resource-agent` for agent mounti
 
 ---
 
+### Skill Block Declaration
+
+Top-level `skill <name> { }` blocks declare a **local knowledge skill** resolved from `.agents/skills/<name>/` in the project repo at deploy time. Referenced skills are listed on an `agent` block via `skills:` (bare identifiers). At runtime the host serves skill bodies through a system-prompt catalog and `open_skill` / `read_skill_file` tools — **no sandbox VM**.
+
+**There is no `type:` field on a skill block** — the keyword `skill` identifies the block.
+
+#### Syntax
+
+```swirls
+skill <blockName> {
+  name: "<directory-slug>"   // required; folder under .agents/skills/
+}
+```
+
+`name:` is a quoted string naming the on-disk directory slug (not the block name). The block name (`<blockName>`) is how agents reference the skill in `skills: [blockName]`.
+
+#### Fields
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `name` | yes | Quoted string. Must match `^[a-zA-Z0-9_-]+$` style directory names under `.agents/skills/`. |
+
+#### Referencing from an agent
+
+```swirls
+skill swirls_lang {
+  name: "swirls-lang"
+}
+
+agent helper {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  skills: [swirls_lang]
+}
+```
+
+`skills:` is a bare-identifier array, same style as `tools:` and `disks:`. Each entry must match a top-level `skill` block in the workspace.
+
+#### Profile narrowing
+
+Profiles may narrow `skills:` to a subset of the agent block's list (same rule as `tools:`):
+
+```swirls
+agent helper {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  skills: [swirls_lang, other_skill]
+
+  profile support {
+    skills: [swirls_lang]
+  }
+}
+```
+
+Profile `skills:` must be a **subset** of the agent's top-level `skills:`.
+
+#### Authoring on disk
+
+Install or author skills under:
+
+```
+.agents/skills/<name>/SKILL.md
+```
+
+`swirls doctor` resolves each declared skill, enforces size/symlink caps, classifies the bundle as knowledge-only, and warns when `SKILL.md` frontmatter `name` does not match the directory slug.
+
+Executable content (scripts, shebangs, `scripts/` paths) is rejected at doctor and deploy.
+
+#### Deploy behavior
+
+- CLI `swirls deploy` collects referenced skill trees into a `skillFiles` payload.
+- API re-classifies, checksums, uploads to R2 at `orgs/<org>/projects/<project>/skills/<checksum>/<path>` (deduped per checksum).
+- Resolved skill references (checksum, description, file manifest) are stamped onto agent blocks in the deployment definition.
+
+#### Runtime behavior
+
+- **Level 0:** skill names + descriptions append to the system prompt.
+- **Level 1:** `open_skill(name)` returns the `SKILL.md` body.
+- **Level 2:** `read_skill_file(name, path)` returns bundled text files.
+
+All reads are host-side from R2. Chat-only turns that never call sandbox tools still work with skills.
+
+#### Validation rules
+
+- Skill block names must match `^[a-zA-Z0-9_]+$`. Duplicate names error.
+- `name:` must be non-empty after trim.
+- `agent.skills` entries must reference declared `skill` blocks in the workspace.
+- Profile `skills:` must be a subset of the parent agent's `skills:`.
+
+See `resource-agent` for the agent block's `skills:` field.
+
+---
+
 ### Agent Block Declaration
 
 Top-level `agent <name> { }` blocks declare an LLM agentic harness: which provider and model to use, which secret block holds the API key, a default system prompt, runtime knobs, optional sandbox sizing, the tools (workflows) the model may call, an optional subagent `team` it may delegate to, and zero or more named `profile <name> { }` sub-blocks. `type: agent` nodes bind to an agent block by bare identifier, and `channel` blocks expose an agent on a chat platform.
@@ -6286,6 +6394,7 @@ agent <name> {
   maxSteps: <number>                  // optional; default 20
 
   tools: [workflow_a, workflow_b]           // optional; workflows exposed as LLM-callable tools
+  skills: [skill_a, skill_b]                // optional; local knowledge skills (see resource-skill)
   team: [agent_b, agent_c]                  // optional; other agents this one may delegate to
 
   sandbox: {                          // optional; workspace sizing + lifecycle
