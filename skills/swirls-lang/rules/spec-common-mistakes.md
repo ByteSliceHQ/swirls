@@ -342,7 +342,7 @@ node per_item {
 }
 ```
 
-There are exactly 17 node types: `agent`, `ai`, `bucket`, `code`, `disk`, `email`, `http`, `integration`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes; Parallel.ai web research belongs in `parallel` nodes — not workflow concurrency.
+There are exactly 18 node types: `agent`, `ai`, `bucket`, `code`, `database`, `disk`, `email`, `http`, `integration`, `map`, `parallel`, `postgres`, `scrape`, `stream`, `switch`, `wait`, `while`, `workflow`. (`graph` is a legacy alias for `workflow`.) Simple data transformation belongs in `code` nodes; per-item iteration belongs in `map` nodes; counter/condition loops belong in `while` nodes; Parallel.ai web research belongs in `parallel` nodes — not workflow concurrency.
 
 ### 11b. Using `type: parallel` for workflow concurrency
 
@@ -1065,3 +1065,109 @@ agent orchestrator {
 ```
 
 Team members are bare identifiers, not quoted strings. See `resource-agent`.
+
+### 35. Putting a `datasource` or `generator` block inside a `@prisma` island
+
+**Incorrect:**
+
+```swirls
+database my_db {
+  schema: @prisma {
+    datasource db {
+      provider = "postgresql"
+      url      = env("DATABASE_URL")
+    }
+    generator client {
+      provider = "prisma-client-js"
+    }
+    model User {
+      id    Int    @id @default(autoincrement())
+      email String @unique
+    }
+  }
+}
+```
+
+Swirls provisions the database and holds the connection; the `@prisma` island is **models and enums only**. Swirls wraps your schema with its own fixed `datasource` + `generator` header before validating it at deploy time, so a user-supplied one collides and the deploy fails Prisma's validator.
+
+**Correct:**
+
+```swirls
+database my_db {
+  schema: @prisma {
+    model User {
+      id    Int    @id @default(autoincrement())
+      email String @unique
+    }
+  }
+}
+```
+
+See `resource-database`.
+
+### 36. Calling `$transaction` from a `code` node
+
+**Incorrect:**
+
+```swirls
+node settle_invoice {
+  type: code
+  code: @ts {
+    return context.db.my_db.$transaction(async (tx) => {
+      return tx.invoice.update({ where: { id: 1 }, data: { status: "PAID" } })
+    })
+  }
+}
+```
+
+This throws at runtime: `Managed database: transactions are only available in a database node with operation: transaction`. A `code` node's `context.db.<name>` is the full client, but it is deliberately transaction-free.
+
+**Correct:**
+
+```swirls
+node settle_invoice {
+  type: database
+  database: my_db
+  operation: transaction
+  run: @ts {
+    return context.db.my_db.$transaction(async (tx) => {
+      return tx.invoice.update({ where: { id: 1 }, data: { status: "PAID" } })
+    })
+  }
+}
+```
+
+See `node-database` and `context-db`.
+
+### 37. Using `postgres` and `database` interchangeably
+
+**Incorrect (assuming `postgres` provisions a database):**
+
+```swirls
+postgres my_db {
+  label: "New database"
+  connection: DATABASE_URL
+
+  table users {
+    schema: @json { { "type": "object", "properties": { "email": { "type": "string" } } } }
+  }
+}
+```
+
+`postgres` never provisions anything — it is a connection to a database you already run, and `connection:` must resolve to a real, existing database or every query fails at runtime.
+
+**Correct (want Swirls to provision and manage the database):**
+
+```swirls
+database my_db {
+  label: "New database"
+  schema: @prisma {
+    model User {
+      id    Int    @id @default(autoincrement())
+      email String @unique
+    }
+  }
+}
+```
+
+Use `postgres` for a database you own and operate; use `database` when you want Swirls to provision, migrate, and hold the connection for you. See `resource-postgres` and `resource-database`.

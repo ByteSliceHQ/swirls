@@ -1,12 +1,12 @@
 ---
 title: Top-Level Declarations
 impact: HIGH
-tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, disk, agent, channel, connection, role, policy
+tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, database, migration, disk, agent, channel, connection, role, policy
 ---
 
 ## Top-Level Declarations
 
-A `.swirls` file contains eighteen kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains twenty kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -18,7 +18,7 @@ export workflow my_workflow {
 }
 ```
 
-The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, disk, agent, channel, schema, role, or policy`.
+The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, database, migration, disk, skill, agent, channel, schema, role, or policy`.
 
 **Correct (all top-level declarations demonstrated):**
 
@@ -104,6 +104,24 @@ postgres my_db {
   }
 }
 
+database app_db {
+  label: "App database"
+  schema: @prisma {
+    model User {
+      id    Int    @id @default(autoincrement())
+      email String @unique
+    }
+  }
+}
+
+migration backfill_defaults {
+  database: app_db
+  order: 1
+  operation: @ts {
+    return { ok: true }
+  }
+}
+
 trigger on_contact {
   form:contact -> process
   enabled: true
@@ -140,7 +158,7 @@ policy {
 }
 ```
 
-### The eighteen valid top-level blocks
+### The twenty valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -152,7 +170,9 @@ policy {
 - `trigger <name> { }` — Binds resources to workflows. See `resource-trigger-binding`.
 - `secret <name> { }` — Named groups of secret var identifiers. See `resource-secrets`.
 - `auth <name> { }` — Authentication configuration for http nodes. See `resource-auth`.
-- `postgres <name> { }` — External PostgreSQL connection and table schemas. See `resource-postgres`.
+- `postgres <name> { }` — External, bring-your-own PostgreSQL connection and table schemas. See `resource-postgres`.
+- `database <name> { }` — Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island; provisioned and migrated by Swirls. See `resource-database`.
+- `migration <name> { }` — Ordered, run-once data transform against a `database` block. See `resource-migration`.
 - `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
 - `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.

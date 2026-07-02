@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "5.7.2"
+  version: "5.7.3"
 ---
 
 # Swirls Language
@@ -16,7 +16,7 @@ metadata:
 > GitHub copy at `ByteSliceHQ/swirls` is a mirror; if your copy's version
 > trails the index, prefer the published one.
 
-Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 16 node types, TypeScript / JSON / SQL embedded blocks, the context object (including `context.iteration` for map/while), resources, triggers, top-level stream / view / schema / disk / agent / channel / connection blocks, access-control blocks (`role` / `policy`; declaring policy grants flips the project to deny-by-default), agent subagent teams, optional agent `wallet` for Zero tool spend, reviews, failure policies, output `format:`, and known parser pitfalls.
+Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 18 node types, TypeScript / JSON / SQL / Prisma embedded blocks, the context object (including `context.iteration` for map/while and `context.db` for managed databases), resources, triggers, top-level stream / view / schema / disk / agent / channel / connection / database / migration blocks, access-control blocks (`role` / `policy`; declaring policy grants flips the project to deny-by-default), agent subagent teams, optional agent `wallet` for Zero tool spend, a Swirls-managed `database` primitive (Prisma schema, generated typed client, governed `type: database` node) distinct from the bring-your-own `postgres` block, reviews, failure policies, output `format:`, and known parser pitfalls.
 
 ## When to Apply
 
@@ -34,6 +34,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - Declaring `agent` blocks (with tools, profiles, subagent `team`, and optional `wallet` for Zero tool spend) and binding them to chat platforms with `channel` blocks.
 - Configuring human-in-the-loop review blocks.
 - Declaring external Postgres databases and writing parameterized SQL nodes.
+- Declaring a Swirls-managed database with a `database` block and a Prisma-language `@prisma` schema, running data transforms with `migration` blocks, querying it via `context.db.<name>` in `code` nodes (full client), and governing mutations with `type: database` nodes (operation-narrowed client, `review:`-gateable).
 
 ## Priority
 
@@ -42,11 +43,11 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 | 1 | **Language Spec** | **CRITICAL** | `spec-` | **READ FIRST. Exhaustive list of valid syntax, keywords, node types, fields. If it is not listed here, it does not exist.** |
 | 2 | File Structure | HIGH | `structure-` | Top-level declarations, file discovery, comment restrictions |
 | 3 | Workflow & Node Basics | CRITICAL | `workflow-` | Root node, flow block, edges, DAG rules, inline `subgraph { }` for map/while |
-| 4 | Node Types | CRITICAL | `node-` | All 16 node types, required/optional fields, secrets map, failure policy |
+| 4 | Node Types | CRITICAL | `node-` | All 18 node types, required/optional fields, secrets map, failure policy |
 | 5 | TypeScript Blocks | CRITICAL | `ts-` | @ts patterns, sandbox limits, safe code |
 | 6 | Schema & Typing | HIGH | `schema-` | JSON Schema, inputSchema/outputSchema/schema placement, bare-identifier refs to top-level `schema` blocks |
 | 7 | Context Object | HIGH | `context-` | context.nodes, context.reviews, context.secrets, context.meta, context.iteration |
-| 8 | Resources & Triggers | HIGH | `resource-` | Forms (incl. `visibility:` and `auth:`), webhooks (incl. `secret:`/`header:`), schedules, secrets, auth blocks, connection blocks (Swirls-brokered OAuth), postgres blocks, agent blocks (incl. subagent `team` and optional `wallet`), channel blocks, role/policy blocks, top-level stream / view / schema blocks, trigger bindings |
+| 8 | Resources & Triggers | HIGH | `resource-` | Forms (incl. `visibility:` and `auth:`), webhooks (incl. `secret:`/`header:`), schedules, secrets, auth blocks, connection blocks (Swirls-brokered OAuth), postgres blocks, database/migration blocks (Swirls-managed Postgres), agent blocks (incl. subagent `team` and optional `wallet`), channel blocks, role/policy blocks, top-level stream / view / schema blocks, trigger bindings |
 | 9 | Streams | MEDIUM | `stream-` | Filter operators, field paths, migration from persistence |
 | 10 | Reviews | MEDIUM | `review-` | Human-in-the-loop review config |
 | 11 | Parser Pitfalls | CRITICAL | `parser-` | Lexer hazards that silently truncate files, cascade errors, validator diagnostics |
@@ -59,7 +60,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `spec-primitive-map` - Map natural-language intents to primitives before writing syntax: the five categories (Agents, Workflows, Memory, Connections, Access) and the common-intent lookup table.
 
 ### 2. File Structure
-- `structure-top-level-declarations` - The seventeen valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, disk, agent, channel, connection, role, policy
+- `structure-top-level-declarations` - The twenty valid top-level blocks (plus the optional `version:` line): schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, database, migration, disk, agent, channel, connection, role, policy
 - `structure-file-discovery` - File extensions, discovery rules, `.ts.swirls` files
 - `structure-comments` - Comment syntax and ASCII-only restriction
 
@@ -70,7 +71,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `workflow-dag-rules` - No cycles, one root, edge validation
 - `workflow-subgraph` - Inline `subgraph { }` block (no colon) inside `map`/`while` nodes; same body as a workflow but no own label/description; subgraph root must declare `inputSchema`
 
-### 4. Node Types (16 total)
+### 4. Node Types (18 total)
 - `node-code` - Code nodes: sandboxed TypeScript execution
 - `node-ai` - AI nodes: text, object, image, video, embed kinds
 - `node-agent` - Agent nodes: bind to a top-level `agent` block; tools, profiles, prompt, structured `schema`, maxSteps tool loop (default 20), persistent sandbox workspace, `swirls chat start`
@@ -88,6 +89,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `node-disk` - Disk nodes: bash exec on a top-level `disk` block (Archil-backed)
 - `node-integration` - Integration nodes: Fabric proxy via `connection:` + typed `action:` (preferred) or raw `path:`
 - `node-postgres` - Postgres nodes: parameterized SELECT and INSERT against external databases
+- `node-database` - Database nodes (`type: database`): governed mutations against a Swirls-managed `database` block; `operation` narrows the injected client to query/insert/update/delete/transaction, enforced at runtime
 - `node-secrets-map` - `secrets: { block: [VAR] }` object-literal syntax (shared across types)
 - `node-failure-policy` - Optional `failurePolicy:` for retry / skip / fallback behavior
 
@@ -109,6 +111,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `context-reviews` - Accessing review form responses
 - `context-meta` - Execution metadata (triggerId, triggerType)
 - `context-iteration` - `context.iteration.item` (map), `context.iteration.input` / `index` / `previous` (while); per-iteration data inside subgraphs
+- `context-db` - `context.db.<name>` in `@ts` blocks: full client in `code` nodes and `migration` bodies, operation-narrowed in `database` nodes; `$transaction` only under `operation: transaction`; `return await` support; Date/BigInt/bytes/Decimal round-tripping
 
 ### 8. Resources & Triggers
 - `resource-form` - Form declarations with label, schema, enabled, `visibility: public | internal` (default internal), and HTTP Basic gating via `auth: <basicAuthBlock>`
@@ -123,6 +126,8 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `resource-connection` - Top-level `connection` blocks: Swirls-brokered outbound OAuth slots (`provider:` slack/linear/discord/linkedin/microsoft), referenced by http nodes and channels via `connection:` (replaces the removed `cloud` auth type)
 - `resource-action` - Top-level `action` blocks: typed integration operations (`provider`, `method`, `path`, input/output schemas); referenced by integration nodes via `action:`; install prebuilt actions with `swirls add`
 - `resource-postgres` - Top-level `postgres` blocks: connection, table schemas, secret references
+- `resource-database` - Top-level `database` blocks: Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (models/enums only); provisioned and migrated by Swirls, distinct from `postgres`
+- `resource-migration` - Top-level `migration` blocks: ordered, run-once data transforms against a `database` block, run after its schema migration
 - `resource-disk` - Top-level `disk` blocks: Archil-backed remote disks (`id: "dsk-..."`, secrets)
 - `resource-agent` - Top-level `agent` blocks: required model + secrets, provider enum (default openrouter), tools (workflows-as-tools), subagent `team`, optional `sandbox { }` sizing/lifecycle, optional `profile` sub-blocks
 - `resource-channel` - Top-level `channel` blocks: bind an agent to a chat platform (`platform` slack/linear/discord/web, `agent`, `mode` mention/dm/all, `enabled`); optional `connection` names a `connection` block whose provider must match platform

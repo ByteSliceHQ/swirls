@@ -13,7 +13,8 @@ The Swirls DSL is a declarative configuration language. It is not TypeScript, YA
 These are the only keywords recognized by the lexer (`packages/language/src/lexer.ts`). Any other word is parsed as an identifier or a quoted string.
 
 ```
-form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, stream, view, schema,
+form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, database, migration,
+stream, view, schema,
 disk, agent, channel, connection, action, skill, profile, tools,
 role, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
@@ -42,6 +43,8 @@ trigger <name> { }
 secret <name> { }
 auth <name> { }
 postgres <name> { }
+database <name> { }
+migration <name> { }
 disk <name> { }
 skill <name> { }
 agent <name> { }
@@ -52,11 +55,11 @@ role <name> { }
 policy { }
 ```
 
-There are **19** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
+There are **21** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. `database <name> { }` declares a Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (see `resource-database`); `migration <name> { }` declares an ordered, run-once data transform against a `database` block (see `resource-migration`). Both are distinct from `postgres`, which stays the bring-your-own external database. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 ### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, schemas, agents, channels, connections, actions, skills, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, database blocks, migration blocks, schemas, agents, channels, connections, actions, skills, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -66,14 +69,14 @@ Names may start with a digit. Hyphens, dots, spaces, and other characters are no
 
 ### Complete node type list
 
-These are the only valid values for `type:` inside a node or root block. There are **17** node types. The canonical names come from `nodeTypeMap` in `@swirls/schemas` (`packages/schemas/src/schemas.ts`).
+These are the only valid values for `type:` inside a node or root block. There are **18** node types. The canonical names come from `nodeTypeMap` in `@swirls/schemas` (`packages/schemas/src/schemas.ts`).
 
 ```
-agent, ai, bucket, code, disk, email, http, integration, map,
+agent, ai, bucket, code, database, disk, email, http, integration, map,
 parallel, postgres, scrape, stream, switch, wait, while, workflow
 ```
 
-The subworkflow node is `type: workflow` (legacy alias `type: graph`, which the validator normalizes to `workflow`). When `swirls doctor` rejects an unknown type it lists the valid set sorted: `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`.
+The subworkflow node is `type: workflow` (legacy alias `type: graph`, which the validator normalizes to `workflow`). When `swirls doctor` rejects an unknown type it lists the valid set sorted: `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, database, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`.
 
 Notes on aliases that do NOT exist:
 - `email` is the type name, not `resend`, `mail`, or `mailer`. (The Resend vendor backs it; the DSL type is `email`.)
@@ -84,7 +87,7 @@ Notes on aliases that do NOT exist:
 - `wait` is the type name, not `delay` or `sleep`.
 - `ai` is the type name, not `llm`, `chat`, or `prompt`.
 - `workflow` is the type name for calling a subworkflow, not `subworkflow`, `subgraph`, `call`, or `child`. (`graph` is a legacy alias for `workflow`; `subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
-- `postgres` is the type name, not `db`, `database`, or `sql`.
+- `postgres` is the type name for a **bring-your-own external** database, not `db` or `sql`. `database` IS a real, separate node type — a governed mutation surface over a **Swirls-managed** `database` block (see `node-database`) — it is not an alias for `postgres` and not interchangeable with it. Use `postgres` for a customer-operated database, `database` for one Swirls provisions.
 - `bucket` is the type name, not `storage`, `file`, or `s3`.
 - `parallel` is the type name, not `fanout` or `workers`. Use `map` for per-item iteration.
 - `map` is the type name, not `for`, `each`, or `foreach`.
@@ -105,12 +108,13 @@ These are the only value forms that can appear after a `:` in a field assignment
 - TypeScript file ref: `@ts "path.ts.swirls"` (file must exist on disk)
 - JSON block: `@json { ... }`
 - SQL block: `@sql { ... }`
+- Prisma schema block: `@prisma { ... }` (only valid as a `database` block's `schema:` value; models and enums only, verbatim Prisma schema language)
 
 Nothing else is valid. No expressions, no arithmetic, no ternary, no function calls, no variables.
 
 ### Complete fenced block languages
 
-Only three: `@ts`, `@json`, `@sql`. No others exist. No `@yaml`, `@html`, `@css`, `@graphql`, `@py`, `@sh`.
+Only four: `@ts`, `@json`, `@sql`, `@prisma`. No others exist. No `@yaml`, `@html`, `@css`, `@graphql`, `@py`, `@sh`. `@prisma` is special-purpose: it only appears as the value of a `database` block's `schema:` field (see `resource-database`).
 
 ### Complete edge syntax
 
@@ -302,7 +306,7 @@ The following constructs do not exist in the Swirls DSL. Do not use them.
 
 **No `subworkflow`, `subgraph`, `child`, or `call` node type.** The correct type name is `workflow` (legacy alias `graph`). (`subgraph` is the inline-block keyword inside `map`/`while` nodes, not a node type.)
 
-**No `db`, `database`, or `sql` node type for external databases.** The correct type name is `postgres`.
+**No `db` or `sql` node type for external databases.** The correct type name is `postgres`. **`database` is a real, separate node type** for governed mutations against a Swirls-managed `database` block (see `node-database`) — it does not replace `postgres` and is not an alias for it. Pick `postgres` for a database you operate yourself, `database` for one Swirls provisions and migrates.
 
 **No `storage`, `file`, or `s3` node type.** The correct type name is `bucket`.
 
@@ -355,6 +359,8 @@ No user `schema:` — vendor-managed output shape.
 **agent** — required: `agent` (bare identifier naming a top-level `agent <name> { }` block), `prompt` (@ts). Optional: `profile` (bare identifier naming a profile inside the agent block), `tools` (array of bare identifiers narrowing within the effective tool set), `system` (@ts; per-call system-prompt override), `schema` (structured-output constraint; use `schema`, never `outputSchema`). See `node-agent` and `resource-agent`.
 
 **postgres** (node) — required: `postgres` (bare identifier naming a top-level `postgres <name> { }` block) and exactly one of `select:` (@sql SELECT or WITH) or `insert:` (@sql INSERT, optionally with ON CONFLICT). Other fields: `params` (@ts returning an object whose keys match `{{key}}` placeholders in the SQL; required when SQL has placeholders, always required for `insert:`), `condition` (@ts returning boolean; only valid on `insert:` nodes), `schema` (recommended for `select:` to type the row output).
+
+**database** (node) — required: `database` (bare identifier naming a top-level `database <name> { }` block), `operation` (`query`/`insert`/`update`/`delete`/`transaction` — narrows the injected `context.db.<name>` client to that capability, enforced at runtime), `run` (@ts body executed against the narrowed client). Optional: `condition` (@ts returning boolean; skip semantics identical to the postgres insert node). Governs a mutation over a **Swirls-managed** `database` block — distinct from `postgres`. See `node-database` and `context-db`.
 
 ### Shared optional fields on every node
 
