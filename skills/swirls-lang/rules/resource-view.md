@@ -175,11 +175,11 @@ view topic_dashboard {
 
 ### Runtime behavior
 
-- A view is materialized **only in a deployed project** (hosted on Swirls Cloud); the local CLI worker does not build views.
+- A view is materialized **only in a deployed project** (hosted on Swirls Cloud); nothing builds views locally.
 - Each source stream row becomes one view row (the `columns` mapping). New stream rows materialize as the source workflow completes; deploying a view backfills existing stream rows.
 - Each computed column runs `graph` **once per row** as a normal workflow execution. Those executions are billed against `execution_credits` exactly like trigger-started runs — an over-quota org gets a failed cell, not a free run. A view over a busy stream with computed columns can launch a large number of graph executions, so reach for computed columns deliberately.
 - Cells move through `pending → running → completed | failed`; the spreadsheet shows a loading state until each settles.
-- Recompute is available from the cloud UI; it re-materializes existing rows and re-runs computed columns (idempotent per row).
+- Recompute is available from the cloud UI; it fills gaps (missing rows and never-settled cells) and does not re-run cells that already settled.
 
 ### Validation rules
 

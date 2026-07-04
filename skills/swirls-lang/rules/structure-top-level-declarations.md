@@ -6,7 +6,7 @@ tags: file, structure, declarations, schema, form, webhook, schedule, workflow, 
 
 ## Top-Level Declarations
 
-A `.swirls` file contains twenty kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains twenty-two kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -169,7 +169,7 @@ policy {
 }
 ```
 
-### The twenty valid top-level blocks
+### The twenty-two valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -184,7 +184,7 @@ policy {
 - `postgres <name> { }` — External, bring-your-own PostgreSQL connection and table schemas. See `resource-postgres`.
 - `database <name> { }` — Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island; provisioned and migrated by Swirls. See `resource-database`.
 - `migration <name> { }` — Ordered, run-once data transform against a `database` block. See `resource-migration`.
-- `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
+- `disk <name> { }` — Platform-provisioned remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
 - `skill <name> { }` — Local knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:`. See `resource-skill`.
 - `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, skills, MCP slots, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `mcp <name> { }` — Remote MCP server slot referenced by `agent.mcp:`; bound to a URL and optional bearer token per project in Cloud, tools discovered at runtime as `mcp__<slot>__<tool>`. See `resource-mcp`.

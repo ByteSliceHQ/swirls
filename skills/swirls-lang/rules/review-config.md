@@ -6,9 +6,9 @@ tags: review, human, approval, schema, actions, hitl
 
 ## Review Block Configuration
 
-Review blocks pause workflow execution at a node and wait for human input. The reviewer sees the node's output and fills in a form defined by the review schema, then picks an action with an outcome of `approve` or `reject`.
+Review blocks turn a node into a human gate. A review-enabled node does not run its own work (its `code:`, `prompt:`, or other type config is never executed): the run pauses at the node, the reviewer fills in the form defined by the review schema and picks an action, and on an `approve` outcome the reviewer's submitted form data becomes the node's output. A `reject` outcome fails the run. A pending review times out (default 7 days) and fails the run.
 
-Any node type can have a review block. Execution pauses after the node runs and before downstream nodes execute.
+Any node type can carry a review block, but since the node's own work never runs, prefer a `code` node whose declared output shape matches the review schema so downstream nodes consume the form data.
 
 ### Shorthand form
 
@@ -50,8 +50,6 @@ node draft {
       { id: "approve", label: "Approve", outcome: "approve" },
       { id: "reject",  label: "Reject",  outcome: "reject" }
     ]
-    approvedOutput: "approved"
-    rejectedOutput: "rejected"
   }
 }
 ```
@@ -66,8 +64,8 @@ node draft {
 | `content` | no | String | Rich text body for the reviewer. |
 | `schema` | no | `@json` block | JSON Schema for the form the reviewer fills out. Can be `null`. |
 | `actions` | no | Array of action objects | Buttons shown to the reviewer. |
-| `approvedOutput` | no | String | Optional static output passed downstream when the action outcome is `approve`. |
-| `rejectedOutput` | no | String | Optional static output passed downstream when the action outcome is `reject`. |
+| `approvedOutput` | no | String | Parses, but the engine does not consume it. Do not rely on it. |
+| `rejectedOutput` | no | String | Parses, but the engine does not consume it. Do not rely on it. |
 
 ### Action object shape
 

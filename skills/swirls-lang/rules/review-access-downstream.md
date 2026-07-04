@@ -6,7 +6,9 @@ tags: review, context, downstream, routing, switch
 
 ## Accessing Review Data Downstream
 
-Review responses are available in downstream nodes via `context.reviews.<nodeName>`. A common pattern is to route execution based on the review outcome using a switch node.
+Review responses are available in downstream nodes via `context.reviews.<nodeName>`. A common pattern is to route execution based on the review response using a switch node.
+
+Remember the gate model: a review-enabled node never runs its own work, and its `output` is the reviewer's submitted form data. Do not read `context.nodes.<gateNode>.output` expecting the node's own code result. Routing on a form field (like `approved: false` below) requires the reviewer to submit with an `approve`-outcome action; a `reject` outcome fails the run and nothing downstream executes.
 
 **Correct (route based on review approval):**
 
@@ -47,7 +49,7 @@ node publish {
   type: code
   label: "Publish"
   code: @ts {
-    return { published: true, text: context.nodes.draft.output.text }
+    return { published: true, text: context.nodes.root.output.text }
   }
 }
 

@@ -357,7 +357,7 @@ node run_steps {
 
 `parallel` is the Parallel.ai vendor node (`operation: search`, `extract`, or `findall`). It does not fan out workflow steps or run DAG branches concurrently.
 
-**Correct (per-item iteration with optional concurrency):**
+**Correct (per-item iteration; iterations run one at a time):**
 
 ```swirls
 node per_item {
@@ -365,7 +365,6 @@ node per_item {
   label: "Process each"
   items: @ts { return context.nodes.root.output.items }
   maxItems: 100
-  concurrency: 4
   workflow: process_one
 }
 ```

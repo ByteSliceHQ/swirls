@@ -37,7 +37,7 @@ node run_helper {
 
 `swirls doctor` and deploy build a workspace index of every `.swirls` file under the working directory, so a workflow declared in another file resolves. `Workflow node references workflow "<n>" which is not defined` fires only when the name matches no workflow anywhere in the workspace (single-file tools without a workspace index may also report it until the full workspace is considered).
 
-**Correct (child workflow in the same file):**
+**Correct (child workflow shown in the same file; any file in the workspace works):**
 
 ```swirls
 workflow helper_workflow {

@@ -18,7 +18,7 @@ A `map` node iterates over an array and runs a child workflow (inline `subgraph 
 
 ### Optional fields
 
-- `concurrency` — positive integer. How many iterations run in parallel. Defaults to a runtime-chosen value when omitted.
+- `concurrency` — positive integer. Parses and validates, but the engine does not honor it: iterations run one at a time in order. Omit it.
 - `label`, `description`, `secrets`, `failurePolicy` — same as any other node.
 
 ### Inline subgraph (typical)
@@ -29,7 +29,6 @@ node per_ticket {
   label: "Process each ticket"
   items: @ts { return context.nodes.root.output.tickets }
   maxItems: 100
-  concurrency: 2
 
   subgraph {
     root {

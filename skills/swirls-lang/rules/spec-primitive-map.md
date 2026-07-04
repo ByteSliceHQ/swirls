@@ -10,7 +10,7 @@ Before writing syntax, map the user's request to primitives. The top-level block
 
 | Category | Blocks | One-line job |
 |---|---|---|
-| Agents | `agent`, `channel` | Actors that reason; channels bind them to chat surfaces |
+| Agents | `agent`, `channel`, `skill`, `mcp` | Actors that reason; channels bind them to chat surfaces; skills package repo-local knowledge; mcp slots wire remote MCP servers |
 | Workflows | `workflow`, `trigger`, `form`, `webhook`, `schedule`, `schema` | Deterministic procedures and what starts them |
 | Memory | `stream`, `view`, `disk`, `postgres`, `database`, `migration` | Structured output, spreadsheet views over it, files, the user's existing database, a Swirls-managed database and its data migrations |
 | Connections | `secret`, `auth`, `connection`, `action` | Outbound credentials (least-managed to most-managed) and typed integration operations |
@@ -23,13 +23,15 @@ Before writing syntax, map the user's request to primitives. The top-level block
 | "run X every Monday" / "daily report" | `schedule` + `trigger` + `workflow` |
 | "when someone submits the form" | `form` + `trigger` + `workflow` |
 | "when service Y calls us" / "on event" | `webhook` + `trigger` + `workflow` |
-| "for each item" / "until done" / run the same step over many items concurrently | `map` / `while` node (inline `subgraph { }` or `workflow:` ref; `map` accepts `concurrency:`) |
+| "for each item" / "until done" / repeat the same step over many items | `map` / `while` node (inline `subgraph { }` or `workflow:` ref; iterations run one at a time) |
 | "research the web with AI" / "multi-query search" / "find entities online" | `parallel` node (Parallel.ai API — not for workflow parallelism) |
 | "needs human approval first" | `review: { enabled: true }` on the node |
 | "summarize / classify / extract with AI" | `ai` node (single call, typed output) |
 | "an assistant that can decide / multi-step reasoning" | `agent` block + `agent` node |
 | "answer in Slack / Linear / Discord / our site" | `channel` block bound to the agent (+ `connection` for the platform) |
 | "restrict the agent's tools for this step" | `profile` inside the agent block, selected via `profile:` on the node |
+| "teach the agent our conventions / reference docs" | `skill` block (from `.agents/skills/<name>/`) + `agent.skills:` |
+| "let the agent use a vendor's MCP tools" | `mcp` block + `agent.mcp:` (server URL bound per project in Cloud) |
 | "save the results / reuse output later" | top-level `stream` block + `type: stream` reader node |
 | "see the data as a spreadsheet / table" | top-level `view` block over the stream(s) |
 | "a column that runs AI / a graph for each row" | `computed { }` column in a `view` block |

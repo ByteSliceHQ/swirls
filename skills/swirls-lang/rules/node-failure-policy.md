@@ -13,8 +13,8 @@ Any node can declare a `failurePolicy:` to control what the durable DAG engine d
 ```swirls
 failurePolicy: {
   strategy: "fail" | "retry" | "skip" | "fallback"
-  maxRetries: <number>        // used by "retry"
-  backoffMs: <number>         // used by "retry"
+  maxRetries: <number>        // parses; not honored by the engine
+  backoffMs: <number>         // parses; not honored by the engine
   fallbackValue: <any>        // used by "fallback"
 }
 ```
@@ -24,7 +24,7 @@ failurePolicy: {
 | Strategy | Meaning |
 |----------|---------|
 | `fail` | Node failure errors the whole workflow execution (default). |
-| `retry` | Re-run the node up to `maxRetries` times, with `backoffMs` between attempts. If still failing, the workflow errors. |
+| `retry` | Opt the node into the platform's retry handling. `maxRetries`/`backoffMs` parse but are not honored: the engine applies its fixed retry policy (up to 3 attempts for standard nodes, 5 for agent nodes; definition-caused errors are never retried). If still failing, the workflow errors. |
 | `skip` | Mark the node as skipped and continue; downstream nodes run without this node's output. |
 | `fallback` | Replace the node's output with `fallbackValue` and continue. |
 
@@ -36,8 +36,6 @@ node external_api {
   url: @ts { return "https://flaky.example.com/data" }
   failurePolicy: {
     strategy: "retry"
-    maxRetries: 3
-    backoffMs: 1000
   }
 }
 

@@ -6,7 +6,7 @@ tags: schema, inline, object, json
 
 ## Inline Schema Syntax
 
-Schemas can use either `@json { }` blocks (with double-quoted JSON) or inline object literal syntax (without `@json`, no quotes on keys). Both are valid.
+Schemas can use either `@json { }` blocks (with double-quoted JSON) or inline object literal syntax (without `@json`). Both are valid.
 
 **Correct (@json block syntax):**
 
@@ -42,6 +42,6 @@ inputSchema: {
 }
 ```
 
-The inline syntax uses the DSL's own object format: keys are unquoted, commas are optional, and string values are double-quoted.
+The inline syntax uses the DSL's own object format: keys may be bare identifiers or double-quoted strings (quote any key that is not a plain identifier, e.g. contains a hyphen), commas are optional, and string values are double-quoted.
 
 Both produce the same AST. Use whichever style is more readable for your case. `@json` is more common and maps directly to JSON Schema documentation.

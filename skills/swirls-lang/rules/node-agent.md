@@ -105,7 +105,7 @@ If the agent block declares a subagent `team:`, each team member is also exposed
 
 ### Execution shape
 
-A turn runs a tool-call loop capped by the agent's `maxSteps` (default **20**, not 10). Built-in workspace tools (read, write, edit, bash, grep, find, ls) run inside a persistent, per-agent sandbox. Sandbox provisioning is lazy: chat-only turns that never call a tool never start one. Workspace files persist across turns for the same agent. Each subgraph named in the effective `tools:` is exposed to the model using its workflow `description` (tool help text) and root `inputSchema` (call arguments). Tool results are the subgraph's leaf outputs.
+A turn runs a tool-call loop capped by the agent's `maxSteps` (default **20**, not 10). Built-in workspace tools (read, write, edit, bash, grep, find, ls) run inside a persistent, per-agent sandbox and are only registered when the agent declares a `sandbox: { }` block or mounts disks via `disks:`. Sandbox provisioning is lazy: turns that never call a workspace tool never start one. Workspace files persist across turns for the same agent. Each subgraph named in the effective `tools:` is exposed to the model using its workflow `description` (tool help text) and root `inputSchema` (call arguments). Tool results are the subgraph's leaf outputs.
 
 ### Persistent chat
 

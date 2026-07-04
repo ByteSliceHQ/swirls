@@ -8,7 +8,7 @@
 ## 2. File Structure (structure)
 
 **Impact:** HIGH
-**Description:** The seventeen top-level declarations (including `view`, which composes streams into a spreadsheet), file discovery, and comment syntax. The foundation for every .swirls file.
+**Description:** The twenty-two top-level declarations (including `view`, which composes streams into a spreadsheet, and the managed `database`/`migration` pair), file discovery, and comment syntax. The foundation for every .swirls file.
 
 ## 3. Workflow & Node Basics (workflow)
 
@@ -18,7 +18,7 @@
 ## 4. Node Types (node)
 
 **Impact:** CRITICAL
-**Description:** All 17 node types (ai, agent, bucket, code, disk, email, workflow, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while) with required and optional fields. `map` and `while` accept either an inline `subgraph { }` block or a `workflow: <name>` reference. Also covers shared fields: `secrets:` map, `failurePolicy:`, review.
+**Description:** All 18 node types (ai, agent, bucket, code, database, disk, email, workflow, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while) with required and optional fields. `map` and `while` accept either an inline `subgraph { }` block or a `workflow: <name>` reference. Also covers shared fields: `secrets:` map, `failurePolicy:`, review.
 
 ## 5. TypeScript Blocks (ts)
 
@@ -33,12 +33,12 @@
 ## 7. Context Object (context)
 
 **Impact:** HIGH
-**Description:** The context object available in @ts blocks: context.nodes, context.secrets, context.reviews, and context.meta. How data flows between nodes.
+**Description:** The context object available in @ts blocks: context.nodes, context.secrets, context.reviews, context.meta, context.iteration, and context.db. How data flows between nodes.
 
 ## 8. Resources & Triggers (resource)
 
 **Impact:** HIGH
-**Description:** Declaring forms (with `visibility: public/internal` and HTTP Basic `auth:`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, views (spreadsheets over streams with `computed` graph columns), secrets, auth, connection (Swirls-brokered OAuth slots), postgres, disk, agent, channel, role/policy, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
+**Description:** Declaring forms (with `visibility: public/internal` and HTTP Basic `auth:`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, views (spreadsheets over streams with `computed` graph columns), secrets, auth, connection (Swirls-brokered OAuth slots), action (typed integration operations), postgres, database/migration (managed Postgres), disk, skill, agent, mcp, channel, role/policy, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
 
 ## 9. Streams (stream)
 
@@ -48,7 +48,7 @@
 ## 10. Reviews (review)
 
 **Impact:** MEDIUM
-**Description:** Human-in-the-loop review blocks. Pausing execution for approval, collecting feedback, routing based on review responses.
+**Description:** Human-in-the-loop review blocks. A review-enabled node becomes a gate: the run pauses, the reviewer's form data becomes the node's output, and downstream nodes route on the response.
 
 ## 11. Parser Pitfalls (parser)
 

@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "5.8.0"
+  version: "5.8.1"
 ---
 
 # Swirls Language
@@ -82,7 +82,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `node-parallel` - Parallel nodes: search / extract / findall operations
 - `node-stream` - Stream nodes: reading persisted stream data at a pinned `version` with filters
 - `node-workflow` - Workflow nodes (`type: workflow`, legacy alias `graph`): calling a subworkflow (one-shot)
-- `node-map` - Map nodes: per-item iteration with inline `subgraph { }` or `workflow: <name>`; required `items`, `maxItems`; optional `concurrency`
+- `node-map` - Map nodes: per-item iteration with inline `subgraph { }` or `workflow: <name>`; required `items`, `maxItems`; iterations run one at a time
 - `node-while` - While nodes: counter/condition loops with `input`, `condition`, `update`, `maxIterations` plus `subgraph { }` or `workflow: <name>`
 - `node-wait` - Wait nodes: pausing execution
 - `node-bucket` - Bucket nodes: object storage upload/download

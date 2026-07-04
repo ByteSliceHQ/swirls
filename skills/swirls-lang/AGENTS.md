@@ -61,7 +61,7 @@ role <name> { }
 policy { }
 ```
 
-There are **22** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `mcp <name> { }` declares a remote MCP server slot referenced by `agent.mcp:`, bound to a URL and optional bearer token per project in Cloud with tools discovered at runtime (see `resource-mcp`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. `database <name> { }` declares a Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (see `resource-database`); `migration <name> { }` declares an ordered, run-once data transform against a `database` block (see `resource-migration`). Both are distinct from `postgres`, which stays the bring-your-own external database. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
+There are **22** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `mcp <name> { }` declares a remote MCP server slot referenced by `agent.mcp:`, bound to a URL and optional bearer token per project in Cloud with tools discovered at runtime (see `resource-mcp`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is a platform-provisioned remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. `database <name> { }` declares a Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (see `resource-database`); `migration <name> { }` declares an ordered, run-once data transform against a `database` block (see `resource-migration`). Both are distinct from `postgres`, which stays the bring-your-own external database. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 #### Resource name pattern
 
@@ -364,9 +364,9 @@ No user `schema:` — vendor-managed output shape.
 
 **stream** (node, read side) — required: `stream` (bare identifier naming a top-level `stream <name> { }` block), `version` (the `versions:` key to read, e.g. `v1`), `filter` (@ts returning a `StreamFilter` object of shape `{ field: { op: value } }` where op is `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`). `streamId`, `query`, `querySql` are removed; using them produces validator errors.
 
-**workflow** (legacy alias `graph`) — required: `workflow` (bare identifier naming a workflow in the same file; `graph:` is the legacy alias and is normalized to `workflow`), `input` (@ts returning the input object to pass to the subworkflow).
+**workflow** (legacy alias `graph`) — required: `workflow` (bare identifier naming a workflow in the workspace; cross-file references resolve; `graph:` is the legacy alias and is normalized to `workflow`), `input` (@ts returning the input object to pass to the subworkflow).
 
-**map** — required: `items` (@ts returning array), `maxItems` (positive number), plus exactly one of `subgraph { ... }` (inline block, no colon) or `workflow: <name>` (reference to a top-level workflow). Optional: `concurrency` (positive integer). The subgraph/referenced-workflow root must declare `inputSchema` (typed iteration). Iteration context: `context.iteration.item` is the current element. See `node-map` and `workflow-subgraph`.
+**map** — required: `items` (@ts returning array), `maxItems` (positive number), plus exactly one of `subgraph { ... }` (inline block, no colon) or `workflow: <name>` (reference to a top-level workflow). Optional: `concurrency` (positive integer; parses but the engine runs iterations one at a time). The subgraph/referenced-workflow root must declare `inputSchema` (typed iteration). Iteration context: `context.iteration.item` is the current element. See `node-map` and `workflow-subgraph`.
 
 **while** — required: `input` (@ts returning the initial loop state), `condition` (@ts returning boolean; loop continues while true), `update` (@ts returning the next iteration's input), `maxIterations` (positive integer), plus exactly one of `subgraph { ... }` or `workflow: <name>`. The subgraph/referenced-workflow root must declare `inputSchema`. Iteration context: `context.iteration.input` (initial), `context.iteration.index` (counter), `context.iteration.previous` (last iteration's leaf outputs). See `node-while`.
 
@@ -758,7 +758,7 @@ node run_steps {
 
 `parallel` is the Parallel.ai vendor node (`operation: search`, `extract`, or `findall`). It does not fan out workflow steps or run DAG branches concurrently.
 
-**Correct (per-item iteration with optional concurrency):**
+**Correct (per-item iteration; iterations run one at a time):**
 
 ```swirls
 node per_item {
@@ -766,7 +766,6 @@ node per_item {
   label: "Process each"
   items: @ts { return context.nodes.root.output.items }
   maxItems: 100
-  concurrency: 4
   workflow: process_one
 }
 ```
@@ -1581,7 +1580,7 @@ Before writing syntax, map the user's request to primitives. The top-level block
 
 | Category | Blocks | One-line job |
 |---|---|---|
-| Agents | `agent`, `channel` | Actors that reason; channels bind them to chat surfaces |
+| Agents | `agent`, `channel`, `skill`, `mcp` | Actors that reason; channels bind them to chat surfaces; skills package repo-local knowledge; mcp slots wire remote MCP servers |
 | Workflows | `workflow`, `trigger`, `form`, `webhook`, `schedule`, `schema` | Deterministic procedures and what starts them |
 | Memory | `stream`, `view`, `disk`, `postgres`, `database`, `migration` | Structured output, spreadsheet views over it, files, the user's existing database, a Swirls-managed database and its data migrations |
 | Connections | `secret`, `auth`, `connection`, `action` | Outbound credentials (least-managed to most-managed) and typed integration operations |
@@ -1594,13 +1593,15 @@ Before writing syntax, map the user's request to primitives. The top-level block
 | "run X every Monday" / "daily report" | `schedule` + `trigger` + `workflow` |
 | "when someone submits the form" | `form` + `trigger` + `workflow` |
 | "when service Y calls us" / "on event" | `webhook` + `trigger` + `workflow` |
-| "for each item" / "until done" / run the same step over many items concurrently | `map` / `while` node (inline `subgraph { }` or `workflow:` ref; `map` accepts `concurrency:`) |
+| "for each item" / "until done" / repeat the same step over many items | `map` / `while` node (inline `subgraph { }` or `workflow:` ref; iterations run one at a time) |
 | "research the web with AI" / "multi-query search" / "find entities online" | `parallel` node (Parallel.ai API — not for workflow parallelism) |
 | "needs human approval first" | `review: { enabled: true }` on the node |
 | "summarize / classify / extract with AI" | `ai` node (single call, typed output) |
 | "an assistant that can decide / multi-step reasoning" | `agent` block + `agent` node |
 | "answer in Slack / Linear / Discord / our site" | `channel` block bound to the agent (+ `connection` for the platform) |
 | "restrict the agent's tools for this step" | `profile` inside the agent block, selected via `profile:` on the node |
+| "teach the agent our conventions / reference docs" | `skill` block (from `.agents/skills/<name>/`) + `agent.skills:` |
+| "let the agent use a vendor's MCP tools" | `mcp` block + `agent.mcp:` (server URL bound per project in Cloud) |
 | "save the results / reuse output later" | top-level `stream` block + `type: stream` reader node |
 | "see the data as a spreadsheet / table" | top-level `view` block over the stream(s) |
 | "a column that runs AI / a graph for each row" | `computed { }` column in a `view` block |
@@ -1632,7 +1633,7 @@ Before writing syntax, map the user's request to primitives. The top-level block
 
 ### Top-Level Declarations
 
-A `.swirls` file contains twenty kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains twenty-two kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -1795,7 +1796,7 @@ policy {
 }
 ```
 
-#### The twenty valid top-level blocks
+#### The twenty-two valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -1810,7 +1811,7 @@ policy {
 - `postgres <name> { }` — External, bring-your-own PostgreSQL connection and table schemas. See `resource-postgres`.
 - `database <name> { }` — Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island; provisioned and migrated by Swirls. See `resource-database`.
 - `migration <name> { }` — Ordered, run-once data transform against a `database` block. See `resource-migration`.
-- `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
+- `disk <name> { }` — Platform-provisioned remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
 - `skill <name> { }` — Local knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:`. See `resource-skill`.
 - `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, skills, MCP slots, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
 - `mcp <name> { }` — Remote MCP server slot referenced by `agent.mcp:`; bound to a URL and optional bearer token per project in Cloud, tools discovered at runtime as `mcp__<slot>__<tool>`. See `resource-mcp`.
@@ -2681,7 +2682,7 @@ If the agent block declares a subagent `team:`, each team member is also exposed
 
 #### Execution shape
 
-A turn runs a tool-call loop capped by the agent's `maxSteps` (default **20**, not 10). Built-in workspace tools (read, write, edit, bash, grep, find, ls) run inside a persistent, per-agent sandbox. Sandbox provisioning is lazy: chat-only turns that never call a tool never start one. Workspace files persist across turns for the same agent. Each subgraph named in the effective `tools:` is exposed to the model using its workflow `description` (tool help text) and root `inputSchema` (call arguments). Tool results are the subgraph's leaf outputs.
+A turn runs a tool-call loop capped by the agent's `maxSteps` (default **20**, not 10). Built-in workspace tools (read, write, edit, bash, grep, find, ls) run inside a persistent, per-agent sandbox and are only registered when the agent declares a `sandbox: { }` block or mounts disks via `disks:`. Sandbox provisioning is lazy: turns that never call a workspace tool never start one. Workspace files persist across turns for the same agent. Each subgraph named in the effective `tools:` is exposed to the model using its workflow `description` (tool help text) and root `inputSchema` (call arguments). Tool results are the subgraph's leaf outputs.
 
 #### Persistent chat
 
@@ -3431,7 +3432,7 @@ node run_helper {
 
 `swirls doctor` and deploy build a workspace index of every `.swirls` file under the working directory, so a workflow declared in another file resolves. `Workflow node references workflow "<n>" which is not defined` fires only when the name matches no workflow anywhere in the workspace (single-file tools without a workspace index may also report it until the full workspace is considered).
 
-**Correct (child workflow in the same file):**
+**Correct (child workflow shown in the same file; any file in the workspace works):**
 
 ```swirls
 workflow helper_workflow {
@@ -3518,7 +3519,7 @@ A `map` node iterates over an array and runs a child workflow (inline `subgraph 
 
 #### Optional fields
 
-- `concurrency` — positive integer. How many iterations run in parallel. Defaults to a runtime-chosen value when omitted.
+- `concurrency` — positive integer. Parses and validates, but the engine does not honor it: iterations run one at a time in order. Omit it.
 - `label`, `description`, `secrets`, `failurePolicy` — same as any other node.
 
 #### Inline subgraph (typical)
@@ -3529,7 +3530,6 @@ node per_ticket {
   label: "Process each ticket"
   items: @ts { return context.nodes.root.output.tickets }
   maxItems: 100
-  concurrency: 2
 
   subgraph {
     root {
@@ -4242,8 +4242,8 @@ Any node can declare a `failurePolicy:` to control what the durable DAG engine d
 ```swirls
 failurePolicy: {
   strategy: "fail" | "retry" | "skip" | "fallback"
-  maxRetries: <number>        // used by "retry"
-  backoffMs: <number>         // used by "retry"
+  maxRetries: <number>        // parses; not honored by the engine
+  backoffMs: <number>         // parses; not honored by the engine
   fallbackValue: <any>        // used by "fallback"
 }
 ```
@@ -4253,7 +4253,7 @@ failurePolicy: {
 | Strategy | Meaning |
 |----------|---------|
 | `fail` | Node failure errors the whole workflow execution (default). |
-| `retry` | Re-run the node up to `maxRetries` times, with `backoffMs` between attempts. If still failing, the workflow errors. |
+| `retry` | Opt the node into the platform's retry handling. `maxRetries`/`backoffMs` parse but are not honored: the engine applies its fixed retry policy (up to 3 attempts for standard nodes, 5 for agent nodes; definition-caused errors are never retried). If still failing, the workflow errors. |
 | `skip` | Mark the node as skipped and continue; downstream nodes run without this node's output. |
 | `fallback` | Replace the node's output with `fallbackValue` and continue. |
 
@@ -4265,8 +4265,6 @@ node external_api {
   url: @ts { return "https://flaky.example.com/data" }
   failurePolicy: {
     strategy: "retry"
-    maxRetries: 3
-    backoffMs: 1000
   }
 }
 
@@ -4932,7 +4930,7 @@ These types provide their own runtime type shape; the LSP uses it automatically.
 
 ### Inline Schema Syntax
 
-Schemas can use either `@json { }` blocks (with double-quoted JSON) or inline object literal syntax (without `@json`, no quotes on keys). Both are valid.
+Schemas can use either `@json { }` blocks (with double-quoted JSON) or inline object literal syntax (without `@json`). Both are valid.
 
 **Correct (@json block syntax):**
 
@@ -4968,7 +4966,7 @@ inputSchema: {
 }
 ```
 
-The inline syntax uses the DSL's own object format: keys are unquoted, commas are optional, and string values are double-quoted.
+The inline syntax uses the DSL's own object format: keys may be bare identifiers or double-quoted strings (quote any key that is not a plain identifier, e.g. contains a hyphen), commas are optional, and string values are double-quoted.
 
 Both produce the same AST. Use whichever style is more readable for your case. `@json` is more common and maps directly to JSON Schema documentation.
 
@@ -6133,11 +6131,11 @@ view topic_dashboard {
 
 #### Runtime behavior
 
-- A view is materialized **only in a deployed project** (hosted on Swirls Cloud); the local CLI worker does not build views.
+- A view is materialized **only in a deployed project** (hosted on Swirls Cloud); nothing builds views locally.
 - Each source stream row becomes one view row (the `columns` mapping). New stream rows materialize as the source workflow completes; deploying a view backfills existing stream rows.
 - Each computed column runs `graph` **once per row** as a normal workflow execution. Those executions are billed against `execution_credits` exactly like trigger-started runs — an over-quota org gets a failed cell, not a free run. A view over a busy stream with computed columns can launch a large number of graph executions, so reach for computed columns deliberately.
 - Cells move through `pending → running → completed | failed`; the spreadsheet shows a loading state until each settles.
-- Recompute is available from the cloud UI; it re-materializes existing rows and re-runs computed columns (idempotent per row).
+- Recompute is available from the cloud UI; it fills gaps (missing rows and never-settled cells) and does not re-run cells that already settled.
 
 #### Validation rules
 
@@ -7189,7 +7187,7 @@ Tools are workflows exposed to the model. The `tools:` field carries workflows o
 - Has a root node with JSON `inputSchema` that declares a **non-empty `properties` object** (defines the tool call arguments — a tool with zero input properties is rejected: `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object`).
 - Has an output schema on **every leaf node** (`outputSchema` on the root if it is a leaf, or `schema` on non-root leaves). **Exception:** an AI leaf whose `kind` is anything other than `object` (`text`, `embed`, `image`, `video`) needs no schema — its output shape is fixed by the kind (`text` → string, `embed` → number array, `image`/`video` → media) and is inferred. Only `kind: object` AI leaves still need a `schema` (already required by the AI-node validator). Do not add `schema: @json { { "type": "string" } }` to a `kind: text` leaf to satisfy this — it triggers the AI-node warning instead.
 
-Built-in workspace tools (read, write, edit, bash, grep, find, ls) are always available inside the sandbox and are not declared in `tools:`.
+Built-in workspace tools (read, write, edit, bash, grep, find, ls) are not declared in `tools:`. They are only registered for agents that declare a `sandbox: { }` block or mount disks via `disks:`; an agent with neither gets no workspace tools.
 
 #### Subagent teams
 
@@ -7929,9 +7927,9 @@ See `node-stream` for the full filter API and `resource-stream` for declaring ve
 
 ### Review Block Configuration
 
-Review blocks pause workflow execution at a node and wait for human input. The reviewer sees the node's output and fills in a form defined by the review schema, then picks an action with an outcome of `approve` or `reject`.
+Review blocks turn a node into a human gate. A review-enabled node does not run its own work (its `code:`, `prompt:`, or other type config is never executed): the run pauses at the node, the reviewer fills in the form defined by the review schema and picks an action, and on an `approve` outcome the reviewer's submitted form data becomes the node's output. A `reject` outcome fails the run. A pending review times out (default 7 days) and fails the run.
 
-Any node type can have a review block. Execution pauses after the node runs and before downstream nodes execute.
+Any node type can carry a review block, but since the node's own work never runs, prefer a `code` node whose declared output shape matches the review schema so downstream nodes consume the form data.
 
 #### Shorthand form
 
@@ -7973,8 +7971,6 @@ node draft {
       { id: "approve", label: "Approve", outcome: "approve" },
       { id: "reject",  label: "Reject",  outcome: "reject" }
     ]
-    approvedOutput: "approved"
-    rejectedOutput: "rejected"
   }
 }
 ```
@@ -7989,8 +7985,8 @@ node draft {
 | `content` | no | String | Rich text body for the reviewer. |
 | `schema` | no | `@json` block | JSON Schema for the form the reviewer fills out. Can be `null`. |
 | `actions` | no | Array of action objects | Buttons shown to the reviewer. |
-| `approvedOutput` | no | String | Optional static output passed downstream when the action outcome is `approve`. |
-| `rejectedOutput` | no | String | Optional static output passed downstream when the action outcome is `reject`. |
+| `approvedOutput` | no | String | Parses, but the engine does not consume it. Do not rely on it. |
+| `rejectedOutput` | no | String | Parses, but the engine does not consume it. Do not rely on it. |
 
 #### Action object shape
 
@@ -8010,7 +8006,9 @@ Review results are available in downstream nodes via `context.reviews.<node_name
 
 ### Accessing Review Data Downstream
 
-Review responses are available in downstream nodes via `context.reviews.<nodeName>`. A common pattern is to route execution based on the review outcome using a switch node.
+Review responses are available in downstream nodes via `context.reviews.<nodeName>`. A common pattern is to route execution based on the review response using a switch node.
+
+Remember the gate model: a review-enabled node never runs its own work, and its `output` is the reviewer's submitted form data. Do not read `context.nodes.<gateNode>.output` expecting the node's own code result. Routing on a form field (like `approved: false` below) requires the reviewer to submit with an `approve`-outcome action; a `reject` outcome fails the run and nothing downstream executes.
 
 **Correct (route based on review approval):**
 
@@ -8051,7 +8049,7 @@ node publish {
   type: code
   label: "Publish"
   code: @ts {
-    return { published: true, text: context.nodes.draft.output.text }
+    return { published: true, text: context.nodes.root.output.text }
   }
 }
 
@@ -8311,7 +8309,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 #### Nodes (general)
 
-- `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow` — Unknown type name. Use one of the 17. (`graph` is accepted as a legacy alias and normalized to `workflow`, so it never trips this error.)
+- `Invalid node type "<t>". Must be one of: agent, ai, bucket, code, database, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow` — Unknown type name. Use one of the 18. (`graph` is accepted as a legacy alias and normalized to `workflow`, so it never trips this error.)
 - `Node type "<t>" requires "<field>"` — Missing required field. See the node-type rule for the required set.
 
 #### Secrets map
