@@ -8,7 +8,7 @@
 ## 2. File Structure (structure)
 
 **Impact:** HIGH
-**Description:** The twenty-two top-level declarations (including `view`, which composes streams into a spreadsheet, and the managed `database`/`migration` pair), file discovery, and comment syntax. The foundation for every .swirls file.
+**Description:** The twenty-three top-level declarations (including `view`, which composes streams into a spreadsheet, the managed `database`/`migration` pair, and `app`, a generated application surface over exposed primitives), file discovery, and comment syntax. The foundation for every .swirls file.
 
 ## 3. Workflow & Node Basics (workflow)
 
@@ -38,7 +38,7 @@
 ## 8. Resources & Triggers (resource)
 
 **Impact:** HIGH
-**Description:** Declaring forms (with `visibility: public/internal` and HTTP Basic `auth:`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, views (spreadsheets over streams with `computed` graph columns), secrets, auth, connection (Swirls-brokered OAuth slots), action (typed integration operations), postgres, database/migration (managed Postgres), disk, skill, agent, mcp, channel, role/policy, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
+**Description:** Declaring forms (with `visibility: public/internal` and HTTP Basic `auth:`), webhooks (with shared-secret `secret:` + `header:` verification), schedules, streams, views (spreadsheets over streams with `computed` graph columns), secrets, auth, connection (Swirls-brokered OAuth slots), action (typed integration operations), postgres, database/migration (managed Postgres), disk, skill, agent, mcp, channel, app (a generated, colon-free application surface exposing agents/workflows/views/databases), role/policy, and reusable top-level `schema` blocks, then binding sources to workflows with triggers. Only three trigger resource types exist: form, webhook, schedule.
 
 ## 9. Streams (stream)
 

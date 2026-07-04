@@ -10,7 +10,7 @@ Every error and warning the validator can emit, grouped by category. Use this as
 
 ### Naming (applies to all resources and nodes)
 
-- `<Kind> name: Name must contain only letters, numbers, and underscores` — The name contains a hyphen, dot, space, or other char. Fix to `^[a-zA-Z0-9_]+$`.
+- `<Kind> name: Name must contain only letters, numbers, and underscores` — The name contains a hyphen, dot, space, or other char. Fix to `^[a-zA-Z0-9_]+$`. Exception: `app` names are quoted strings and may contain hyphens (see `resource-app`).
 - `Duplicate <kind> name "<n>"` — Two declarations share a name. Rename one.
 
 ### Workflows

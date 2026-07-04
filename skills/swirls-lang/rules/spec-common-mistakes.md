@@ -719,7 +719,7 @@ form contact_form {
 }
 ```
 
-Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, workflows, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids.
+Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, workflows, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids. The one exception is the `app` block, whose name is a quoted string where hyphens are allowed: `app "client-portal" { }` is valid (see `resource-app`).
 
 ### 24. Quoting the `visibility` value (or dropping its colon) on a form
 
@@ -1170,3 +1170,33 @@ database my_db {
 ```
 
 Use `postgres` for a database you own and operate; use `database` when you want Swirls to provision, migrate, and hold the connection for you. See `resource-postgres` and `resource-database`.
+
+### 38. Using `key: value` syntax inside an `app` block
+
+**Incorrect (colons, bare-identifier name):**
+
+```swirls
+app client_portal {
+  description: "Customer portal"
+
+  expose {
+    agent: triage
+  }
+}
+```
+
+The parser errors with `Expected app name as a quoted string` and skips the whole block. With the name quoted but the colons kept, it errors `app description must be a quoted string` on the description and `Expected a name after agent` inside `expose { }`.
+
+**Correct (quoted-string name, space-separated fields):**
+
+```swirls
+app "client-portal" {
+  description "Customer portal"
+
+  expose {
+    agent triage
+  }
+}
+```
+
+`app` is the one block in the DSL where `key: value` is wrong. The name is a quoted string (hyphens allowed), and every field — `description`, each `expose` member, `brand`'s `accent`/`logo`, the `access read` modifier — binds its value with a space, never a colon. Every other top-level block keeps its `key: value` syntax; do not carry the colon-free style out of `app`. See `resource-app`.

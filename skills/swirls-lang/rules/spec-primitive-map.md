@@ -15,6 +15,7 @@ Before writing syntax, map the user's request to primitives. The top-level block
 | Memory | `stream`, `view`, `disk`, `postgres`, `database`, `migration` | Structured output, spreadsheet views over it, files, the user's existing database, a Swirls-managed database and its data migrations |
 | Connections | `secret`, `auth`, `connection`, `action` | Outbound credentials (least-managed to most-managed) and typed integration operations |
 | Access | `role`, `policy` | Inbound permission: who may invoke agents/workflows |
+| Interfaces | `app` | A generated application surface over a set of exposed primitives |
 
 ### Common intents
 
@@ -47,6 +48,7 @@ Before writing syntax, map the user's request to primitives. The top-level block
 | "call paid external capabilities / API marketplace" | optional `wallet: { }` on an `agent` block (enables Zero tools) |
 | "password-protect the form" | `basic` auth block + form `auth:` |
 | "verify webhook callers" | webhook `secret:` + `header:` |
+| "give the customer a portal / dashboard for this deployment" | `app` block, `expose { }` naming the agent/workflow/view/database it surfaces |
 
 ### Disambiguations the map encodes
 
@@ -57,3 +59,4 @@ Before writing syntax, map the user's request to primitives. The top-level block
 - `postgres` (bring-your-own, hand-written JSON Schema, raw `@sql`) is not `database` (Swirls-managed, Prisma schema, typed `context.db` client). Pick by who operates the database.
 - `role` (top-level, who may invoke) is not `profile` (inside `agent`, what it may do).
 - `parallel` node is Parallel.ai web research (`search`, `extract`, `findall`), not workflow concurrency. Use `map`/`while` for iteration; independent branches in a DAG are just multiple edges from one node in `flow { }`.
+- `app` is not a hand-authored frontend or layout language. It declares `expose { }` (the authority boundary: which primitives the app can see) and a `description` (the generation prompt); Swirls composes the actual layout at deploy time.

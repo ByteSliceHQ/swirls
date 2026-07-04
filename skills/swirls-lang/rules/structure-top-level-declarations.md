@@ -1,12 +1,12 @@
 ---
 title: Top-Level Declarations
 impact: HIGH
-tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, database, migration, disk, skill, agent, mcp, channel, connection, role, policy
+tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, database, migration, disk, skill, agent, mcp, channel, connection, app, role, policy
 ---
 
 ## Top-Level Declarations
 
-A `.swirls` file contains twenty-two kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
+A `.swirls` file contains twenty-three kinds of top-level declarations (plus the optional `version:` line), in any order. There are no imports, exports, or module syntax.
 
 **Incorrect (using unsupported syntax):**
 
@@ -18,7 +18,7 @@ export workflow my_workflow {
 }
 ```
 
-The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, database, migration, disk, skill, agent, mcp, channel, schema, role, or policy`.
+The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, app, postgres, database, migration, disk, skill, agent, mcp, channel, schema, role, or policy`.
 
 **Correct (all top-level declarations demonstrated):**
 
@@ -158,6 +158,15 @@ connection acme_slack {
   provider: slack
 }
 
+app "concierge_portal" {
+  description "Customer-facing portal: chat with the concierge agent and see process runs."
+
+  expose {
+    agent concierge
+    view  process_log_table
+  }
+}
+
 role admins {
   match {
     org_role: admin
@@ -169,7 +178,7 @@ policy {
 }
 ```
 
-### The twenty-two valid top-level blocks
+### The twenty-three valid top-level blocks
 
 - `schema <name> { }` — Reusable JSON Schema referenced by bare identifier from forms, webhooks, root `inputSchema`/`outputSchema`, and node `schema`. See `resource-schema`.
 - `form <name> { }` — UI forms and API endpoints. See `resource-form`.
@@ -191,6 +200,7 @@ policy {
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 - `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
 - `action <name> { }` — Typed integration operation (provider/method/path) referenced by `type: integration` nodes via `action:`. See `resource-action`.
+- `app "<name>" { }`: generated application surface over the deployment; name is a quoted string (hyphens allowed). Requires `description` and a non-empty `expose { }` naming the agents, workflows, views, and databases it surfaces; `brand { }` is optional. Every field inside is space-separated, never `key: value`. See `resource-app`.
 - `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
 - `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. Declaring a grant flips the project to deny-by-default. See `resource-access-control`.
 
