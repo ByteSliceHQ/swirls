@@ -158,7 +158,7 @@ connection acme_slack {
   provider: slack
 }
 
-app "concierge_portal" {
+app concierge_portal {
   description "Customer-facing portal: chat with the concierge agent and see process runs."
 
   expose {
@@ -200,7 +200,7 @@ policy {
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 - `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
 - `action <name> { }` — Typed integration operation (provider/method/path) referenced by `type: integration` nodes via `action:`. See `resource-action`.
-- `app "<name>" { }`: generated application surface over the deployment; name is a quoted string (hyphens allowed). Requires `description` and a non-empty `expose { }` naming the agents, workflows, views, and databases it surfaces; `brand { }` is optional. Every field inside is space-separated, never `key: value`. See `resource-app`.
+- `app <name> { }` — Generated application surface over the deployment. Requires `description` and a non-empty `expose { }` naming the agents, workflows, views, and databases it surfaces; `brand { }` is optional. Every field inside is space-separated, never `key: value`. See `resource-app`.
 - `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
 - `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. Declaring a grant flips the project to deny-by-default. See `resource-access-control`.
 

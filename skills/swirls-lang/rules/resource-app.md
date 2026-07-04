@@ -6,16 +6,16 @@ tags: resource, app, top-level, expose, brand, generated-ui, dashboard, authorit
 
 ## App Block Declaration
 
-Top-level `app "<name>" { }` blocks declare a generated application surface over a deployment: which primitives it exposes, to whom, and with what intent. Swirls composes the actual layout at deploy time from the exposed primitives and the app's `description`. The block itself never describes pages, components, or styling beyond a small `brand { }` hint.
+Top-level `app <name> { }` blocks declare a generated application surface over a deployment: which primitives it exposes, to whom, and with what intent. Swirls composes the actual layout at deploy time from the exposed primitives and the app's `description`. The block itself never describes pages, components, or styling beyond a small `brand { }` hint.
 
-**The name is a quoted string, not a bare identifier.** This is the only top-level block where that's true. Hyphens are allowed: `app "client-portal"` is valid, unlike every other block name in the DSL.
+**The name is a bare identifier, like every other top-level block.** Do not quote it, and do not use hyphens: `app client_portal` is valid, `app "client-portal"` is a parse error.
 
 **Every field inside `app` is space-separated, never `key: value`.** `description`, `brand`'s `accent`/`logo`, each `expose` member, and the `access` modifier on a database expose entry all bind their value directly with a space. Writing a colon anywhere inside an `app` block is a parser error.
 
 ### Syntax
 
 ```swirls
-app "<name>" {
+app <name> {
   description "<generation prompt, a quoted string>"   // required
 
   expose {                                              // required; non-empty
@@ -119,7 +119,7 @@ database tickets {
   }
 }
 
-app "client-portal" {
+app client_portal {
   description "Support portal for Acme's customers: chat with the
     triage agent, see open tickets, kick off a refund."
 
@@ -153,7 +153,8 @@ Each `expose` member is checked against the merged project at compile time, the 
 
 Parser-level (all indicate a colon, missing brace, or unknown key rather than a semantic problem):
 
-- `Expected app name as a quoted string`: the token after `app` isn't a quoted string.
+- `App name must be a bare identifier, not a quoted string (e.g. \`app client_portal {\`)`: the name was written in quotes.
+- `Expected app name`: the token after `app` isn't an identifier.
 - `Expected {`: missing opening brace after the app name.
 - `Expected { after expose`: `expose` wasn't followed by `{`.
 - `Expected expose member (agent, workflow, view, or database)`: a token inside `expose { }` isn't one of the four kinds.
@@ -170,4 +171,4 @@ Parser-level (all indicate a colon, missing brace, or unknown key rather than a 
 
 ### App as a top-level keyword
 
-The lexer treats `app` as a keyword. At the top level, `app "<name>" { }` declares an app block. There is no `app` node type and no `app:` config field. An app is never referenced from inside a workflow; it only reads from the primitives it exposes.
+The lexer treats `app` as a keyword. At the top level, `app <name> { }` declares an app block. There is no `app` node type and no `app:` config field. An app is never referenced from inside a workflow; it only reads from the primitives it exposes.

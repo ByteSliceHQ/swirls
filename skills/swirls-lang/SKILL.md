@@ -4,7 +4,7 @@ description: "Swirls language skill for writing correct .swirls workflow files. 
 license: MIT
 metadata:
   author: swirls
-  version: "5.9.1"
+  version: "5.10.0"
 ---
 
 # Swirls Language
@@ -16,7 +16,7 @@ metadata:
 > GitHub copy at `ByteSliceHQ/swirls` is a mirror; if your copy's version
 > trails the index, prefer the published one.
 
-Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 18 node types, TypeScript / JSON / SQL / Prisma embedded blocks, the context object (including `context.iteration` for map/while and `context.db` for managed databases), resources, triggers, top-level stream / view / schema / disk / skill / agent / mcp / channel / connection / database / migration / app blocks, access-control blocks (`role` / `policy`; declaring policy grants flips the project to deny-by-default), agent subagent teams, agent `mcp` slots bound to remote MCP servers in Cloud, optional agent `wallet` for Zero tool spend, a Swirls-managed `database` primitive (Prisma schema, generated typed client, governed `type: database` node) distinct from the bring-your-own `postgres` block, `app` blocks declaring a generated application surface over exposed primitives (quoted-string name, colon-free space-separated fields), reviews, failure policies, output `format:`, and known parser pitfalls.
+Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL: file structure, workflow declarations (formerly `graph`), all 18 node types, TypeScript / JSON / SQL / Prisma embedded blocks, the context object (including `context.iteration` for map/while and `context.db` for managed databases), resources, triggers, top-level stream / view / schema / disk / skill / agent / mcp / channel / connection / database / migration / app blocks, access-control blocks (`role` / `policy`; declaring policy grants flips the project to deny-by-default), agent subagent teams, agent `mcp` slots bound to remote MCP servers in Cloud, optional agent `wallet` for Zero tool spend, a Swirls-managed `database` primitive (Prisma schema, generated typed client, governed `type: database` node) distinct from the bring-your-own `postgres` block, `app` blocks declaring a generated application surface over exposed primitives (bare-identifier name, colon-free space-separated fields), reviews, failure policies, output `format:`, and known parser pitfalls.
 
 ## When to Apply
 
@@ -35,7 +35,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - Configuring human-in-the-loop review blocks.
 - Declaring external Postgres databases and writing parameterized SQL nodes.
 - Declaring a Swirls-managed database with a `database` block and a Prisma-language `@prisma` schema, running data transforms with `migration` blocks, querying it via `context.db.<name>` in `code` nodes (full client), and governing mutations with `type: database` nodes (operation-narrowed client, `review:`-gateable).
-- Declaring an `app "<name>" { }` block: a generated application surface over the deployment, with a required `description` (the generation prompt), a required non-empty `expose { }` naming the agents, workflows, views, and databases it surfaces, and an optional `brand { }`.
+- Declaring an `app <name> { }` block: a generated application surface over the deployment, with a required `description` (the generation prompt), a required non-empty `expose { }` naming the agents, workflows, views, and databases it surfaces, and an optional `brand { }`.
 
 ## Priority
 
@@ -126,7 +126,7 @@ Comprehensive guide for authoring `.swirls` workflow files. Covers the full DSL:
 - `resource-auth` - Top-level `auth` blocks (oauth, api_key, basic, bearer) and http-node `auth:` references
 - `resource-connection` - Top-level `connection` blocks: Swirls-brokered outbound OAuth slots (`provider:` slack/linear/discord/linkedin/microsoft), referenced by http nodes and channels via `connection:` (replaces the removed `cloud` auth type)
 - `resource-action` - Top-level `action` blocks: typed integration operations (`provider`, `method`, `path`, input/output schemas); referenced by integration nodes via `action:`; install prebuilt actions with `swirls add`
-- `resource-app` - Top-level `app "<name>" { }` blocks: generated application surface over the deployment; quoted-string name (hyphens allowed), required `description` (generation prompt) and non-empty `expose { }` (agent/workflow/view/database), optional `brand { }`; every field is space-separated, never `key: value`
+- `resource-app` - Top-level `app <name> { }` blocks: generated application surface over the deployment; required `description` (generation prompt) and non-empty `expose { }` (agent/workflow/view/database), optional `brand { }`; every field is space-separated, never `key: value`
 - `resource-postgres` - Top-level `postgres` blocks: connection, table schemas, secret references
 - `resource-database` - Top-level `database` blocks: Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (models/enums only); provisioned and migrated by Swirls, distinct from `postgres`
 - `resource-migration` - Top-level `migration` blocks: ordered, run-once data transforms against a `database` block, run after its schema migration

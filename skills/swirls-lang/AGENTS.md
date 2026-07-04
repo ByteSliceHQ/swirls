@@ -57,24 +57,22 @@ mcp <name> { }
 channel <name> { }
 connection <name> { }
 action <name> { }
-app "<name>" { }
+app <name> { }
 role <name> { }
 policy { }
 ```
 
-There are **23** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `mcp <name> { }` declares a remote MCP server slot referenced by `agent.mcp:`, bound to a URL and optional bearer token per project in Cloud with tools discovered at runtime (see `resource-mcp`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is a platform-provisioned remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. `database <name> { }` declares a Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (see `resource-database`); `migration <name> { }` declares an ordered, run-once data transform against a `database` block (see `resource-migration`). Both are distinct from `postgres`, which stays the bring-your-own external database. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed. `app "<name>" { }` declares a generated application surface over the deployment: `description` (the generation prompt) and a non-empty `expose { }` list are required, `brand { }` is optional, and `domain`/`audience` are reserved for hosted apps (see `resource-app`). Its name is the one exception to the bare-identifier naming rule below.
+There are **23** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `mcp <name> { }` declares a remote MCP server slot referenced by `agent.mcp:`, bound to a URL and optional bearer token per project in Cloud with tools discovered at runtime (see `resource-mcp`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is a platform-provisioned remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. `database <name> { }` declares a Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (see `resource-database`); `migration <name> { }` declares an ordered, run-once data transform against a `database` block (see `resource-migration`). Both are distinct from `postgres`, which stays the bring-your-own external database. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed. `app <name> { }` declares a generated application surface over the deployment: `description` (the generation prompt) and a non-empty `expose { }` list are required, `brand { }` is optional, and `domain`/`audience` are reserved for hosted apps (see `resource-app`).
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, database blocks, migration blocks, schemas, agents, mcp blocks, channels, connections, actions, skills, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, database blocks, migration blocks, schemas, agents, mcp blocks, channels, connections, actions, skills, apps, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
 ```
 
-Names may start with a digit. Hyphens, dots, spaces, and other characters are not allowed. `bad-name`, `1.0`, and `with space` are invalid. `my_name`, `name1`, and `_name` are valid.
-
-**Exception:** `app "<name>" { }` names are a quoted string, not a bare identifier, and hyphens are allowed: `app "client-portal"` is valid. This is the only top-level block whose name isn't matched against the pattern above. See "App block fields" below.
+Names may start with a digit. Hyphens, dots, spaces, and other characters are not allowed. `bad-name`, `1.0`, and `with space` are invalid. `my_name`, `name1`, and `_name` are valid. There are no exceptions: `app` names follow the same rule (`app client_portal`, never `app "client-portal"`).
 
 #### Complete node type list
 
@@ -208,10 +206,10 @@ label: "..."   description: "..."                            // optional
 
 #### App block fields
 
-`app "<name>" { }` declares a generated application surface over the deployment: which primitives it exposes, to whom, and with what intent. The name is a **quoted string** (hyphens allowed, e.g. `app "client-portal"`), not a bare identifier.
+`app <name> { }` declares a generated application surface over the deployment: which primitives it exposes, to whom, and with what intent. The name is a bare identifier, same as every other block: `app client_portal`, never `app "client-portal"`.
 
 ```swirls
-app "client-portal" {
+app client_portal {
   description "Support portal for Acme's customers: chat with the
     triage agent, see open tickets, kick off a refund."
 
@@ -1177,7 +1175,7 @@ form contact_form {
 }
 ```
 
-Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, workflows, streams, triggers, secrets, auths, postgres blocks, schemas, nodes, secret vars, switch cases, and review action ids. The one exception is the `app` block, whose name is a quoted string where hyphens are allowed: `app "client-portal" { }` is valid (see `resource-app`).
+Resource names match `^[a-zA-Z0-9_]+$`. No hyphens, dots, spaces, or other special characters. This applies to every name: forms, webhooks, schedules, workflows, streams, triggers, secrets, auths, postgres blocks, schemas, apps, nodes, secret vars, switch cases, and review action ids. There are no exceptions.
 
 #### 24. Quoting the `visibility` value (or dropping its colon) on a form
 
@@ -1629,12 +1627,12 @@ database my_db {
 
 Use `postgres` for a database you own and operate; use `database` when you want Swirls to provision, migrate, and hold the connection for you. See `resource-postgres` and `resource-database`.
 
-#### 38. Using `key: value` syntax inside an `app` block
+#### 38. Quoting the `app` name or using `key: value` syntax inside an `app` block
 
-**Incorrect (colons, bare-identifier name):**
+**Incorrect (quoted name, colons):**
 
 ```swirls
-app client_portal {
+app "client-portal" {
   description: "Customer portal"
 
   expose {
@@ -1643,12 +1641,12 @@ app client_portal {
 }
 ```
 
-The parser errors with `Expected app name as a quoted string` and skips the whole block. With the name quoted but the colons kept, it errors `app description must be a quoted string` on the description and `Expected a name after agent` inside `expose { }`.
+The parser errors with `App name must be a bare identifier, not a quoted string` and skips the whole block. With the name fixed but the colons kept, it errors `app description must be a quoted string` on the description and `Expected a name after agent` inside `expose { }`.
 
-**Correct (quoted-string name, space-separated fields):**
+**Correct (bare-identifier name, space-separated fields):**
 
 ```swirls
-app "client-portal" {
+app client_portal {
   description "Customer portal"
 
   expose {
@@ -1657,7 +1655,7 @@ app "client-portal" {
 }
 ```
 
-`app` is the one block in the DSL where `key: value` is wrong. The name is a quoted string (hyphens allowed), and every field — `description`, each `expose` member, `brand`'s `accent`/`logo`, the `access read` modifier — binds its value with a space, never a colon. Every other top-level block keeps its `key: value` syntax; do not carry the colon-free style out of `app`. See `resource-app`.
+The name is a bare identifier, same as every other top-level block — no quotes, no hyphens. But `app` is the one block in the DSL where `key: value` is wrong: every field — `description`, each `expose` member, `brand`'s `accent`/`logo`, the `access read` modifier — binds its value with a space, never a colon. Every other top-level block keeps its `key: value` syntax; do not carry the colon-free style out of `app`. See `resource-app`.
 
 ---
 
@@ -1875,7 +1873,7 @@ connection acme_slack {
   provider: slack
 }
 
-app "concierge_portal" {
+app concierge_portal {
   description "Customer-facing portal: chat with the concierge agent and see process runs."
 
   expose {
@@ -1917,7 +1915,7 @@ policy {
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 - `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
 - `action <name> { }` — Typed integration operation (provider/method/path) referenced by `type: integration` nodes via `action:`. See `resource-action`.
-- `app "<name>" { }`: generated application surface over the deployment; name is a quoted string (hyphens allowed). Requires `description` and a non-empty `expose { }` naming the agents, workflows, views, and databases it surfaces; `brand { }` is optional. Every field inside is space-separated, never `key: value`. See `resource-app`.
+- `app <name> { }` — Generated application surface over the deployment. Requires `description` and a non-empty `expose { }` naming the agents, workflows, views, and databases it surfaces; `brand { }` is optional. Every field inside is space-separated, never `key: value`. See `resource-app`.
 - `role <name> { }` — Derives a named role from verified principal attributes via `match { }`. See `resource-access-control`.
 - `policy { }` — Nameless; `allow|deny <role> -> agent <name>|*` grants. Declaring a grant flips the project to deny-by-default. See `resource-access-control`.
 
@@ -7784,16 +7782,16 @@ See `node-integration` and `resource-connection`.
 
 ### App Block Declaration
 
-Top-level `app "<name>" { }` blocks declare a generated application surface over a deployment: which primitives it exposes, to whom, and with what intent. Swirls composes the actual layout at deploy time from the exposed primitives and the app's `description`. The block itself never describes pages, components, or styling beyond a small `brand { }` hint.
+Top-level `app <name> { }` blocks declare a generated application surface over a deployment: which primitives it exposes, to whom, and with what intent. Swirls composes the actual layout at deploy time from the exposed primitives and the app's `description`. The block itself never describes pages, components, or styling beyond a small `brand { }` hint.
 
-**The name is a quoted string, not a bare identifier.** This is the only top-level block where that's true. Hyphens are allowed: `app "client-portal"` is valid, unlike every other block name in the DSL.
+**The name is a bare identifier, like every other top-level block.** Do not quote it, and do not use hyphens: `app client_portal` is valid, `app "client-portal"` is a parse error.
 
 **Every field inside `app` is space-separated, never `key: value`.** `description`, `brand`'s `accent`/`logo`, each `expose` member, and the `access` modifier on a database expose entry all bind their value directly with a space. Writing a colon anywhere inside an `app` block is a parser error.
 
 #### Syntax
 
 ```swirls
-app "<name>" {
+app <name> {
   description "<generation prompt, a quoted string>"   // required
 
   expose {                                              // required; non-empty
@@ -7897,7 +7895,7 @@ database tickets {
   }
 }
 
-app "client-portal" {
+app client_portal {
   description "Support portal for Acme's customers: chat with the
     triage agent, see open tickets, kick off a refund."
 
@@ -7931,7 +7929,8 @@ Each `expose` member is checked against the merged project at compile time, the 
 
 Parser-level (all indicate a colon, missing brace, or unknown key rather than a semantic problem):
 
-- `Expected app name as a quoted string`: the token after `app` isn't a quoted string.
+- `App name must be a bare identifier, not a quoted string (e.g. \`app client_portal {\`)`: the name was written in quotes.
+- `Expected app name`: the token after `app` isn't an identifier.
 - `Expected {`: missing opening brace after the app name.
 - `Expected { after expose`: `expose` wasn't followed by `{`.
 - `Expected expose member (agent, workflow, view, or database)`: a token inside `expose { }` isn't one of the four kinds.
@@ -7948,7 +7947,7 @@ Parser-level (all indicate a colon, missing brace, or unknown key rather than a 
 
 #### App as a top-level keyword
 
-The lexer treats `app` as a keyword. At the top level, `app "<name>" { }` declares an app block. There is no `app` node type and no `app:` config field. An app is never referenced from inside a workflow; it only reads from the primitives it exposes.
+The lexer treats `app` as a keyword. At the top level, `app <name> { }` declares an app block. There is no `app` node type and no `app:` config field. An app is never referenced from inside a workflow; it only reads from the primitives it exposes.
 
 
 # 9. Streams
