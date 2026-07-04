@@ -15,7 +15,7 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, database, migration,
 stream, view, schema,
-disk, agent, channel, connection, action, skill, profile, tools,
+disk, agent, mcp, channel, connection, action, skill, profile, tools,
 role, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
@@ -48,6 +48,7 @@ migration <name> { }
 disk <name> { }
 skill <name> { }
 agent <name> { }
+mcp <name> { }
 channel <name> { }
 connection <name> { }
 action <name> { }
@@ -55,11 +56,11 @@ role <name> { }
 policy { }
 ```
 
-There are **21** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. `database <name> { }` declares a Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (see `resource-database`); `migration <name> { }` declares an ordered, run-once data transform against a `database` block (see `resource-migration`). Both are distinct from `postgres`, which stays the bring-your-own external database. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
+There are **22** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `mcp <name> { }` declares a remote MCP server slot referenced by `agent.mcp:`, bound to a URL and optional bearer token per project in Cloud with tools discovered at runtime (see `resource-mcp`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. `database <name> { }` declares a Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (see `resource-database`); `migration <name> { }` declares an ordered, run-once data transform against a `database` block (see `resource-migration`). Both are distinct from `postgres`, which stays the bring-your-own external database. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 ### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, database blocks, migration blocks, schemas, agents, channels, connections, actions, skills, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, database blocks, migration blocks, schemas, agents, mcp blocks, channels, connections, actions, skills, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -207,6 +208,16 @@ name: "<directory-slug>"   // required; quoted string; folder under .agents/skil
 
 The block name (`skill <name>`) is the Swirls handle referenced by `agent.skills:`; `name:` is the on-disk directory slug (may contain hyphens). The slug must be a single path segment — no `/`, `\`, or `..`. See `resource-skill`.
 
+### MCP block fields
+
+`mcp <name> { }` declares a remote MCP server slot an agent may draw tools from. Fields:
+
+```
+label: "..."   description: "..."   // both optional; quoted strings
+```
+
+There are no required fields. The block name (`mcp <name>`) is the slot handle referenced by `agent.mcp:`. Unknown keys are rejected. The server URL and optional bearer token are bound per project in Cloud, never in the file. Tools are discovered on the agent's first turn and named `mcp__<slot>__<tool>`. See `resource-mcp`.
+
 ### Access-control blocks
 
 `role <name> { match { <claim>: <value> } }` derives a role from verified principal attributes (scalar value = equality, array value = membership). `policy { allow|deny <role> -> agent <name>|* { workflows: […], tools: […] } }` grants roles access to agents; declaring any grant flips the project to deny-by-default. There is no `access { }` block. See `resource-access-control`.
@@ -214,6 +225,10 @@ The block name (`skill <name>`) is the Swirls handle referenced by `agent.skills
 ### Agent knowledge skills
 
 `agent <name> { }` accepts `skills: [ skillBlockName, ... ]` — a bare-identifier array of top-level `skill` blocks whose bodies are served at runtime via `open_skill` and `read_skill_file`. A `profile` may narrow `skills:` to a subset of the agent's list (same rule as `tools:`). See `resource-agent` and `resource-skill`.
+
+### Agent MCP slots
+
+`agent <name> { }` accepts `mcp: [ mcpBlockName, ... ]` — a bare-identifier array of top-level `mcp` blocks. Each named slot is bound to a remote MCP server in Cloud; its tools are discovered at runtime and exposed to the model as `mcp__<slot>__<tool>`. A `profile` may narrow `mcp:` to a subset of the agent's list (same rule as `tools:` and `skills:`). MCP tools are agent-only; workflows cannot use MCP. See `resource-agent` and `resource-mcp`.
 
 ### Agent subagent team
 

@@ -4,7 +4,7 @@
 >
 > **Source of truth lives in `rules/`.** This file is regenerated from those rules by `apps/web/skills/regen-agents.ts`. When in doubt, defer to `rules/spec-strict-syntax.md` and `rules/spec-common-mistakes.md`.
 >
-> Current scope: **17 node types** (`agent, ai, bucket, code, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`; `graph` is a legacy alias for `workflow`), **19 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, connection, action, postgres, disk, skill, agent, channel, role, policy`), inline `subgraph { }` for map/while, form `visibility: public | internal` and HTTP Basic `auth:`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, top-level `view <name> { }` blocks composing streams into a spreadsheet with per-row `computed` graph columns, `context.iteration.*` (item/index/input/previous) for map/while subgraphs, agent subagent `team`, agent knowledge `skills:` referencing top-level `skill` blocks, `channel` blocks binding an agent to Slack / Linear / Discord / web, `connection` blocks declaring Swirls-brokered outbound OAuth slots, and access-control `role` / `policy` blocks.
+> Current scope: **18 node types** (`agent, ai, bucket, code, database, disk, email, http, integration, map, parallel, postgres, scrape, stream, switch, wait, while, workflow`; `graph` is a legacy alias for `workflow`), **22 top-level declarations** (`schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, connection, action, postgres, database, migration, disk, skill, agent, mcp, channel, role, policy`), inline `subgraph { }` for map/while, form `visibility: public | internal` and HTTP Basic `auth:`, webhook shared-secret `secret:` + `header:`, top-level `schema <name> { }` blocks referenced by bare identifier, top-level `view <name> { }` blocks composing streams into a spreadsheet with per-row `computed` graph columns, `context.iteration.*` (item/index/input/previous) for map/while subgraphs, `context.db.*` managed-database client, agent subagent `team`, agent knowledge `skills:` referencing top-level `skill` blocks, agent `mcp:` slots referencing top-level `mcp` blocks bound to remote MCP servers in Cloud, `channel` blocks binding an agent to Slack / Linear / Discord / web, `connection` blocks declaring Swirls-brokered outbound OAuth slots, a Swirls-managed `database` primitive (Prisma `@prisma` schema, generated typed client, governed `type: database` node) with a companion `migration` block, distinct from the bring-your-own `postgres` block, and access-control `role` / `policy` blocks.
 
 
 # 1. Language Specification (READ FIRST)
@@ -20,7 +20,7 @@ These are the only keywords recognized by the lexer (`packages/language/src/lexe
 ```
 form, webhook, schedule, workflow, graph, trigger, secret, auth, postgres, database, migration,
 stream, view, schema,
-disk, agent, channel, connection, action, skill, profile, tools,
+disk, agent, mcp, channel, connection, action, skill, profile, tools,
 role, match, policy, allow, deny,
 node, root, type, label, description, enabled, cron, timezone, version, review,
 condition, name, flow, select, insert, params, table,
@@ -53,6 +53,7 @@ migration <name> { }
 disk <name> { }
 skill <name> { }
 agent <name> { }
+mcp <name> { }
 channel <name> { }
 connection <name> { }
 action <name> { }
@@ -60,11 +61,11 @@ role <name> { }
 policy { }
 ```
 
-There are **21** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. `database <name> { }` declares a Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (see `resource-database`); `migration <name> { }` declares an ordered, run-once data transform against a `database` block (see `resource-migration`). Both are distinct from `postgres`, which stays the bring-your-own external database. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
+There are **22** top-level block kinds (plus the optional `version:` line). `workflow <name> { }` was formerly written `graph <name> { }`; `graph` still parses as a legacy alias. `agent <name> { }` is an LLM agent definition with tools, profiles, skills, and a subagent `team`, bound by `type: agent` nodes; `skill <name> { }` declares a knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:` (see `resource-skill`); `mcp <name> { }` declares a remote MCP server slot referenced by `agent.mcp:`, bound to a URL and optional bearer token per project in Cloud with tools discovered at runtime (see `resource-mcp`); `channel <name> { }` binds an agent to a chat platform (Slack, Linear, Discord, or web); `connection <name> { }` is a project-scoped, Swirls-brokered outbound OAuth slot referenced by `http` nodes and channels; `action <name> { }` declares a typed integration operation referenced by `type: integration` nodes via `action:` (see `resource-action`); `disk <name> { }` is an Archil-backed remote disk that `type: disk` nodes mount. `view <name> { }` composes one or more `stream` blocks into a spreadsheet, mapping each source row through `columns` and optionally adding `computed` columns that run a graph per row (see `resource-view`); it is not a node type and is not referenced from inside a workflow. `database <name> { }` declares a Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island (see `resource-database`); `migration <name> { }` declares an ordered, run-once data transform against a `database` block (see `resource-migration`). Both are distinct from `postgres`, which stays the bring-your-own external database. The access-control pair — `role <name> { }` (claim matching) and `policy { }` (nameless; `allow|deny <role> -> agent <name>|*` grants, which flip the project to deny-by-default) — is covered in `resource-access-control`. There is no `access { }` block; it was removed.
 
 #### Resource name pattern
 
-All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, database blocks, migration blocks, schemas, agents, channels, connections, actions, skills, roles, nodes, secret vars, switch cases, review action ids) must match:
+All resource names (forms, webhooks, schedules, workflows, streams, views, triggers, secrets, auth, postgres, database blocks, migration blocks, schemas, agents, mcp blocks, channels, connections, actions, skills, roles, nodes, secret vars, switch cases, review action ids) must match:
 
 ```
 ^[a-zA-Z0-9_]+$
@@ -212,6 +213,16 @@ name: "<directory-slug>"   // required; quoted string; folder under .agents/skil
 
 The block name (`skill <name>`) is the Swirls handle referenced by `agent.skills:`; `name:` is the on-disk directory slug (may contain hyphens). The slug must be a single path segment — no `/`, `\`, or `..`. See `resource-skill`.
 
+#### MCP block fields
+
+`mcp <name> { }` declares a remote MCP server slot an agent may draw tools from. Fields:
+
+```
+label: "..."   description: "..."   // both optional; quoted strings
+```
+
+There are no required fields. The block name (`mcp <name>`) is the slot handle referenced by `agent.mcp:`. Unknown keys are rejected. The server URL and optional bearer token are bound per project in Cloud, never in the file. Tools are discovered on the agent's first turn and named `mcp__<slot>__<tool>`. See `resource-mcp`.
+
 #### Access-control blocks
 
 `role <name> { match { <claim>: <value> } }` derives a role from verified principal attributes (scalar value = equality, array value = membership). `policy { allow|deny <role> -> agent <name>|* { workflows: […], tools: […] } }` grants roles access to agents; declaring any grant flips the project to deny-by-default. There is no `access { }` block. See `resource-access-control`.
@@ -219,6 +230,10 @@ The block name (`skill <name>`) is the Swirls handle referenced by `agent.skills
 #### Agent knowledge skills
 
 `agent <name> { }` accepts `skills: [ skillBlockName, ... ]` — a bare-identifier array of top-level `skill` blocks whose bodies are served at runtime via `open_skill` and `read_skill_file`. A `profile` may narrow `skills:` to a subset of the agent's list (same rule as `tools:`). See `resource-agent` and `resource-skill`.
+
+#### Agent MCP slots
+
+`agent <name> { }` accepts `mcp: [ mcpBlockName, ... ]` — a bare-identifier array of top-level `mcp` blocks. Each named slot is bound to a remote MCP server in Cloud; its tools are discovered at runtime and exposed to the model as `mcp__<slot>__<tool>`. A `profile` may narrow `mcp:` to a subset of the agent's list (same rule as `tools:` and `skills:`). MCP tools are agent-only; workflows cannot use MCP. See `resource-agent` and `resource-mcp`.
 
 #### Agent subagent team
 
@@ -1629,7 +1644,7 @@ export workflow my_workflow {
 }
 ```
 
-The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, database, migration, disk, skill, agent, channel, schema, role, or policy`.
+The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, database, migration, disk, skill, agent, mcp, channel, schema, role, or policy`.
 
 **Correct (all top-level declarations demonstrated):**
 
@@ -1738,11 +1753,22 @@ trigger on_contact {
   enabled: true
 }
 
+skill product_kb {
+  name: "product-kb"
+}
+
+mcp support_desk {
+  label: "Support desk"
+  description: "Remote MCP server for the support tooling"
+}
+
 agent concierge {
   label: "Concierge"
   secrets: vendor_keys
   provider: openrouter
   model: "openai/gpt-4o-mini"
+  skills: [product_kb]
+  mcp: [support_desk]
 }
 
 channel concierge_web {
@@ -1785,7 +1811,9 @@ policy {
 - `database <name> { }` — Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island; provisioned and migrated by Swirls. See `resource-database`.
 - `migration <name> { }` — Ordered, run-once data transform against a `database` block. See `resource-migration`.
 - `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
-- `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
+- `skill <name> { }` — Local knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:`. See `resource-skill`.
+- `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, skills, MCP slots, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
+- `mcp <name> { }` — Remote MCP server slot referenced by `agent.mcp:`; bound to a URL and optional bearer token per project in Cloud, tools discovered at runtime as `mcp__<slot>__<tool>`. See `resource-mcp`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 - `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
 - `action <name> { }` — Typed integration operation (provider/method/path) referenced by `type: integration` nodes via `action:`. See `resource-action`.
@@ -3966,6 +3994,153 @@ node upsert_lead {
 
 ---
 
+### Database Nodes
+
+`type: database` nodes are an **opt-in governed surface** for mutations against a managed `database` block: visible in `flow { }`, gateable with `review:`, and traced as their own step. They coexist with the full, un-narrowed `context.db.<name>` client available in `code` nodes (see `context-db`) — reach for `code` for unrestricted programming power, reach for `database` when a specific mutation needs to be governed.
+
+**Required fields:** `database`, `operation`, `run`.
+
+**Incorrect (missing `operation`):**
+
+```swirls
+node purge_stale {
+  type: database
+  database: my_db
+  run: @ts {
+    return context.db.my_db.user.deleteMany({ where: { active: false } })
+  }
+}
+```
+
+The validator errors: `Database node requires an "operation" field`.
+
+**Incorrect (`operation` outside the allowed set):**
+
+```swirls
+node purge_stale {
+  type: database
+  database: my_db
+  operation: remove
+  run: @ts {
+    return context.db.my_db.user.deleteMany({ where: { active: false } })
+  }
+}
+```
+
+The validator errors: `Database node "operation" must be one of: query, insert, update, delete, transaction, got "remove"`.
+
+**Incorrect (a call outside the declared operation):**
+
+```swirls
+node load_admins {
+  type: database
+  database: my_db
+  operation: query
+  run: @ts {
+    // "query" only exposes reads — this call is rejected at runtime
+    return context.db.my_db.user.deleteMany({ where: { role: "ADMIN" } })
+  }
+}
+```
+
+The declared `operation` mints a capability-narrowed client: `deleteMany` is not reachable from a `query` node. This is enforced host-side at runtime (not only as a type), so it cannot be worked around by constructing the call dynamically.
+
+**Correct (query):**
+
+```swirls
+node load_admins {
+  type: database
+  label: "Load admins"
+  database: my_db
+  operation: query
+  run: @ts {
+    return context.db.my_db.user.findMany({ where: { role: "ADMIN" } })
+  }
+}
+```
+
+**Correct (governed delete with review and condition):**
+
+```swirls
+node purge_stale {
+  type: database
+  label: "Purge stale users"
+  database: my_db
+  operation: delete
+  review: { enabled: true }
+  condition: @ts {
+    return context.nodes.root.output.confirmed === true
+  }
+  run: @ts {
+    return context.db.my_db.user.deleteMany({
+      where: { lastSeen: { lt: context.nodes.root.output.cutoff } },
+    })
+  }
+}
+```
+
+**Correct (transaction — the full client, atomically):**
+
+```swirls
+node settle_invoice {
+  type: database
+  label: "Settle invoice"
+  database: my_db
+  operation: transaction
+  review: { enabled: true }
+  run: @ts {
+    return context.db.my_db.$transaction(async (tx) => {
+      const invoice = await tx.invoice.update({
+        where: { id: context.nodes.root.output.invoiceId },
+        data: { status: "PAID" },
+      })
+      await tx.ledgerEntry.create({
+        data: { invoiceId: invoice.id, amount: invoice.total },
+      })
+      return invoice
+    })
+  }
+}
+```
+
+#### Fields
+
+| Field | Required | Description |
+|-------|----------|--------------|
+| `database` | yes | Bare identifier naming a top-level `database` block. |
+| `operation` | yes | One of `query`, `insert`, `update`, `delete`, `transaction`. |
+| `condition` | no | `@ts` block returning boolean. When `false`, the node is skipped (output `{ skipped: true }`); mirrors the `postgres` insert node's `condition`. |
+| `run` | yes | Non-empty `@ts` block: the typed Prisma body, executed against the operation-narrowed client. |
+
+Every node also accepts the shared optional fields (`label`, `description`, `secrets`, `review`, `failurePolicy`, `format`).
+
+#### Operation → client capability
+
+| `operation` | Client exposes |
+|---|---|
+| `query` | `findMany`, `findFirst`, `findUnique`, `findFirstOrThrow`, `findUniqueOrThrow`, `count`, `aggregate`, `groupBy` |
+| `insert` | `create`, `createMany`, `createManyAndReturn` |
+| `update` | `update`, `updateMany`, `updateManyAndReturn`, `upsert` |
+| `delete` | `delete`, `deleteMany` |
+| `transaction` | the full client (every action above), inside one interactive `$transaction` |
+
+`transaction` is the deliberate exception: it spans every operation class for the atomic multi-step case a single narrowed operation can't express (insert then update, or a read that decides a delete, in one atomic block). Because of that it is governed **at the node grain, not per operation** — `review:` and `policy` treat the whole transaction as one step.
+
+#### Output
+
+- Output is whatever `run` returns.
+- When `condition` is present and evaluates `false`, the node is skipped: output is `{ skipped: true }` and the node does not execute `run`.
+- `database` nodes require the cloud managed-database provider; they are not available to the local CLI worker (managed databases are a hosted-only feature).
+
+#### Key rules
+
+- Exactly one `database:` and one `operation:` per node; `operation` is required even for a single-statement `run`.
+- A call the declared `operation` does not expose is rejected before it reaches the client, even if constructed dynamically — there is no way to compute around the narrowing.
+- Only an `operation: transaction` node's `run` body may call `$transaction`; see `context-db` for why `code` nodes cannot.
+- `database:` must reference a top-level `database` block declared in the workspace (same file or another `.swirls` file), the same rule as `postgres:` on a `postgres` node.
+
+---
+
 ### Node `secrets:` Map Syntax
 
 Every node can declare which secret vars it is allowed to read using a `secrets:` field. The value is **always an object literal** mapping a declared secret block name to an array of var names from that block. It is never a bare identifier, never a string, never a flat array.
@@ -4118,153 +4293,6 @@ node optional_step {
 - The policy lives alongside other config fields on a node; it is not a separate block.
 - Downstream nodes still see `context.nodes.<name>.output` for skipped/fallback cases; `skip` sets it to `undefined` (or absent), `fallback` sets it to `fallbackValue`.
 - `failurePolicy` is optional and can be omitted on any node.
-
----
-
-### Database Nodes
-
-`type: database` nodes are an **opt-in governed surface** for mutations against a managed `database` block: visible in `flow { }`, gateable with `review:`, and traced as their own step. They coexist with the full, un-narrowed `context.db.<name>` client available in `code` nodes (see `context-db`) — reach for `code` for unrestricted programming power, reach for `database` when a specific mutation needs to be governed.
-
-**Required fields:** `database`, `operation`, `run`.
-
-**Incorrect (missing `operation`):**
-
-```swirls
-node purge_stale {
-  type: database
-  database: my_db
-  run: @ts {
-    return context.db.my_db.user.deleteMany({ where: { active: false } })
-  }
-}
-```
-
-The validator errors: `Database node requires an "operation" field`.
-
-**Incorrect (`operation` outside the allowed set):**
-
-```swirls
-node purge_stale {
-  type: database
-  database: my_db
-  operation: remove
-  run: @ts {
-    return context.db.my_db.user.deleteMany({ where: { active: false } })
-  }
-}
-```
-
-The validator errors: `Database node "operation" must be one of: query, insert, update, delete, transaction, got "remove"`.
-
-**Incorrect (a call outside the declared operation):**
-
-```swirls
-node load_admins {
-  type: database
-  database: my_db
-  operation: query
-  run: @ts {
-    // "query" only exposes reads — this call is rejected at runtime
-    return context.db.my_db.user.deleteMany({ where: { role: "ADMIN" } })
-  }
-}
-```
-
-The declared `operation` mints a capability-narrowed client: `deleteMany` is not reachable from a `query` node. This is enforced host-side at runtime (not only as a type), so it cannot be worked around by constructing the call dynamically.
-
-**Correct (query):**
-
-```swirls
-node load_admins {
-  type: database
-  label: "Load admins"
-  database: my_db
-  operation: query
-  run: @ts {
-    return context.db.my_db.user.findMany({ where: { role: "ADMIN" } })
-  }
-}
-```
-
-**Correct (governed delete with review and condition):**
-
-```swirls
-node purge_stale {
-  type: database
-  label: "Purge stale users"
-  database: my_db
-  operation: delete
-  review: { enabled: true }
-  condition: @ts {
-    return context.nodes.root.output.confirmed === true
-  }
-  run: @ts {
-    return context.db.my_db.user.deleteMany({
-      where: { lastSeen: { lt: context.nodes.root.output.cutoff } },
-    })
-  }
-}
-```
-
-**Correct (transaction — the full client, atomically):**
-
-```swirls
-node settle_invoice {
-  type: database
-  label: "Settle invoice"
-  database: my_db
-  operation: transaction
-  review: { enabled: true }
-  run: @ts {
-    return context.db.my_db.$transaction(async (tx) => {
-      const invoice = await tx.invoice.update({
-        where: { id: context.nodes.root.output.invoiceId },
-        data: { status: "PAID" },
-      })
-      await tx.ledgerEntry.create({
-        data: { invoiceId: invoice.id, amount: invoice.total },
-      })
-      return invoice
-    })
-  }
-}
-```
-
-#### Fields
-
-| Field | Required | Description |
-|-------|----------|--------------|
-| `database` | yes | Bare identifier naming a top-level `database` block. |
-| `operation` | yes | One of `query`, `insert`, `update`, `delete`, `transaction`. |
-| `condition` | no | `@ts` block returning boolean. When `false`, the node is skipped (output `{ skipped: true }`); mirrors the `postgres` insert node's `condition`. |
-| `run` | yes | Non-empty `@ts` block: the typed Prisma body, executed against the operation-narrowed client. |
-
-Every node also accepts the shared optional fields (`label`, `description`, `secrets`, `review`, `failurePolicy`, `format`).
-
-#### Operation → client capability
-
-| `operation` | Client exposes |
-|---|---|
-| `query` | `findMany`, `findFirst`, `findUnique`, `findFirstOrThrow`, `findUniqueOrThrow`, `count`, `aggregate`, `groupBy` |
-| `insert` | `create`, `createMany`, `createManyAndReturn` |
-| `update` | `update`, `updateMany`, `updateManyAndReturn`, `upsert` |
-| `delete` | `delete`, `deleteMany` |
-| `transaction` | the full client (every action above), inside one interactive `$transaction` |
-
-`transaction` is the deliberate exception: it spans every operation class for the atomic multi-step case a single narrowed operation can't express (insert then update, or a read that decides a delete, in one atomic block). Because of that it is governed **at the node grain, not per operation** — `review:` and `policy` treat the whole transaction as one step.
-
-#### Output
-
-- Output is whatever `run` returns.
-- When `condition` is present and evaluates `false`, the node is skipped: output is `{ skipped: true }` and the node does not execute `run`.
-- `database` nodes require the cloud managed-database provider; they are not available to the local CLI worker (managed databases are a hosted-only feature).
-
-#### Key rules
-
-- Exactly one `database:` and one `operation:` per node; `operation` is required even for a single-statement `run`.
-- A call the declared `operation` does not expose is rejected before it reaches the client, even if constructed dynamically — there is no way to compute around the narrowing.
-- Only an `operation: transaction` node's `run` body may call `$transaction`; see `context-db` for why `code` nodes cannot.
-- `database:` must reference a top-level `database` block declared in the workspace (same file or another `.swirls` file), the same rule as `postgres:` on a `postgres` node.
 
 ---
 
@@ -6575,6 +6603,184 @@ postgres my_db {
 
 ---
 
+### Database Block Declaration
+
+Top-level `database <name> { }` blocks declare a **Swirls-managed** Postgres: Swirls provisions it on deploy, migrates its schema when it changes, and injects a generated typed Prisma client into `@ts` blocks as `context.db.<name>`. This is distinct from `postgres`, which is a bring-your-own external database the customer connects to and operates (see `resource-postgres`).
+
+There is no `type:` field — the keyword `database` identifies the block. The schema is Prisma schema language inside a `schema: @prisma { }` island.
+
+**Incorrect (empty schema):**
+
+```swirls
+database my_db {
+  schema: @prisma {
+  }
+}
+```
+
+The validator errors: `Database block requires a non-empty schema: @prisma { } block`.
+
+**Incorrect (datasource/generator in the island):**
+
+```swirls
+database my_db {
+  schema: @prisma {
+    datasource db {
+      provider = "postgresql"
+      url      = env("DATABASE_URL")
+    }
+    model User {
+      id    Int    @id @default(autoincrement())
+      email String @unique
+    }
+  }
+}
+```
+
+The `@prisma` island is **models and enums only**. Swirls owns provisioning and the connection; it wraps your schema with its own `datasource` and `generator` block before validating it at deploy time, so a user-supplied `datasource` (or `generator`, or a literal connection URL) collides and fails Prisma's validator. Never write one.
+
+**Correct:**
+
+```swirls
+database my_db {
+  label: "App database"
+  description: "Primary application data"
+  schema: @prisma {
+    model User {
+      id        Int      @id @default(autoincrement())
+      createdAt DateTime @default(now())
+      email     String   @unique
+      role      Role     @default(USER)
+      posts     Post[]
+    }
+
+    model Post {
+      id       Int    @id @default(autoincrement())
+      title    String @db.VarChar(255)
+      author   User   @relation(fields: [authorId], references: [id])
+      authorId Int
+    }
+
+    enum Role {
+      USER
+      ADMIN
+    }
+  }
+}
+```
+
+#### Fields
+
+| Field | Required | Description |
+|-------|----------|--------------|
+| `label` | no | Human-readable label. |
+| `description` | no | Human-readable description. |
+| `schema` | yes | `@prisma { }` island: models, enums, relations, and attributes, written in the Prisma schema language. No `datasource`, `generator`, or connection URL. |
+
+#### The `@prisma` island
+
+`@prisma { ... }` is brace-balanced like `@ts` / `@json` / `@sql`. The Prisma schema language uses only double-quoted strings and `//` / `///` line comments (no single-quoted strings, no block comments), so those are the only constructs that can hide a brace from the lexer. The content is captured verbatim and is **not** re-lexed or reinterpreted by Swirls — it is handed to Prisma's own validator, migration engine, and client generator at deploy time.
+
+#### What the language layer validates (and what it doesn't)
+
+- Database block names must be unique and match `^[a-zA-Z0-9_]+$` (see `spec-common-mistakes`).
+- `schema:` must be present and non-empty.
+- **Prisma-schema correctness (models, fields, relations, attributes) is deliberately NOT checked at the language layer.** The deploy path validates it via Prisma's own validator (`@prisma/internals`), so a malformed model only surfaces as a deploy-time error, not a `swirls doctor` diagnostic.
+
+#### Provisioning and migration
+
+On deploy, Swirls provisions the database if it doesn't exist yet (idempotent — a retried deploy never double-provisions) and holds the connection encrypted with the project's keyset; it is never customer-supplied and never appears in `.swirls`. When the schema changes, the next deploy migrates it: additive changes (new model, new field, new index) auto-apply; destructive or unclassifiable changes are gated for approval rather than applied silently. See `resource-migration` for data transforms a schema diff can't express, and `node-database` and `context-db` for querying.
+
+---
+
+### Migration Block Declaration
+
+Top-level `migration <name> { }` blocks declare an ordered, run-once **data transform** against a managed `database` block — the kind of change a schema diff can't express, like collapsing two columns into one. They run after their target database's schema migration, in ascending `order`, and are tracked so a workflow retry never re-applies one.
+
+There is no `type:` field — the keyword `migration` identifies the block.
+
+**Incorrect (missing `database`):**
+
+```swirls
+migration collapse_names {
+  order: 1
+  operation: @ts {
+    // ...
+  }
+}
+```
+
+The validator errors: `Migration "collapse_names" requires "database" (a database block name)`.
+
+**Incorrect (`database` references an undeclared block):**
+
+```swirls
+migration collapse_names {
+  database: not_a_real_db
+  order: 1
+  operation: @ts {
+    // ...
+  }
+}
+```
+
+The validator errors: `Migration "collapse_names" references database "not_a_real_db" which is not defined`.
+
+**Incorrect (duplicate `order` for the same database):**
+
+```swirls
+migration first {
+  database: my_db
+  order: 1
+  operation: @ts { /* ... */ }
+}
+
+migration second {
+  database: my_db
+  order: 1
+  operation: @ts { /* ... */ }
+}
+```
+
+The validator errors: `Migration "second" reuses order 1 for database "my_db" (already used by "first")`. `order` must be a non-negative integer, unique per target database.
+
+**Correct:**
+
+```swirls
+migration collapse_names {
+  database: my_db
+  order: 1
+  operation: @ts {
+    const users = await context.db.my_db.user.findMany({ where: { name: null } })
+    for (const user of users) {
+      await context.db.my_db.user.update({
+        where: { id: user.id },
+        data: { name: `${user.firstName} ${user.lastName}` },
+      })
+    }
+  }
+}
+```
+
+The body runs over the same single-call bridge as a `code` node. Use model methods (`findMany`, `update`, `updateMany`) awaited one at a time. Streaming helpers like `.stream()` and `for await` are not available over the bridge; page with `findMany` instead.
+
+#### Fields
+
+| Field | Required | Description |
+|-------|----------|--------------|
+| `database` | yes | Bare identifier naming a declared top-level `database` block (same file or workspace). |
+| `order` | yes | Non-negative integer. Migrations targeting the same database apply in ascending order. |
+| `operation` | yes | Non-empty `@ts` block: the typed Prisma data-migration body, run against `context.db.<name>` (the full client, same as a `code` node — see `context-db`). |
+
+#### Semantics
+
+- Data migrations run in the post-deploy migration workflow, after the schema migration for the same `database` block, each **exactly once**.
+- A pending data migration gates its deploy for approval, the same way a destructive schema change does — it does not apply silently.
+- Migrations are ordered **per target database** — `order: 1` in one database's migrations does not conflict with `order: 1` in another's.
+- `operation:` runs the same full, un-narrowed Prisma client available in `code` nodes (see `context-db`); it is not a `type: database` node and does not take `operation:` as a capability narrowing field (name collision with the node's `operation` field is coincidental — here `operation:` just holds the `@ts` body).
+
+---
+
 ### Disk Block Declaration
 
 Top-level `disk <name> { }` blocks declare a **platform-managed shared disk**. Swirls provisions the Archil backing store at deploy time — authors do not set provider disk ids or `ARCHIL_API_KEY` in DSL.
@@ -6776,6 +6982,7 @@ agent <name> {
 
   tools: [workflow_a, workflow_b]           // optional; workflows exposed as LLM-callable tools
   skills: [skill_a, skill_b]                // optional; local knowledge skills (see resource-skill)
+  mcp: [mcp_a, mcp_b]                        // optional; remote MCP server slots (see resource-mcp)
   team: [agent_b, agent_c]                  // optional; other agents this one may delegate to
 
   sandbox: {                          // optional; workspace sizing + lifecycle
@@ -6815,6 +7022,8 @@ agent <name> {
 | `maxTokens` | no | Number. |
 | `maxSteps` | no | Number. Caps how many tool-call turns the agent may take. Default **20**. |
 | `tools` | no | Array of bare identifiers naming tool workflows in the workspace. |
+| `skills` | no | Array of bare identifiers naming top-level `skill` blocks (local knowledge skills). See `resource-skill`. |
+| `mcp` | no | Array of bare identifiers naming top-level `mcp` blocks (remote MCP server slots). Tools are discovered at runtime and named `mcp__<slot>__<tool>`. See `resource-mcp`. |
 | `team` | no | Array of bare identifiers naming other `agent` blocks this agent may delegate to as subagents. See below. |
 | `sandbox: { }` | no | Workspace sizing and lifecycle. See below. |
 | `disks` | no | Array of bare identifiers naming top-level `disk` blocks to mount for the agent. See `resource-disk`. |
@@ -6974,7 +7183,7 @@ workflow handle_ticket {
 
 #### Tool workflows (workflows-as-tools only)
 
-Tools are workflows exposed to the model. There is no MCP, HTTP, or builtin tool syntax. Each entry in `tools: [ … ]` must name a workflow in the workspace that:
+Tools are workflows exposed to the model. The `tools:` field carries workflows only — there is no HTTP or builtin tool syntax, and remote MCP tools are wired separately through `mcp:` (see `resource-mcp`), not through `tools:`. Workflows still cannot use MCP; MCP tools are agent-only. Each entry in `tools: [ … ]` must name a workflow in the workspace that:
 
 - Has a non-empty workflow-level `description:` (fed to the model as tool help text).
 - Has a root node with JSON `inputSchema` that declares a **non-empty `properties` object** (defines the tool call arguments — a tool with zero input properties is rejected: `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object`).
@@ -7024,11 +7233,105 @@ Team members are referenced by bare identifier (not a quoted string). A `team` m
 - `provider`, if present, must be one of the four allowed values; it defaults to `openrouter`.
 - Every entry in `tools:` must name a tool workflow defined in the workspace.
 - Every entry in `team:` must name a defined `agent` block in the workspace. An agent cannot list itself, a team member name cannot collide with a `tools:` workflow name in the same agent, and teams cannot form a cycle (`a -> b -> a` is rejected, as is any longer loop).
+- Every entry in `mcp:` must name a declared `mcp` block in the workspace. Each profile's `mcp:` must be a SUBSET of the agent's top-level `mcp:`. See `resource-mcp`.
 - Every `profile <name> { }` must have a unique name within the agent block. Each profile's `tools:` must be a SUBSET of the agent's top-level `tools:`.
 - `sandbox.<field>` values must satisfy the bounds above.
 - `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `profile:`, it must name a declared profile in that block.
 
 See `node-agent` for the binding side.
+
+---
+
+### MCP Block Declaration
+
+Top-level `mcp <name> { }` blocks declare a **remote MCP server slot** an agent may draw tools from. The DSL declares the slot by name; a human binds it to a remote MCP server URL (and optional bearer token) on the project **MCP servers** page in Swirls Cloud. Agents reference a slot by name via `mcp:`. At the agent's first turn the host discovers the server's tools and exposes them to the model as `mcp__<slot>__<tool>`. **No URL or token lives in the file.**
+
+**There is no `type:` field on an mcp block** — the keyword `mcp` identifies the block. Names must match `^[a-zA-Z0-9_]+$`.
+
+#### Syntax
+
+```swirls
+mcp <name> {
+  label: "<optional label>"
+  description: "<optional description>"
+}
+```
+
+Both fields are optional quoted strings. There are no required fields. Unknown keys are rejected.
+
+#### Fields
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `label` | no | Display string shown on the Cloud MCP servers page. |
+| `description` | no | Description shown on the Cloud MCP servers page. |
+
+#### Referencing from an agent
+
+An agent draws tools from one or more slots via `mcp: [ slotName, ... ]` — a bare-identifier array, same style as `tools:` and `skills:`. Each entry must name a declared `mcp` block in the workspace.
+
+```swirls
+mcp axiom_observability {
+  label: "Axiom"
+  description: "Query traces, logs, and metrics via MCP"
+}
+
+agent observer {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  mcp: [axiom_observability]
+}
+```
+
+MCP tools are agent-only. Workflows cannot use MCP. There is no MCP node type and no MCP tool syntax inside a workflow.
+
+#### Profile narrowing
+
+Profiles may narrow `mcp:` to a subset of the agent block's list (same rule as `tools:` and `skills:`):
+
+```swirls
+agent observer {
+  secrets: vendor_keys
+  model: "openai/gpt-4o-mini"
+  mcp: [axiom_observability, product_analytics]
+
+  profile readonly {
+    mcp: [axiom_observability]
+  }
+}
+```
+
+Profile `mcp:` must be a **subset** of the agent's top-level `mcp:`.
+
+#### Bind in Cloud
+
+Slots are bound per project, not in git.
+
+1. Deploy carries the `mcp` block metadata only (name, label, description). It never carries a server URL or token.
+2. On the project **MCP servers** page in Cloud, bind each slot to a remote MCP server URL plus an optional bearer token. Tokens are stored encrypted; the URL is validated against SSRF rules.
+3. On the agent's first turn the host connects to each bound slot and discovers its tools.
+
+#### Tool naming at runtime
+
+Discovered tools are exposed to the model as `mcp__<slot>__<tool>`. For a slot named `axiom_observability` with a server tool `queryDataset`, the agent sees `mcp__axiom_observability__queryDataset`.
+
+A slot that is **unbound or unreachable yields no tools**. Instruct the agent's system prompt to tell the user to connect the slot on the Cloud MCP servers page when its tools are missing.
+
+#### No secrets in git
+
+The server URL and bearer token are bound in Cloud, never written to a `.swirls` file. The `mcp` block is a named slot only. This is the same posture as `connection` blocks (see `resource-connection`).
+
+#### Validation diagnostics
+
+- `MCP block name: <msg>` — name must match `^[a-zA-Z0-9_]+$`.
+- `Duplicate mcp block name "<n>"` — two `mcp` blocks share a name (also across files in one project).
+- `Agent "<n>" references undefined mcp block "<m>"` — an agent's `mcp:` entry is not a declared `mcp` block.
+- `Profile "<p>" mcp "<m>" is not listed on agent "<a>" mcp:` — a profile's `mcp:` entry is not in the agent's list.
+- Parser: `Expected mcp block name` / `Unknown mcp property "<key>"` / `Duplicate mcp property "<key>"` / `Expected } to close mcp block`.
+
+Binding, discovery, and token exchange are platform concerns; the DSL validates the block shape and the agent references.
+
+See `resource-agent` for the agent block's `mcp:` field.
 
 ---
 
@@ -7378,184 +7681,6 @@ When `action:` is set, do **not** set `method` or `path` on the node — deploy 
 - Override registry URL: `--registry` or `SWIRLS_REGISTRY_URL`.
 
 See `node-integration` and `resource-connection`.
-
----
-
-### Database Block Declaration
-
-Top-level `database <name> { }` blocks declare a **Swirls-managed** Postgres: Swirls provisions it on deploy, migrates its schema when it changes, and injects a generated typed Prisma client into `@ts` blocks as `context.db.<name>`. This is distinct from `postgres`, which is a bring-your-own external database the customer connects to and operates (see `resource-postgres`).
-
-There is no `type:` field — the keyword `database` identifies the block. The schema is Prisma schema language inside a `schema: @prisma { }` island.
-
-**Incorrect (empty schema):**
-
-```swirls
-database my_db {
-  schema: @prisma {
-  }
-}
-```
-
-The validator errors: `Database block requires a non-empty schema: @prisma { } block`.
-
-**Incorrect (datasource/generator in the island):**
-
-```swirls
-database my_db {
-  schema: @prisma {
-    datasource db {
-      provider = "postgresql"
-      url      = env("DATABASE_URL")
-    }
-    model User {
-      id    Int    @id @default(autoincrement())
-      email String @unique
-    }
-  }
-}
-```
-
-The `@prisma` island is **models and enums only**. Swirls owns provisioning and the connection; it wraps your schema with its own `datasource` and `generator` block before validating it at deploy time, so a user-supplied `datasource` (or `generator`, or a literal connection URL) collides and fails Prisma's validator. Never write one.
-
-**Correct:**
-
-```swirls
-database my_db {
-  label: "App database"
-  description: "Primary application data"
-  schema: @prisma {
-    model User {
-      id        Int      @id @default(autoincrement())
-      createdAt DateTime @default(now())
-      email     String   @unique
-      role      Role     @default(USER)
-      posts     Post[]
-    }
-
-    model Post {
-      id       Int    @id @default(autoincrement())
-      title    String @db.VarChar(255)
-      author   User   @relation(fields: [authorId], references: [id])
-      authorId Int
-    }
-
-    enum Role {
-      USER
-      ADMIN
-    }
-  }
-}
-```
-
-#### Fields
-
-| Field | Required | Description |
-|-------|----------|--------------|
-| `label` | no | Human-readable label. |
-| `description` | no | Human-readable description. |
-| `schema` | yes | `@prisma { }` island: models, enums, relations, and attributes, written in the Prisma schema language. No `datasource`, `generator`, or connection URL. |
-
-#### The `@prisma` island
-
-`@prisma { ... }` is brace-balanced like `@ts` / `@json` / `@sql`. The Prisma schema language uses only double-quoted strings and `//` / `///` line comments (no single-quoted strings, no block comments), so those are the only constructs that can hide a brace from the lexer. The content is captured verbatim and is **not** re-lexed or reinterpreted by Swirls — it is handed to Prisma's own validator, migration engine, and client generator at deploy time.
-
-#### What the language layer validates (and what it doesn't)
-
-- Database block names must be unique and match `^[a-zA-Z0-9_]+$` (see `spec-common-mistakes`).
-- `schema:` must be present and non-empty.
-- **Prisma-schema correctness (models, fields, relations, attributes) is deliberately NOT checked at the language layer.** The deploy path validates it via Prisma's own validator (`@prisma/internals`), so a malformed model only surfaces as a deploy-time error, not a `swirls doctor` diagnostic.
-
-#### Provisioning and migration
-
-On deploy, Swirls provisions the database if it doesn't exist yet (idempotent — a retried deploy never double-provisions) and holds the connection encrypted with the project's keyset; it is never customer-supplied and never appears in `.swirls`. When the schema changes, the next deploy migrates it: additive changes (new model, new field, new index) auto-apply; destructive or unclassifiable changes are gated for approval rather than applied silently. See `resource-migration` for data transforms a schema diff can't express, and `node-database` and `context-db` for querying.
-
----
-
-### Migration Block Declaration
-
-Top-level `migration <name> { }` blocks declare an ordered, run-once **data transform** against a managed `database` block — the kind of change a schema diff can't express, like collapsing two columns into one. They run after their target database's schema migration, in ascending `order`, and are tracked so a workflow retry never re-applies one.
-
-There is no `type:` field — the keyword `migration` identifies the block.
-
-**Incorrect (missing `database`):**
-
-```swirls
-migration collapse_names {
-  order: 1
-  operation: @ts {
-    // ...
-  }
-}
-```
-
-The validator errors: `Migration "collapse_names" requires "database" (a database block name)`.
-
-**Incorrect (`database` references an undeclared block):**
-
-```swirls
-migration collapse_names {
-  database: not_a_real_db
-  order: 1
-  operation: @ts {
-    // ...
-  }
-}
-```
-
-The validator errors: `Migration "collapse_names" references database "not_a_real_db" which is not defined`.
-
-**Incorrect (duplicate `order` for the same database):**
-
-```swirls
-migration first {
-  database: my_db
-  order: 1
-  operation: @ts { /* ... */ }
-}
-
-migration second {
-  database: my_db
-  order: 1
-  operation: @ts { /* ... */ }
-}
-```
-
-The validator errors: `Migration "second" reuses order 1 for database "my_db" (already used by "first")`. `order` must be a non-negative integer, unique per target database.
-
-**Correct:**
-
-```swirls
-migration collapse_names {
-  database: my_db
-  order: 1
-  operation: @ts {
-    const users = await context.db.my_db.user.findMany({ where: { name: null } })
-    for (const user of users) {
-      await context.db.my_db.user.update({
-        where: { id: user.id },
-        data: { name: `${user.firstName} ${user.lastName}` },
-      })
-    }
-  }
-}
-```
-
-The body runs over the same single-call bridge as a `code` node. Use model methods (`findMany`, `update`, `updateMany`) awaited one at a time. Streaming helpers like `.stream()` and `for await` are not available over the bridge; page with `findMany` instead.
-
-#### Fields
-
-| Field | Required | Description |
-|-------|----------|--------------|
-| `database` | yes | Bare identifier naming a declared top-level `database` block (same file or workspace). |
-| `order` | yes | Non-negative integer. Migrations targeting the same database apply in ascending order. |
-| `operation` | yes | Non-empty `@ts` block: the typed Prisma data-migration body, run against `context.db.<name>` (the full client, same as a `code` node — see `context-db`). |
-
-#### Semantics
-
-- Data migrations run in the post-deploy migration workflow, after the schema migration for the same `database` block, each **exactly once**.
-- A pending data migration gates its deploy for approval, the same way a destructive schema change does — it does not apply silently.
-- Migrations are ordered **per target database** — `order: 1` in one database's migrations does not conflict with `order: 1` in another's.
-- `operation:` runs the same full, un-narrowed Prisma client available in `code` nodes (see `context-db`); it is not a `type: database` node and does not take `operation:` as a capability narrowing field (name collision with the node's `operation` field is coincidental — here `operation:` just holds the `@ts` body).
 
 
 # 9. Streams

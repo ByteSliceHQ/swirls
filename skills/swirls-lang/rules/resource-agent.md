@@ -31,6 +31,7 @@ agent <name> {
 
   tools: [workflow_a, workflow_b]           // optional; workflows exposed as LLM-callable tools
   skills: [skill_a, skill_b]                // optional; local knowledge skills (see resource-skill)
+  mcp: [mcp_a, mcp_b]                        // optional; remote MCP server slots (see resource-mcp)
   team: [agent_b, agent_c]                  // optional; other agents this one may delegate to
 
   sandbox: {                          // optional; workspace sizing + lifecycle
@@ -70,6 +71,8 @@ agent <name> {
 | `maxTokens` | no | Number. |
 | `maxSteps` | no | Number. Caps how many tool-call turns the agent may take. Default **20**. |
 | `tools` | no | Array of bare identifiers naming tool workflows in the workspace. |
+| `skills` | no | Array of bare identifiers naming top-level `skill` blocks (local knowledge skills). See `resource-skill`. |
+| `mcp` | no | Array of bare identifiers naming top-level `mcp` blocks (remote MCP server slots). Tools are discovered at runtime and named `mcp__<slot>__<tool>`. See `resource-mcp`. |
 | `team` | no | Array of bare identifiers naming other `agent` blocks this agent may delegate to as subagents. See below. |
 | `sandbox: { }` | no | Workspace sizing and lifecycle. See below. |
 | `disks` | no | Array of bare identifiers naming top-level `disk` blocks to mount for the agent. See `resource-disk`. |
@@ -229,7 +232,7 @@ workflow handle_ticket {
 
 ### Tool workflows (workflows-as-tools only)
 
-Tools are workflows exposed to the model. There is no MCP, HTTP, or builtin tool syntax. Each entry in `tools: [ … ]` must name a workflow in the workspace that:
+Tools are workflows exposed to the model. The `tools:` field carries workflows only — there is no HTTP or builtin tool syntax, and remote MCP tools are wired separately through `mcp:` (see `resource-mcp`), not through `tools:`. Workflows still cannot use MCP; MCP tools are agent-only. Each entry in `tools: [ … ]` must name a workflow in the workspace that:
 
 - Has a non-empty workflow-level `description:` (fed to the model as tool help text).
 - Has a root node with JSON `inputSchema` that declares a **non-empty `properties` object** (defines the tool call arguments — a tool with zero input properties is rejected: `Agent tool workflow "<n>" root inputSchema must declare a non-empty properties object`).
@@ -279,6 +282,7 @@ Team members are referenced by bare identifier (not a quoted string). A `team` m
 - `provider`, if present, must be one of the four allowed values; it defaults to `openrouter`.
 - Every entry in `tools:` must name a tool workflow defined in the workspace.
 - Every entry in `team:` must name a defined `agent` block in the workspace. An agent cannot list itself, a team member name cannot collide with a `tools:` workflow name in the same agent, and teams cannot form a cycle (`a -> b -> a` is rejected, as is any longer loop).
+- Every entry in `mcp:` must name a declared `mcp` block in the workspace. Each profile's `mcp:` must be a SUBSET of the agent's top-level `mcp:`. See `resource-mcp`.
 - Every `profile <name> { }` must have a unique name within the agent block. Each profile's `tools:` must be a SUBSET of the agent's top-level `tools:`.
 - `sandbox.<field>` values must satisfy the bounds above.
 - `type: agent` nodes' `agent:` field must match a declared agent block. If the node also sets `profile:`, it must name a declared profile in that block.

@@ -1,7 +1,7 @@
 ---
 title: Top-Level Declarations
 impact: HIGH
-tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, database, migration, disk, agent, channel, connection, role, policy
+tags: file, structure, declarations, schema, form, webhook, schedule, workflow, stream, view, trigger, secret, auth, postgres, database, migration, disk, skill, agent, mcp, channel, connection, role, policy
 ---
 
 ## Top-Level Declarations
@@ -18,7 +18,7 @@ export workflow my_workflow {
 }
 ```
 
-The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, database, migration, disk, skill, agent, channel, schema, role, or policy`.
+The parser errors: `Unexpected token: expected form, webhook, schedule, graph, workflow, stream, view, trigger, secret, auth, connection, action, postgres, database, migration, disk, skill, agent, mcp, channel, schema, role, or policy`.
 
 **Correct (all top-level declarations demonstrated):**
 
@@ -127,11 +127,22 @@ trigger on_contact {
   enabled: true
 }
 
+skill product_kb {
+  name: "product-kb"
+}
+
+mcp support_desk {
+  label: "Support desk"
+  description: "Remote MCP server for the support tooling"
+}
+
 agent concierge {
   label: "Concierge"
   secrets: vendor_keys
   provider: openrouter
   model: "openai/gpt-4o-mini"
+  skills: [product_kb]
+  mcp: [support_desk]
 }
 
 channel concierge_web {
@@ -174,7 +185,9 @@ policy {
 - `database <name> { }` — Swirls-managed Postgres with a Prisma-language `schema: @prisma { }` island; provisioned and migrated by Swirls. See `resource-database`.
 - `migration <name> { }` — Ordered, run-once data transform against a `database` block. See `resource-migration`.
 - `disk <name> { }` — Archil-backed remote disk mount; `type: disk` nodes bind to it and run bash. See `resource-disk`.
-- `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
+- `skill <name> { }` — Local knowledge-skill package from `.agents/skills/<name>/`, referenced by `agent.skills:`. See `resource-skill`.
+- `agent <name> { }` — LLM agent definition (provider, model, tools, profiles, skills, MCP slots, subagent `team`); `type: agent` nodes bind to it. See `resource-agent`.
+- `mcp <name> { }` — Remote MCP server slot referenced by `agent.mcp:`; bound to a URL and optional bearer token per project in Cloud, tools discovered at runtime as `mcp__<slot>__<tool>`. See `resource-mcp`.
 - `channel <name> { }` — Binds an agent to a chat platform (Slack, Linear, Discord, web) so it answers messages there. See `resource-channel`.
 - `connection <name> { }` — Project-scoped, Swirls-brokered outbound OAuth slot (`provider:` slack/linear/discord/linkedin/microsoft); referenced by `http` nodes and channels via `connection:`. See `resource-connection`.
 - `action <name> { }` — Typed integration operation (provider/method/path) referenced by `type: integration` nodes via `action:`. See `resource-action`.
