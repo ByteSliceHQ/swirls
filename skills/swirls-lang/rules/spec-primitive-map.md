@@ -6,7 +6,7 @@ tags: spec, primitives, taxonomy, intent, natural-language, categories
 
 ## Intent to Primitive Map
 
-Before writing syntax, map the user's request to primitives. The top-level blocks organize into five categories; pick blocks by category, then look up exact syntax in the other rules.
+Before writing syntax, map the user's request to primitives. The top-level blocks organize into six categories; pick blocks by category, then look up exact syntax in the other rules.
 
 | Category | Blocks | One-line job |
 |---|---|---|
