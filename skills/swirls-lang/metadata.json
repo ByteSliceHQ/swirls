@@ -1,7 +1,0 @@
-{
-  "version": "6.0.0",
-  "organization": "Swirls",
-  "date": "July 2026",
-  "abstract": "DEPRECATED. This GitHub copy of the swirls-lang skill is no longer updated. Install the current skill from https://swirls.ai (npx skills add https://swirls.ai), which resolves through the Agent Skills Discovery index at https://swirls.ai/.well-known/agent-skills/index.json.",
-  "references": ["https://swirls.ai", "https://swirls.ai/.well-known/agent-skills/index.json"]
-}
