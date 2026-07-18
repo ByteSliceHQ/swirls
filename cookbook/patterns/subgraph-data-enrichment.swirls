@@ -1,6 +1,6 @@
 /**
- * Demonstrates the subgraph pattern. A helper workflow enriches company data,
- * and the main workflow calls it as a node.
+ * Demonstrates the subworkflow pattern. A helper workflow enriches company
+ * data, and the main workflow calls it with a workflow node.
  */
 
 webhook company_data {
@@ -107,14 +107,16 @@ workflow process_company {
     label: "Combine results"
     code: @ts {
       const original = context.nodes.root.output
+      // A workflow node's output is keyed by the child workflow's leaf node
+      // name -- extract_info is the leaf of enrich_company.
       const enriched = context.nodes.enrich.output.extract_info
       return {
         company_name: original.company_name,
         domain: original.domain,
         description: enriched.description,
         industry: enriched.industry,
-        products: enriched.products,
-        technologies: enriched.technologies
+        products: enriched.products || [],
+        technologies: enriched.technologies || []
       }
     }
   }

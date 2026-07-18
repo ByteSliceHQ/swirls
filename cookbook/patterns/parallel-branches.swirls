@@ -1,6 +1,6 @@
 /**
  * Demonstrates parallel branches in a workflow.
- * Root fans out to multiple independent nodes that run concurrently.
+ * Root fans out to multiple independent nodes; the branches join downstream.
  */
 
 webhook article_submitted {

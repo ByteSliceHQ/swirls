@@ -67,7 +67,8 @@ workflow generate_report {
     stream: events
     version: v1
     filter: @ts {
-      return {}
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      return { created_at: { gte: since } }
     }
   }
 
@@ -95,7 +96,7 @@ workflow generate_report {
     type: email
     label: "Send report"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return "team@example.com" }
     subject: @ts { return "Daily Event Report - " + context.nodes.root.output.date }
     text: @ts {
       const summary = context.nodes.summarize.output

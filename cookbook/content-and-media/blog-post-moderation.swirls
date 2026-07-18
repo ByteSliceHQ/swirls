@@ -97,7 +97,7 @@ workflow moderate_post {
     type: email
     label: "Notify author"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return context.nodes.root.output.author_email }
     subject: @ts { return "Your post: " + context.nodes.root.output.title }
     text: @ts {
       return "Your blog post has been submitted and is being reviewed. You will hear back shortly."

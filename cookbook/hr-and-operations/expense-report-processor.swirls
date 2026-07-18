@@ -89,23 +89,11 @@ workflow process_expense {
   node manager_review {
     type: code
     label: "Manager review"
-    code: @ts {
-      const expense = context.nodes.root.output
-      const policy = context.nodes.check_policy.output
-      return {
-        employee: expense.employee_email,
-        description: expense.description,
-        amount: expense.amount,
-        category: expense.category,
-        policy_limit: policy.limit,
-        over_limit: policy.over_limit,
-        receipt: expense.receipt_url || "not provided"
-      }
-    }
+    code: @ts { return {} }
     review: {
       enabled: true
       title: "Expense Approval Required"
-      description: "This expense exceeds the auto-approval threshold."
+      description: "This expense exceeds the auto-approval threshold. See the check_policy node output for the expense details. Submit your decision; the employee is notified either way."
       schema: @json {
         {
           "type": "object",
@@ -117,8 +105,7 @@ workflow process_expense {
         }
       }
       actions: [
-        { id: "approve", label: "Approve", outcome: "approve" },
-        { id: "deny", label: "Deny", outcome: "reject" }
+        { id: "submit", label: "Submit Decision", outcome: "approve" }
       ]
     }
   }
@@ -127,10 +114,14 @@ workflow process_expense {
     type: email
     label: "Notify employee"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return context.nodes.root.output.employee_email }
     subject: @ts { return "Expense report update" }
     text: @ts {
-      return "Your expense report for $" + context.nodes.root.output.amount + " (" + context.nodes.root.output.category + ") has been submitted for review."
+      const expense = context.nodes.root.output
+      const review = context.reviews.manager_review || {}
+      const decision = review.approved ? "approved" : "denied"
+      const notes = review.notes ? "\n\nManager notes: " + review.notes : ""
+      return "Your expense report for $" + expense.amount + " (" + expense.category + ") has been " + decision + "." + notes
     }
   }
 

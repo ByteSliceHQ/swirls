@@ -87,11 +87,68 @@ workflow monitor_prices {
     }
   }
 
+  node compare {
+    type: code
+    label: "Compare with previous prices"
+    code: @ts {
+      const rows = context.nodes.check_history.output || []
+      const previous = rows.length > 0 && rows[0].tiers ? rows[0].tiers : null
+      const current = context.nodes.extract_prices.output.tiers
+      const key = function(tiers) {
+        return JSON.stringify((tiers || []).map(function(t) {
+          return { name: t.name, monthly_price: t.monthly_price, annual_price: t.annual_price }
+        }))
+      }
+      const changed = previous !== null && key(previous) !== key(current)
+      return {
+        changed: changed,
+        current_count: current.length,
+        previous_count: previous ? previous.length : 0,
+        current_tiers: current
+      }
+    }
+  }
+
+  node route_change {
+    type: switch
+    label: "Route on change"
+    cases: ["changed", "unchanged"]
+    router: @ts {
+      if (context.nodes.compare.output.changed) return "changed"
+      return "unchanged"
+    }
+  }
+
+  node alert_change {
+    type: email
+    label: "Alert on price change"
+    from: @ts { return "no-reply@transactional.byteslice.co" }
+    to: @ts { return "team@example.com" }
+    subject: @ts { return "Competitor pricing changed" }
+    text: @ts {
+      const cmp = context.nodes.compare.output
+      return "Competitor pricing changed.\n\nTiers now: " + cmp.current_count + " (was " + cmp.previous_count + ")\n\nCurrent tiers:\n" + JSON.stringify(cmp.current_tiers, null, 2)
+    }
+  }
+
+  node no_change {
+    type: code
+    label: "No change"
+    code: @ts {
+      return { changed: false }
+    }
+  }
+
   flow {
     root -> scrape_competitor
     scrape_competitor -> extract_prices
     root -> check_history
     extract_prices -> store_result
+    extract_prices -> compare
+    check_history -> compare
+    compare -> route_change
+    route_change -["changed"]-> alert_change
+    route_change -["unchanged"]-> no_change
   }
 }
 

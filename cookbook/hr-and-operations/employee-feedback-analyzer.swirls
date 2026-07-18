@@ -53,7 +53,7 @@ workflow analyze_feedback {
     schema: @json {
       {
         "type": "object",
-        "required": ["themes", "sentiment", "action_items"],
+        "required": ["themes", "sentiment", "action_items", "priority"],
         "properties": {
           "themes": { "type": "array", "items": { "type": "string" } },
           "sentiment": { "type": "string", "enum": ["positive", "neutral", "negative", "mixed"] },

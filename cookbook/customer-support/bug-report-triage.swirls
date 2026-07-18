@@ -24,6 +24,10 @@ form bug_report {
   }
 }
 
+secret triage_slack {
+  vars: [SLACK_WEBHOOK_URL]
+}
+
 workflow triage_bug {
   label: "Triage Bug Report"
 
@@ -82,13 +86,17 @@ workflow triage_bug {
     type: http
     label: "Page on-call"
     method: "POST"
-    url: @ts { return "https://hooks.slack.com/services/EXAMPLE/ONCALL" }
+    url: @ts { return context.secrets.triage_slack.SLACK_WEBHOOK_URL }
+    headers: @ts { return { "Content-Type": "application/json" } }
     body: @ts {
       const bug = context.nodes.root.output
       const cls = context.nodes.classify.output
       return JSON.stringify({
         text: "CRITICAL BUG: " + bug.title + "\nCategory: " + cls.category + "\nPriority: " + cls.priority + "\n" + bug.description
       })
+    }
+    secrets: {
+      triage_slack: [SLACK_WEBHOOK_URL]
     }
   }
 
@@ -113,7 +121,7 @@ workflow triage_bug {
     type: email
     label: "Acknowledge reporter"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return context.nodes.root.output.reporter_email }
     subject: @ts { return "Bug received: " + context.nodes.root.output.title }
     text: @ts {
       return "Thanks for reporting this bug. It has been triaged as " + context.nodes.classify.output.priority + " (" + context.nodes.classify.output.severity + "). Our team is on it."

@@ -66,7 +66,7 @@ workflow onboard_customer {
     type: email
     label: "Send welcome email"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return context.nodes.root.output.email }
     subject: @ts { return context.nodes.personalize.output.subject }
     text: @ts {
       const content = context.nodes.personalize.output

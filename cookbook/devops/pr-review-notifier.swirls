@@ -97,6 +97,7 @@ workflow notify_pr {
     label: "Post to Slack"
     method: "POST"
     url: @ts { return context.secrets.pr_config.SLACK_WEBHOOK_URL }
+    headers: @ts { return { "Content-Type": "application/json" } }
     body: @ts {
       const pr = context.nodes.root.output
       const summary = context.nodes.summarize.output

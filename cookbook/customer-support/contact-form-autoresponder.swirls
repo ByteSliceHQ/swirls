@@ -4,6 +4,7 @@
 
 form contact {
   label: "Contact Us"
+  visibility: public
   schema: @json {
     {
       "type": "object",
@@ -72,7 +73,7 @@ workflow handle_contact {
     type: email
     label: "Send autoresponse"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return context.nodes.root.output.email }
     subject: @ts { return "Re: Your inquiry" }
     text: @ts { return context.nodes.draft_reply.output }
   }

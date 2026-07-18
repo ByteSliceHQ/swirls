@@ -37,6 +37,10 @@ workflow check_uptime {
     secrets: {
       monitor_config: [MONITOR_URL]
     }
+    failurePolicy: {
+      strategy: "fallback"
+      fallbackValue: {}
+    }
   }
 
   node evaluate {
@@ -77,7 +81,7 @@ workflow check_uptime {
     type: email
     label: "Send downtime alert"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return "team@example.com" }
     subject: @ts { return "ALERT: Website is DOWN" }
     text: @ts {
       return "Website is unreachable.\nStatus code: " + context.nodes.evaluate.output.status_code + "\nChecked at: " + context.nodes.evaluate.output.timestamp

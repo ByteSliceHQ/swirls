@@ -1,6 +1,7 @@
 /**
- * Demonstrates complex data transformation in code nodes.
- * All logic stays inline in @ts blocks.
+ * Demonstrates referencing an external .ts.swirls file from a code node.
+ * The transform node loads its function body from ./transform.ts.swirls;
+ * the other nodes keep their logic inline for contrast.
  */
 
 form data_input {
@@ -55,18 +56,7 @@ workflow process_data {
   node transform {
     type: code
     label: "Transform data"
-    code: @ts {
-      const items = context.nodes.root.output.items || []
-      const processed = items.map(function(item) {
-        return {
-          name: item.name ? item.name.toUpperCase() : "",
-          value: item.value || 0,
-          doubled: (item.value || 0) * 2
-        }
-      })
-      const total = processed.reduce(function(sum, item) { return sum + item.value }, 0)
-      return { items: processed, total: total }
-    }
+    code: @ts "./transform.ts.swirls"
   }
 
   node summarize {

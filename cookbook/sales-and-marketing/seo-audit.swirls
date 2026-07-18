@@ -57,7 +57,7 @@ workflow run_seo_audit {
     schema: @json {
       {
         "type": "object",
-        "required": ["score", "issues", "recommendations"],
+        "required": ["score", "issues", "recommendations", "word_count"],
         "properties": {
           "score": { "type": "number", "minimum": 0, "maximum": 100 },
           "issues": {

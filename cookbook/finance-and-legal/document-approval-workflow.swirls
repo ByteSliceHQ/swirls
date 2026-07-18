@@ -7,11 +7,12 @@ form document_submission {
   schema: @json {
     {
       "type": "object",
-      "required": ["title", "content", "author", "doc_type"],
+      "required": ["title", "content", "author", "author_email", "doc_type"],
       "properties": {
         "title": { "type": "string", "title": "Document Title" },
         "content": { "type": "string", "title": "Document Content" },
         "author": { "type": "string", "title": "Author" },
+        "author_email": { "type": "string", "format": "email", "title": "Author Email" },
         "doc_type": {
           "type": "string",
           "title": "Document Type",
@@ -36,6 +37,7 @@ workflow approve_document {
           "title": { "type": "string" },
           "content": { "type": "string" },
           "author": { "type": "string" },
+          "author_email": { "type": "string" },
           "doc_type": {
             "type": "string",
             "enum": ["policy", "procedure", "contract", "proposal"]
@@ -70,36 +72,23 @@ workflow approve_document {
   node manager_review {
     type: code
     label: "Manager review"
-    code: @ts {
-      const doc = context.nodes.root.output
-      const qc = context.nodes.quality_check.output
-      return {
-        title: doc.title,
-        author: doc.author,
-        type: doc.doc_type,
-        quality_score: qc.quality_score,
-        issues: qc.issues,
-        suggestions: qc.suggestions,
-        content_preview: doc.content.substring(0, 500) + "..."
-      }
-    }
+    code: @ts { return {} }
     review: {
       enabled: true
       title: "Manager Approval Required"
-      description: "Review this document and approve or request revisions."
+      description: "Review this document and approve or request revisions. See the quality_check node output for the AI quality report. Reject fails the run; Request Revisions emails the author."
       schema: @json {
         {
           "type": "object",
           "required": ["decision"],
           "properties": {
-            "decision": { "type": "string", "enum": ["approve", "revise", "reject"], "title": "Decision" },
+            "decision": { "type": "string", "enum": ["approve", "revise"], "title": "Decision" },
             "comments": { "type": "string", "title": "Comments" }
           }
         }
       }
       actions: [
-        { id: "approve", label: "Approve", outcome: "approve" },
-        { id: "revise", label: "Request Revisions", outcome: "reject" },
+        { id: "submit", label: "Submit Decision", outcome: "approve" },
         { id: "reject", label: "Reject", outcome: "reject" }
       ]
     }
@@ -133,7 +122,7 @@ workflow approve_document {
     type: email
     label: "Request revisions"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return context.nodes.root.output.author_email }
     subject: @ts { return "Revisions requested: " + context.nodes.root.output.title }
     text: @ts {
       const review = context.reviews.manager_review

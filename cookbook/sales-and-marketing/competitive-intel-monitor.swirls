@@ -69,7 +69,7 @@ workflow scan_competitors {
     type: email
     label: "Send intel report"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return "team@example.com" }
     subject: @ts { return "Weekly Competitive Intel - " + context.nodes.root.output.scanned_at.split("T")[0] }
     text: @ts {
       const report = context.nodes.analyze.output

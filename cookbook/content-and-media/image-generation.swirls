@@ -15,11 +15,6 @@ form image_request {
           "type": "string",
           "title": "Style",
           "enum": ["photorealistic", "illustration", "minimalist", "3d_render"]
-        },
-        "size": {
-          "type": "string",
-          "title": "Size",
-          "enum": ["1024x1024", "1792x1024", "1024x1792"]
         }
       }
     }
@@ -38,8 +33,7 @@ workflow generate_image {
         "type": "object",
         "properties": {
           "description": { "type": "string" },
-          "style": { "type": "string" },
-          "size": { "type": "string" }
+          "style": { "type": "string" }
         }
       }
     }
@@ -63,10 +57,7 @@ workflow generate_image {
     kind: image
     model: "openai/dall-e-3"
     prompt: @ts { return context.nodes.create_prompt.output }
-    options: {
-      n: 1
-      size: "1024x1024"
-    }
+    options: { n: 1, size: "1024x1024" }
   }
 
   node result {

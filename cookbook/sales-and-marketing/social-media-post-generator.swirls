@@ -59,7 +59,7 @@ workflow generate_posts {
     schema: @json {
       {
         "type": "object",
-        "required": ["twitter", "linkedin"],
+        "required": ["twitter", "linkedin", "hashtags"],
         "properties": {
           "twitter": { "type": "string" },
           "linkedin": { "type": "string" },

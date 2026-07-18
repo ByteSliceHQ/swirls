@@ -4,6 +4,7 @@
 
 form event_registration {
   label: "Event Registration"
+  visibility: public
   schema: @json {
     {
       "type": "object",
@@ -46,7 +47,7 @@ workflow register_attendee {
     stream: registrations
     version: v1
     filter: @ts {
-      return {}
+      return { status: { eq: "registered" } }
     }
   }
 

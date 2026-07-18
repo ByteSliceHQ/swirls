@@ -1,7 +1,7 @@
 {
   "title": "The Swirls Cookbook",
   "description": "Copy-paste recipes for real workflows. Each .swirls file is a complete, runnable workflow you can drop into your project, tweak to taste, and deploy.",
-  "updated_at": "2026-04-12T00:00:00Z",
+  "updated_at": "2026-07-18T00:00:00Z",
   "categories": [
     {
       "slug": "sales-and-marketing",
@@ -13,16 +13,26 @@
           "title": "Lead Scoring",
           "file": "sales-and-marketing/lead-scoring.swirls",
           "description": "Scores incoming leads, persists results, and alerts sales on hot ones.",
-          "nodes": ["ai", "switch", "resend"],
+          "nodes": [
+            "ai",
+            "switch",
+            "email"
+          ],
           "trigger": "webhook",
-          "tags": ["persistence"]
+          "tags": [
+            "persistence"
+          ]
         },
         {
           "slug": "competitive-intel-monitor",
           "title": "Competitive Intel Monitor",
           "file": "sales-and-marketing/competitive-intel-monitor.swirls",
           "description": "Scrapes competitor sites weekly and emails a summary of changes.",
-          "nodes": ["firecrawl", "ai", "resend"],
+          "nodes": [
+            "scrape",
+            "ai",
+            "email"
+          ],
           "trigger": "schedule"
         },
         {
@@ -30,16 +40,25 @@
           "title": "Newsletter Generator",
           "file": "sales-and-marketing/newsletter-generator.swirls",
           "description": "Scrapes your blog and industry news, composes a weekly newsletter with human review.",
-          "nodes": ["firecrawl", "ai", "resend"],
+          "nodes": [
+            "scrape",
+            "ai",
+            "email"
+          ],
           "trigger": "schedule",
-          "tags": ["review"]
+          "tags": [
+            "review"
+          ]
         },
         {
           "slug": "seo-audit",
           "title": "SEO Audit",
           "file": "sales-and-marketing/seo-audit.swirls",
           "description": "Scrapes a page and produces an SEO audit with scores, issues, and fixes.",
-          "nodes": ["firecrawl", "ai"],
+          "nodes": [
+            "scrape",
+            "ai"
+          ],
           "trigger": "form"
         },
         {
@@ -47,7 +66,9 @@
           "title": "Content Calendar Generator",
           "file": "sales-and-marketing/content-calendar-generator.swirls",
           "description": "Generates a month of content ideas from themes and goals.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form"
         },
         {
@@ -55,7 +76,9 @@
           "title": "Social Media Post Generator",
           "file": "sales-and-marketing/social-media-post-generator.swirls",
           "description": "Creates platform-specific social posts from a topic and key points.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form"
         },
         {
@@ -63,18 +86,30 @@
           "title": "Sales Call Summarizer",
           "file": "sales-and-marketing/sales-call-summarizer.swirls",
           "description": "Summarizes sales call transcripts and extracts deal signals.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form",
-          "tags": ["persistence"]
+          "tags": [
+            "persistence"
+          ]
         },
         {
           "slug": "price-monitor",
           "title": "Price Monitor",
           "file": "sales-and-marketing/price-monitor.swirls",
           "description": "Monitors competitor pricing pages and alerts on changes.",
-          "nodes": ["firecrawl", "ai", "stream"],
+          "nodes": [
+            "scrape",
+            "ai",
+            "stream",
+            "switch",
+            "email"
+          ],
           "trigger": "schedule",
-          "tags": ["persistence"]
+          "tags": [
+            "persistence"
+          ]
         }
       ]
     },
@@ -88,7 +123,11 @@
           "title": "Support Ticket Router",
           "file": "customer-support/support-ticket-router.swirls",
           "description": "Routes tickets by urgency and department, sends Slack alerts for critical ones.",
-          "nodes": ["ai", "switch", "http"],
+          "nodes": [
+            "ai",
+            "switch",
+            "http"
+          ],
           "trigger": "webhook"
         },
         {
@@ -96,7 +135,12 @@
           "title": "Bug Report Triage",
           "file": "customer-support/bug-report-triage.swirls",
           "description": "Classifies bug severity, assigns priority, notifies the right Slack channel, and emails the reporter.",
-          "nodes": ["ai", "switch", "http", "resend"],
+          "nodes": [
+            "ai",
+            "switch",
+            "http",
+            "email"
+          ],
           "trigger": "form"
         },
         {
@@ -104,7 +148,10 @@
           "title": "Contact Form Autoresponder",
           "file": "customer-support/contact-form-autoresponder.swirls",
           "description": "Classifies contact form inquiries and sends a tailored autoresponse.",
-          "nodes": ["ai", "resend"],
+          "nodes": [
+            "ai",
+            "email"
+          ],
           "trigger": "form"
         },
         {
@@ -112,27 +159,43 @@
           "title": "CSAT Scorer",
           "file": "customer-support/csat-scorer.swirls",
           "description": "Scores customer satisfaction from support interactions and triggers follow-ups for unhappy customers.",
-          "nodes": ["ai", "switch", "resend"],
+          "nodes": [
+            "ai",
+            "switch",
+            "email"
+          ],
           "trigger": "webhook",
-          "tags": ["persistence"]
+          "tags": [
+            "persistence"
+          ]
         },
         {
           "slug": "feedback-survey-processor",
           "title": "Feedback Survey Processor",
           "file": "customer-support/feedback-survey-processor.swirls",
           "description": "Processes NPS surveys, routes detractors for follow-up, and persists all scores.",
-          "nodes": ["ai", "switch", "resend"],
+          "nodes": [
+            "ai",
+            "switch",
+            "email"
+          ],
           "trigger": "webhook",
-          "tags": ["persistence"]
+          "tags": [
+            "persistence"
+          ]
         },
         {
           "slug": "review-sentiment-analysis",
           "title": "Review Sentiment Analysis",
           "file": "customer-support/review-sentiment-analysis.swirls",
           "description": "Analyzes product review sentiment and persists results for dashboards.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "webhook",
-          "tags": ["persistence"]
+          "tags": [
+            "persistence"
+          ]
         }
       ]
     },
@@ -146,16 +209,24 @@
           "title": "Blog Post Moderation",
           "file": "content-and-media/blog-post-moderation.swirls",
           "description": "AI checks blog submissions for policy violations, then routes to human review or auto-publish.",
-          "nodes": ["ai", "switch", "resend"],
+          "nodes": [
+            "ai",
+            "switch",
+            "email"
+          ],
           "trigger": "form",
-          "tags": ["review"]
+          "tags": [
+            "review"
+          ]
         },
         {
           "slug": "meeting-notes-summarizer",
           "title": "Meeting Notes Summarizer",
           "file": "content-and-media/meeting-notes-summarizer.swirls",
           "description": "Turns raw meeting notes into structured summaries with action items.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form"
         },
         {
@@ -163,7 +234,9 @@
           "title": "Content Translator",
           "file": "content-and-media/content-translator.swirls",
           "description": "Translates content into multiple languages with tone preservation.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form"
         },
         {
@@ -171,7 +244,9 @@
           "title": "KB Article Generator",
           "file": "content-and-media/kb-article-generator.swirls",
           "description": "Generates knowledge base articles from support ticket patterns, scrapes existing docs to find gaps.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form"
         },
         {
@@ -179,7 +254,9 @@
           "title": "Recipe Generator",
           "file": "content-and-media/recipe-generator.swirls",
           "description": "Generates recipes from available ingredients and dietary preferences.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form"
         },
         {
@@ -187,7 +264,11 @@
           "title": "Changelog Announcer",
           "file": "content-and-media/changelog-announcer.swirls",
           "description": "Takes a changelog entry and generates announcements for email, Slack, and social.",
-          "nodes": ["ai", "http", "resend"],
+          "nodes": [
+            "ai",
+            "http",
+            "email"
+          ],
           "trigger": "form"
         },
         {
@@ -195,7 +276,12 @@
           "title": "Daily News Digest",
           "file": "content-and-media/daily-news-digest.swirls",
           "description": "Fetches top Hacker News stories daily, summarizes with AI, and emails a digest.",
-          "nodes": ["http", "ai", "resend"],
+          "nodes": [
+            "http",
+            "map",
+            "ai",
+            "email"
+          ],
           "trigger": "schedule"
         },
         {
@@ -203,18 +289,26 @@
           "title": "AI Embeddings",
           "file": "content-and-media/ai-embeddings.swirls",
           "description": "Generates text embeddings for semantic search.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "webhook",
-          "tags": ["ai-embed"]
+          "tags": [
+            "ai-embed"
+          ]
         },
         {
           "slug": "image-generation",
           "title": "Image Generation",
           "file": "content-and-media/image-generation.swirls",
           "description": "Generates product images from text descriptions with prompt refinement.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form",
-          "tags": ["ai-image"]
+          "tags": [
+            "ai-image"
+          ]
         }
       ]
     },
@@ -228,25 +322,39 @@
           "title": "Job Application Screener",
           "file": "hr-and-operations/job-application-screener.swirls",
           "description": "AI evaluates job applications for fit, routes top candidates to human review, and sends rejections.",
-          "nodes": ["ai", "switch", "resend"],
+          "nodes": [
+            "ai",
+            "switch",
+            "email"
+          ],
           "trigger": "form",
-          "tags": ["review"]
+          "tags": [
+            "review"
+          ]
         },
         {
           "slug": "expense-report-processor",
           "title": "Expense Report Processor",
           "file": "hr-and-operations/expense-report-processor.swirls",
           "description": "Validates expense amounts against policy, routes high-value expenses for manager approval.",
-          "nodes": ["switch", "resend"],
+          "nodes": [
+            "switch",
+            "email"
+          ],
           "trigger": "form",
-          "tags": ["review"]
+          "tags": [
+            "review"
+          ]
         },
         {
           "slug": "onboarding-email-sequence",
           "title": "Onboarding Email Sequence",
           "file": "hr-and-operations/onboarding-email-sequence.swirls",
           "description": "Sends personalized onboarding emails tailored to plan and use case.",
-          "nodes": ["ai", "resend"],
+          "nodes": [
+            "ai",
+            "email"
+          ],
           "trigger": "webhook"
         },
         {
@@ -254,16 +362,24 @@
           "title": "Employee Feedback Analyzer",
           "file": "hr-and-operations/employee-feedback-analyzer.swirls",
           "description": "Analyzes anonymous employee feedback for themes and action items, persists for trend tracking.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form",
-          "tags": ["persistence"]
+          "tags": [
+            "persistence"
+          ]
         },
         {
           "slug": "event-registration",
           "title": "Event Registration",
           "file": "hr-and-operations/event-registration.swirls",
           "description": "Handles registrations with confirmation emails and waitlist overflow.",
-          "nodes": ["switch", "stream", "resend"],
+          "nodes": [
+            "switch",
+            "stream",
+            "email"
+          ],
           "trigger": "form"
         }
       ]
@@ -278,27 +394,43 @@
           "title": "Contract Reviewer",
           "file": "finance-and-legal/contract-reviewer.swirls",
           "description": "Reviews contracts for risks and key terms, flags critical clauses for human legal review.",
-          "nodes": ["ai", "switch"],
+          "nodes": [
+            "ai",
+            "switch"
+          ],
           "trigger": "form",
-          "tags": ["review"]
+          "tags": [
+            "review"
+          ]
         },
         {
           "slug": "invoice-processor",
           "title": "Invoice Processor",
           "file": "finance-and-legal/invoice-processor.swirls",
           "description": "Extracts line items and totals from invoices, flags anomalies, and stores results.",
-          "nodes": ["ai", "switch"],
+          "nodes": [
+            "ai",
+            "switch"
+          ],
           "trigger": "form",
-          "tags": ["persistence"]
+          "tags": [
+            "persistence"
+          ]
         },
         {
           "slug": "document-approval-workflow",
           "title": "Document Approval Workflow",
           "file": "finance-and-legal/document-approval-workflow.swirls",
           "description": "Multi-stage document approval with human review gates and revision requests.",
-          "nodes": ["ai", "switch", "resend"],
+          "nodes": [
+            "ai",
+            "switch",
+            "email"
+          ],
           "trigger": "form",
-          "tags": ["review"]
+          "tags": [
+            "review"
+          ]
         }
       ]
     },
@@ -312,16 +444,26 @@
           "title": "Website Uptime Monitor",
           "file": "devops/website-uptime-monitor.swirls",
           "description": "Pings a URL every 15 minutes, emails an alert when it goes down.",
-          "nodes": ["http", "switch", "resend"],
+          "nodes": [
+            "http",
+            "switch",
+            "email"
+          ],
           "trigger": "schedule",
-          "tags": ["persistence"]
+          "tags": [
+            "persistence"
+          ]
         },
         {
           "slug": "inventory-alert",
           "title": "Inventory Alert",
           "file": "devops/inventory-alert.swirls",
           "description": "Checks inventory levels via API, emails when stock hits reorder point.",
-          "nodes": ["http", "switch", "resend"],
+          "nodes": [
+            "http",
+            "switch",
+            "email"
+          ],
           "trigger": "schedule"
         },
         {
@@ -329,7 +471,11 @@
           "title": "PR Review Notifier",
           "file": "devops/pr-review-notifier.swirls",
           "description": "Receives GitHub PR webhooks, summarizes changes with AI, and posts to Slack.",
-          "nodes": ["ai", "http", "switch"],
+          "nodes": [
+            "ai",
+            "http",
+            "switch"
+          ],
           "trigger": "webhook"
         },
         {
@@ -337,7 +483,9 @@
           "title": "Webhook to Slack",
           "file": "devops/webhook-to-slack.swirls",
           "description": "Forwards any webhook event to Slack with formatted messages.",
-          "nodes": ["http"],
+          "nodes": [
+            "http"
+          ],
           "trigger": "webhook"
         },
         {
@@ -345,7 +493,9 @@
           "title": "Data Quality Checker",
           "file": "devops/data-quality-checker.swirls",
           "description": "Validates incoming data records against quality rules and quarantines bad data.",
-          "nodes": ["switch"],
+          "nodes": [
+            "switch"
+          ],
           "trigger": "webhook"
         },
         {
@@ -353,36 +503,53 @@
           "title": "API Key Auth Example",
           "file": "devops/api-key-auth-example.swirls",
           "description": "Demonstrates auth blocks with API key authentication (OpenWeatherMap).",
-          "nodes": ["http"],
+          "nodes": [
+            "http"
+          ],
           "trigger": "schedule",
-          "tags": ["auth"]
+          "tags": [
+            "auth"
+          ]
         },
         {
           "slug": "oauth-github-integration",
           "title": "OAuth GitHub Integration",
           "file": "devops/oauth-github-integration.swirls",
           "description": "Demonstrates OAuth auth blocks with GitHub client credentials.",
-          "nodes": ["http"],
+          "nodes": [
+            "http"
+          ],
           "trigger": "schedule",
-          "tags": ["auth"]
+          "tags": [
+            "auth"
+          ]
         },
         {
           "slug": "postgres-crm-pipeline",
           "title": "Postgres CRM Pipeline",
           "file": "devops/postgres-crm-pipeline.swirls",
           "description": "Reads leads from Postgres, scores with AI, writes results back.",
-          "nodes": ["postgres", "ai"],
+          "nodes": [
+            "postgres",
+            "ai"
+          ],
           "trigger": "schedule",
-          "tags": ["database"]
+          "tags": [
+            "database"
+          ]
         },
         {
           "slug": "bucket-file-processor",
           "title": "Bucket File Processor",
           "file": "devops/bucket-file-processor.swirls",
           "description": "Downloads a file from a bucket, processes it, and uploads the result.",
-          "nodes": ["bucket"],
+          "nodes": [
+            "bucket"
+          ],
           "trigger": "webhook",
-          "tags": ["storage"]
+          "tags": [
+            "storage"
+          ]
         }
       ]
     },
@@ -396,54 +563,84 @@
           "title": "Parallel Branches",
           "file": "patterns/parallel-branches.swirls",
           "description": "Fan-out: root splits into multiple independent nodes that run concurrently.",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "webhook",
-          "tags": ["pattern"]
+          "tags": [
+            "pattern"
+          ]
         },
         {
           "slug": "multi-trigger-workflow",
           "title": "Multi-Trigger Workflow",
           "file": "patterns/multi-trigger-workflow.swirls",
           "description": "One workflow, three trigger sources (form, webhook, schedule).",
-          "nodes": ["ai"],
+          "nodes": [
+            "ai"
+          ],
           "trigger": "form",
-          "tags": ["pattern"]
+          "tags": [
+            "pattern"
+          ]
         },
         {
           "slug": "subgraph-data-enrichment",
           "title": "Subgraph Data Enrichment",
           "file": "patterns/subgraph-data-enrichment.swirls",
-          "description": "Calling one workflow from another as a subgraph node.",
-          "nodes": ["firecrawl", "ai", "workflow"],
+          "description": "Subworkflows: calling one workflow from another with a workflow node.",
+          "nodes": [
+            "scrape",
+            "ai",
+            "workflow"
+          ],
           "trigger": "webhook",
-          "tags": ["pattern", "subgraph"]
+          "tags": [
+            "pattern",
+            "subgraph"
+          ]
         },
         {
           "slug": "wait-node-delayed-followup",
           "title": "Wait Node Delayed Follow-up",
           "file": "patterns/wait-node-delayed-followup.swirls",
           "description": "Sends email immediately, then waits 3 days before a follow-up.",
-          "nodes": ["resend", "wait"],
+          "nodes": [
+            "email",
+            "wait"
+          ],
           "trigger": "webhook",
-          "tags": ["pattern"]
+          "tags": [
+            "pattern"
+          ]
         },
         {
           "slug": "stream-reporting-dashboard",
           "title": "Stream Reporting Dashboard",
           "file": "patterns/stream-reporting-dashboard.swirls",
           "description": "One workflow logs events with persistence, another queries the stream and emails a report.",
-          "nodes": ["stream", "resend"],
+          "nodes": [
+            "stream",
+            "email"
+          ],
           "trigger": "webhook",
-          "tags": ["pattern", "persistence"]
+          "tags": [
+            "pattern",
+            "persistence"
+          ]
         },
         {
           "slug": "external-ts-file-pattern",
           "title": "External TS File Pattern",
           "file": "patterns/external-ts-file-pattern.swirls",
-          "description": "Complex data transformations entirely in inline @ts blocks.",
-          "nodes": ["code"],
+          "description": "Referencing an external .ts.swirls file from a code node with @ts \"path\".",
+          "nodes": [
+            "code"
+          ],
           "trigger": "form",
-          "tags": ["pattern"]
+          "tags": [
+            "pattern"
+          ]
         }
       ]
     }
@@ -456,12 +653,12 @@
     },
     {
       "name": "RESEND_API_KEY",
-      "required_by": "All resend nodes",
+      "required_by": "All email nodes",
       "description": "Sends transactional emails via Resend"
     },
     {
       "name": "FIRECRAWL_API_KEY",
-      "required_by": "All firecrawl nodes",
+      "required_by": "All scrape nodes",
       "description": "Web scraping via Firecrawl"
     },
     {
@@ -483,6 +680,26 @@
       "name": "DATABASE_URL",
       "required_by": "postgres-crm-pipeline",
       "description": "PostgreSQL connection string"
+    },
+    {
+      "name": "SLACK_WEBHOOK_URL",
+      "required_by": "Slack notification recipes",
+      "description": "Slack incoming webhook URL"
+    },
+    {
+      "name": "MONITOR_URL",
+      "required_by": "website-uptime-monitor",
+      "description": "URL to ping"
+    },
+    {
+      "name": "INVENTORY_API_URL",
+      "required_by": "inventory-alert",
+      "description": "Inventory API endpoint"
+    },
+    {
+      "name": "INVENTORY_API_KEY",
+      "required_by": "inventory-alert",
+      "description": "Inventory API key"
     }
   ],
   "node_types": [
@@ -492,13 +709,19 @@
     },
     {
       "type": "ai",
-      "description": "Call an LLM (text, object, embed, or image)"
+      "description": "Call an LLM (text, object, embed, image, or video)"
     },
-    { "type": "http", "description": "Make HTTP requests to external APIs" },
-    { "type": "resend", "description": "Send transactional email via Resend" },
     {
-      "type": "firecrawl",
-      "description": "Scrape and extract web page content"
+      "type": "http",
+      "description": "Make HTTP requests to external APIs"
+    },
+    {
+      "type": "email",
+      "description": "Send transactional email (via Resend)"
+    },
+    {
+      "type": "scrape",
+      "description": "Scrape and extract web page content (via Firecrawl)"
     },
     {
       "type": "switch",
@@ -506,17 +729,27 @@
     },
     {
       "type": "postgres",
-      "description": "Read from or write to a PostgreSQL database"
+      "description": "Run parameterized SQL against a database you operate"
     },
     {
       "type": "bucket",
       "description": "Download or upload files to cloud storage"
     },
-    { "type": "stream", "description": "Query persisted event streams" },
-    { "type": "workflow", "description": "Call another workflow as a subgraph" },
+    {
+      "type": "stream",
+      "description": "Read persisted stream data with filters"
+    },
+    {
+      "type": "workflow",
+      "description": "Call another workflow one-shot"
+    },
     {
       "type": "wait",
       "description": "Pause execution for a duration before continuing"
+    },
+    {
+      "type": "map",
+      "description": "Iterate over an array, running a subgraph or workflow per item"
     }
   ]
 }

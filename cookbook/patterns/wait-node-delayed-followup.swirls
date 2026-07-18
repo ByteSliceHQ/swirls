@@ -39,7 +39,7 @@ workflow delayed_followup {
     type: email
     label: "Send welcome"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return context.nodes.root.output.email }
     subject: @ts { return "Welcome, " + context.nodes.root.output.name + "!" }
     text: @ts {
       return "Hi " + context.nodes.root.output.name + ",\n\nWelcome aboard! We are excited to have you."
@@ -57,7 +57,7 @@ workflow delayed_followup {
     type: email
     label: "Send check-in"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return context.nodes.root.output.email }
     subject: @ts { return "How is it going, " + context.nodes.root.output.name + "?" }
     text: @ts {
       return "Hi " + context.nodes.root.output.name + ",\n\nJust checking in. Is there anything we can help you with? Reply to this email anytime."

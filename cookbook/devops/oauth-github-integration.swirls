@@ -1,6 +1,8 @@
 /**
- * Demonstrates OAuth auth blocks. Fetches GitHub repo stats
- * using client credentials.
+ * Demonstrates the shape of an oauth auth block with the
+ * client_credentials grant. Note: GitHub's token endpoint does not
+ * actually support client_credentials -- swap in your own provider's
+ * token URL to run this, or use a bearer auth block with a GitHub PAT.
  */
 
 secret github_creds {

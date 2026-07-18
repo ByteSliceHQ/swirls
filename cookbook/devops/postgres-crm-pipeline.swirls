@@ -22,7 +22,8 @@ postgres crm_db {
           "email": { "type": "string" },
           "company": { "type": "string" },
           "score": { "type": "number" },
-          "status": { "type": "string" }
+          "status": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
         },
         "required": ["id", "email"]
       }

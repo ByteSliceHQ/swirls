@@ -50,7 +50,7 @@ workflow summarize_call {
     schema: @json {
       {
         "type": "object",
-        "required": ["summary", "deal_stage", "next_steps"],
+        "required": ["summary", "deal_stage", "next_steps", "sentiment", "deal_probability"],
         "properties": {
           "summary": { "type": "string" },
           "deal_stage": { "type": "string", "enum": ["discovery", "demo", "proposal", "negotiation", "closed_won", "closed_lost"] },

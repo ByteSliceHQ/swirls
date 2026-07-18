@@ -51,7 +51,7 @@ workflow score_csat {
     schema: @json {
       {
         "type": "object",
-        "required": ["score", "resolved"],
+        "required": ["score", "resolved", "customer_sentiment"],
         "properties": {
           "score": { "type": "number", "minimum": 1, "maximum": 5 },
           "resolved": { "type": "boolean" },
@@ -76,7 +76,7 @@ workflow score_csat {
     type: email
     label: "Send follow-up"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return context.nodes.root.output.customer_email }
     subject: @ts { return "Following up on your support experience" }
     text: @ts {
       return "We noticed your recent support experience may not have met your expectations. We are committed to doing better. A senior support specialist will reach out within 24 hours to ensure your issue is fully resolved."

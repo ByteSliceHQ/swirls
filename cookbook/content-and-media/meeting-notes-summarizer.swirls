@@ -85,7 +85,7 @@ workflow summarize_meeting {
         summary: result.summary,
         action_items: result.action_items,
         decisions: result.decisions,
-        follow_ups: result.follow_ups
+        follow_ups: result.follow_ups || []
       }
     }
   }

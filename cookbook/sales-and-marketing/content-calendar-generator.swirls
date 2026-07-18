@@ -94,7 +94,7 @@ workflow generate_calendar {
       const cal = context.nodes.plan.output
       return {
         goal: context.nodes.root.output.goal,
-        total_posts: cal.total_posts,
+        total_posts: cal.weeks.reduce(function(n, w) { return n + (w.posts ? w.posts.length : 0) }, 0),
         weeks: cal.weeks
       }
     }

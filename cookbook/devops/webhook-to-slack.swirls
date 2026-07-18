@@ -54,6 +54,7 @@ workflow forward_to_slack {
     label: "Post to Slack"
     method: "POST"
     url: @ts { return context.secrets.slack_config.SLACK_WEBHOOK_URL }
+    headers: @ts { return { "Content-Type": "application/json" } }
     body: @ts {
       return JSON.stringify(context.nodes.format_message.output)
     }

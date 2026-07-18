@@ -74,7 +74,7 @@ workflow check_inventory {
     type: email
     label: "Send low stock alert"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return "team@example.com" }
     subject: @ts {
       return "Low Stock Alert: " + context.nodes.find_low_stock.output.low_stock_count + " items need reorder"
     }

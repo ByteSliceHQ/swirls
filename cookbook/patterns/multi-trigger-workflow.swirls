@@ -40,7 +40,7 @@ workflow process_message {
     type: code
     label: "Normalize input"
     code: @ts {
-      const input = context.nodes.root.input
+      const input = context.nodes.root.input || {}
       const triggerType = context.meta.triggerType
       return {
         message: input.message || "Scheduled run at " + new Date().toISOString(),

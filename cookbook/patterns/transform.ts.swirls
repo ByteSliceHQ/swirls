@@ -1,0 +1,12 @@
+// Function body for the "Transform data" node in external-ts-file-pattern.swirls.
+// The same context object is in scope as in an inline @ts block.
+const items = context.nodes.root.output.items || []
+const processed = items.map(function(item) {
+  return {
+    name: item.name ? item.name.toUpperCase() : "",
+    value: item.value || 0,
+    doubled: (item.value || 0) * 2
+  }
+})
+const total = processed.reduce(function(sum, item) { return sum + item.value }, 0)
+return { items: processed, total: total }

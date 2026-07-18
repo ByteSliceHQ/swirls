@@ -31,7 +31,6 @@ workflow generate_newsletter {
     type: scrape
     label: "Scrape company blog"
     url: @ts { return "https://byteslice.co/blog" }
-    selector: ".post-list"
     onlyMainContent: true
     formats: ["markdown"]
   }
@@ -40,7 +39,6 @@ workflow generate_newsletter {
     type: scrape
     label: "Scrape industry news"
     url: @ts { return "https://news.ycombinator.com" }
-    selector: ".headlines"
     onlyMainContent: true
     formats: ["markdown"]
   }
@@ -72,20 +70,23 @@ workflow generate_newsletter {
   node review_draft {
     type: code
     label: "Review draft"
-    code: @ts {
-      return {
-        subject: context.nodes.compose.output.subject,
-        preview: context.nodes.compose.output.preview_text || "",
-        body: context.nodes.compose.output.body_html
-      }
-    }
+    code: @ts { return {} }
     review: {
       enabled: true
       title: "Review newsletter draft"
-      description: "Approve or request changes to this week's newsletter."
+      description: "Approve to send this week's newsletter, or discard to stop the run. The draft is in the compose node's output."
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "notes": { "type": "string", "title": "Notes" }
+          },
+          "additionalProperties": false
+        }
+      }
       actions: [
         { id: "send", label: "Send", outcome: "approve" },
-        { id: "revise", label: "Needs Changes", outcome: "reject" }
+        { id: "discard", label: "Discard", outcome: "reject" }
       ]
     }
   }
@@ -94,7 +95,7 @@ workflow generate_newsletter {
     type: email
     label: "Send newsletter"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return "team@example.com" }
     subject: @ts { return context.nodes.compose.output.subject }
     html: @ts { return context.nodes.compose.output.body_html }
   }

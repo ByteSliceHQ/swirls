@@ -99,24 +99,41 @@ workflow review_contract {
   node legal_review {
     type: code
     label: "Queue for legal"
-    code: @ts {
-      const analysis = context.nodes.analyze.output
-      return {
-        status: "pending_legal_review",
-        risk_level: analysis.risk_level,
-        risks: analysis.risks,
-        key_terms: analysis.key_terms,
-        contract_type: context.nodes.root.output.contract_type
-      }
-    }
+    code: @ts { return {} }
     review: {
       enabled: true
       title: "Legal Review Required"
-      description: "This contract has been flagged as high risk."
+      description: "This contract has been flagged as high risk. See the analyze node output for the flagged risks and key terms."
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "notes": { "type": "string", "title": "Notes" }
+          },
+          "additionalProperties": false
+        }
+      }
       actions: [
         { id: "approve", label: "Approve with Notes", outcome: "approve" },
         { id: "reject", label: "Do Not Sign", outcome: "reject" }
       ]
+    }
+  }
+
+  node record_approval {
+    type: code
+    label: "Record legal approval"
+    code: @ts {
+      const analysis = context.nodes.analyze.output
+      const review = context.reviews.legal_review || {}
+      return {
+        status: "approved_by_legal",
+        risk_level: analysis.risk_level,
+        risks: analysis.risks,
+        key_terms: analysis.key_terms,
+        contract_type: context.nodes.root.output.contract_type,
+        legal_notes: review.notes || ""
+      }
     }
   }
 
@@ -140,6 +157,7 @@ workflow review_contract {
     analyze -> route_risk
     route_risk -["needs_legal"]-> legal_review
     route_risk -["low_risk"]-> summary
+    legal_review -> record_approval
   }
 }
 

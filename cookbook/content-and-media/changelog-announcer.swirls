@@ -69,6 +69,7 @@ workflow announce_release {
     label: "Post to Slack"
     method: "POST"
     url: @ts { return context.secrets.announce_config.SLACK_WEBHOOK_URL }
+    headers: @ts { return { "Content-Type": "application/json" } }
     body: @ts {
       return JSON.stringify({
         text: context.nodes.generate_announcement.output.slack_message
@@ -83,7 +84,7 @@ workflow announce_release {
     type: email
     label: "Send email announcement"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return "team@example.com" }
     subject: @ts { return "Release " + context.nodes.root.output.version }
     text: @ts { return context.nodes.generate_announcement.output.email_body }
   }

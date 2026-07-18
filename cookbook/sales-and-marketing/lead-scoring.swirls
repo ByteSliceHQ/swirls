@@ -53,7 +53,7 @@ workflow score_lead {
     schema: @json {
       {
         "type": "object",
-        "required": ["score", "reasoning"],
+        "required": ["score", "reasoning", "tier"],
         "properties": {
           "score": { "type": "number", "minimum": 0, "maximum": 100 },
           "reasoning": { "type": "string" },
@@ -77,7 +77,7 @@ workflow score_lead {
     type: email
     label: "Alert sales team"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return "sales@example.com" }
     subject: @ts {
       return "Hot lead: " + context.nodes.root.output.company + " (Score: " + context.nodes.score.output.score + ")"
     }

@@ -1,6 +1,6 @@
 /**
- * Generates knowledge base articles from support ticket patterns.
- * Scrapes existing docs, identifies gaps, and drafts new articles.
+ * Generates knowledge base articles from support ticket patterns,
+ * with a human review gate before the article is published.
  */
 
 form kb_request {
@@ -12,7 +12,6 @@ form kb_request {
       "properties": {
         "topic": { "type": "string", "title": "Topic" },
         "common_questions": { "type": "string", "title": "Common Questions (one per line)" },
-        "existing_doc_url": { "type": "string", "title": "Existing Doc URL (if updating)" },
         "audience": {
           "type": "string",
           "title": "Audience",
@@ -36,7 +35,6 @@ workflow generate_kb_article {
         "properties": {
           "topic": { "type": "string" },
           "common_questions": { "type": "string" },
-          "existing_doc_url": { "type": "string" },
           "audience": { "type": "string" }
         }
       }
@@ -90,21 +88,38 @@ workflow generate_kb_article {
   node review_article {
     type: code
     label: "Review article"
-    code: @ts {
-      return {
-        title: context.nodes.research.output.title,
-        article: context.nodes.write_article.output,
-        section_count: context.nodes.research.output.sections.length
-      }
-    }
+    code: @ts { return {} }
     review: {
       enabled: true
       title: "Review KB Article"
-      description: "Review the generated article before publishing."
+      description: "Review the generated article (see the write_article node output) before publishing. Approve to publish or reject to discard."
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "notes": { "type": "string", "title": "Reviewer Notes" }
+          },
+          "additionalProperties": false
+        }
+      }
       actions: [
         { id: "publish", label: "Publish", outcome: "approve" },
-        { id: "edit", label: "Needs Editing", outcome: "reject" }
+        { id: "discard", label: "Discard", outcome: "reject" }
       ]
+    }
+  }
+
+  node publish {
+    type: code
+    label: "Publish article"
+    code: @ts {
+      const review = context.reviews.review_article || {}
+      return {
+        title: context.nodes.research.output.title,
+        article: context.nodes.write_article.output,
+        section_count: context.nodes.research.output.sections.length,
+        reviewer_notes: review.notes || ""
+      }
     }
   }
 
@@ -112,6 +127,7 @@ workflow generate_kb_article {
     root -> research
     research -> write_article
     write_article -> review_article
+    review_article -> publish
   }
 }
 

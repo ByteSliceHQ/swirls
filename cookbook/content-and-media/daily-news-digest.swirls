@@ -41,13 +41,44 @@ workflow build_digest {
     }
   }
 
+  node fetch_details {
+    type: map
+    label: "Fetch each story"
+    items: @ts { return context.nodes.fetch_stories.output.ids }
+    maxItems: 5
+
+    subgraph {
+      root {
+        type: http
+        label: "Fetch story"
+        inputSchema: @json { { "type": "number" } }
+        url: @ts { return "https://hacker-news.firebaseio.com/v0/item/" + context.iteration.item + ".json" }
+      }
+    }
+  }
+
+  node collect_stories {
+    type: code
+    label: "Collect story titles"
+    code: @ts {
+      const rows = context.nodes.fetch_details.output || []
+      const stories = rows
+        .map(function(row) { return row.root })
+        .filter(function(story) { return story && story.title })
+        .map(function(story) { return { title: story.title, url: story.url || "", score: story.score || 0 } })
+      return { stories: stories }
+    }
+  }
+
   node summarize {
     type: ai
     label: "Summarize headlines"
     kind: text
     model: "google/gemini-2.5-flash"
     prompt: @ts {
-      return "Write a brief daily tech news digest intro paragraph based on today being " + context.nodes.root.output.timestamp + ". Keep it to 3-4 sentences highlighting that these are the top stories from Hacker News today."
+      const stories = context.nodes.collect_stories.output.stories
+      const list = stories.map(function(s) { return "- " + s.title + " (" + s.score + " points) " + s.url }).join("\n")
+      return "Write a brief daily tech news digest for " + context.nodes.root.output.timestamp + ". Open with a 2-3 sentence intro, then list each story with a one-line takeaway.\n\nToday's top Hacker News stories:\n" + list
     }
     temperature: 0.7
   }
@@ -56,7 +87,7 @@ workflow build_digest {
     type: email
     label: "Send digest email"
     from: @ts { return "no-reply@transactional.byteslice.co" }
-    to: @ts { return "cj@swirls.ai" }
+    to: @ts { return "team@example.com" }
     subject: @ts {
       const d = new Date(context.nodes.root.output.timestamp)
       return "Daily Tech Digest - " + d.toLocaleDateString()
@@ -67,7 +98,9 @@ workflow build_digest {
   flow {
     root -> fetch_tech
     fetch_tech -> fetch_stories
-    fetch_stories -> summarize
+    fetch_stories -> fetch_details
+    fetch_details -> collect_stories
+    collect_stories -> summarize
     summarize -> send_digest
   }
 }
