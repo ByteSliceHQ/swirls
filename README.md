@@ -14,7 +14,7 @@
   <a href="https://discord.gg/ZXTBZGjQ5a"><strong>Discord</strong></a>
 </p>
 
-## Skills have moved
+## Skills
 
 The swirls-lang skill installs directly from the site:
 
@@ -25,10 +25,6 @@ npx skills add https://swirls.ai
 That resolves through the Agent Skills Discovery index at
 [swirls.ai/.well-known/agent-skills](https://swirls.ai/.well-known/agent-skills/index.json),
 which always serves the latest version with an integrity digest.
-
-The copy that used to live in this repo (`skills/swirls-lang`) is deprecated
-and no longer updated. If you installed from this repo, reinstall with the
-command above.
 
 ## Getting Started
 
