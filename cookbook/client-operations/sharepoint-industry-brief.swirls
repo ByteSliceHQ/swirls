@@ -1,0 +1,132 @@
+/**
+ * Weekly industry brief for a client. Searches the web for news in the
+ * client's industry, writes a short briefing with AI, saves it into the
+ * client's SharePoint document library, and emails them the link from
+ * your own Microsoft 365 mailbox.
+ *
+ * Setup:
+ *   1. swirls add microsoft upload_drive_file send_mail
+ *   2. Deploy, then authorize the Microsoft connection in Cloud -> Connections.
+ *   3. Fill in the drive and folder ids below. Find them with the
+ *      list_site_drives and list_drive_items actions, or from SharePoint URLs.
+ */
+
+connection client_microsoft {
+  label: "Client Microsoft 365"
+  provider: microsoft
+}
+
+schedule monday_brief {
+  label: "Monday Brief"
+  cron: "0 8 * * 1"
+}
+
+workflow publish_industry_brief {
+  label: "Publish Industry Brief"
+  description: "Search industry news, write a brief, save it to SharePoint, and email the client the link."
+
+  root {
+    type: code
+    label: "Configure"
+    code: @ts {
+      return {
+        clientName: "Acme Manufacturing",
+        industry: "precision manufacturing",
+        clientEmail: "owner@client-company.com",
+        driveId: "REPLACE_WITH_DRIVE_ID",
+        folderId: "REPLACE_WITH_FOLDER_ID",
+        week: new Date().toISOString().slice(0, 10)
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "clientName": { "type": "string" },
+          "industry": { "type": "string" },
+          "clientEmail": { "type": "string" },
+          "driveId": { "type": "string" },
+          "folderId": { "type": "string" },
+          "week": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node find_news {
+    type: search
+    label: "Find industry news"
+    query: @ts {
+      return context.nodes.root.output.industry + " industry news this week"
+    }
+    limit: 8
+    sources: ["news"]
+  }
+
+  node write_brief {
+    type: ai
+    label: "Write the brief"
+    kind: text
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const cfg = context.nodes.root.output
+      const results = (context.nodes.find_news.output.results || [])
+        .map(r => "- " + (r.title || "") + " (" + (r.url || "") + "): " + (r.description || ""))
+        .join("\n")
+      return "Write a one-page weekly industry brief for " + cfg.clientName + ", a company in " + cfg.industry + ". Use plain language for a business owner, not an analyst. Format as markdown with a short overview, three to five notable developments with source links, and one paragraph on what to watch next week.\n\nThis week's headlines:\n" + results
+    }
+  }
+
+  node save_to_sharepoint {
+    type: integration
+    label: "Save to SharePoint"
+    connection: client_microsoft
+    action: microsoft_upload_drive_file
+    params: @ts {
+      const cfg = context.nodes.root.output
+      return {
+        drive_id: cfg.driveId,
+        parent_id: cfg.folderId,
+        filename: "industry-brief-" + cfg.week + ".md",
+        content: context.nodes.write_brief.output,
+        contentType: "text/markdown"
+      }
+    }
+  }
+
+  node email_client {
+    type: integration
+    label: "Email the client"
+    connection: client_microsoft
+    action: microsoft_send_mail
+    params: @ts {
+      const cfg = context.nodes.root.output
+      const fileUrl = context.nodes.save_to_sharepoint.output.webUrl || ""
+      return {
+        message: {
+          subject: "Your industry brief for the week of " + cfg.week,
+          body: {
+            contentType: "text",
+            content: "Hi,\n\nThis week's industry brief is ready. It is saved in your SharePoint library:\n\n" + fileUrl + "\n\nReply to this email if you want us to dig deeper on anything in it."
+          },
+          toRecipients: [
+            { emailAddress: { address: cfg.clientEmail } }
+          ]
+        },
+        saveToSentItems: true
+      }
+    }
+  }
+
+  flow {
+    root -> find_news
+    find_news -> write_brief
+    write_brief -> save_to_sharepoint
+    save_to_sharepoint -> email_client
+  }
+}
+
+trigger on_monday_brief {
+  schedule:monday_brief -> publish_industry_brief
+  enabled: true
+}

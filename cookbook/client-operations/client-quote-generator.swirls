@@ -1,0 +1,181 @@
+/**
+ * Client quote generator. A quote request comes in from a public form,
+ * AI drafts the quote from your rate card, a human approves it, and the
+ * quote goes out from your own Microsoft 365 mailbox. Every quote is
+ * persisted to a stream for reporting.
+ *
+ * Setup:
+ *   1. swirls add microsoft send_mail
+ *   2. Deploy, then authorize the Microsoft connection in Cloud -> Connections.
+ *   3. Edit the rate card in the draft_quote prompt to match your pricing.
+ */
+
+connection client_microsoft {
+  label: "Client Microsoft 365"
+  provider: microsoft
+}
+
+schema quote_request_payload {
+  label: "Quote request"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["contact_name", "contact_email", "company", "project_description"],
+      "properties": {
+        "contact_name": { "type": "string", "title": "Your name" },
+        "contact_email": { "type": "string", "format": "email", "title": "Email" },
+        "company": { "type": "string", "title": "Company" },
+        "project_description": { "type": "string", "title": "What do you need?" }
+      }
+    }
+  }
+}
+
+form quote_request {
+  label: "Request a Quote"
+  visibility: public
+  schema: quote_request_payload
+}
+
+workflow generate_quote {
+  label: "Generate Quote"
+  description: "Draft a quote from the rate card, hold for human approval, then email it to the client."
+
+  root {
+    type: code
+    label: "Receive request"
+    inputSchema: quote_request_payload
+    code: @ts { return context.nodes.root.input }
+    outputSchema: quote_request_payload
+  }
+
+  node draft_quote {
+    type: ai
+    label: "Draft quote"
+    kind: object
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const req = context.nodes.root.output
+      return "Draft a service quote.\n\nRate card:\n- Discovery and scoping: 950 flat\n- Workflow build: 1800 per workflow\n- Integration setup: 600 per system connected\n- Monthly run and support: 400 per month\n\nRequest from " + req.contact_name + " at " + req.company + ":\n" + req.project_description + "\n\nPick only the line items the request needs, compute the total, and write a short professional email presenting the quote. Address the client by first name. Do not invent services that are not on the rate card."
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["line_items", "total", "email_subject", "email_body"],
+        "properties": {
+          "line_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["description", "amount"],
+              "properties": {
+                "description": { "type": "string" },
+                "amount": { "type": "number" }
+              }
+            }
+          },
+          "total": { "type": "number" },
+          "email_subject": { "type": "string" },
+          "email_body": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node approve_quote {
+    type: code
+    label: "Approve quote"
+    code: @ts { return {} }
+    review: {
+      enabled: true
+      title: "Approve this quote"
+      description: "The drafted quote is in the draft_quote node output. Approve to send it to the client, or reject to stop the run."
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "notes": { "type": "string", "title": "Internal notes" }
+          },
+          "additionalProperties": false
+        }
+      }
+      actions: [
+        { id: "send", label: "Send quote", outcome: "approve" },
+        { id: "reject", label: "Reject", outcome: "reject" }
+      ]
+    }
+  }
+
+  node send_quote {
+    type: integration
+    label: "Send quote"
+    connection: client_microsoft
+    action: microsoft_send_mail
+    params: @ts {
+      const req = context.nodes.root.output
+      const quote = context.nodes.draft_quote.output
+      return {
+        message: {
+          subject: quote.email_subject,
+          body: { contentType: "text", content: quote.email_body },
+          toRecipients: [
+            { emailAddress: { address: req.contact_email, name: req.contact_name } }
+          ]
+        },
+        saveToSentItems: true
+      }
+    }
+  }
+
+  node record_quote {
+    type: code
+    label: "Record quote"
+    code: @ts {
+      const req = context.nodes.root.output
+      const quote = context.nodes.draft_quote.output
+      return {
+        company: req.company,
+        contact_email: req.contact_email,
+        total: quote.total,
+        sent_at: new Date().toISOString()
+      }
+    }
+  }
+
+  flow {
+    root -> draft_quote
+    draft_quote -> approve_quote
+    approve_quote -> send_quote
+    send_quote -> record_quote
+  }
+}
+
+stream sent_quotes {
+  label: "Sent quotes"
+  workflow: generate_quote
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "company": { "type": "string" },
+            "contact_email": { "type": "string" },
+            "total": { "type": "number" },
+            "sent_at": { "type": "string" }
+          }
+        }
+      }
+      prepare: @ts {
+        return context.output.record_quote
+      }
+    }
+  }
+}
+
+trigger on_quote_request {
+  form:quote_request -> generate_quote
+  enabled: true
+}

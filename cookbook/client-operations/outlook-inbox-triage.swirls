@@ -1,0 +1,220 @@
+/**
+ * Morning inbox triage for a client mailbox. Pulls unread Outlook mail,
+ * classifies every message with AI, archives newsletters and junk, and
+ * emails a digest of what actually needs a reply.
+ *
+ * Setup:
+ *   1. swirls add microsoft list_messages move_message
+ *   2. Deploy, then authorize the Microsoft connection in Cloud -> Connections.
+ */
+
+connection client_microsoft {
+  label: "Client Microsoft 365"
+  provider: microsoft
+}
+
+schedule weekday_mornings {
+  label: "Weekday Mornings"
+  cron: "0 7 * * 1-5"
+}
+
+workflow triage_inbox {
+  label: "Triage Inbox"
+  description: "Classify unread Outlook mail, archive the noise, and send a digest of what needs a reply."
+
+  root {
+    type: code
+    label: "Configure"
+    code: @ts {
+      return { maxMessages: 25, digestTo: "owner@client-company.com" }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "maxMessages": { "type": "number" },
+          "digestTo": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node fetch_unread {
+    type: integration
+    label: "Fetch unread mail"
+    connection: client_microsoft
+    action: microsoft_list_messages
+    params: @ts {
+      return {
+        "$filter": "isRead eq false",
+        "$orderby": "receivedDateTime desc",
+        "$top": context.nodes.root.output.maxMessages
+      }
+    }
+  }
+
+  node classify_each {
+    type: map
+    label: "Classify each message"
+    items: @ts { return context.nodes.fetch_unread.output.value || [] }
+    maxItems: 25
+
+    subgraph {
+      root {
+        type: code
+        label: "Extract fields"
+        inputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "subject": { "type": "string" },
+              "bodyPreview": { "type": "string" }
+            }
+          }
+        }
+        code: @ts {
+          const m = context.iteration.item
+          const from = (m.from && m.from.emailAddress && m.from.emailAddress.address) || "unknown"
+          return {
+            id: m.id,
+            subject: m.subject || "(no subject)",
+            preview: m.bodyPreview || "",
+            from: from
+          }
+        }
+        outputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "subject": { "type": "string" },
+              "preview": { "type": "string" },
+              "from": { "type": "string" }
+            }
+          }
+        }
+      }
+
+      node classify {
+        type: ai
+        label: "Classify"
+        kind: object
+        model: "google/gemini-2.5-flash"
+        prompt: @ts {
+          const m = context.nodes.root.output
+          return "Classify this email for a busy business owner.\n\nFrom: " + m.from + "\nSubject: " + m.subject + "\nPreview: " + m.preview + "\n\nCategories:\n- needs_reply: a person is waiting on an answer\n- fyi: worth seeing, no reply needed\n- noise: newsletter, promotion, or automated notification"
+        }
+        schema: @json {
+          {
+            "type": "object",
+            "required": ["category", "summary"],
+            "properties": {
+              "category": { "type": "string", "enum": ["needs_reply", "fyi", "noise"] },
+              "summary": { "type": "string" }
+            }
+          }
+        }
+      }
+
+      node pack {
+        type: code
+        label: "Pack result"
+        code: @ts {
+          const m = context.nodes.root.output
+          const c = context.nodes.classify.output
+          return {
+            id: m.id,
+            subject: m.subject,
+            from: m.from,
+            category: c.category,
+            summary: c.summary
+          }
+        }
+      }
+
+      flow {
+        root -> classify
+        classify -> pack
+      }
+    }
+  }
+
+  node archive_noise {
+    type: map
+    label: "Archive the noise"
+    items: @ts {
+      const rows = context.nodes.classify_each.output || []
+      return rows.map(r => r.pack).filter(m => m && m.category === "noise")
+    }
+    maxItems: 25
+
+    subgraph {
+      root {
+        type: code
+        label: "Message id"
+        inputSchema: @json {
+          { "type": "object", "properties": { "id": { "type": "string" } } }
+        }
+        code: @ts { return { id: context.iteration.item.id } }
+        outputSchema: @json {
+          { "type": "object", "properties": { "id": { "type": "string" } } }
+        }
+      }
+
+      node archive {
+        type: integration
+        label: "Move to archive"
+        connection: client_microsoft
+        action: microsoft_move_message
+        params: @ts {
+          return { message_id: context.nodes.root.output.id, destinationId: "archive" }
+        }
+      }
+
+      flow {
+        root -> archive
+      }
+    }
+  }
+
+  node send_digest {
+    type: email
+    label: "Send digest"
+    from: @ts { return "no-reply@transactional.byteslice.co" }
+    to: @ts { return context.nodes.root.output.digestTo }
+    subject: @ts {
+      const rows = (context.nodes.classify_each.output || []).map(r => r.pack).filter(Boolean)
+      const needs = rows.filter(m => m.category === "needs_reply")
+      return "Inbox triage: " + needs.length + " emails need a reply"
+    }
+    text: @ts {
+      const rows = (context.nodes.classify_each.output || []).map(r => r.pack).filter(Boolean)
+      const needs = rows.filter(m => m.category === "needs_reply")
+      const fyi = rows.filter(m => m.category === "fyi")
+      const noise = rows.filter(m => m.category === "noise")
+
+      const lines = []
+      lines.push("Needs a reply (" + needs.length + "):")
+      needs.forEach(m => lines.push("- " + m.from + ": " + m.subject + " -- " + m.summary))
+      lines.push("")
+      lines.push("FYI (" + fyi.length + "):")
+      fyi.forEach(m => lines.push("- " + m.from + ": " + m.subject))
+      lines.push("")
+      lines.push("Archived as noise: " + noise.length + " messages")
+      return lines.join("\n")
+    }
+  }
+
+  flow {
+    root -> fetch_unread
+    fetch_unread -> classify_each
+    classify_each -> archive_noise
+    archive_noise -> send_digest
+  }
+}
+
+trigger on_weekday_morning {
+  schedule:weekday_mornings -> triage_inbox
+  enabled: true
+}

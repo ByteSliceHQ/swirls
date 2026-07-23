@@ -1,0 +1,71 @@
+/**
+ * One agent that brokers every tool through a single chat. The agent
+ * connects to remote MCP servers (Stripe billing, Notion docs, Linear
+ * projects) and answers questions across all of them from one chat
+ * interface. Instead of teaching a client three tools, you hand them one
+ * chat link.
+ *
+ * Setup:
+ *   1. Deploy, then open Cloud -> MCP servers and bind each slot:
+ *      Stripe takes an API key, Notion and Linear connect over OAuth.
+ *   2. Share the web chat link, or chat with the agent in Cloud.
+ */
+
+secret vendor_keys {
+  vars: [OPENROUTER_API_KEY]
+}
+
+mcp stripe_billing {
+  label: "Stripe"
+  description: "Customer billing: invoices, subscriptions, payment links"
+  url: "https://mcp.stripe.com"
+  auth: static
+}
+
+mcp notion_docs {
+  label: "Notion"
+  description: "Company docs and internal knowledge base"
+  url: "https://mcp.notion.com/mcp"
+  auth: interactive
+}
+
+mcp linear_projects {
+  label: "Linear"
+  description: "Project and issue tracking"
+  url: "https://mcp.linear.app/mcp"
+  auth: interactive
+}
+
+agent office_concierge {
+  label: "Office Concierge"
+  description: "One chat that reaches billing, docs, and projects through governed MCP connections."
+  provider: openrouter
+  model: "anthropic/claude-sonnet-4.5"
+  secrets: vendor_keys
+  maxSteps: 24
+  mcp: [stripe_billing, notion_docs, linear_projects]
+
+  system: @ts {
+    return [
+      "You are the office concierge for a small business. You broker three systems through your tools:",
+      "- Stripe for billing questions (invoices, subscriptions, payment links)",
+      "- Notion for company docs and how-to questions",
+      "- Linear for project and issue status",
+      "Always answer from tool results, never from memory. Say which system the answer came from.",
+      "If a tool you need is missing, tell the user an administrator must connect it on the project's MCP servers page in Swirls Cloud.",
+      "Never take a destructive action (refunds, deletions, cancellations). Describe the steps and hand it to a human instead.",
+    ].join("\n")
+  }
+
+  suggestions: [
+    { label: "Unpaid invoices", message: "Which invoices are currently unpaid, and how overdue is each one?" },
+    { label: "Find a policy", message: "Find our refund policy in Notion and summarize it." },
+    { label: "Project status", message: "What shipped in Linear this week and what is blocked?" }
+  ]
+}
+
+channel concierge_web {
+  label: "Concierge (Web)"
+  platform: web
+  agent: office_concierge
+}

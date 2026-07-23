@@ -1,0 +1,187 @@
+/**
+ * CRM enrichment. Once a week it walks the companies in Attio, finds the
+ * ones missing a description, researches each on the web, and writes the
+ * description and industry back onto the record.
+ *
+ * Setup:
+ *   1. swirls add attio query_records update_record
+ *   2. Deploy, then authorize the Attio connection in Cloud -> Connections.
+ */
+
+connection team_attio {
+  label: "Attio CRM"
+  provider: attio
+}
+
+schedule weekly_enrichment {
+  label: "Weekly Enrichment"
+  cron: "0 6 * * 1"
+}
+
+workflow enrich_companies {
+  label: "Enrich Companies"
+  description: "Research companies missing a description in Attio and fill in description and industry."
+
+  root {
+    type: code
+    label: "Start"
+    code: @ts { return { batchSize: 25 } }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": { "batchSize": { "type": "number" } }
+      }
+    }
+  }
+
+  node fetch_companies {
+    type: integration
+    label: "Fetch companies"
+    connection: team_attio
+    action: attio_query_records
+    params: @ts {
+      return {
+        object: "companies",
+        limit: context.nodes.root.output.batchSize
+      }
+    }
+  }
+
+  node enrich_each {
+    type: map
+    label: "Enrich each company"
+    items: @ts {
+      const rows = context.nodes.fetch_companies.output.data || []
+      return rows.map(r => {
+        const values = r.values || {}
+        const nameEntry = (values.name && values.name[0]) || {}
+        const domainEntry = (values.domains && values.domains[0]) || {}
+        const descEntry = (values.description && values.description[0]) || {}
+        return {
+          record_id: r.id ? r.id.record_id : "",
+          name: nameEntry.value || "",
+          domain: domainEntry.domain || "",
+          description: descEntry.value || ""
+        }
+      }).filter(c => c.record_id && c.name && !c.description)
+    }
+    maxItems: 25
+
+    subgraph {
+      root {
+        type: code
+        label: "Company"
+        inputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "record_id": { "type": "string" },
+              "name": { "type": "string" },
+              "domain": { "type": "string" }
+            }
+          }
+        }
+        code: @ts { return context.iteration.item }
+        outputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "record_id": { "type": "string" },
+              "name": { "type": "string" },
+              "domain": { "type": "string" }
+            }
+          }
+        }
+      }
+
+      node research {
+        type: search
+        label: "Research company"
+        query: @ts {
+          const c = context.nodes.root.output
+          return c.name + " " + c.domain + " company overview"
+        }
+        limit: 5
+      }
+
+      node summarize {
+        type: ai
+        label: "Summarize"
+        kind: object
+        model: "google/gemini-2.5-flash"
+        prompt: @ts {
+          const c = context.nodes.root.output
+          const results = (context.nodes.research.output.results || [])
+            .map(r => "- " + (r.title || "") + ": " + (r.description || ""))
+            .join("\n")
+          return "Write a two-sentence factual description of the company " + c.name + " (" + c.domain + ") and name its industry in a few words. Only state what the search results support.\n\nSearch results:\n" + results
+        }
+        schema: @json {
+          {
+            "type": "object",
+            "required": ["description", "industry"],
+            "properties": {
+              "description": { "type": "string" },
+              "industry": { "type": "string" }
+            }
+          }
+        }
+      }
+
+      node update_company {
+        type: integration
+        label: "Update record"
+        connection: team_attio
+        action: attio_update_record
+        params: @ts {
+          const c = context.nodes.root.output
+          const s = context.nodes.summarize.output
+          return {
+            object: "companies",
+            record_id: c.record_id,
+            data: {
+              values: {
+                description: s.description + " Industry: " + s.industry
+              }
+            }
+          }
+        }
+      }
+
+      node done {
+        type: code
+        label: "Record result"
+        code: @ts {
+          return { name: context.nodes.root.output.name, enriched: true }
+        }
+      }
+
+      flow {
+        root -> research
+        research -> summarize
+        summarize -> update_company
+        update_company -> done
+      }
+    }
+  }
+
+  node summarize_run {
+    type: code
+    label: "Summarize run"
+    code: @ts {
+      const rows = (context.nodes.enrich_each.output || []).map(r => r.done).filter(Boolean)
+      return { enriched: rows.length, companies: rows.map(r => r.name) }
+    }
+  }
+
+  flow {
+    root -> fetch_companies
+    fetch_companies -> enrich_each
+    enrich_each -> summarize_run
+  }
+}
+
+trigger on_weekly_enrichment {
+  schedule:weekly_enrichment -> enrich_companies
+  enabled: true
+}

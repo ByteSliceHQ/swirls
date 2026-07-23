@@ -1,0 +1,197 @@
+/**
+ * Meeting follow-up drafts. Every weekday evening it reads the day's
+ * calendar, writes a follow-up email for each external meeting with AI,
+ * and places it in the Drafts folder. Nothing sends automatically: you
+ * open Outlook, review each draft, and hit send.
+ *
+ * Setup:
+ *   1. swirls add microsoft list_events create_draft
+ *   2. Deploy, then authorize the Microsoft connection in Cloud -> Connections.
+ */
+
+connection client_microsoft {
+  label: "Client Microsoft 365"
+  provider: microsoft
+}
+
+schedule weekday_evenings {
+  label: "Weekday Evenings"
+  cron: "0 17 * * 1-5"
+}
+
+workflow draft_meeting_followups {
+  label: "Draft Meeting Follow-ups"
+  description: "Write a follow-up draft for each of today's meetings and leave it in the Drafts folder for review."
+
+  root {
+    type: code
+    label: "Build day window"
+    code: @ts {
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      const end = now.toISOString()
+      return { start: start, end: end, myDomain: "your-msp.com" }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "start": { "type": "string" },
+          "end": { "type": "string" },
+          "myDomain": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node fetch_meetings {
+    type: integration
+    label: "Fetch today's meetings"
+    connection: client_microsoft
+    action: microsoft_list_events
+    params: @ts {
+      const w = context.nodes.root.output
+      return {
+        "$filter": "start/dateTime ge '" + w.start + "' and end/dateTime le '" + w.end + "'",
+        "$select": "id,subject,start,end,attendees,organizer,bodyPreview",
+        "$orderby": "start/dateTime asc",
+        "$top": 20
+      }
+    }
+  }
+
+  node draft_each {
+    type: map
+    label: "Draft each follow-up"
+    items: @ts {
+      const myDomain = context.nodes.root.output.myDomain
+      const events = context.nodes.fetch_meetings.output.value || []
+      return events.filter(e => {
+        const attendees = e.attendees || []
+        return attendees.some(a => {
+          const addr = (a.emailAddress && a.emailAddress.address) || ""
+          return addr && !addr.endsWith("@" + myDomain)
+        })
+      })
+    }
+    maxItems: 20
+
+    subgraph {
+      root {
+        type: code
+        label: "Extract meeting"
+        inputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "subject": { "type": "string" }
+            }
+          }
+        }
+        code: @ts {
+          const e = context.iteration.item
+          const attendees = (e.attendees || [])
+            .map(a => (a.emailAddress && a.emailAddress.address) || "")
+            .filter(Boolean)
+          return {
+            subject: e.subject || "(no subject)",
+            attendees: attendees,
+            preview: e.bodyPreview || ""
+          }
+        }
+        outputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "subject": { "type": "string" },
+              "attendees": { "type": "array", "items": { "type": "string" } },
+              "preview": { "type": "string" }
+            }
+          }
+        }
+      }
+
+      node write_followup {
+        type: ai
+        label: "Write follow-up"
+        kind: object
+        model: "google/gemini-2.5-flash"
+        prompt: @ts {
+          const m = context.nodes.root.output
+          return "Write a short, warm follow-up email for a meeting that happened today.\n\nMeeting: " + m.subject + "\nAgenda notes: " + m.preview + "\n\nThank them for their time, recap in one or two sentences, and ask for anything that is blocking next steps. Do not invent specifics that are not in the agenda notes. Keep it under 120 words."
+        }
+        schema: @json {
+          {
+            "type": "object",
+            "required": ["subject", "body"],
+            "properties": {
+              "subject": { "type": "string" },
+              "body": { "type": "string" }
+            }
+          }
+        }
+      }
+
+      node create_draft {
+        type: integration
+        label: "Place in Drafts"
+        connection: client_microsoft
+        action: microsoft_create_draft
+        params: @ts {
+          const m = context.nodes.root.output
+          const d = context.nodes.write_followup.output
+          return {
+            subject: d.subject,
+            body: { contentType: "text", content: d.body },
+            toRecipients: m.attendees.map(a => ({ emailAddress: { address: a } }))
+          }
+        }
+      }
+
+      node done {
+        type: code
+        label: "Record draft"
+        code: @ts {
+          return { meeting: context.nodes.root.output.subject, drafted: true }
+        }
+      }
+
+      flow {
+        root -> write_followup
+        write_followup -> create_draft
+        create_draft -> done
+      }
+    }
+  }
+
+  node notify {
+    type: email
+    label: "Notify"
+    from: @ts { return "no-reply@transactional.byteslice.co" }
+    to: @ts { return "you@your-msp.com" }
+    subject: @ts {
+      const rows = context.nodes.draft_each.output || []
+      return rows.length + " follow-up drafts are waiting in Outlook"
+    }
+    text: @ts {
+      const rows = (context.nodes.draft_each.output || []).map(r => r.done).filter(Boolean)
+      const lines = ["Follow-up drafts created today:"]
+      rows.forEach(r => lines.push("- " + r.meeting))
+      lines.push("")
+      lines.push("Open your Drafts folder, review each one, and send.")
+      return lines.join("\n")
+    }
+  }
+
+  flow {
+    root -> fetch_meetings
+    fetch_meetings -> draft_each
+    draft_each -> notify
+  }
+}
+
+trigger on_weekday_evening {
+  schedule:weekday_evenings -> draft_meeting_followups
+  enabled: true
+}

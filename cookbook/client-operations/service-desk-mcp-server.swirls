@@ -1,0 +1,232 @@
+/**
+ * Your service desk as an MCP server. Clients add one connector to
+ * Claude Desktop (or any MCP client) and can file requests and check
+ * status from inside their own AI chat. Every request lands in a stream
+ * you monitor, and the agent can only do what its tools allow.
+ *
+ * Setup:
+ *   1. Deploy. Swirls provisions the inbound OAuth application.
+ *   2. In Cloud, mint client credentials under the connector and send
+ *      your client the connection details.
+ */
+
+secret vendor_keys {
+  vars: [OPENROUTER_API_KEY]
+}
+
+schema request_payload {
+  label: "Service request"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["summary", "urgency"],
+      "properties": {
+        "summary": { "type": "string", "description": "What the client needs, in one or two sentences." },
+        "urgency": { "type": "string", "enum": ["low", "normal", "high"], "description": "How urgent the request is." },
+        "contact_email": { "type": "string", "description": "Who to follow up with." }
+      }
+    }
+  }
+}
+
+workflow file_request {
+  label: "File Request"
+  description: "File a new service desk request and return its ticket id."
+
+  root {
+    type: code
+    label: "Create ticket"
+    inputSchema: request_payload
+    code: @ts {
+      const input = context.nodes.root.input
+      const ticketId = "REQ_" + Date.now().toString(36).toUpperCase()
+      return {
+        ticket_id: ticketId,
+        summary: input.summary,
+        urgency: input.urgency || "normal",
+        contact_email: input.contact_email || "",
+        filed_at: new Date().toISOString()
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["ticket_id", "summary", "urgency", "filed_at"],
+        "properties": {
+          "ticket_id": { "type": "string" },
+          "summary": { "type": "string" },
+          "urgency": { "type": "string" },
+          "contact_email": { "type": "string" },
+          "filed_at": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node notify_desk {
+    type: email
+    label: "Notify service desk"
+    from: @ts { return "no-reply@transactional.byteslice.co" }
+    to: @ts { return "desk@your-msp.com" }
+    subject: @ts {
+      const t = context.nodes.root.output
+      return "[" + t.urgency.toUpperCase() + "] " + t.ticket_id + ": " + t.summary
+    }
+    text: @ts {
+      const t = context.nodes.root.output
+      return "New service request " + t.ticket_id + "\n\nSummary: " + t.summary + "\nUrgency: " + t.urgency + "\nContact: " + (t.contact_email || "not provided") + "\nFiled: " + t.filed_at
+    }
+  }
+
+  node confirm {
+    type: code
+    label: "Confirm ticket"
+    code: @ts {
+      const t = context.nodes.root.output
+      return {
+        ticket_id: t.ticket_id,
+        status: "Filed with the service desk. Reference " + t.ticket_id + " to check progress."
+      }
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["ticket_id", "status"],
+        "properties": {
+          "ticket_id": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  flow {
+    root -> notify_desk
+    notify_desk -> confirm
+  }
+}
+
+workflow check_request {
+  label: "Check Request"
+  description: "Look up a service desk request by its ticket id."
+
+  root {
+    type: code
+    label: "Read ticket id"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["ticket_id"],
+        "properties": {
+          "ticket_id": { "type": "string", "description": "The REQ_ ticket id to look up." }
+        }
+      }
+    }
+    code: @ts { return { ticket_id: context.nodes.root.input.ticket_id } }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["ticket_id"],
+        "properties": { "ticket_id": { "type": "string" } }
+      }
+    }
+  }
+
+  node find_ticket {
+    type: stream
+    label: "Find ticket"
+    stream: service_requests
+    version: v1
+    filter: @ts {
+      return { ticket_id: { eq: context.nodes.root.output.ticket_id } }
+    }
+  }
+
+  node answer {
+    type: code
+    label: "Answer"
+    code: @ts {
+      const rows = context.nodes.find_ticket.output || []
+      if (!rows.length) {
+        return { found: false, status: "No request found with that ticket id." }
+      }
+      const t = rows[0]
+      return {
+        found: true,
+        status: "Request " + t.ticket_id + " (" + t.urgency + ") was filed at " + t.filed_at + " and is with the service desk: " + t.summary
+      }
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["found", "status"],
+        "properties": {
+          "found": { "type": "boolean" },
+          "status": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  flow {
+    root -> find_ticket
+    find_ticket -> answer
+  }
+}
+
+stream service_requests {
+  label: "Service requests"
+  workflow: file_request
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "ticket_id": { "type": "string" },
+            "summary": { "type": "string" },
+            "urgency": { "type": "string" },
+            "contact_email": { "type": "string" },
+            "filed_at": { "type": "string" }
+          }
+        }
+      }
+      prepare: @ts {
+        return context.output.root
+      }
+    }
+  }
+}
+
+agent service_desk {
+  label: "Service Desk"
+  description: "Files and tracks service desk requests for clients."
+  provider: openrouter
+  model: "google/gemini-2.5-flash"
+  secrets: vendor_keys
+  maxSteps: 8
+  tools: [file_request, check_request]
+
+  system: @ts {
+    return [
+      "You are the service desk intake agent for a managed service provider.",
+      "When a client describes a problem, file it with the file_request tool and give them the ticket id.",
+      "When they ask about an existing request, look it up with check_request.",
+      "Set urgency to high only for outages or security issues. Be brief and concrete.",
+    ].join("\n")
+  }
+}
+
+connector client_desk {
+  label: "Service desk connector"
+  description: "Lets a client's MCP-enabled AI reach the service desk agent."
+}
+
+channel desk_mcp {
+  label: "Service Desk (MCP)"
+  platform: mcp
+  agent: service_desk
+  connector: client_desk
+}

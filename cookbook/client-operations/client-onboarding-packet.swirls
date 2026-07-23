@@ -1,0 +1,154 @@
+/**
+ * New client onboarding. Fill in one internal form and the system does
+ * the rest: creates the client's folder in OneDrive, writes a tailored
+ * onboarding packet with AI, saves it to the folder, upserts the company
+ * into Attio, and sends the welcome email from your own mailbox.
+ *
+ * Setup:
+ *   1. swirls add microsoft create_folder upload_file send_mail
+ *   2. swirls add attio assert_record
+ *   3. Deploy, then authorize both connections in Cloud -> Connections.
+ */
+
+connection client_microsoft {
+  label: "Client Microsoft 365"
+  provider: microsoft
+}
+
+connection team_attio {
+  label: "Attio CRM"
+  provider: attio
+}
+
+schema onboarding_payload {
+  label: "New client"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["company", "domain", "contact_name", "contact_email", "services"],
+      "properties": {
+        "company": { "type": "string", "title": "Company name" },
+        "domain": { "type": "string", "title": "Company domain" },
+        "contact_name": { "type": "string", "title": "Primary contact" },
+        "contact_email": { "type": "string", "format": "email", "title": "Contact email" },
+        "services": { "type": "string", "title": "Services sold" }
+      }
+    }
+  }
+}
+
+form new_client {
+  label: "Onboard a New Client"
+  schema: onboarding_payload
+}
+
+workflow onboard_client {
+  label: "Onboard Client"
+  description: "Create the OneDrive folder, write the onboarding packet, upsert the CRM record, and send the welcome email."
+
+  root {
+    type: code
+    label: "Receive client"
+    inputSchema: onboarding_payload
+    code: @ts { return context.nodes.root.input }
+    outputSchema: onboarding_payload
+  }
+
+  node create_client_folder {
+    type: integration
+    label: "Create OneDrive folder"
+    connection: client_microsoft
+    action: microsoft_create_folder
+    params: @ts {
+      return {
+        parent_id: "root",
+        name: "Clients - " + context.nodes.root.output.company,
+        folder: {},
+        "@microsoft.graph.conflictBehavior": "rename"
+      }
+    }
+  }
+
+  node write_packet {
+    type: ai
+    label: "Write onboarding packet"
+    kind: text
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const c = context.nodes.root.output
+      return "Write an onboarding packet in markdown for a new managed services client.\n\nClient: " + c.company + " (" + c.domain + ")\nPrimary contact: " + c.contact_name + "\nServices sold: " + c.services + "\n\nSections: welcome note, what happens in the first two weeks, how to reach support, and what we need from the client to get started. Keep it to one page and write in plain language."
+    }
+  }
+
+  node save_packet {
+    type: integration
+    label: "Save packet to folder"
+    connection: client_microsoft
+    action: microsoft_upload_file
+    params: @ts {
+      return {
+        parent_id: context.nodes.create_client_folder.output.id,
+        filename: "onboarding-packet.md",
+        content: context.nodes.write_packet.output,
+        contentType: "text/markdown"
+      }
+    }
+  }
+
+  node upsert_company {
+    type: integration
+    label: "Upsert company in Attio"
+    connection: team_attio
+    action: attio_assert_record
+    params: @ts {
+      const c = context.nodes.root.output
+      return {
+        object: "companies",
+        matching_attribute: "domains",
+        data: {
+          values: {
+            domains: [c.domain],
+            name: c.company
+          }
+        }
+      }
+    }
+  }
+
+  node send_welcome {
+    type: integration
+    label: "Send welcome email"
+    connection: client_microsoft
+    action: microsoft_send_mail
+    params: @ts {
+      const c = context.nodes.root.output
+      const folderUrl = context.nodes.create_client_folder.output.webUrl || ""
+      return {
+        message: {
+          subject: "Welcome aboard, " + c.company,
+          body: {
+            contentType: "text",
+            content: "Hi " + c.contact_name + ",\n\nWelcome! Your onboarding packet is ready and your shared folder is set up:\n\n" + folderUrl + "\n\nIt covers what happens in the first two weeks and what we need from your side. Reply to this email with any questions.\n"
+          },
+          toRecipients: [
+            { emailAddress: { address: c.contact_email, name: c.contact_name } }
+          ]
+        },
+        saveToSentItems: true
+      }
+    }
+  }
+
+  flow {
+    root -> create_client_folder
+    create_client_folder -> write_packet
+    write_packet -> save_packet
+    save_packet -> upsert_company
+    upsert_company -> send_welcome
+  }
+}
+
+trigger on_new_client {
+  form:new_client -> onboard_client
+  enabled: true
+}

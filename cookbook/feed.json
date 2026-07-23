@@ -1,8 +1,174 @@
 {
   "title": "The Swirls Cookbook",
   "description": "Copy-paste recipes for real workflows. Each .swirls file is a complete, runnable workflow you can drop into your project, tweak to taste, and deploy.",
-  "updated_at": "2026-07-18T00:00:00Z",
+  "updated_at": "2026-07-23T00:00:00Z",
   "categories": [
+    {
+      "slug": "client-operations",
+      "title": "Client Operations",
+      "description": "Recipes MSPs run for clients: Microsoft 365 mail, SharePoint, and Teams, CRM sync with Attio, and chat agents that broker every tool through one interface.",
+      "recipes": [
+        {
+          "slug": "outlook-inbox-triage",
+          "title": "Outlook Inbox Triage",
+          "file": "client-operations/outlook-inbox-triage.swirls",
+          "description": "Classifies unread Outlook mail every morning, archives the noise, and emails a digest of what needs a reply.",
+          "nodes": [
+            "integration",
+            "map",
+            "ai",
+            "email"
+          ],
+          "trigger": "schedule",
+          "tags": [
+            "microsoft"
+          ]
+        },
+        {
+          "slug": "outlook-to-crm",
+          "title": "Outlook to CRM Sync",
+          "file": "client-operations/outlook-to-crm.swirls",
+          "description": "Extracts the people behind each day's email conversations and upserts them into Attio with a context note.",
+          "nodes": [
+            "integration",
+            "map",
+            "ai",
+            "switch"
+          ],
+          "trigger": "schedule",
+          "tags": [
+            "microsoft",
+            "attio"
+          ]
+        },
+        {
+          "slug": "sharepoint-industry-brief",
+          "title": "SharePoint Industry Brief",
+          "file": "client-operations/sharepoint-industry-brief.swirls",
+          "description": "Writes a weekly industry brief with AI, saves it to the client's SharePoint library, and emails the link from your own mailbox.",
+          "nodes": [
+            "search",
+            "ai",
+            "integration"
+          ],
+          "trigger": "schedule",
+          "tags": [
+            "microsoft"
+          ]
+        },
+        {
+          "slug": "meeting-followup-drafts",
+          "title": "Meeting Follow-up Drafts",
+          "file": "client-operations/meeting-followup-drafts.swirls",
+          "description": "Reads the day's calendar and writes a follow-up draft for every external meeting. Nothing sends until a human hits send.",
+          "nodes": [
+            "integration",
+            "map",
+            "ai",
+            "email"
+          ],
+          "trigger": "schedule",
+          "tags": [
+            "microsoft"
+          ]
+        },
+        {
+          "slug": "teams-uptime-alerts",
+          "title": "Teams Uptime Alerts",
+          "file": "client-operations/teams-uptime-alerts.swirls",
+          "description": "Checks every client site each 15 minutes and posts to the client's Teams channel the moment one goes down.",
+          "nodes": [
+            "map",
+            "http",
+            "switch",
+            "integration"
+          ],
+          "trigger": "schedule",
+          "tags": [
+            "microsoft"
+          ]
+        },
+        {
+          "slug": "crm-enrichment",
+          "title": "CRM Enrichment",
+          "file": "client-operations/crm-enrichment.swirls",
+          "description": "Finds Attio companies missing a description, researches each on the web, and writes the findings back onto the record.",
+          "nodes": [
+            "integration",
+            "map",
+            "search",
+            "ai"
+          ],
+          "trigger": "schedule",
+          "tags": [
+            "attio"
+          ]
+        },
+        {
+          "slug": "client-quote-generator",
+          "title": "Client Quote Generator",
+          "file": "client-operations/client-quote-generator.swirls",
+          "description": "Drafts a quote from your rate card, holds it for human approval, then sends it from your own mailbox and logs it to a stream.",
+          "nodes": [
+            "ai",
+            "integration",
+            "code"
+          ],
+          "trigger": "form",
+          "tags": [
+            "microsoft",
+            "review",
+            "persistence"
+          ]
+        },
+        {
+          "slug": "mcp-broker-agent",
+          "title": "MCP Broker Agent",
+          "file": "client-operations/mcp-broker-agent.swirls",
+          "description": "One chat agent brokering Stripe, Notion, and Linear through remote MCP servers. Hand a client one link instead of three tools.",
+          "nodes": [
+            "agent"
+          ],
+          "trigger": "chat",
+          "tags": [
+            "mcp",
+            "agent"
+          ]
+        },
+        {
+          "slug": "service-desk-mcp-server",
+          "title": "Service Desk MCP Server",
+          "file": "client-operations/service-desk-mcp-server.swirls",
+          "description": "Exposes your service desk agent as an MCP server, so clients file and track requests from inside Claude Desktop.",
+          "nodes": [
+            "agent",
+            "stream",
+            "email"
+          ],
+          "trigger": "mcp",
+          "tags": [
+            "mcp",
+            "agent",
+            "persistence"
+          ]
+        },
+        {
+          "slug": "client-onboarding-packet",
+          "title": "Client Onboarding Packet",
+          "file": "client-operations/client-onboarding-packet.swirls",
+          "description": "One form creates the OneDrive folder, writes the onboarding packet, upserts the company into Attio, and sends the welcome email.",
+          "nodes": [
+            "integration",
+            "ai"
+          ],
+          "trigger": "form",
+          "tags": [
+            "microsoft",
+            "attio"
+          ]
+        }
+      ]
+    },
     {
       "slug": "sales-and-marketing",
       "title": "Sales & Marketing",

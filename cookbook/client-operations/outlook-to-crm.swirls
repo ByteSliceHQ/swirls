@@ -1,0 +1,221 @@
+/**
+ * Consolidates email conversations into the CRM. Every day it reads the
+ * last 24 hours of Outlook mail, extracts the people behind each business
+ * conversation with AI, upserts them into Attio, and files a note on the
+ * record so the whole team sees the thread context.
+ *
+ * Setup:
+ *   1. swirls add microsoft list_messages
+ *   2. swirls add attio assert_record create_note
+ *   3. Deploy, then authorize both connections in Cloud -> Connections.
+ */
+
+connection client_microsoft {
+  label: "Client Microsoft 365"
+  provider: microsoft
+}
+
+connection team_attio {
+  label: "Attio CRM"
+  provider: attio
+}
+
+schedule nightly_sync {
+  label: "Nightly CRM Sync"
+  cron: "0 23 * * *"
+}
+
+workflow sync_mail_to_crm {
+  label: "Sync Mail to CRM"
+  description: "Extract contacts from the day's email and upsert them into Attio with a context note."
+
+  root {
+    type: code
+    label: "Build window"
+    code: @ts {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      return { since: since }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": { "since": { "type": "string" } }
+      }
+    }
+  }
+
+  node fetch_mail {
+    type: integration
+    label: "Fetch recent mail"
+    connection: client_microsoft
+    action: microsoft_list_messages
+    params: @ts {
+      return {
+        "$filter": "receivedDateTime ge " + context.nodes.root.output.since,
+        "$orderby": "receivedDateTime desc",
+        "$top": 50
+      }
+    }
+  }
+
+  node sync_each {
+    type: map
+    label: "Upsert each contact"
+    items: @ts { return context.nodes.fetch_mail.output.value || [] }
+    maxItems: 50
+
+    subgraph {
+      root {
+        type: code
+        label: "Extract sender"
+        inputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "subject": { "type": "string" },
+              "bodyPreview": { "type": "string" }
+            }
+          }
+        }
+        code: @ts {
+          const m = context.iteration.item
+          const addr = (m.from && m.from.emailAddress) || {}
+          return {
+            email: addr.address || "",
+            name: addr.name || "",
+            subject: m.subject || "(no subject)",
+            preview: m.bodyPreview || ""
+          }
+        }
+        outputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "email": { "type": "string" },
+              "name": { "type": "string" },
+              "subject": { "type": "string" },
+              "preview": { "type": "string" }
+            }
+          }
+        }
+      }
+
+      node assess {
+        type: ai
+        label: "Assess sender"
+        kind: object
+        model: "google/gemini-2.5-flash"
+        prompt: @ts {
+          const m = context.nodes.root.output
+          return "Decide whether this email is a real business conversation worth tracking in a CRM. Automated senders, newsletters, and internal system mail are not.\n\nFrom: " + m.name + " <" + m.email + ">\nSubject: " + m.subject + "\nPreview: " + m.preview + "\n\nIf it is worth tracking, write a one-sentence note describing what the conversation is about."
+        }
+        schema: @json {
+          {
+            "type": "object",
+            "required": ["track", "note"],
+            "properties": {
+              "track": { "type": "boolean" },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+
+      node route {
+        type: switch
+        label: "Track or skip"
+        cases: ["track", "skip"]
+        router: @ts {
+          const m = context.nodes.root.output
+          if (!m.email) return "skip"
+          if (!context.nodes.assess.output.track) return "skip"
+          return "track"
+        }
+      }
+
+      node upsert_person {
+        type: integration
+        label: "Upsert person in Attio"
+        connection: team_attio
+        action: attio_assert_record
+        params: @ts {
+          const m = context.nodes.root.output
+          const values = { email_addresses: [m.email] }
+          if (m.name) values.name = [{ full_name: m.name }]
+          return {
+            object: "people",
+            matching_attribute: "email_addresses",
+            data: { values: values }
+          }
+        }
+      }
+
+      node file_note {
+        type: integration
+        label: "File context note"
+        connection: team_attio
+        action: attio_create_note
+        params: @ts {
+          const m = context.nodes.root.output
+          const recordId = context.nodes.upsert_person.output.data.id.record_id
+          return {
+            data: {
+              parent_object: "people",
+              parent_record_id: recordId,
+              title: m.subject,
+              format: "plaintext",
+              content: context.nodes.assess.output.note
+            }
+          }
+        }
+      }
+
+      node synced {
+        type: code
+        label: "Mark synced"
+        code: @ts {
+          return { email: context.nodes.root.output.email, synced: true }
+        }
+      }
+
+      node skipped {
+        type: code
+        label: "Mark skipped"
+        code: @ts {
+          return { email: context.nodes.root.output.email, synced: false }
+        }
+      }
+
+      flow {
+        root -> assess
+        assess -> route
+        route -["track"]-> upsert_person
+        upsert_person -> file_note
+        file_note -> synced
+        route -["skip"]-> skipped
+      }
+    }
+  }
+
+  node summarize {
+    type: code
+    label: "Summarize run"
+    code: @ts {
+      const rows = context.nodes.sync_each.output || []
+      const synced = rows.filter(r => r.synced && r.synced.synced).length
+      const skipped = rows.filter(r => r.skipped).length
+      return { synced: synced, skipped: skipped }
+    }
+  }
+
+  flow {
+    root -> fetch_mail
+    fetch_mail -> sync_each
+    sync_each -> summarize
+  }
+}
+
+trigger on_nightly_sync {
+  schedule:nightly_sync -> sync_mail_to_crm
+  enabled: true
+}

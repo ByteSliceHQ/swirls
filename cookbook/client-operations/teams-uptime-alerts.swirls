@@ -1,0 +1,178 @@
+/**
+ * Uptime alerts in Microsoft Teams. Checks each client site every 15
+ * minutes and posts to the client's Teams channel the moment one goes
+ * down. SMB teams live in Teams, so the alert lands where they already
+ * work.
+ *
+ * Setup:
+ *   1. swirls add microsoft send_channel_message
+ *   2. Deploy, then authorize the Microsoft connection in Cloud -> Connections.
+ *   3. Fill in each site's team and channel ids below. Find them with the
+ *      list_chats and get_chat actions, or from Teams channel links.
+ */
+
+connection client_microsoft {
+  label: "Client Microsoft 365"
+  provider: microsoft
+}
+
+schedule every_15_minutes {
+  label: "Every 15 Minutes"
+  cron: "*/15 * * * *"
+}
+
+workflow check_client_sites {
+  label: "Check Client Sites"
+  description: "Ping every client site and post a Teams alert for any that are down."
+
+  root {
+    type: code
+    label: "List sites"
+    code: @ts {
+      return {
+        sites: [
+          {
+            name: "Acme storefront",
+            url: "https://www.acme-client.com",
+            teamId: "REPLACE_WITH_TEAM_ID",
+            channelId: "REPLACE_WITH_CHANNEL_ID"
+          },
+          {
+            name: "Acme booking portal",
+            url: "https://book.acme-client.com",
+            teamId: "REPLACE_WITH_TEAM_ID",
+            channelId: "REPLACE_WITH_CHANNEL_ID"
+          }
+        ]
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "sites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "url": { "type": "string" },
+                "teamId": { "type": "string" },
+                "channelId": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  node check_each {
+    type: map
+    label: "Check each site"
+    items: @ts { return context.nodes.root.output.sites }
+    maxItems: 20
+
+    subgraph {
+      root {
+        type: code
+        label: "Site under test"
+        inputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "teamId": { "type": "string" },
+              "channelId": { "type": "string" }
+            }
+          }
+        }
+        code: @ts { return context.iteration.item }
+        outputSchema: @json {
+          {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "teamId": { "type": "string" },
+              "channelId": { "type": "string" }
+            }
+          }
+        }
+      }
+
+      node ping {
+        type: http
+        label: "Ping site"
+        url: @ts { return context.nodes.root.output.url }
+        failurePolicy: {
+          strategy: "fallback"
+          fallbackValue: {}
+        }
+      }
+
+      node evaluate {
+        type: code
+        label: "Evaluate response"
+        code: @ts {
+          const statusCode = context.nodes.ping.meta ? context.nodes.ping.meta.status : 0
+          const isUp = statusCode >= 200 && statusCode < 400
+          return { status: isUp ? "up" : "down", statusCode: statusCode }
+        }
+      }
+
+      node route {
+        type: switch
+        label: "Route by status"
+        cases: ["up", "down"]
+        router: @ts { return context.nodes.evaluate.output.status }
+      }
+
+      node post_alert {
+        type: integration
+        label: "Post Teams alert"
+        connection: client_microsoft
+        action: microsoft_send_channel_message
+        params: @ts {
+          const site = context.nodes.root.output
+          const code = context.nodes.evaluate.output.statusCode
+          return {
+            team_id: site.teamId,
+            channel_id: site.channelId,
+            importance: "urgent",
+            body: {
+              contentType: "text",
+              content: "DOWN: " + site.name + " (" + site.url + ") returned status " + code + ". We are on it."
+            }
+          }
+        }
+      }
+
+      node log_ok {
+        type: code
+        label: "Log healthy"
+        code: @ts {
+          return { name: context.nodes.root.output.name, status: "up" }
+        }
+      }
+
+      flow {
+        root -> ping
+        ping -> evaluate
+        evaluate -> route
+        route -["down"]-> post_alert
+        route -["up"]-> log_ok
+      }
+    }
+  }
+
+  flow {
+    root -> check_each
+  }
+}
+
+trigger on_interval {
+  schedule:every_15_minutes -> check_client_sites
+  enabled: true
+}
