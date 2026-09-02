@@ -1,0 +1,41 @@
+{
+  "name": "swirls",
+  "version": "0.0.1",
+  "description": "Swirls — standard for authoring and deploying agents and workflows",
+  "author": {
+    "name": "Swirls",
+    "url": "https://swirls.ai"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.js",
+  "bin": {
+    "swirls": "./bin/swirls.js"
+  },
+  "files": [
+    "bin",
+    "index.js",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ByteSliceHQ/swirls.git"
+  },
+  "homepage": "https://swirls.ai",
+  "bugs": {
+    "url": "https://github.com/ByteSliceHQ/swirls/issues",
+    "email": "security@swirls.ai"
+  },
+  "keywords": [
+    "swirls",
+    "agents",
+    "workflows",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
