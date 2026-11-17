@@ -2,11 +2,11 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   type NodeDecl,
-  parse,
   type SourceRange,
   type SwirlsFile,
   type WorkflowDecl,
 } from '@swirls/language'
+import { parse } from './parse-cache'
 import type {
   DeclSite,
   WorkspaceResourceIndex,

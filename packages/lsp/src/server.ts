@@ -10,7 +10,16 @@ import './stdio-guard'
 import fs, { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parse, validate, validateTsFileRefs } from '@swirls/language'
+import {
+  validate,
+  validateTsFileRefs,
+} from '@swirls/language'
+import { parse } from './parse-cache'
+import {
+  collectVirtualDiagnostics,
+  getVirtualDiagnostics,
+  toDocumentDiagnostics,
+} from './ts-service/block-diagnostics'
 import {
   buildWorkspaceResourceIndex,
   emptyWorkspaceResourceIndex,
@@ -190,6 +199,9 @@ function getWorkspaceIndexForUri(uri: string): WorkspaceResourceIndex {
     idx = buildWorkspaceResourceIndex({
       cwd,
       fileSystem: makeOverlayFileSystem(),
+      // Unchanged files, and open documents the handlers already parsed, are
+      // cache hits: a rebuild after an edit parses one file, not the workspace.
+      parse,
     })
   } catch {
     idx = emptyWorkspaceResourceIndex()
@@ -249,10 +261,23 @@ interface DocumentTsCache {
 
 const documentTsCache = new Map<string, DocumentTsCache>()
 const standaloneTsCache = new Map<string, DocumentTsCache>()
+
+/** Drop a cached service and release its source files from the shared registry. */
+function evictTsCache(cache: Map<string, DocumentTsCache>, uri: string): void {
+  cache.get(uri)?.ls.dispose()
+  cache.delete(uri)
+}
+
+function clearTsCache(cache: Map<string, DocumentTsCache>): void {
+  for (const entry of cache.values()) {
+    entry.ls.dispose()
+  }
+  cache.clear()
+}
 const openStandaloneTsUris = new Set<string>()
 
 async function refreshAllStandaloneDiagnostics(): Promise<void> {
-  standaloneTsCache.clear()
+  clearTsCache(standaloneTsCache)
   await Promise.all(
     [...openStandaloneTsUris].map(async (u) => {
       const d = documents.get(u)
@@ -281,7 +306,7 @@ function getDocumentTsCache(
   const result = parse(text)
 
   if (result.errors.length > 0) {
-    documentTsCache.delete(uri)
+    evictTsCache(documentTsCache, uri)
     return null
   }
 
@@ -301,6 +326,7 @@ function getDocumentTsCache(
   const ls = createLanguageServiceFromMap(contentMap)
   const cache: DocumentTsCache = { version, blocks, contentMap, ls }
 
+  existing?.ls.dispose()
   documentTsCache.set(uri, cache)
   return cache
 }
@@ -331,6 +357,7 @@ function getStandaloneDocumentTsCache(
     ls,
     standaloneMeta: { ambiguous, unbound },
   }
+  existing?.ls.dispose()
   standaloneTsCache.set(uri, cache)
   return cache
 }
@@ -414,39 +441,12 @@ function getStandaloneFileDiagnostics(
   }
 
   const virtualUri = virtualUriForBlock('0')
-  const tsDiags = cache.ls.getSemanticDiagnostics(virtualUri)
-
-  for (const d of tsDiags) {
-    if (
-      d.file?.fileName === virtualUri &&
-      d.start !== undefined &&
-      d.length !== undefined
-    ) {
-      const start = d.file.getLineAndCharacterOfPosition(d.start)
-      const end = d.file.getLineAndCharacterOfPosition(d.start + d.length)
-      const origStart = virtualToOriginal(block, start.line, start.character)
-      const origEnd = virtualToOriginal(block, end.line, end.character)
-
-      let message = ts.flattenDiagnosticMessageText(d.messageText, '\n')
-      const expectedReturn = getExpectedReturnType(block)
-      if (
-        expectedReturn !== undefined &&
-        message.includes('__ExpectedReturn')
-      ) {
-        message = message.replace(/__ExpectedReturn/g, expectedReturn)
-        message = `${message} Expected return type for this block: \`${expectedReturn}\`.`
-      }
-
-      diagnostics.push({
-        message,
-        range: {
-          start: { line: origStart.line, character: origStart.character },
-          end: { line: origEnd.line, character: origEnd.character },
-        },
-        severity: DiagnosticSeverity.Error,
-      })
-    }
-  }
+  diagnostics.push(
+    ...toDocumentDiagnostics(
+      block,
+      collectVirtualDiagnostics(cache.ls, virtualUri),
+    ),
+  )
 
   return diagnostics
 }
@@ -527,62 +527,14 @@ async function getDiagnostics(
   }
 
   const blocks = collectTsBlocksForUri(uri, result.ast)
-  const contentMap = new Map<string, string>()
-
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i]
-    if (block) {
-      contentMap.set(
-        virtualUriForBlock(String(i)),
-        buildVirtualTsContent(block),
-      )
-    }
-  }
-
-  const ls = createLanguageServiceFromMap(contentMap)
-
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i]
-
-    if (!block) {
-      continue
-    }
-
-    const uri = virtualUriForBlock(String(i))
-    const tsDiags = ls.getSemanticDiagnostics(uri)
-
-    for (const d of tsDiags) {
-      if (
-        d.file?.fileName === uri &&
-        d.start !== undefined &&
-        d.length !== undefined
-      ) {
-        const start = d.file.getLineAndCharacterOfPosition(d.start)
-        const end = d.file.getLineAndCharacterOfPosition(d.start + d.length)
-        const origStart = virtualToOriginal(block, start.line, start.character)
-        const origEnd = virtualToOriginal(block, end.line, end.character)
-
-        let message = ts.flattenDiagnosticMessageText(d.messageText, '\n')
-        const expectedReturn = getExpectedReturnType(block)
-        if (
-          expectedReturn !== undefined &&
-          message.includes('__ExpectedReturn')
-        ) {
-          message = message.replace(/__ExpectedReturn/g, expectedReturn)
-          message = `${message} Expected return type for this block: \`${expectedReturn}\`.`
-        }
-
-        diagnostics.push({
-          message,
-          range: {
-            start: { line: origStart.line, character: origStart.character },
-            end: { line: origEnd.line, character: origEnd.character },
-          },
-          severity: DiagnosticSeverity.Error,
-        })
-      }
-    }
-  }
+  const virtualDiagnostics = getVirtualDiagnostics(
+    blocks.map((block) => buildVirtualTsContent(block)),
+  )
+  blocks.forEach((block, i) => {
+    diagnostics.push(
+      ...toDocumentDiagnostics(block, virtualDiagnostics[i] ?? []),
+    )
+  })
 
   const jsonBlocks = collectJsonBlocks(result.ast)
 
@@ -675,8 +627,20 @@ function offsetToLineChar(
   }
 }
 
+/** Delay before re-validating the document being edited. */
 const DIAGNOSTIC_DEBOUNCE_MS = 200
-let diagnosticDebounceTimer: ReturnType<typeof setTimeout> | null = null
+/**
+ * Delay before re-validating the other open documents. Cross-file effects come
+ * from adding or removing a resource, not from typing inside one, so this can
+ * wait for a pause instead of running on every burst of keystrokes.
+ */
+const CASCADE_DEBOUNCE_MS = 600
+/** One timer per document, so an edit in one file never cancels another's refresh. */
+const diagnosticDebounceTimers = new Map<
+  string,
+  ReturnType<typeof setTimeout>
+>()
+let cascadeDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 async function refreshDiagnostics(
   uri: string,
@@ -687,8 +651,27 @@ async function refreshDiagnostics(
     await refreshAllStandaloneDiagnostics()
   }
 
-  const diagnostics = await getDiagnostics(uri, document)
+  const diagnostics = await getDiagnosticsSafely(uri, document)
   connection.sendDiagnostics({ uri, diagnostics })
+}
+
+/**
+ * Diagnostics run from timers and notifications, where a rejection has no
+ * caller to catch it and would take the whole server down. Log and keep the
+ * previous squiggles out of the way instead.
+ */
+async function getDiagnosticsSafely(
+  uri: string,
+  document: TextDocument,
+): Promise<Diagnostic[]> {
+  try {
+    return await getDiagnostics(uri, document)
+  } catch (error) {
+    connection.console.error(
+      `[Swirls LSP] diagnostics failed for ${uri}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+    )
+    return []
+  }
 }
 
 /** Refresh diagnostics for every open `.swirls` DSL doc. Used after cross-file invalidations. */
@@ -707,28 +690,43 @@ async function refreshAllOpenDslDiagnostics(primary?: {
       if (!isDslSwirlsUri(doc.uri)) {
         return
       }
-      const diagnostics = await getDiagnostics(doc.uri, doc)
+      const diagnostics = await getDiagnosticsSafely(doc.uri, doc)
       connection.sendDiagnostics({ uri: doc.uri, diagnostics })
     }),
   )
 }
 
 function scheduleRefreshDiagnostics(uri: string, document: TextDocument): void {
-  if (diagnosticDebounceTimer !== null) {
-    clearTimeout(diagnosticDebounceTimer)
+  const pending = diagnosticDebounceTimers.get(uri)
+  if (pending !== undefined) {
+    clearTimeout(pending)
   }
 
-  diagnosticDebounceTimer = setTimeout(() => {
-    diagnosticDebounceTimer = null
-    if (isDslSwirlsUri(uri)) {
-      // A change to any DSL file invalidates cross-file resource resolution; rebuild the
-      // workspace index and re-validate every open DSL doc so cross-file diagnostics are fresh.
-      invalidateWorkspaceIndices()
-      void refreshAllOpenDslDiagnostics({ uri, document })
-      return
-    }
-    void refreshDiagnostics(uri, document)
-  }, DIAGNOSTIC_DEBOUNCE_MS)
+  diagnosticDebounceTimers.set(
+    uri,
+    setTimeout(() => {
+      diagnosticDebounceTimers.delete(uri)
+      if (isDslSwirlsUri(uri)) {
+        // A change to any DSL file invalidates cross-file resource resolution.
+        // Rebuilding is cheap (one parse, the rest are cache hits), so the
+        // edited document always validates against a fresh index.
+        invalidateWorkspaceIndices()
+        scheduleCascadeRefresh()
+      }
+      void refreshDiagnostics(uri, document)
+    }, DIAGNOSTIC_DEBOUNCE_MS),
+  )
+}
+
+/** Re-validate every open DSL document once edits have paused. */
+function scheduleCascadeRefresh(): void {
+  if (cascadeDebounceTimer !== null) {
+    clearTimeout(cascadeDebounceTimer)
+  }
+  cascadeDebounceTimer = setTimeout(() => {
+    cascadeDebounceTimer = null
+    void refreshAllOpenDslDiagnostics()
+  }, CASCADE_DEBOUNCE_MS)
 }
 
 connection.onInitialize((params: InitializeParams): InitializeResult => {
@@ -1475,8 +1473,13 @@ documents.onDidChangeContent((e: TextDocumentChangeEvent<TextDocument>) => {
 
 documents.onDidClose((e) => {
   const uri = e.document.uri
-  documentTsCache.delete(uri)
-  standaloneTsCache.delete(uri)
+  const pending = diagnosticDebounceTimers.get(uri)
+  if (pending !== undefined) {
+    clearTimeout(pending)
+    diagnosticDebounceTimers.delete(uri)
+  }
+  evictTsCache(documentTsCache, uri)
+  evictTsCache(standaloneTsCache, uri)
   if (isStandaloneTsSwirlsUri(uri)) {
     openStandaloneTsUris.delete(uri)
   }

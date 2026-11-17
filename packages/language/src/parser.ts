@@ -107,7 +107,9 @@ class Parser {
   private lastBlockComment: string | undefined
 
   constructor(source: string) {
-    this.tokens = new Lexer(source).tokenize()
+    const lexer = new Lexer(source)
+    this.tokens = lexer.tokenize()
+    this.errors.push(...lexer.errors)
   }
 
   private eof(): boolean {
@@ -143,6 +145,36 @@ class Parser {
         message,
         range: { ...t.range },
       })
+      return
+    }
+    // At end of input there is no token to point at. Anchor the error to the
+    // end of the last token so it is still reported.
+    const last = this.tokens[this.tokens.length - 1]
+    const end = last?.range.end ?? { line: 1, column: 1, offset: 0 }
+    this.errors.push({ message, range: { start: { ...end }, end: { ...end } } })
+  }
+
+  /**
+   * Report a file that ends inside a block or array. Block parsers stop
+   * quietly when the tokens run out, so without this a truncated file would
+   * parse with no errors.
+   */
+  private reportUnclosedDelimiters(): void {
+    const open: Token[] = []
+    for (const t of this.tokens) {
+      if (t.kind === 'lbrace' || t.kind === 'lbracket') {
+        open.push(t)
+      } else if (t.kind === 'rbrace' || t.kind === 'rbracket') {
+        open.pop()
+      }
+    }
+    const unclosed = open[open.length - 1]
+    if (unclosed) {
+      const closer = unclosed.kind === 'lbrace' ? '}' : ']'
+      this.error(
+        `Unexpected end of file: expected "${closer}" to close the "${unclosed.kind === 'lbrace' ? '{' : '['}" on line ${unclosed.range.start.line}`,
+        null,
+      )
     }
   }
 
@@ -648,6 +680,7 @@ class Parser {
       this.skipToNextBlock()
     }
 
+    this.reportUnclosedDelimiters()
     return { ast, errors: this.errors }
   }
 
@@ -2809,9 +2842,19 @@ class Parser {
         break
       }
 
-      const value = this.parseConfigValue(this.peek()!)
+      const next = this.peek()
+      if (!next) {
+        this.error(`Expected a value for "${key}"`)
+        break
+      }
+      const before = this.index
+      const value = this.parseConfigValue(next)
       if (value) {
         out[key] = value
+      }
+      if (this.index === before) {
+        this.error(`Expected a value for "${key}"`, next)
+        this.advance()
       }
 
       this.expect('comma')
@@ -2834,9 +2877,16 @@ class Parser {
         break
       }
 
+      const before = this.index
       const value = this.parseConfigValue(t)
       if (value) {
         arr.push(value)
+      }
+      // A token that is not a value must still be consumed, or this loop
+      // never ends.
+      if (this.index === before) {
+        this.error('Expected a value or "]"', t)
+        this.advance()
       }
 
       this.expect('comma')

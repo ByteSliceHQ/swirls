@@ -1,9 +1,9 @@
 import {
   type NodeDecl,
-  parse,
   type SourceRange,
   type SwirlsFile,
 } from '@swirls/language'
+import { parse } from './parse-cache'
 import type { Location, Position } from 'vscode-languageserver'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
 import { getDefinition } from './definition'

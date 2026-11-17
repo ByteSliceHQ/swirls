@@ -1,5 +1,9 @@
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { parse, resolveTsRefFullPath, type SourceRange } from '@swirls/language'
+import {
+  resolveTsRefFullPath,
+  type SourceRange,
+} from '@swirls/language'
+import { parse } from './parse-cache'
 import type {
   DocumentLink,
   Location,

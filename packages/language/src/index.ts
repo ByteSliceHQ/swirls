@@ -211,3 +211,8 @@ export {
   PROVIDER_KEY_PATTERN,
   type ProviderCatalog,
 } from './host'
+export {
+  createParseCache,
+  type ParseCache,
+  type ParseCacheOptions,
+} from './parse-cache'

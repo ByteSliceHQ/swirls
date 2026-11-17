@@ -8,7 +8,10 @@ import type {
   StreamVersionDecl,
   WorkflowDecl,
 } from '@swirls/language'
-import { parse, resolveTsRefFullPath } from '@swirls/language'
+import {
+  resolveTsRefFullPath,
+} from '@swirls/language'
+import { parse } from './parse-cache'
 import { getRootNode } from './ts-service/context-types'
 
 export interface TsSwirlsBinding {

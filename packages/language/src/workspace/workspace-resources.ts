@@ -10,7 +10,8 @@ import type { DatabaseDecl } from '../database/ast'
 import type { DiskDecl } from '../disk/ast'
 import type { McpDecl } from '../mcp/ast'
 import type { OperationDecl } from '../operation/ast'
-import { parse } from '../parser'
+import type { ParseCache } from '../parse-cache'
+import { type ParseResult, parse as parseSource } from '../parser'
 import type { PostgresDecl } from '../postgres/ast'
 import type { QueryDecl } from '../query/ast'
 import { resolveNamedSchemasFromDecls } from '../schema'
@@ -330,12 +331,18 @@ export function workspaceDuplicates(
 /**
  * Parse-only scan of all `.swirls` files under `cwd` to index top-level resources
  * and resolved schema literals (for cross-file `schemaRef`).
+ *
+ * A long-lived caller that rebuilds the index as files change (the language
+ * server) passes `parse` from a {@link ParseCache}, so a rebuild re-parses only
+ * the files whose text changed. One-shot callers leave it out.
  */
 export function buildWorkspaceResourceIndex(args: {
   cwd: string
   fileSystem?: SwirlsWorkspaceFileSystem
+  parse?: (source: string) => ParseResult
 }): WorkspaceResourceIndex {
   const fileSystem = args.fileSystem ?? nodeWorkspaceFileSystem
+  const parse = args.parse ?? parseSource
   const paths = collectSwirlsFiles({ cwd: args.cwd, fileSystem })
   const idx = emptyWorkspaceResourceIndex()
   const allSchemas: SchemaDecl[] = []

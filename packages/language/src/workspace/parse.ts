@@ -1,5 +1,6 @@
 import { join } from 'pathe'
 import type { SwirlsFile } from '../ast'
+import type { LanguageHost } from '../host'
 import { inlineTsFileRefs } from '../inline-ts-file-refs'
 import { parse } from '../parser'
 import { validateTsFileRefs } from '../validate-ts-file-refs'
@@ -22,6 +23,8 @@ export function parseSwirlsFile(args: {
   fileSystem?: SwirlsWorkspaceFileSystem
   /** When scanning multiple files (doctor, deploy, CLI), pass the workspace resource index. */
   workspace?: WorkspaceResourceIndex
+  /** The runtime's provider catalog and `@openui` support, for its checks. */
+  host?: LanguageHost
 }): SwirlsFile | null {
   const { cwd, relativePath } = args
   const fileSystem = args.fileSystem ?? nodeWorkspaceFileSystem
@@ -43,7 +46,10 @@ export function parseSwirlsFile(args: {
     )
   }
 
-  const diagnostics = validate(result.ast, { workspace: args.workspace })
+  const diagnostics = validate(result.ast, {
+    workspace: args.workspace,
+    host: args.host,
+  })
   const blocking = diagnostics.filter((d) => d.severity === 'error')
   if (blocking.length > 0) {
     const first = blocking[0]

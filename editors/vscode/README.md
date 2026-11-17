@@ -16,14 +16,6 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 
 Or install from a `.vsix` file: **Extensions** → **...** → **Install from VSIX...**.
 
-## Configuration
-
-
-| Setting                                   | Description                                                           | Default |
-| ----------------------------------------- | --------------------------------------------------------------------- | ------- |
-| `swirls.lsp.enableTypeScriptIntellisense` | Enable TypeScript completions and diagnostics inside `@ts { }` blocks | `true`  |
-
-
 ## Links
 
 - [Swirls](https://swirls.ai)

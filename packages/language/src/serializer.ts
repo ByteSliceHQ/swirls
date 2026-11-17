@@ -1410,7 +1410,7 @@ function serializeDisk(r: DiskDecl): string {
   }
 
   if (r.region != null && r.region !== '') {
-    if (/^[a-zA-Z0-9_-]+$/.test(r.region)) {
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(r.region)) {
       lines.push(`  region: ${r.region}`)
     } else {
       lines.push(`  region: ${escapeString(r.region)}`)
@@ -2029,7 +2029,7 @@ export function serialize(ast: SwirlsFile): string {
       `decision ${d.name} {\n${Object.entries(d.fields)
         .map(
           ([k, v]) =>
-            `  ${k}: ${k === 'secrets' || (k === 'inputSchema' && typeof v === 'string') ? String(v) : JSON.stringify(v)}`,
+            `  ${k}: ${k === 'secrets' ? (Array.isArray(v) ? `[${v.join(', ')}]` : String(v)) : k === 'inputSchema' && typeof v === 'string' ? String(v) : JSON.stringify(v)}`,
         )
         .join('\n')}\n}\n`,
     )

@@ -5,8 +5,8 @@ import {
   HARNESS_PROVIDERS,
   HARNESS_TYPE_DESCRIPTIONS,
   HARNESS_TYPES,
-  parse,
 } from '@swirls/language'
+import { parse } from './parse-cache'
 import type { WorkspaceResourceIndex } from '@swirls/language/workspace'
 import type { CompletionItem, Position } from 'vscode-languageserver'
 import { CompletionItemKind } from 'vscode-languageserver'

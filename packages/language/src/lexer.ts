@@ -158,6 +158,11 @@ export class Lexer {
   private line = 1
   private column = 1
   private offset = 0
+  /**
+   * Characters the lexer could not turn into a token. Each is skipped so the
+   * rest of the file is still tokenized; the parser reports them.
+   */
+  readonly errors: Array<{ message: string; range: SourceRange }> = []
 
   constructor(source: string) {
     this.source = source
@@ -1220,7 +1225,25 @@ export class Lexer {
       const t = this.next()
 
       if (t === null) {
-        break
+        if (this.eof()) {
+          break
+        }
+        // Not end of input: `next()` met a character that starts no token.
+        // Skip it and keep going, so one stray character cannot hide the
+        // rest of the file.
+        const start = this.startPos()
+        const ch = String.fromCodePoint(this.source.codePointAt(this.offset)!)
+        for (let i = 0; i < ch.length; i++) {
+          this.advance()
+        }
+        // A byte order mark at the very start is not an error.
+        if (!(ch === '\uFEFF' && start.offset === 0)) {
+          this.errors.push({
+            message: `Unexpected character ${JSON.stringify(ch)}`,
+            range: range(start, this.startPos()),
+          })
+        }
+        continue
       }
 
       tokens.push(t)

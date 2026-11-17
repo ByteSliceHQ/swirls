@@ -146,7 +146,7 @@ agent a {
   model: "gpt-4o"
 }
 channel support {
-  platform: portal
+  platform: swirls
   agent: a
 }
 workflow review_flow {
@@ -443,7 +443,6 @@ connection c {
   },
   {
     name: 'app-threads-channel',
-    knownGap: true,
     astField: 'threadsRanges',
     inline: INLINE_APP_PAGE_REFERENCES,
     line: 16,
@@ -457,7 +456,6 @@ connection c {
   },
   {
     name: 'app-reviews-workflow',
-    knownGap: true,
     astField: 'reviewsRanges',
     inline: INLINE_APP_PAGE_REFERENCES,
     line: 19,

@@ -61,22 +61,12 @@
         "scopeName": "source.prisma",
         "path": "./syntaxes/prisma.tmLanguage.json"
       }
-    ],
-    "configuration": {
-      "title": "Swirls",
-      "properties": {
-        "swirls.lsp.enableTypeScriptIntellisense": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable TypeScript intellisense inside @ts { } blocks and .ts.swirls files"
-        }
-      }
-    }
+    ]
   },
   "scripts": {
     "compile": "tsc -p .",
     "watch": "tsc -p . -w",
-    "build:server": "mkdir -p server && cp ../../packages/lsp/dist/server.js server/ && cp ../../packages/lsp/dist/prisma_schema_build_bg.wasm server/ && rm -rf server/typescript-lib && cp -RL node_modules/typescript/lib server/typescript-lib",
+    "build:server": "mkdir -p server && cp ../../packages/lsp/dist/server.js server/ && cp ../../packages/lsp/dist/prisma_schema_build_bg.wasm server/ && rm -rf server/typescript-lib && mkdir -p server/typescript-lib && cp -L node_modules/typescript/lib/lib*.d.ts server/typescript-lib/",
     "build:client": "node esbuild.mjs",
     "build": "bun run build:server && bun run build:client",
     "package:vsix": "mkdir -p dist && rm -f dist/*.vsix && vsce package --no-dependencies --out dist",
@@ -95,8 +85,7 @@
     "@vscode/vsce": "3.7.1",
     "esbuild": "0.24.0",
     "ovsx": "0.10.9",
-    "typescript": "catalog:",
-    "vsce": "2.15.0"
+    "typescript": "catalog:"
   },
   "dependencies": {
     "@swirls/lsp": "workspace:*",

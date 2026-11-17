@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import * as fs from 'node:fs'
 import { createRequire } from 'node:module'
 import * as path from 'node:path'
@@ -67,13 +68,13 @@ export function virtualUriForBlock(blockId: string): string {
   return `__swirls_ts_block_${blockId}.ts`
 }
 
-/** Simple content-derived version so cached LS can invalidate when content changes. */
+/**
+ * Version string for a virtual file. The shared document registry reuses a
+ * parsed source file whenever name and version match, so this has to be a real
+ * content hash: a collision would serve a stale file.
+ */
 function scriptVersion(content: string): string {
-  let h = 0
-  for (let i = 0; i < content.length; i++) {
-    h = ((h << 5) - h + content.charCodeAt(i)) | 0
-  }
-  return `${content.length}-${h}`
+  return createHash('sha1').update(content).digest('base64')
 }
 
 function loadLibFile(filePath: string): string | undefined {
@@ -185,12 +186,20 @@ function createTypeScriptHost(
   }
 }
 
+/**
+ * Shared by every language service the server creates, so the parsed standard
+ * library (several megabytes of `lib.*.d.ts`) is built once per process and
+ * not once per service. A service must be `dispose()`d when it is dropped, or
+ * the registry keeps its source files alive.
+ */
+const documentRegistry = ts.createDocumentRegistry()
+
 export function createLanguageService(
   fileName: string,
   content: string,
 ): ts.LanguageService {
   const host = createTypeScriptHost(fileName, content)
-  return ts.createLanguageService(host)
+  return ts.createLanguageService(host, documentRegistry)
 }
 
 /**
@@ -282,5 +291,5 @@ export function createLanguageServiceFromMap(
   contentMap: Map<string, string>,
 ): ts.LanguageService {
   const host = createMultiFileTypeScriptHost(contentMap)
-  return ts.createLanguageService(host)
+  return ts.createLanguageService(host, documentRegistry)
 }

@@ -549,7 +549,12 @@ export function virtualToOriginal(
   }
   const originalLine =
     block.innerRange.start.line - 1 + (virtualLine - preambleLines)
-  const originalChar = virtualChar
+  // The block's first line starts mid-line in the source (after `@ts {`), so
+  // its columns are offset; later lines start at column 0 in both.
+  const originalChar =
+    virtualLine === preambleLines
+      ? virtualChar + (block.innerRange.start.column - 1)
+      : virtualChar
   return { line: originalLine, character: originalChar }
 }
 
@@ -565,7 +570,10 @@ export function originalToVirtual(
   const preambleLines = getPreambleLineCount(block)
   const startLine = block.innerRange.start.line - 1
   const virtualLine = preambleLines + (originalLine - startLine)
-  const virtualChar = originalChar
+  const virtualChar =
+    originalLine === startLine
+      ? Math.max(0, originalChar - (block.innerRange.start.column - 1))
+      : originalChar
   return { line: virtualLine, character: virtualChar }
 }
 

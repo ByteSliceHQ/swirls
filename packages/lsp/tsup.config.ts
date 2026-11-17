@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
@@ -8,4 +9,13 @@ export default defineConfig({
   outDir: 'dist',
   noExternal: [/.*/],
   shims: true,
+  minify: true,
+  esbuildOptions(options) {
+    options.alias = {
+      ...options.alias,
+      '@prisma/config': fileURLToPath(
+        new URL('./src/prisma-service/prisma-config-stub.ts', import.meta.url),
+      ),
+    }
+  },
 })
