@@ -614,7 +614,7 @@ export function validateAgentBlocks(
     if (!providerParsed.success && (a.provider ?? '').trim() !== '') {
       out.push(
         diag(
-          `Invalid agent provider "${a.provider}". Must be one of: openrouter, anthropic, openai, google`,
+          `Invalid agent provider "${a.provider}". Must be one of: ${aiProviderSchema.options.join(', ')}`,
           a.providerRange ?? a.range,
         ),
       )

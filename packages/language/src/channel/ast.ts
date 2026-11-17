@@ -1,13 +1,11 @@
+import {
+  type ChannelPlatform,
+  channelPlatformSchema,
+} from '@swirls/definition/deployment-definition'
 import type { SourceRange } from '../ast'
 
-/** Supported chat platforms for agent channel bindings. */
-export type ChannelPlatform =
-  | 'slack'
-  | 'linear'
-  | 'discord'
-  | 'web'
-  | 'mcp'
-  | 'swirls'
+/** Supported chat platforms for agent channel bindings; the definition owns the list. */
+export type { ChannelPlatform }
 
 /** Surface-hosted rooms (`platform: swirls`). */
 export function isSurfaceChannelPlatform(platform: string): boolean {
@@ -75,14 +73,8 @@ export interface ChannelDecl {
   range: SourceRange
 }
 
-export const CHANNEL_PLATFORMS: readonly ChannelPlatform[] = [
-  'slack',
-  'linear',
-  'discord',
-  'web',
-  'mcp',
-  'swirls',
-]
+export const CHANNEL_PLATFORMS: readonly ChannelPlatform[] =
+  channelPlatformSchema.options
 
 export const CHANNEL_MODES: readonly ChannelMode[] = [
   'mention',

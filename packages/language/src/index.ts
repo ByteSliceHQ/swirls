@@ -105,17 +105,8 @@ export type {
   WorkflowDecl,
 } from './ast'
 export { channelResponsePolicyToDeploymentPayload } from './channel/validator'
-export {
-  HARNESS_PROVIDER_DESCRIPTIONS,
-  HARNESS_PROVIDER_PACKAGES,
-  HARNESS_PROVIDERS,
-  HARNESS_TYPE_DESCRIPTIONS,
-  HARNESS_TYPES,
-  type HarnessProvider,
-  type HarnessType,
-  isHarnessProvider,
-  isHarnessType,
-} from './computer/harness'
+export { SWIRLS_HARNESSES } from './computer/harness'
+export { swirlsHost } from './hosts/swirls'
 export { validateConnectorBlocks } from './connector/validator'
 export {
   parseDatabaseBlock,
@@ -203,6 +194,8 @@ export {
 } from './workflow'
 export {
   isProviderKey,
+  type HarnessCatalog,
+  type HarnessEntry,
   type LanguageHost,
   type OpenUiBindings,
   type OpenUiExpose,

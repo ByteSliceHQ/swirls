@@ -190,6 +190,21 @@ export const CHANNEL_RESPONSE_POLICY_LIMITS = {
   maxCooldownSeconds: 24 * 60 * 60,
 } as const
 
+/**
+ * Where a channel can be bound. Part of the definition, so the language reads
+ * its platform list from here instead of keeping a copy.
+ */
+export const channelPlatformSchema = z.enum([
+  'slack',
+  'linear',
+  'discord',
+  'web',
+  'mcp',
+  'swirls',
+])
+
+export type ChannelPlatform = z.infer<typeof channelPlatformSchema>
+
 export const deploymentDefinitionChannelBlockSchema = z
   .object({
     id: uuidLike,
@@ -198,7 +213,7 @@ export const deploymentDefinitionChannelBlockSchema = z
     description: z.string().optional(),
     platform: z.preprocess(
       (value) => (value === 'portal' ? 'swirls' : value),
-      z.enum(['slack', 'linear', 'discord', 'web', 'mcp', 'swirls']),
+      channelPlatformSchema,
     ),
     agent: z.string().optional(),
     workflows: z.array(z.string().min(1)).optional(),

@@ -36,7 +36,7 @@ The files under [`examples/`](examples) cover each of them and are parsed and va
 
 ## The runtime's part: `LanguageHost`
 
-Some rules belong to the runtime that will run the file, not to the language: which integration providers exist, and how the body of an `@openui { }` block is checked. Pass them in:
+Some rules belong to the runtime that will run the file, not to the language: which integration providers exist, how the body of an `@openui { }` block is checked, and which coding harnesses a `computer` may declare. Pass them in:
 
 ```ts
 validate(ast, {
@@ -44,11 +44,19 @@ validate(ast, {
   host: {
     providers: { has: (key) => catalog.has(key) },
     openui: { extractBindings, validate },
+    harnesses: {
+      types: [{ name: 'coding' }],
+      providers: [{ name: 'codex', package: 'codex' }],
+    },
   },
 })
 ```
 
-With no `host` those checks are skipped: a provider only has to be a well-formed key.
+With no `host` those checks are skipped: a provider or harness name only has to be well formed. The parser never consults the host, so any file parses the same everywhere.
+
+`swirlsHost` (also at `@swirls/language/hosts/swirls`) is the harness catalog of the hosted Swirls runtime; the language server uses it. It does not include an integration provider catalog or an `@openui` checker.
+
+Vocabulary that the deployment definition fixes (AI providers, search providers, channel platforms) is not host policy. The language reads those lists from `@swirls/definition`, so there is one copy.
 
 ## Serializer limits
 

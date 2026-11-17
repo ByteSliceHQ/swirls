@@ -54,6 +54,7 @@ import {
   getNodeContextAtPosition,
 } from './completions'
 import { getDefinition } from './definition'
+import { languageHost } from './language-host'
 import {
   buildHoverContent,
   type DeclWithDoc,
@@ -555,6 +556,7 @@ async function getDiagnostics(
   const validationDiags = validate(result.ast, {
     workspace: getWorkspaceIndexForUri(uri),
     includeUnboundComputerWarnings: true,
+    host: languageHost,
   })
 
   for (const d of validationDiags) {

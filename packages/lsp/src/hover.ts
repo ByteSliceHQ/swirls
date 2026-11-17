@@ -27,12 +27,8 @@ import type {
   WebhookDecl,
   WorkflowDecl,
 } from '@swirls/language'
+import { harnessProviders, harnessTypes } from './language-host'
 import {
-  HARNESS_PROVIDER_DESCRIPTIONS,
-  HARNESS_PROVIDER_PACKAGES,
-  HARNESS_PROVIDERS,
-  HARNESS_TYPE_DESCRIPTIONS,
-  HARNESS_TYPES,
 } from '@swirls/language'
 import type { Position, Range } from 'vscode-languageserver'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
@@ -589,12 +585,12 @@ export function markdownTsQuickInfo(
 export const HARNESS_BLOCK_HOVER =
   '**Coding harness**: a coding agent CLI that Swirls installs and versions on this computer. ' +
   'A computer declares at most one, as `harness: { type: coding, provider: <name> }`. ' +
-  `Providers: ${HARNESS_PROVIDERS.map((provider) => `\`${provider}\``).join(', ')}. ` +
+  `Providers: ${harnessProviders.map((entry) => `\`${entry.name}\``).join(', ')}. ` +
   'Do not pin the provider package in `software:`.'
 
-const HARNESS_TYPE_KEY_HOVER = `**harness.type**: the kind of harness. Allowed: ${HARNESS_TYPES.map((type) => `\`${type}\``).join(', ')}.`
+const HARNESS_TYPE_KEY_HOVER = `**harness.type**: the kind of harness. Allowed: ${harnessTypes.map((entry) => `\`${entry.name}\``).join(', ')}.`
 
-const HARNESS_PROVIDER_KEY_HOVER = `**harness.provider**: which coding agent runs on the guest. Allowed: ${HARNESS_PROVIDERS.map((provider) => `\`${provider}\``).join(', ')}.`
+const HARNESS_PROVIDER_KEY_HOVER = `**harness.provider**: which coding agent runs on the guest. Allowed: ${harnessProviders.map((entry) => `\`${entry.name}\``).join(', ')}.`
 
 /** Hover text and LSP range for a position inside a `harness: { }` block. */
 export interface HarnessHover {
@@ -668,15 +664,25 @@ export function getHarnessHover(
   }
 
   if (positionInRange(line, character, harness.typeRange)) {
+    const entry = harnessTypes.find((t) => t.name === harness.type)
     return {
-      value: `**${harness.type}** harness: ${HARNESS_TYPE_DESCRIPTIONS[harness.type]}.`,
+      value: entry
+        ? `**${harness.type}** harness: ${entry.description ?? ''}`.trimEnd()
+        : `**${harness.type}** is not a harness type this runtime offers.`,
       range: sourceToLspRange(harness.typeRange),
     }
   }
 
   if (positionInRange(line, character, harness.providerRange)) {
+    const entry = harnessProviders.find((p) => p.name === harness.provider)
+    const ships = entry?.package
+      ? `\n\nShips as the package \`${entry.package}\`; the runtime owns its version.`
+      : ''
     return {
-      value: `**${harness.provider}** harness: ${HARNESS_PROVIDER_DESCRIPTIONS[harness.provider]}.\n\nShips as the Flox package \`${HARNESS_PROVIDER_PACKAGES[harness.provider]}\`; Swirls owns its version.`,
+      value: entry
+        ? `**${harness.provider}** harness: ${entry.description ?? ''}`.trimEnd() +
+          ships
+        : `**${harness.provider}** is not a harness provider this runtime offers.`,
       range: sourceToLspRange(harness.providerRange),
     }
   }

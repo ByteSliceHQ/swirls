@@ -13,6 +13,7 @@
     ".": "./src/index.ts",
     "./inline-ts-file-refs": "./src/inline-ts-file-refs.ts",
     "./workspace": "./src/workspace/index.ts",
+    "./hosts/swirls": "./src/hosts/swirls.ts",
     "./postgres/sql-utils": "./src/postgres/sql-utils.ts"
   },
   "scripts": {

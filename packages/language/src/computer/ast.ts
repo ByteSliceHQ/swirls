@@ -4,7 +4,6 @@
  */
 
 import type { SourceRange } from '../ast'
-import type { HarnessProvider, HarnessType } from './harness'
 
 export interface ComputerSoftwarePin {
   packageName: string
@@ -25,9 +24,10 @@ export interface ComputerResourcesDecl {
 
 /** `harness: { type: coding, provider: codex }`. At most one per computer. */
 export interface ComputerHarnessDecl {
-  type: HarnessType
+  /** Any bare name; the host's harness catalog decides which are valid. */
+  type: string
   typeRange: SourceRange
-  provider: HarnessProvider
+  provider: string
   providerRange: SourceRange
   /** From the `harness` key through the closing brace. */
   range: SourceRange

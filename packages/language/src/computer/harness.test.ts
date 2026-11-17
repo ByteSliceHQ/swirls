@@ -1,11 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import {
-  HARNESS_PROVIDER_PACKAGES,
-  HARNESS_PROVIDERS,
-  HARNESS_TYPES,
-  isHarnessProvider,
-  isHarnessType,
-} from '../index'
+import { SWIRLS_HARNESSES, swirlsHost } from '../index'
 import { parse } from '../parser'
 import { serialize } from '../serializer'
 import { validate } from '../validator'
@@ -17,32 +11,30 @@ function errorMessages(src: string): string[] {
 function diagnostics(src: string) {
   const { ast, errors } = parse(src)
   expect(errors).toEqual([])
-  return validate(ast)
+  return validate(ast, { host: swirlsHost })
 }
 
-describe('harness catalog', () => {
+const HARNESS_PROVIDERS = SWIRLS_HARNESSES.providers.map((entry) => entry.name)
+
+describe('swirls harness catalog', () => {
   test('lists the coding type and four providers', () => {
-    expect([...HARNESS_TYPES]).toEqual(['coding'])
-    expect([...HARNESS_PROVIDERS]).toEqual(['claude', 'codex', 'pi', 'hermes'])
+    expect(SWIRLS_HARNESSES.types.map((entry) => entry.name)).toEqual([
+      'coding',
+    ])
+    expect(HARNESS_PROVIDERS).toEqual(['claude', 'codex', 'pi', 'hermes'])
   })
 
-  test('maps every provider to its Flox package', () => {
-    expect(HARNESS_PROVIDER_PACKAGES).toEqual({
+  test('maps every provider to its package', () => {
+    expect(
+      Object.fromEntries(
+        SWIRLS_HARNESSES.providers.map((entry) => [entry.name, entry.package]),
+      ),
+    ).toEqual({
       claude: 'claude-code',
       codex: 'codex',
       pi: 'pi-coding-agent',
       hermes: 'hermes-agent',
     })
-  })
-
-  test('type guards accept catalog names only', () => {
-    expect(isHarnessType('coding')).toBe(true)
-    expect(isHarnessType('chat')).toBe(false)
-    for (const provider of HARNESS_PROVIDERS) {
-      expect(isHarnessProvider(provider)).toBe(true)
-    }
-    expect(isHarnessProvider('claude-code')).toBe(false)
-    expect(isHarnessProvider('')).toBe(false)
   })
 })
 
@@ -83,33 +75,61 @@ describe('harness parsing', () => {
     expect(ast.computer[0]?.harness).toBeUndefined()
   })
 
-  test('unknown provider lists the allowed names', () => {
-    const src =
-      'computer box {\n  harness: { type: coding, provider: gemini }\n}\n'
-    const { ast, errors } = parse(src)
-    expect(errors.map((error) => error.message)).toEqual([
-      'Unknown harness provider "gemini"; expected one of claude, codex, pi, hermes',
-    ])
-    expect(errors[0]?.range.start).toMatchObject({ line: 2, column: 38 })
-    expect(ast.computer[0]?.harness).toBeUndefined()
+  test('the parser accepts any bare name: the catalog is the host\'s', () => {
+    const { ast, errors } = parse(
+      'computer box {\n  harness: { type: chat, provider: gemini }\n}\n',
+    )
+    expect(errors).toEqual([])
+    expect(ast.computer[0]?.harness).toMatchObject({
+      type: 'chat',
+      provider: 'gemini',
+    })
   })
 
-  test('unknown type lists the allowed names', () => {
+  test('with a host, an unknown provider lists the allowed names', () => {
+    const found = diagnostics(
+      'computer box {\n  harness: { type: coding, provider: gemini }\n}\n',
+    )
+    expect(found.map((d) => d.message)).toEqual([
+      'Unknown harness provider "gemini"; expected one of claude, codex, pi, hermes',
+    ])
+    expect(found[0]?.range.start).toMatchObject({ line: 2, column: 38 })
+  })
+
+  test('with a host, an unknown type lists the allowed names', () => {
     expect(
-      errorMessages(
+      diagnostics(
         'computer box {\n  harness: { type: chat, provider: codex }\n}\n',
-      ),
+      ).map((d) => d.message),
     ).toEqual(['Unknown harness type "chat"; expected one of coding'])
   })
 
-  test('quoted values are rejected with the allowed names', () => {
+  test('with no host, harness names are not checked', () => {
+    const { ast } = parse(
+      'computer box {\n  harness: { type: chat, provider: gemini }\n}\n',
+    )
+    expect(validate(ast)).toEqual([])
+  })
+
+  test('a host can bring its own catalog', () => {
+    const { ast } = parse(
+      'computer box {\n  harness: { type: coding, provider: gemini }\n}\n',
+    )
+    const host = {
+      harnesses: {
+        types: [{ name: 'coding' }],
+        providers: [{ name: 'gemini', package: 'gemini-cli' }],
+      },
+    }
+    expect(validate(ast, { host })).toEqual([])
+  })
+
+  test('quoted values are rejected', () => {
     expect(
       errorMessages(
         'computer box {\n  harness: { type: coding, provider: "codex" }\n}\n',
       ),
-    ).toEqual([
-      'harness.provider must be a bare name, one of claude, codex, pi, hermes',
-    ])
+    ).toEqual(['harness.provider must be a bare name, not a quoted string'])
   })
 
   test('versions are not a harness property', () => {
@@ -125,8 +145,8 @@ describe('harness parsing', () => {
   test('missing type and provider are errors on the harness key', () => {
     const { errors } = parse('computer box {\n  harness: { }\n}\n')
     expect(errors.map((error) => error.message)).toEqual([
-      'harness requires "type" (one of coding)',
-      'harness requires "provider" (one of claude, codex, pi, hermes)',
+      'harness requires "type"',
+      'harness requires "provider"',
     ])
     expect(errors[0]?.range.start).toMatchObject({ line: 2, column: 3 })
   })
@@ -222,8 +242,7 @@ describe('harness validation', () => {
   })
 
   test('the provider package in software: is an error', () => {
-    for (const provider of HARNESS_PROVIDERS) {
-      const pkg = HARNESS_PROVIDER_PACKAGES[provider]
+    for (const { name: provider, package: pkg } of SWIRLS_HARNESSES.providers) {
       const found = diagnostics(`computer box {
   harness: { type: coding, provider: ${provider} }
   software: { "${pkg}": "1.0.0" }

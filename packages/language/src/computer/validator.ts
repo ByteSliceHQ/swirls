@@ -15,7 +15,7 @@ import type {
 } from '../ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import type { ComputerDecl } from './ast'
-import { HARNESS_PROVIDER_PACKAGES } from './harness'
+import type { HarnessCatalog, LanguageHost } from '../host'
 
 /** Flox catalog attribute names. */
 const SOFTWARE_PACKAGE_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/
@@ -65,6 +65,7 @@ export function validateComputerBlocks(
   options?: {
     workspace?: WorkspaceResourceIndex
     includeUnboundComputerWarnings?: boolean
+    host?: LanguageHost
   },
 ): Diagnostic[] {
   const out: Diagnostic[] = []
@@ -139,7 +140,7 @@ export function validateComputerBlocks(
       out.push(...validateResources(computer))
     }
 
-    out.push(...validateHarness(computer))
+    out.push(...validateHarness(computer, options?.host?.harnesses))
   }
 
   if (options?.includeUnboundComputerWarnings) {
@@ -206,13 +207,40 @@ const NIX_CLAUDE_CODE_PACKAGE = 'claude-code'
  * be pinned; guests below the vendor minimum size get a warning; and a Nix
  * `claude-code` pin gets a warning pointing at the claude harness.
  */
-function validateHarness(computer: ComputerDecl): Diagnostic[] {
+function validateHarness(
+  computer: ComputerDecl,
+  catalog: HarnessCatalog | undefined,
+): Diagnostic[] {
   const out: Diagnostic[] = []
   const label = `Computer "${computer.name}"`
   const harness = computer.harness
-  const harnessPackage = harness
-    ? HARNESS_PROVIDER_PACKAGES[harness.provider]
-    : undefined
+
+  // Which harnesses exist is the runtime's call. With no catalog any bare
+  // name passes and the package rules below have nothing to go on.
+  const providerEntry = catalog?.providers.find(
+    (entry) => entry.name === harness?.provider,
+  )
+  if (harness && catalog) {
+    if (!catalog.types.some((entry) => entry.name === harness.type)) {
+      out.push(
+        diag(
+          `Unknown harness type "${harness.type}"; expected one of ${catalog.types.map((entry) => entry.name).join(', ')}`,
+          harness.typeRange,
+        ),
+      )
+    }
+    if (!providerEntry) {
+      out.push(
+        diag(
+          `Unknown harness provider "${harness.provider}"; expected one of ${catalog.providers.map((entry) => entry.name).join(', ')}`,
+          harness.providerRange,
+        ),
+      )
+    }
+  }
+  const harnessPackage = providerEntry?.package
+  const offersClaude =
+    catalog?.providers.some((entry) => entry.name === 'claude') ?? false
 
   for (const pin of computer.software ?? []) {
     if (harness && pin.packageName === harnessPackage) {
@@ -224,7 +252,7 @@ function validateHarness(computer: ComputerDecl): Diagnostic[] {
       )
       continue
     }
-    if (pin.packageName === NIX_CLAUDE_CODE_PACKAGE) {
+    if (offersClaude && pin.packageName === NIX_CLAUDE_CODE_PACKAGE) {
       out.push(
         diag(
           `${label} pins "${NIX_CLAUDE_CODE_PACKAGE}" in software:, but nixpkgs rewrites that binary and Anthropic's hosted conditions do not allow a modified binary; use harness: { type: coding, provider: claude } instead`,

@@ -1,10 +1,10 @@
 import type { SwirlsFile, WorkflowDecl } from '@swirls/language'
 import {
-  HARNESS_PROVIDER_DESCRIPTIONS,
-  HARNESS_PROVIDER_PACKAGES,
-  HARNESS_PROVIDERS,
-  HARNESS_TYPE_DESCRIPTIONS,
-  HARNESS_TYPES,
+  harnessProviderDetail,
+  harnessProviders,
+  harnessTypes,
+} from './language-host'
+import {
 } from '@swirls/language'
 import { parse } from './parse-cache'
 import type { WorkspaceResourceIndex } from '@swirls/language/workspace'
@@ -997,7 +997,7 @@ const COMPUTER_BLOCK_PROPERTIES: CompletionItem[] = [
   {
     label: 'harness',
     kind: CompletionItemKind.Property,
-    detail: `Coding harness on the guest (${HARNESS_PROVIDERS.join(' | ')}); at most one`,
+    detail: `Coding harness on the guest (${harnessProviders.map((entry) => entry.name).join(' | ')}); at most one`,
     insertText: 'harness: { type: coding, provider: codex }',
   },
 ]
@@ -1006,28 +1006,28 @@ const HARNESS_BLOCK_PROPERTIES: CompletionItem[] = [
   {
     label: 'type',
     kind: CompletionItemKind.Property,
-    detail: `Kind of harness (${HARNESS_TYPES.join(' | ')})`,
+    detail: `Kind of harness (${harnessTypes.map((entry) => entry.name).join(' | ')})`,
     insertText: 'type: ',
   },
   {
     label: 'provider',
     kind: CompletionItemKind.Property,
-    detail: `Harness provider (${HARNESS_PROVIDERS.join(' | ')})`,
+    detail: `Harness provider (${harnessProviders.map((entry) => entry.name).join(' | ')})`,
     insertText: 'provider: ',
   },
 ]
 
-const HARNESS_TYPE_VALUES: CompletionItem[] = HARNESS_TYPES.map((type) => ({
-  label: type,
+const HARNESS_TYPE_VALUES: CompletionItem[] = harnessTypes.map((entry) => ({
+  label: entry.name,
   kind: CompletionItemKind.EnumMember,
-  detail: HARNESS_TYPE_DESCRIPTIONS[type],
+  detail: entry.description,
 }))
 
-const HARNESS_PROVIDER_VALUES: CompletionItem[] = HARNESS_PROVIDERS.map(
-  (provider) => ({
-    label: provider,
+const HARNESS_PROVIDER_VALUES: CompletionItem[] = harnessProviders.map(
+  (entry) => ({
+    label: entry.name,
     kind: CompletionItemKind.EnumMember,
-    detail: `${HARNESS_PROVIDER_DESCRIPTIONS[provider]} (Flox package ${HARNESS_PROVIDER_PACKAGES[provider]})`,
+    detail: harnessProviderDetail(entry),
   }),
 )
 

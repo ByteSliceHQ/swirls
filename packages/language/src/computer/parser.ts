@@ -11,14 +11,6 @@ import type {
   ComputerResourcesDecl,
   ComputerSoftwarePin,
 } from './ast'
-import {
-  HARNESS_PROVIDERS,
-  HARNESS_TYPES,
-  type HarnessProvider,
-  type HarnessType,
-  isHarnessProvider,
-  isHarnessType,
-} from './harness'
 
 function rangeFromTokens(start: Token, end: Token): SourceRange {
   return {
@@ -250,10 +242,11 @@ function skipHarnessValue(d: ResourceParserDelegate): void {
 }
 
 /**
- * Parse `harness: { type: coding, provider: codex }`. Values are bare names
- * checked against the platform catalog, which `parseValue` cannot read because
- * it rejects bare identifiers. Returns null when the block is incomplete or
- * names a value outside the catalog; each problem is reported as an error.
+ * Parse `harness: { type: coding, provider: codex }`. Values are bare names,
+ * which `parseValue` cannot read because it rejects bare identifiers. Which
+ * names exist is the runtime's decision, so that is checked by the validator
+ * against the host's harness catalog. Returns null when the block is
+ * incomplete; each problem is reported as an error.
  */
 function parseHarness(
   d: ResourceParserDelegate,
@@ -268,9 +261,9 @@ function parseHarness(
     return null
   }
 
-  let type: HarnessType | undefined
+  let type: string | undefined
   let typeRange: SourceRange | undefined
-  let provider: HarnessProvider | undefined
+  let provider: string | undefined
   let providerRange: SourceRange | undefined
   const seen = new Set<HarnessKey>()
   let valid = true
@@ -316,39 +309,18 @@ function parseHarness(
     }
     seen.add(key)
 
-    const allowed = key === 'type' ? HARNESS_TYPES : HARNESS_PROVIDERS
     if (value === null) {
-      d.error(
-        `harness.${key} must be a bare name, one of ${formatAllowed(allowed)}`,
-        valTok ?? t,
-      )
+      d.error(`harness.${key} must be a bare name, not a quoted string`, valTok ?? t)
       valid = false
       continue
     }
 
     if (key === 'type') {
-      if (isHarnessType(value)) {
-        type = value
-        typeRange = valTok?.range
-      } else {
-        d.error(
-          `Unknown harness type "${value}"; expected one of ${formatAllowed(HARNESS_TYPES)}`,
-          valTok,
-        )
-        valid = false
-      }
-      continue
-    }
-
-    if (isHarnessProvider(value)) {
+      type = value
+      typeRange = valTok?.range
+    } else {
       provider = value
       providerRange = valTok?.range
-    } else {
-      d.error(
-        `Unknown harness provider "${value}"; expected one of ${formatAllowed(HARNESS_PROVIDERS)}`,
-        valTok,
-      )
-      valid = false
     }
   }
 
@@ -359,17 +331,11 @@ function parseHarness(
   }
 
   if (!seen.has('type')) {
-    d.error(
-      `harness requires "type" (one of ${formatAllowed(HARNESS_TYPES)})`,
-      harnessKey,
-    )
+    d.error('harness requires "type"', harnessKey)
     valid = false
   }
   if (!seen.has('provider')) {
-    d.error(
-      `harness requires "provider" (one of ${formatAllowed(HARNESS_PROVIDERS)})`,
-      harnessKey,
-    )
+    d.error('harness requires "provider"', harnessKey)
     valid = false
   }
 

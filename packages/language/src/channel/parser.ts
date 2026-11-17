@@ -177,7 +177,7 @@ export function parseChannelBlock(
         platformRange = parsed.range
       } else {
         d.error(
-          'channel platform must be slack, linear, discord, web, mcp, or swirls',
+          `channel platform must be one of ${CHANNEL_PLATFORMS.join(', ')}`,
           d.peek(),
         )
       }

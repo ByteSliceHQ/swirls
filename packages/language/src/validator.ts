@@ -1462,7 +1462,7 @@ export function validate(
         ) {
           out.push(
             diag(
-              'Search "provider" must be firecrawl or telem',
+              `Search "provider" must be ${searchProviderSchema.options.join(' or ')}`,
               providerCv.range ?? node.range,
             ),
           )
@@ -1645,7 +1645,7 @@ export function validate(
           if (!pv.success) {
             out.push(
               diag(
-                `Invalid ai provider "${providerCv.value}". Must be one of: openrouter, anthropic, openai, google`,
+                `Invalid ai provider "${providerCv.value}". Must be one of: ${aiProviderSchema.options.join(', ')}`,
                 providerCv.range,
               ),
             )
@@ -1720,6 +1720,7 @@ export function validate(
     ...validateComputerBlocks(ast, {
       workspace,
       includeUnboundComputerWarnings: options?.includeUnboundComputerWarnings,
+      host,
     }),
   )
   out.push(...validateShellNodes(ast, { workspace }))
