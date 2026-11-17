@@ -1,0 +1,349 @@
+================================================================================
+strings and escapes
+================================================================================
+
+form f {
+  label: "Escaped \"quotes\" and \\ backslash and \n newline"
+  empty: ""
+  url: "https://example.com/a//b"
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)
+          (escape_sequence)
+          (string_content)
+          (escape_sequence)
+          (string_content)
+          (escape_sequence)
+          (string_content)
+          (escape_sequence)
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (string))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content))))))
+
+================================================================================
+string spanning lines
+================================================================================
+
+form f {
+  description: "first line
+    second line"
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content))))))
+
+================================================================================
+numbers
+================================================================================
+
+node n {
+  a: 0
+  b: 42
+  c: 0.75
+  d: -1
+  e: -2.5
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (number))
+      (field
+        key: (identifier)
+        value: (number))
+      (field
+        key: (identifier)
+        value: (number))
+      (field
+        key: (identifier)
+        value: (number))
+      (field
+        key: (identifier)
+        value: (number)))))
+
+================================================================================
+durations
+================================================================================
+
+node n {
+  timeout: "30m"
+  retention: 30d
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (duration)))))
+
+================================================================================
+booleans and null
+================================================================================
+
+node n {
+  enabled: true
+  skip: false
+  fallback: null
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (boolean))
+      (field
+        key: (identifier)
+        value: (boolean))
+      (field
+        key: (identifier)
+        value: (null)))))
+
+================================================================================
+references
+================================================================================
+
+node n {
+  type: code
+  secret: vendor.API_KEY
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)
+          (identifier))))))
+
+================================================================================
+unquoted path
+================================================================================
+
+action a {
+  path: /v1/users
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (path)))))
+
+================================================================================
+arrays
+================================================================================
+
+node n {
+  empty: []
+  names: [a, b, c]
+  mixed: ["x", 1, true, { k: v }, [nested]]
+  trailing: [a, b,]
+  spaced: [ a b ]
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (array))
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))
+          (reference
+            (identifier))
+          (reference
+            (identifier))))
+      (field
+        key: (identifier)
+        value: (array
+          (string
+            (string_content))
+          (number)
+          (boolean)
+          (object
+            (field
+              key: (identifier)
+              value: (reference
+                (identifier))))
+          (array
+            (reference
+              (identifier)))))
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))
+          (reference
+            (identifier))))
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))
+          (reference
+            (identifier)))))))
+
+================================================================================
+objects
+================================================================================
+
+node n {
+  empty: {}
+  inline: { a: 1, b: "two", c: three }
+  lines: {
+    a: 1
+    b: 2
+  }
+  quoted: { "type": "object", "required": ["a"] }
+  nested: { outer: { inner: { leaf: true } } }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (object))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (number))
+          (field
+            key: (identifier)
+            value: (string
+              (string_content)))
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (number))
+          (field
+            key: (identifier)
+            value: (number))))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (string
+              (string_content))
+            value: (string
+              (string_content)))
+          (field
+            key: (string
+              (string_content))
+            value: (array
+              (string
+                (string_content))))))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (object
+              (field
+                key: (identifier)
+                value: (object
+                  (field
+                    key: (identifier)
+                    value: (boolean)))))))))))
+
+================================================================================
+reference with a body
+================================================================================
+
+section s {
+  page: home { label: "Dashboard" }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier))
+        body: (object
+          (field
+            key: (identifier)
+            value: (string
+              (string_content))))))))

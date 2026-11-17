@@ -1,0 +1,302 @@
+================================================================================
+workflow with root, node and flow
+================================================================================
+
+workflow notify {
+  label: "Notify"
+  description: "Send a message"
+
+  root {
+    type: code
+    inputSchema: contact_input
+    code: @ts { return context.nodes.root.input }
+  }
+
+  node send {
+    type: integration
+    connection: team_slack
+    action: slack_post_message
+  }
+
+  flow {
+    root -> send
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (block
+        kind: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (embedded_block
+              language: (embedded_language)
+              content: (embedded_content)))))
+      (block
+        kind: (identifier)
+        name: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))))
+      (block
+        kind: (identifier)
+        body: (body
+          (edge
+            source: (identifier)
+            target: (identifier)))))))
+
+================================================================================
+graph is an alias of workflow
+================================================================================
+
+graph legacy {
+  root { type: code }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (block
+        kind: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier))))))))
+
+================================================================================
+labeled edges
+================================================================================
+
+workflow routed {
+  flow {
+    root -> route
+    route -["urgent"]-> escalate
+    route -["not \"urgent\""]-> archive
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (block
+        kind: (identifier)
+        body: (body
+          (edge
+            source: (identifier)
+            target: (identifier))
+          (edge
+            source: (identifier)
+            (labeled_arrow
+              label: (string
+                (string_content)))
+            target: (identifier))
+          (edge
+            source: (identifier)
+            (labeled_arrow
+              label: (string
+                (string_content)
+                (escape_sequence)
+                (string_content)
+                (escape_sequence)))
+            target: (identifier)))))))
+
+================================================================================
+inline subgraph
+================================================================================
+
+workflow top {
+  node each_item {
+    type: map
+    maxItems: 10
+    concurrency: 2
+
+    subgraph {
+      root {
+        type: code
+      }
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (block
+        kind: (identifier)
+        name: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (number))
+          (field
+            key: (identifier)
+            value: (number))
+          (block
+            kind: (identifier)
+            body: (body
+              (block
+                kind: (identifier)
+                body: (body
+                  (field
+                    key: (identifier)
+                    value: (reference
+                      (identifier))))))))))))
+
+================================================================================
+review object with fields on separate lines
+================================================================================
+
+workflow gated {
+  node review_gate {
+    type: code
+    review: {
+      title: "Review"
+      enabled: true
+      actions: [approve, reject]
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (block
+        kind: (identifier)
+        name: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (object
+              (field
+                key: (identifier)
+                value: (string
+                  (string_content)))
+              (field
+                key: (identifier)
+                value: (boolean))
+              (field
+                key: (identifier)
+                value: (array
+                  (reference
+                    (identifier))
+                  (reference
+                    (identifier)))))))))))
+
+================================================================================
+decision
+================================================================================
+
+decision support_triage {
+  provider: typesafe
+  model: "jev-1.13.0"
+  secrets: decision_vendor
+  questions: {
+    urgent: { type: noul, instructions: "Is it urgent?" },
+    severity: { type: score, criteria: ["None", "Blocked"] }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (object
+              (field
+                key: (identifier)
+                value: (reference
+                  (identifier)))
+              (field
+                key: (identifier)
+                value: (string
+                  (string_content)))))
+          (field
+            key: (identifier)
+            value: (object
+              (field
+                key: (identifier)
+                value: (reference
+                  (identifier)))
+              (field
+                key: (identifier)
+                value: (array
+                  (string
+                    (string_content))
+                  (string
+                    (string_content)))))))))))

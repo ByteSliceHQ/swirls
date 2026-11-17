@@ -1,0 +1,1003 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Swirls",
+  "scopeName": "source.swirls",
+  "patterns": [
+    { "include": "#block-declarations" },
+    { "include": "#edge" },
+    { "include": "#trigger-binding" },
+    { "include": "#property" },
+    { "include": "#value" },
+    { "include": "#comment" },
+    { "include": "#at-ts-file-ref" },
+    { "include": "#at-ts" },
+    { "include": "#at-json" },
+    { "include": "#at-sql" },
+    { "include": "#at-prisma" },
+    { "include": "#at-openui" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.swirls",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.swirls",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "block-declarations": {
+      "patterns": [
+        {
+          "name": "meta.block.form.swirls",
+          "begin": "\\b(form)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.webhook.swirls",
+          "begin": "\\b(webhook)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.schedule.swirls",
+          "begin": "\\b(schedule)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.schema.swirls",
+          "begin": "\\b(schema)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.workflow.swirls",
+          "begin": "\\b(workflow|graph)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.stream.swirls",
+          "begin": "\\b(stream)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.view.swirls",
+          "begin": "\\b(view)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.query.swirls",
+          "begin": "\\b(query)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.postgres.swirls",
+          "begin": "\\b(postgres)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.database.swirls",
+          "begin": "\\b(database)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.migration.swirls",
+          "begin": "\\b(migration)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.computer.swirls",
+          "begin": "\\b(computer)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.operation.swirls",
+          "begin": "\\b(operation)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#at-script-file-ref" },
+            { "include": "#at-script" },
+            { "include": "#block-body" }
+          ]
+        },
+        {
+          "name": "meta.block.disk.swirls",
+          "begin": "\\b(disk)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.skill.swirls",
+          "begin": "\\b(skill)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.mcp.swirls",
+          "begin": "\\b(mcp)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.agent.swirls",
+          "begin": "\\b(agent)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.channel.swirls",
+          "begin": "\\b(channel)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.trigger.swirls",
+          "begin": "\\b(trigger)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.secret.swirls",
+          "begin": "\\b(secret)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.auth.swirls",
+          "begin": "\\b(auth)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.connection.swirls",
+          "begin": "\\b(connection)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.connector.swirls",
+          "begin": "\\b(connector)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.network.swirls",
+          "begin": "\\b(network)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.mock.swirls",
+          "begin": "\\b(mock)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.playbook.swirls",
+          "begin": "\\b(playbook)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.action.swirls",
+          "begin": "\\b(action)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.app.swirls",
+          "begin": "\\b(app)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#app-body" }]
+        },
+        {
+          "name": "meta.block.role.swirls",
+          "begin": "\\b(role)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.policy.swirls",
+          "begin": "\\b(policy)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#policy-body" }]
+        },
+        {
+          "name": "meta.block.root.swirls",
+          "begin": "\\b(root)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        },
+        {
+          "name": "meta.block.node.swirls",
+          "begin": "\\b(node)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          },
+          "end": "\\}",
+          "patterns": [{ "include": "#block-body" }]
+        }
+      ]
+    },
+    "block-body": {
+      "patterns": [
+        { "include": "#flow-block" },
+        { "include": "#comment" },
+        { "include": "#at-ts-file-ref" },
+        { "include": "#at-ts" },
+        { "include": "#at-json" },
+        { "include": "#at-sql" },
+        { "include": "#at-prisma" },
+        { "include": "#at-openui" },
+        { "include": "#root-block" },
+        { "include": "#node-block" },
+        { "include": "#table-block" },
+        { "include": "#subgraph-block" },
+        { "include": "#computed-block" },
+        { "include": "#match-block" },
+        { "include": "#profile-block" },
+        { "include": "#case-block" },
+        { "include": "#eval-block" },
+        { "include": "#expect-block" },
+        { "include": "#judge-block" },
+        { "include": "#expose-block" },
+        { "include": "#brace-block" },
+        { "include": "#property-key" },
+        { "include": "#property" },
+        { "include": "#value" },
+        { "include": "#edge" },
+        { "include": "#trigger-binding" }
+      ]
+    },
+    "expose-block": {
+      "begin": "\\b(expose)\\s*:\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.other.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "brace-block": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "flow-block": {
+      "name": "meta.block.flow.swirls",
+      "begin": "\\b(flow)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" },
+        "2": { "name": "entity.name.type.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#comment" }, { "include": "#edge" }]
+    },
+    "root-block": {
+      "name": "meta.block.root.swirls",
+      "begin": "\\b(root)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" },
+        "2": { "name": "entity.name.type.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "node-block": {
+      "name": "meta.block.node.swirls",
+      "begin": "\\b(node)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" },
+        "2": { "name": "entity.name.type.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "table-block": {
+      "name": "meta.block.table.swirls",
+      "begin": "\\b(table)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" },
+        "2": { "name": "entity.name.type.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "subgraph-block": {
+      "name": "meta.block.subgraph.swirls",
+      "begin": "\\b(subgraph)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "computed-block": {
+      "name": "meta.block.computed.swirls",
+      "begin": "\\b(computed)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#computed-body" }]
+    },
+    "computed-body": {
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#at-ts-file-ref" },
+        { "include": "#at-ts" },
+        { "include": "#at-json" },
+        { "include": "#at-prisma" },
+        { "include": "#computed-column-block" },
+        { "include": "#property-key" },
+        { "include": "#property" },
+        { "include": "#value" },
+        { "include": "#brace-block" }
+      ]
+    },
+    "computed-column-block": {
+      "name": "meta.block.computed-column.swirls",
+      "begin": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "entity.name.type.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "profile-block": {
+      "name": "meta.block.profile.swirls",
+      "begin": "\\b(profile)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" },
+        "2": { "name": "entity.name.type.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "case-block": {
+      "name": "meta.block.case.swirls",
+      "begin": "\\b(case)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" },
+        "2": { "name": "entity.name.type.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "eval-block": {
+      "name": "meta.block.eval.swirls",
+      "begin": "\\b(eval)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" },
+        "2": { "name": "entity.name.type.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "expect-block": {
+      "name": "meta.block.expect.swirls",
+      "begin": "\\b(expect)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "judge-block": {
+      "name": "meta.block.judge.swirls",
+      "begin": "\\b(judge)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [{ "include": "#block-body" }]
+    },
+    "app-body": {
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#at-openui" },
+        { "include": "#at-ts-file-ref" },
+        { "include": "#at-ts" },
+        { "include": "#at-json" },
+        { "include": "#at-sql" },
+        { "include": "#at-prisma" },
+        { "include": "#app-expose-block" },
+        { "include": "#app-brand-block" },
+        { "include": "#app-shell-block" },
+        { "include": "#app-nav-block" },
+        { "include": "#app-page-block" },
+        { "include": "#property-key" },
+        { "include": "#property" },
+        { "include": "#value" },
+        { "include": "#brace-block" }
+      ]
+    },
+    "app-expose-block": {
+      "name": "meta.block.expose.swirls",
+      "begin": "\\b(expose)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "name": "meta.expose-member.swirls",
+          "match": "\\b(agent|workflow|view|database)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          }
+        },
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [
+            { "include": "#comment" },
+            {
+              "match": "\\b(access)\\s+(read)\\b",
+              "captures": {
+                "1": { "name": "keyword.other.swirls" },
+                "2": { "name": "constant.language.swirls" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "app-brand-block": {
+      "name": "meta.block.brand.swirls",
+      "begin": "\\b(brand)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#app-brand-tokens-block" },
+        {
+          "match": "\\b(accent|logo|theme)\\s*:",
+          "captures": { "1": { "name": "keyword.other.swirls" } }
+        },
+        { "include": "#property" },
+        { "include": "#value" }
+      ]
+    },
+    "app-brand-tokens-block": {
+      "name": "meta.block.tokens.swirls",
+      "begin": "\\b(tokens)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#app-brand-token-mode-block" }
+      ]
+    },
+    "app-brand-token-mode-block": {
+      "name": "meta.block.token-mode.swirls",
+      "begin": "\\b(light|dark)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "match": "\\b(canvas|text|text_muted|text_dim|surface|viewport|raised|active|field|border|brand|brand_foreground|brand_soft|warning|success|info|danger|radius)\\s*:",
+          "captures": { "1": { "name": "keyword.other.swirls" } }
+        },
+        { "include": "#property" },
+        { "include": "#value" }
+      ]
+    },
+    "app-shell-block": {
+      "name": "meta.block.shell.swirls",
+      "begin": "\\b(shell)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#app-shell-region-block" },
+        {
+          "match": "\\b(sidebar|topnav|chat|canvas)\\b",
+          "name": "constant.language.swirls"
+        },
+        { "include": "#property" },
+        { "include": "#value" }
+      ]
+    },
+    "app-shell-region-block": {
+      "name": "meta.block.shell-region.swirls",
+      "begin": "\\b(topbar|leftbar|rightbar)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#property" },
+        { "include": "#value" },
+        { "include": "#brace-block" }
+      ]
+    },
+    "app-nav-block": {
+      "name": "meta.block.nav.swirls",
+      "begin": "\\b(nav)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#app-nav-section-block" }
+      ]
+    },
+    "app-nav-section-block": {
+      "name": "meta.block.section.swirls",
+      "begin": "\\b(section)\\s+(\"(?:[^\"\\\\]|\\\\.)*\")\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" },
+        "2": { "name": "string.quoted.double.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "match": "\\b(page)\\s*:\\s*([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.swirls" },
+            "2": { "name": "entity.name.type.swirls" }
+          }
+        },
+        { "include": "#property" },
+        { "include": "#value" },
+        { "include": "#brace-block" }
+      ]
+    },
+    "app-page-block": {
+      "name": "meta.block.page.swirls",
+      "begin": "\\b(page)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" },
+        "2": { "name": "entity.name.type.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#at-openui" },
+        { "include": "#property" },
+        {
+          "match": "\\b(full)\\b",
+          "name": "constant.language.swirls"
+        },
+        { "include": "#value" },
+        { "include": "#brace-block" }
+      ]
+    },
+    "match-block": {
+      "name": "meta.block.match.swirls",
+      "begin": "\\b(match)\\s*\\{",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.swirls" }
+      },
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#property" },
+        { "include": "#value" },
+        { "include": "#brace-block" }
+      ]
+    },
+    "policy-body": {
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#policy-grant-line" },
+        { "include": "#grant-body-block" }
+      ]
+    },
+    "policy-grant-line": {
+      "name": "meta.policy-grant.swirls",
+      "match": "\\b(allow|deny)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(->)\\s*(agent)\\s+(\\*|[a-zA-Z_][a-zA-Z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.control.swirls" },
+        "2": { "name": "entity.name.type.swirls" },
+        "3": { "name": "keyword.operator.arrow.swirls" },
+        "4": { "name": "keyword.other.swirls" },
+        "5": { "name": "entity.name.type.swirls" }
+      }
+    },
+    "grant-body-block": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "#policy-grant-body" }]
+    },
+    "policy-grant-body": {
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#property-key" },
+        { "include": "#property" },
+        { "include": "#value" },
+        { "include": "#brace-block" }
+      ]
+    },
+    "property-key": {
+      "patterns": [
+        {
+          "name": "meta.key-value.swirls",
+          "match": "\\b(type)\\s*:",
+          "captures": { "1": { "name": "keyword.other.swirls" } }
+        },
+        {
+          "match": "\\b(label|description|enabled|schema|cron|timezone|version|name|model|provider|agent|decision|disk|temperature|maxTokens|maxSteps|tools|system|role|command|id|region|connection|connector|network|action|encoding|scopes|tables|visibility|platform|integration|url|method|headers|body|from|to|subject|text|html|replyTo|code|prompt|outputs|filter|path|operation|amount|unit|secondsFromConfig|inputSchema|outputSchema|review|vars|secrets|auth|grant_type|client_id|client_secret|token_url|query_param|scope|key|header|username|password|token|condition|prepare|workflow|workflows|cases|router|kind|stream|streamId|streams|columns|graph|input|output|items|maxItems|maxIterations|concurrency|update|select|insert|delete|params|objective|urls|searchQueries|mode|excerpts|fullContent|excerptsMaxCharsPerResult|excerptsMaxCharsTotal|apps|channels|forms|webhooks|services|databases|database|connections|mocks|tags|timeout|retries|skip|dataset|judge|expect|status|duration|severity|budget|called|notCalled|order|includes|matches|equals|similar|events|only|except|generate|formData|auto|instructions|rubric|criteria|minScore|max)\\s*:",
+          "captures": { "1": { "name": "keyword.other.swirls" } }
+        }
+      ]
+    },
+    "property": {
+      "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*:",
+      "captures": { "1": { "name": "keyword.other.swirls" } }
+    },
+    "value": {
+      "patterns": [
+        { "name": "constant.language.swirls", "match": "\\b(true|false)\\b" },
+        {
+          "name": "constant.language.node-type.swirls",
+          "match": "\\b(agent|ai|code|database|decision|device|disk|email|fanout|workflow|http|integration|map|parallel|postgres|scrape|search|shell|stream|switch|wait|while)\\b"
+        },
+        {
+          "name": "constant.language.auth-kind.swirls",
+          "match": "\\b(oauth|api_key|basic|bearer|client_credentials)\\b"
+        },
+        {
+          "name": "constant.language.mock-mode.swirls",
+          "match": "\\b(all|off|selective)\\b"
+        },
+        {
+          "name": "constant.language.review-auto.swirls",
+          "match": "\\b(approve|reject)\\b"
+        },
+        {
+          "name": "constant.language.expect-status.swirls",
+          "match": "\\b(completed|failed|waiting)\\b"
+        },
+        {
+          "name": "constant.language.severity.swirls",
+          "match": "\\b(soft|gate)\\b"
+        },
+        {
+          "name": "string.quoted.double.swirls",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.swirls", "match": "\\\\." }
+          ]
+        },
+        {
+          "name": "constant.numeric.swirls",
+          "match": "\\b[0-9]+(\\.[0-9]+)?\\b"
+        }
+      ]
+    },
+    "edge": {
+      "patterns": [
+        {
+          "name": "meta.edge.labeled.swirls",
+          "match": "([a-zA-Z_][a-zA-Z0-9_]*)\\s*(-\\[)(\"(?:[^\"\\\\]|\\\\.)*\")(\\]->)\\s*([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "entity.name.type.swirls" },
+            "2": { "name": "keyword.operator.arrow.swirls" },
+            "3": { "name": "string.quoted.double.swirls" },
+            "4": { "name": "keyword.operator.arrow.swirls" },
+            "5": { "name": "entity.name.type.swirls" }
+          }
+        },
+        {
+          "name": "meta.edge.swirls",
+          "match": "([a-zA-Z_][a-zA-Z0-9_]*)\\s*(->)\\s*([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "entity.name.type.swirls" },
+            "2": { "name": "keyword.operator.arrow.swirls" },
+            "3": { "name": "entity.name.type.swirls" },
+            "4": { "name": "keyword.operator.arrow.swirls" },
+            "5": { "name": "entity.name.type.swirls" }
+          }
+        }
+      ]
+    },
+    "trigger-binding": {
+      "name": "meta.trigger-binding.swirls",
+      "match": "\\b(form|webhook|schedule)\\s*:\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*(->)\\s*([a-zA-Z_][a-zA-Z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.other.swirls" },
+        "2": { "name": "entity.name.type.swirls" },
+        "3": { "name": "keyword.operator.arrow.swirls" },
+        "4": { "name": "entity.name.type.swirls" }
+      }
+    },
+    "at-ts-file-ref": {
+      "name": "meta.at-ts-file-ref.swirls",
+      "begin": "(@ts)(\\s*)(\\\")",
+      "beginCaptures": {
+        "1": { "name": "keyword.other.swirls" },
+        "2": { "name": "white.space.swirls" },
+        "3": { "name": "punctuation.definition.string.begin.swirls" }
+      },
+      "end": "\\\"",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.string.end.swirls" }
+      },
+      "contentName": "string.quoted.double.path.swirls",
+      "patterns": [
+        { "name": "constant.character.escape.swirls", "match": "\\\\." }
+      ]
+    },
+    "at-ts": {
+      "name": "meta.embedded.block.ts.swirls",
+      "begin": "@ts\\s*\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "#at-ts-body" }]
+    },
+    "at-ts-body": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "#at-ts-body" }]
+        },
+        { "include": "source.ts" }
+      ]
+    },
+    "at-json": {
+      "name": "meta.embedded.block.json.swirls",
+      "begin": "@json\\s*\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "#at-json-body" }]
+    },
+    "at-json-body": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "#at-json-body" }]
+        },
+        { "include": "source.json" }
+      ]
+    },
+    "at-script-file-ref": {
+      "name": "meta.embedded.script-ref.swirls",
+      "match": "(@(?:ps|sh))\\s*(\"[^\"]*\")",
+      "captures": {
+        "1": { "name": "keyword.other.swirls" },
+        "2": { "name": "string.quoted.double.swirls" }
+      }
+    },
+    "at-script": {
+      "name": "meta.embedded.block.script.swirls",
+      "begin": "(@(?:ps|sh))\\s*\\{",
+      "beginCaptures": { "1": { "name": "keyword.other.swirls" } },
+      "end": "\\}",
+      "patterns": [{ "include": "#at-script-body" }]
+    },
+    "at-script-body": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.swirls",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [{ "match": "[\\\\`]." }]
+        },
+        {
+          "name": "string.quoted.single.swirls",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "name": "comment.line.number-sign.swirls",
+          "match": "(?<=^|\\s)#.*$"
+        },
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "#at-script-body" }]
+        }
+      ]
+    },
+    "at-sql": {
+      "name": "meta.embedded.block.sql.swirls",
+      "begin": "@sql\\s*\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "#at-sql-body" }]
+    },
+    "at-sql-body": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "#at-sql-body" }]
+        },
+        { "include": "source.sql" }
+      ]
+    },
+    "at-prisma": {
+      "name": "meta.embedded.block.prisma.swirls",
+      "begin": "@prisma\\s*\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "#at-prisma-body" }]
+    },
+    "at-prisma-body": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "#at-prisma-body" }]
+        },
+        { "include": "source.prisma" }
+      ]
+    },
+    "at-openui": {
+      "name": "meta.embedded.block.openui.swirls",
+      "begin": "@openui\\s*\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "#at-openui-body" }]
+    },
+    "at-openui-body": {
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "name": "string.quoted.double.swirls",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.swirls", "match": "\\\\." }
+          ]
+        },
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [{ "include": "#at-openui-body" }]
+        }
+      ]
+    }
+  }
+}

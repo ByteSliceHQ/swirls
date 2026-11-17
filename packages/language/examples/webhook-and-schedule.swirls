@@ -1,0 +1,71 @@
+// Webhook + schedule both triggering the same graph
+
+schema inbound_event_payload {
+  label: "Inbound event"
+  description: "Webhook body shape shared with handle_event root input"
+  schema: @json {
+    {
+      "type": "object",
+      "properties": {
+        "event": { "type": "string" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  }
+}
+
+webhook inbound {
+  label: "Inbound Webhook"
+  enabled: true
+  schema: inbound_event_payload
+}
+
+schedule daily {
+  label: "Daily run"
+  cron: "0 9 * * *"
+  timezone: "America/New_York"
+  enabled: true
+}
+
+workflow handle_event {
+  label: "Handle Event"
+
+  root {
+    type: code
+    label: "Process"
+    inputSchema: inbound_event_payload
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["event", "payload", "at"], 
+        "properties": {
+          "event": { "type": "string" },
+          "payload": { "type": "object" },
+          "at": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+    code: @ts {
+      const event = context.nodes.root.input?.event ?? "unknown"
+      const payload = context.nodes.root.input?.payload ?? {}
+      
+      return {
+        event,
+        payload,
+        at: new Date().toISOString(),
+      }
+    }
+  }
+}
+
+trigger webhook_trigger {
+  webhook:inbound -> handle_event
+  enabled: true
+}
+
+trigger schedule_trigger {
+  schedule:daily -> handle_event
+  enabled: true
+}

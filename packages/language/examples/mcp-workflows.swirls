@@ -1,0 +1,44 @@
+// Managed MCP example. Assign department=sales to a connector credential in Cloud.
+// This workflow prepares a draft; it does not save or send a quote.
+connector customer_access {
+  label: "Customer access"
+}
+
+workflow prepare_quote {
+  label: "Prepare a quote"
+  description: "Calculate a draft quote from an item price and quantity. Does not save or send the quote."
+  root {
+    type: code
+    inputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "item": { "type": "string", "minLength": 1 },
+          "unit_price_cents": { "type": "integer", "minimum": 0, "maximum": 100000000 },
+          "quantity": { "type": "integer", "minimum": 1, "maximum": 10000 }
+        },
+        "required": ["item", "unit_price_cents", "quantity"],
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const { item, unit_price_cents, quantity } = context.nodes.root.input
+      return { item, quantity, total_cents: unit_price_cents * quantity, status: "draft" }
+    }
+  }
+}
+
+channel sales_operations {
+  label: "Sales operations"
+  platform: mcp
+  connector: customer_access
+  workflows: [prepare_quote]
+}
+
+role sales {
+  match { department: "sales" }
+}
+
+policy {
+  allow sales -> workflow prepare_quote
+}

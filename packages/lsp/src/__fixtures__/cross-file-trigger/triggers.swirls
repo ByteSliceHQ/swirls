@@ -1,0 +1,4 @@
+version: 1
+trigger on_form {
+  form: intake -> process
+}

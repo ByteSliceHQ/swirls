@@ -1,0 +1,39 @@
+{
+  "name": "@swirls/definition",
+  "version": "0.1.0",
+  "description": "The Swirls deployment definition: the versioned schema a .swirls project compiles to and a runtime consumes.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ByteSliceHQ/swirls.git",
+    "directory": "packages/definition"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/deployment-definition.ts",
+    "./deployment-definition": "./src/deployment-definition.ts",
+    "./schemas": "./src/schemas.ts",
+    "./app-audience": "./src/app-audience.ts",
+    "./app-avatar": "./src/app-avatar.ts",
+    "./app-brand-tokens": "./src/app-brand-tokens.ts",
+    "./app-themes": "./src/app-themes.ts",
+    "./connection-mode": "./src/connection-mode.ts",
+    "./decision": "./src/decision.ts",
+    "./device": "./src/device.ts",
+    "./file-values": "./src/file-values.ts",
+    "./managed-database": "./src/managed-database.ts",
+    "./secrets/vendor-keys": "./src/secrets/vendor-keys.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/json-schema": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,91 @@
+workflow process_leads {
+  label: "Process incoming leads"
+
+  root {
+    type: code
+    label: "Score lead"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" }
+        },
+        "required": ["email", "name"]
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "name": { "type": "string" },
+          "score": { "type": "number" }
+        },
+        "required": ["email", "name", "score"]
+      }
+    }
+    code: @ts {
+      return {
+        name: context.nodes.root.input.name,
+        email: context.nodes.root.input.email,
+        score: Math.random() * 100
+      }
+    }
+  }
+}
+
+stream scored_leads {
+  enabled: true
+  label: "Scored leads"
+  description: "Persists scored lead data from the process_leads graph"
+  workflow: process_leads
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "email": { "type": "string" },
+            "name": { "type": "string" },
+            "score": { "type": "number" }
+          },
+          "required": ["email", "name", "score"]
+        }
+      }
+
+      condition: @ts {
+        // `root` is the only leaf and is must-run (no upstream switches),
+        // so `context.output.root` is typed as required.
+        return context.output.root.score > 50
+      }
+
+      prepare: @ts {
+        const lead = context.output.root
+        return {
+          email: lead.email,
+          name: lead.name,
+          score: lead.score
+        }
+      }
+    }
+  }
+}
+
+workflow read_scored_leads {
+  label: "Read from scored_leads stream"
+
+  root {
+    type: stream
+    label: "Recent scored leads"
+    stream: scored_leads
+    version: v1
+    filter: @ts {
+      return {
+        score: { gte: 0 },
+      }
+    }
+  }
+}

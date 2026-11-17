@@ -1,0 +1,103 @@
+/**
+ * Firecrawl-backed search node example: query → search → pack results.
+ * Requires: FIRECRAWL_API_KEY — see vendor-keys.swirls; set firecrawl_vendor::FIRECRAWL_API_KEY in project secrets.
+ *
+ * Run with:
+ *   bunx swirls doctor
+ *   bunx swirls graph execute search_web
+ *     (with CLI worker running if using local execution)
+ */
+
+form search_input {
+  label: "Web Search Input"
+  description: "Provide a topic to search the web."
+  enabled: true
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["topic"],
+      "properties": {
+        "topic": { "type": "string", "title": "Search Topic" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+workflow search_web {
+  label: "Web search demo"
+  description: "Accepts a topic via form; search node calls Firecrawl /v2/search and packs results."
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic"],
+        "properties": {
+          "topic": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic"],
+        "properties": {
+          "topic": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      return {
+        topic: context.nodes.root.input.topic,
+      }
+    }
+  }
+
+  node find {
+    type: search
+    label: "Firecrawl web search"
+    query: @ts {
+      return context.nodes.root.output.topic
+    }
+    limit: 10
+    sources: ["web"]
+  }
+
+  node pack {
+    type: code
+    label: "Pack results"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["query", "count", "urls"],
+        "properties": {
+          "query": { "type": "string" },
+          "count": { "type": "number" },
+          "urls": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const out = context.nodes.find.output
+      return {
+        query: out.query,
+        count: out.results.length,
+        urls: out.results.map((r) => r.url),
+      }
+    }
+  }
+
+  flow {
+    root -> find
+    find -> pack
+  }
+}

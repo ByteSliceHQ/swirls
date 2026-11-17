@@ -1,0 +1,167 @@
+================================================================================
+mock
+================================================================================
+
+mock defaults {
+  mode: all
+  except: [linkedin_get_me]
+}
+
+mock review_gate {
+  workflow: demo
+  node: review_draft
+  review: {
+    auto: approve
+    formData: @json { { "approved": true } }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))))))
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (embedded_block
+              language: (embedded_language)
+              content: (embedded_content))))))))
+
+================================================================================
+playbook with case and eval
+================================================================================
+
+playbook smoke {
+  label: "Smoke tests"
+  mocks: defaults
+  tags: [ci]
+
+  case happy_path {
+    workflow: process_contact
+    timeout: "2m"
+
+    expect {
+      status: completed
+      duration: { max: "2m" }
+      called: [root]
+    }
+  }
+
+  eval draft_quality {
+    workflow: generate_draft
+    retries: 1
+
+    judge: {
+      rubric: criteria
+      minScore: 0.7
+      severity: soft
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))))
+      (block
+        kind: (identifier)
+        name: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (string
+              (string_content)))
+          (block
+            kind: (identifier)
+            body: (body
+              (field
+                key: (identifier)
+                value: (reference
+                  (identifier)))
+              (field
+                key: (identifier)
+                value: (object
+                  (field
+                    key: (identifier)
+                    value: (string
+                      (string_content)))))
+              (field
+                key: (identifier)
+                value: (array
+                  (reference
+                    (identifier))))))))
+      (block
+        kind: (identifier)
+        name: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (number))
+          (field
+            key: (identifier)
+            value: (object
+              (field
+                key: (identifier)
+                value: (reference
+                  (identifier)))
+              (field
+                key: (identifier)
+                value: (number))
+              (field
+                key: (identifier)
+                value: (reference
+                  (identifier))))))))))

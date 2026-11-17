@@ -1,0 +1,35 @@
+form f {
+  label: "F"
+  schema: {}
+}
+
+workflow top {
+  label: "Top"
+  root {
+    type: code
+    label: "Root"
+    code: @ts { return {} }
+  }
+
+  node each_item {
+    type: map
+    label: "Each"
+    items: @ts { return [{ x: 1 }, { x: 2 }] }
+    maxItems: 10
+
+    subgraph {
+      root {
+        type: code
+        label: "Iter root"
+        inputSchema: @json {
+          { "type": "object", "required": ["x"], "properties": { "x": { "type": "number" } }, "additionalProperties": false }
+        }
+        code: @ts { return context.iteration.item.x + 1 }
+      }
+    }
+  }
+
+  flow {
+    root -> each_item
+  }
+}

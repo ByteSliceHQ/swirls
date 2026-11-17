@@ -1,0 +1,287 @@
+================================================================================
+secret
+================================================================================
+
+secret vendor {
+  label: "Vendor keys"
+  type: managed
+  vars: [ OPENROUTER_API_KEY, "OTHER_KEY" ]
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))
+          (string
+            (string_content)))))))
+
+================================================================================
+auth
+================================================================================
+
+auth oauth_ex {
+  label: "Example OAuth"
+  type: oauth
+  secrets: gh
+  grant_type: client_credentials
+  client_id: CLIENT_ID
+  token_url: "https://example.com/token"
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content))))))
+
+================================================================================
+connection, connector and action
+================================================================================
+
+connection team_slack {
+  label: "Team Slack"
+  provider: slack
+}
+
+connector customer_access {
+  label: "Customer access"
+}
+
+action slack_post_message {
+  provider: slack
+  method: POST
+  path: /chat.postMessage
+  encoding: form
+  scopes: ["chat:write"]
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))))
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))))
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (path))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (array
+          (string
+            (string_content)))))))
+
+================================================================================
+mcp
+================================================================================
+
+mcp stripe_billing {
+  label: "Stripe"
+  url: "https://mcp.stripe.com"
+  auth: static
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier))))))
+
+================================================================================
+disk and computer
+================================================================================
+
+disk kb {}
+
+computer pr_bot {
+  label: "PR bot"
+  software: { gh: "2.63.2", "claude-code": "1.0.0" }
+  disks: [kb]
+  resources: { cpus: 2, memoryMiB: 1024 }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body))
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (string
+              (string_content)))
+          (field
+            key: (string
+              (string_content))
+            value: (string
+              (string_content)))))
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (number))
+          (field
+            key: (identifier)
+            value: (number)))))))
+
+================================================================================
+operation
+================================================================================
+
+operation collect_diagnostics {
+  label: "Collect diagnostics"
+  platform: windows
+  timeout: 120
+  command: @ps "scripts/collect.ps1"
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (number))
+      (field
+        key: (identifier)
+        value: (file_reference
+          language: (embedded_language)
+          path: (string
+            (string_content)))))))
+
+================================================================================
+skill
+================================================================================
+
+skill swirls_lang {
+  name: "swirls-lang"
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content))))))

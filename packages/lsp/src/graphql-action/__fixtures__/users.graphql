@@ -1,0 +1,81 @@
+scalar DateTime
+scalar CustomJSON
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+interface Node {
+  id: ID!
+}
+
+union SearchResult = User
+
+type Team {
+  id: ID!
+  name: String!
+  department: Department
+}
+
+type Department {
+  id: ID!
+  label: String!
+}
+
+input IssueFilter {
+  id: String
+  and: [IssueFilter!]
+  or: [IssueFilter!]
+}
+
+input IssueSortInput {
+  field: String
+}
+
+type Query {
+  user(id: ID!): User
+  users: UserConnection
+  issues(
+    first: Int
+    after: String
+    filter: IssueFilter
+    orderBy: UserRole
+    sort: [IssueSortInput!]
+  ): UserConnection
+  search(term: String!): SearchResult
+}
+
+type User implements Node {
+  id: ID!
+  name: String!
+  email: String
+  createdAt: DateTime!
+  role: UserRole!
+  source: UserRole
+  metadata: CustomJSON
+  team: Team
+  profile(id: ID!): UserProfile
+}
+
+type UserProfile {
+  bio: String
+}
+
+type UserConnection {
+  edges: [UserEdge!]!
+  nodes: [User!]!
+  pageInfo: PageInfo!
+}
+
+type UserEdge {
+  cursor: String!
+  node: User!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}

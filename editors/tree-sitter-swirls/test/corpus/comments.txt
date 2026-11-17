@@ -1,0 +1,94 @@
+================================================================================
+line comments
+================================================================================
+
+// leading comment
+form f { // trailing comment
+  // inside a block
+  label: "not // a comment"
+}
+// closing comment
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (line_comment)
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (line_comment)
+      (line_comment)
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))))
+  (line_comment))
+
+================================================================================
+block comments
+================================================================================
+
+/* Doc comment for the workflow. */
+workflow w {
+  /*
+   * Multi-line
+   */
+  label: /* inline */ "W"
+  flow {
+    /* between edges **/
+    root -> a
+  }
+}
+/**/
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block_comment)
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (block_comment)
+      (field
+        key: (identifier)
+        (block_comment)
+        value: (string
+          (string_content)))
+      (block
+        kind: (identifier)
+        body: (body
+          (block_comment)
+          (edge
+            source: (identifier)
+            target: (identifier))))))
+  (block_comment))
+
+================================================================================
+comments in values
+================================================================================
+
+node n {
+  list: [
+    a, // first
+    b  /* second */
+  ]
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))
+          (line_comment)
+          (reference
+            (identifier))
+          (block_comment))))))

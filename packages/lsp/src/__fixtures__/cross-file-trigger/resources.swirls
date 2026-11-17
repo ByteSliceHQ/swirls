@@ -1,0 +1,14 @@
+version: 1
+form intake {
+  label: "Intake"
+  schema: @json { { "type": "object" } }
+}
+
+workflow process {
+  label: "Process"
+  root {
+    type: code
+    label: "R"
+    code: @ts { return {} }
+  }
+}

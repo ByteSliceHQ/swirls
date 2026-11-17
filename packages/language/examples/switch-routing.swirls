@@ -1,0 +1,118 @@
+form support_ticket {
+  label: "Support Ticket!"
+  enabled: true
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["email", "subject", "body"],
+      "properties": {
+        "email": { "type": "string", "title": "Email" },
+        "subject": { "type": "string", "title": "Subject" },
+        "body": { "type": "string", "title": "Message" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+workflow triage_ticket {
+  label: "Triage Ticket"
+  description: "Classify urgency and route to the appropriate handler"
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["email", "subject", "body"],
+        "properties": {
+          "email": { "type": "string" },
+          "subject": { "type": "string" },
+          "body": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["email", "subject", "body"],
+        "properties": {
+          "email": { "type": "string" },
+          "subject": { "type": "string" },
+          "body": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const { email, subject, body } = context.nodes.root.input
+      
+      return {
+        email: (email ?? "").trim().toLowerCase(),
+        subject: (subject ?? "").trim(),
+        body: (body ?? "").trim(),
+      }
+    }
+  }
+
+  node classify {
+    type: switch
+    label: "Classify urgency"
+    cases: ["urgent", "normal", "low"]
+    router: @ts {
+      const body = (context.nodes.root.output?.body ?? "").toLowerCase()
+      
+      if (body.includes("urgent") || body.includes("asap")) return "urgent"
+      if (body.length > 500) return "normal"
+      
+      return "low"
+    }
+  }
+
+  node handle_urgent {
+    type: ai
+    kind: text
+    label: "Draft escalation"
+    model: "gpt-4o-mini"
+    prompt: @ts {
+      const { subject, body } = context.nodes.root.output
+      return `Draft a short urgent escalation note for: ${subject}\n\n${body}`
+    }
+  }
+
+  node handle_normal {
+    type: ai
+    kind: text
+    label: "Draft response"
+    model: "gpt-4o-mini"
+    prompt: @ts {
+      const { subject, body } = context.nodes.root.output
+      return `Draft a standard support response for: ${subject}\n\n${body}`
+    }
+  }
+
+  node handle_low {
+    type: code
+    label: "Auto-acknowledge"
+    schema: @json {
+      { "type": "object", "required": ["message"], "properties": { "message": { "type": "string" } } }
+    }
+    code: @ts {
+      const { subject } = context.nodes.root.output
+      return { message: `We received your request: ${subject}. We'll get back to you soon.` }
+    }
+  }
+
+  flow {
+    root -> classify
+    classify -["urgent"]-> handle_urgent
+    classify -["normal"]-> handle_normal
+    classify -["low"]-> handle_low
+  }
+}
+
+trigger on_support_ticket {
+  form:support_ticket -> triage_ticket
+  enabled: true
+}

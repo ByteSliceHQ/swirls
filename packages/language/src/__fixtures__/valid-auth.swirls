@@ -1,0 +1,67 @@
+version: 1
+
+secret gh {
+  label: "GitHub OAuth client"
+  description: "Client credentials for the example integration"
+  vars: [CLIENT_ID, CLIENT_SECRET]
+}
+
+secret api_k {
+  vars: [API_KEY]
+}
+
+secret basic_s {
+  vars: [USER, PASS]
+}
+
+secret tok {
+  vars: [BEARER]
+}
+
+auth oauth_ex {
+  label: "Example OAuth"
+  type: oauth
+  secrets: gh
+  grant_type: client_credentials
+  client_id: CLIENT_ID
+  client_secret: CLIENT_SECRET
+  token_url: "https://example.com/token"
+}
+
+auth api_key_ex {
+  type: api_key
+  secrets: api_k
+  key: API_KEY
+  header: "X-Key"
+}
+
+auth basic_ex {
+  type: basic
+  secrets: basic_s
+  username: USER
+  password: PASS
+}
+
+auth bearer_ex {
+  type: bearer
+  secrets: tok
+  token: BEARER
+}
+
+workflow g {
+  label: "G"
+  root {
+    type: code
+    label: "R"
+    code: @ts { return {} }
+  }
+  node call {
+    type: http
+    label: "Call"
+    auth: oauth_ex
+    url: @ts { return "https://api.example.com" }
+  }
+  flow {
+    root -> call
+  }
+}

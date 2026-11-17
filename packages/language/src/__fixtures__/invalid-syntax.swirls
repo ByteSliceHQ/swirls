@@ -1,0 +1,17 @@
+// Intentionally malformed for parser error recovery tests
+
+form bad_form {
+  label: "Missing closing brace
+
+form no_brace
+  label: "No opening brace"
+
+trigger t {
+  form:missing -> also_missing
+}
+
+workflow g {
+  node n {
+    type: code
+    code: @ts {
+      // Unterminated @ts block — no closing } before end of file

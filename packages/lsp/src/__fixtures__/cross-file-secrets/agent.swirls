@@ -1,0 +1,10 @@
+version: 1
+agent engineer {
+  label: "Engineer"
+  secrets: engineer_openrouter
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  system: @ts {
+    return "Engineer agent";
+  }
+}

@@ -1,0 +1,240 @@
+// Example: postgres block with type: postgres read/write nodes
+//
+// 1. Secret block "db_credentials" groups the Postgres connection secret.
+// 2. Postgres "my_db" references db_credentials and declares two table schemas.
+// 3. Graph "process_lead" reads from leads, scores via AI, then upserts leads, logs to audit_log,
+//    refreshes low scores in place (update:), and prunes old audit rows (delete:).
+
+secret db_credentials {
+  label: "Production Postgres"
+  vars: [PG_CONNECTION_STRING]
+}
+
+secret llm_keys {
+  type: managed
+  vars: [OPENROUTER_API_KEY]
+}
+
+postgres my_db {
+  label: "Production Postgres"
+  secrets: db_credentials
+  connection: PG_CONNECTION_STRING
+
+  table leads {
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "score": { "type": "number" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+
+  table audit_log {
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["event", "actor"],
+        "properties": {
+          "event": { "type": "string" },
+          "actor": { "type": "string" },
+          "detail": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}
+
+form lead_form {
+  label: "New Lead"
+  enabled: true
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["name", "email", "message"],
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}
+
+workflow process_lead {
+  label: "Process and store lead"
+
+  root {
+    type: code
+    label: "Normalize"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["name", "email", "message"],
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["name", "email", "message"],
+        "properties": {
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+    code: @ts {
+      const { name, email, message } = context.nodes.root.input
+      return {
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        message: message.trim()
+      }
+    }
+  }
+
+  node check_existing {
+    type: postgres
+    label: "Check if lead exists"
+    postgres: my_db
+    select: @sql {
+      SELECT id, email, score
+      FROM leads
+      WHERE email = {{email}}
+      LIMIT 1
+    }
+    params: @ts {
+      return { email: context.nodes.root.output.email }
+    }
+    schema: @json {
+      {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "email": { "type": "string" },
+            "score": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+
+  node classify {
+    type: ai
+    label: "Score lead"
+    kind: object
+    model: "gpt-4o-mini"
+    prompt: @ts {
+      const existing = context.nodes.check_existing.output
+      const isNew = !existing || existing.length === 0
+      return "Score this lead 0-100. " + (isNew ? "New lead. " : "Returning lead. ") + context.nodes.root.output.message
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["score"],
+        "properties": { "score": { "type": "number" } }
+      }
+    }
+  }
+
+  node upsert_lead {
+    type: postgres
+    label: "Upsert lead row"
+    postgres: my_db
+    condition: @ts {
+      return context.nodes.classify.output.score > 20
+    }
+    insert: @sql {
+      INSERT INTO leads (name, email, score)
+      VALUES ({{name}}, {{email}}, {{score}})
+      ON CONFLICT (email) DO UPDATE SET score = EXCLUDED.score
+    }
+    params: @ts {
+      return {
+        name: context.nodes.root.output.name,
+        email: context.nodes.root.output.email,
+        score: context.nodes.classify.output.score
+      }
+    }
+  }
+
+  node log_event {
+    type: postgres
+    label: "Log audit event"
+    postgres: my_db
+    insert: @sql {
+      INSERT INTO audit_log (event, actor, detail)
+      VALUES ({{event}}, {{actor}}, {{detail}})
+    }
+    params: @ts {
+      return {
+        event: "lead_processed",
+        actor: context.nodes.root.output.email,
+        detail: "Score: " + context.nodes.classify.output.score
+      }
+    }
+  }
+
+  node refresh_score {
+    type: postgres
+    label: "Refresh lead score"
+    postgres: my_db
+    condition: @ts {
+      return context.nodes.classify.output.score <= 20
+    }
+    update: @sql {
+      UPDATE leads
+      SET score = {{score}}
+      WHERE email = {{email}}
+    }
+    params: @ts {
+      return {
+        score: context.nodes.classify.output.score,
+        email: context.nodes.root.output.email
+      }
+    }
+  }
+
+  node prune_audit {
+    type: postgres
+    label: "Prune old audit rows"
+    postgres: my_db
+    delete: @sql {
+      DELETE FROM audit_log
+      WHERE actor = {{actor}}
+    }
+    params: @ts {
+      return { actor: context.nodes.root.output.email }
+    }
+  }
+
+  flow {
+    root -> check_existing
+    check_existing -> classify
+    classify -> upsert_lead
+    classify -> log_event
+    classify -> refresh_score
+    log_event -> prune_audit
+  }
+}
+
+trigger on_lead {
+  form:lead_form -> process_lead
+  enabled: true
+}

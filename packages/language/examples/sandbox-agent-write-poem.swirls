@@ -1,0 +1,291 @@
+// E2E test target for `swirls graph execute`: parent graph runs an `agent` node
+// whose agent uses the built-in sandbox `write` tool and a graph-backed
+// `list_recent_poems` tool that reads from the `store_poems` stream.
+// The root node supplies a poem topic; the agent composes a short poem and saves it
+// to `poem_<UNIX_EPOCH_TIMESTAMP>.txt` in the sandbox workspace.
+//
+// Run it:
+//   swirls graph execute write_poem_via_agent --input '{"topic":"autumn rain"}'
+//
+// Slack: deploy with slack-team-orchestrator.swirls for managed @swirls testing.
+//
+// Expected: structured output includes the filename written; the poem file exists in
+// the agent sandbox at `/srv/workspace/poem_<unix>.txt`. Successful runs are also
+// persisted to the `store_poems` stream.
+//
+// Requires OPENROUTER_API_KEY in the workspace env (sandbox credentials are runtime-specific).
+
+secret poem_writer_svc {
+  label: "Poem writer vendor keys"
+  vars: [ OPENROUTER_API_KEY ]
+}
+
+/* Structured output from the agent node (submit_output when schema is set). */
+schema poem_write_result_shape {
+  label: "Poem write result"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["topic", "filename", "written"],
+      "properties": {
+        "topic": { "type": "string" },
+        "filename": { "type": "string" },
+        "written": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+/* Agent under test: sandbox write + graph tool to list recent poems from store_poems. */
+agent poem_writer {
+  label: "Poem writer"
+  secrets: poem_writer_svc
+  provider: openrouter
+  model: "google/gemini-3.1-flash-lite"
+  maxSteps: 20
+  tools: [ list_recent_poems ]
+  disks: [ project_disk ]
+  sandbox: {
+    cpus: 1
+    memoryMiB: 1024
+    autoStopMinutes: 5
+  }
+  wallet: {
+    budget: 10
+    cadence: daily
+    maxPerCall: 2
+  }
+  suggestions: [
+    { label: "Write a poem", message: "Write a beautiful yet succinct poem about" }
+  ]
+  system: @ts {
+    return [
+      "You write short poems and persist them with sandbox tools.",
+      "When asked to save a poem, you MUST call the built-in write tool with the exact filename provided.",
+      "Do not claim the file was written unless write succeeded.",
+      "Use list_recent_poems when the user asks about prior poems or wants inspiration from recent work.",
+    ].join("\n")
+  }
+}
+
+/* Entry-point graph for `swirls graph execute write_poem_via_agent`. */
+workflow write_poem_via_agent {
+  label: "Write poem via agent"
+  description: "Parent workflow: supplies topic + poem filename, delegates to an agent node that writes the poem with the built-in sandbox write tool."
+
+  root {
+    type: code
+    label: "Prepare topic and filename"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic"],
+        "properties": {
+          "topic": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic", "filename"],
+        "properties": {
+          "topic": { "type": "string" },
+          "filename": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const topic = String(context.nodes.root.input.topic ?? "").trim()
+      const unix = Math.floor(Date.now() / 1000)
+      const filename = "poem_" + unix + ".txt"
+      return { topic, filename }
+    }
+  }
+
+  node delegate {
+    type: agent
+    label: "Delegate to poem_writer"
+    agent: poem_writer
+    schema: poem_write_result_shape
+    prompt: @ts {
+      const topic = String(context.nodes.root.output.topic ?? "")
+      const filename = String(context.nodes.root.output.filename ?? "")
+      return [
+        "Write a short poem (4-8 lines) about the topic below.",
+        "You MUST use the built-in write tool to save the poem text to this exact filename:",
+        filename,
+        "Set written to true in your structured output only after write succeeds.",
+        "",
+        "Topic:",
+        topic,
+      ].join("\n")
+    }
+  }
+
+  node result {
+    type: code
+    label: "Format result"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["topic", "filename", "written"],
+        "properties": {
+          "topic": { "type": "string" },
+          "filename": { "type": "string" },
+          "written": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const prepared = context.nodes.root.output
+      const out = context.nodes.delegate.output
+      return {
+        topic: String(out?.topic ?? prepared.topic ?? ""),
+        filename: String(out?.filename ?? prepared.filename ?? ""),
+        written: Boolean(out?.written),
+      }
+    }
+  }
+
+  flow {
+    root -> delegate
+    delegate -> result
+  }
+}
+
+/* Graph-backed tool: read latest rows from store_poems (newest first). */
+workflow list_recent_poems {
+  label: "List recent poems"
+  description: "Returns the most recently saved poems from the store_poems stream (topic, filename, written)."
+
+  root {
+    type: code
+    label: "Parse limit"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "number" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["limit"],
+        "properties": {
+          "limit": { "type": "number" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const raw = context.nodes.root.input.limit
+      const limit =
+        typeof raw === 'number' && raw > 0 ? Math.min(Math.floor(raw), 50) : 5
+      return { limit }
+    }
+  }
+
+  node pull {
+    type: stream
+    label: "Pull stored poems"
+    stream: store_poems
+    version: v1
+    filter: @ts {
+      return {
+        written: { eq: true },
+      }
+    }
+  }
+
+  node format {
+    type: code
+    label: "Take latest N"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["poems"],
+        "properties": {
+          "poems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["topic", "filename", "written"],
+              "properties": {
+                "topic": { "type": "string" },
+                "filename": { "type": "string" },
+                "written": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const limit = context.nodes.root.output.limit
+      const rows = context.nodes.pull.output
+      const poems: Record<string, unknown>[] = []
+      if (Array.isArray(rows)) {
+        for (let i = 0; i < rows.length && poems.length < limit; i++) {
+          const row = rows[i]
+          if (row == null || typeof row !== 'object') continue
+          const r = row as Record<string, unknown>
+          poems.push({
+            topic: String(r.topic ?? ''),
+            filename: String(r.filename ?? ''),
+            written: Boolean(r.written),
+          })
+        }
+      }
+      return { poems }
+    }
+  }
+
+  flow {
+    root -> pull
+    pull -> format
+  }
+}
+
+stream store_poems {
+  label: "Store written poems"
+  description: "One record per successful write_poem_via_agent graph execution when the agent wrote the poem file."
+
+  workflow: write_poem_via_agent
+  enabled: true
+  version: v1
+
+  versions: {
+    v1 {
+      schema: poem_write_result_shape
+
+      condition: @ts {
+        return context.output.result.written === true
+      }
+
+      prepare: @ts {
+        return {
+          topic: context.output.result.topic,
+          filename: context.output.result.filename,
+          written: context.output.result.written,
+        }
+      }
+    }
+  }
+}
+
+channel poem_writer_web {
+  label: "Poem writer (Web)"
+  platform: web
+  agent: poem_writer
+  enabled: true
+  mode: dm
+}

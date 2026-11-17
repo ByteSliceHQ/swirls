@@ -1,0 +1,171 @@
+/**
+ * Stream example: switch-routed graph and leaf-keyed `context.output`.
+ *
+ * How switches affect `context.output` typing in stream blocks:
+ *
+ *   - Leaves NOT downstream of any switch are must-run and are typed as
+ *     REQUIRED on `context.output` (see `stream.swirls` for that case).
+ *   - Leaves downstream of a switch may or may not run depending on the
+ *     switch outcome, so the LSP types each such leaf as OPTIONAL.
+ *   - The LSP cannot express mutual exclusion between switch cases, so
+ *     both `short_tokens?` and `long_tokens?` are independently optional
+ *     even though exactly one branch fires at runtime (see SPEC §8 for
+ *     the planned discriminated-union refinement).
+ *
+ * The `condition` below checks that one branch produced output, and
+ * `prepare` narrows with `if`/`if`/`throw` rather than a non-null
+ * assertion so the unreachable case is explicit.
+ *
+ */
+
+workflow estimate_topic_tokens {
+  label: "Estimate tokens via short or long path based on topic length"
+
+  root {
+    type: code
+    label: "Accept topic"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" }
+        },
+        "required": ["topic"]
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" },
+          "length": { "type": "number" }
+        },
+        "required": ["topic", "length"]
+      }
+    }
+    code: @ts {
+      const { topic } = context.nodes.root.input
+
+      return {
+        topic,
+        length: topic.length,
+      }
+    }
+  }
+
+  node route {
+    type: switch
+    label: "Route by topic length"
+    cases: ["short", "long"]
+    router: @ts {
+      return context.nodes.root.output.length < 10 ? "short" : "long"
+    }
+  }
+
+  node short_tokens {
+    type: code
+    label: "Estimate tokens (short path)"
+    schema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "tokens": { "type": "number" }
+        },
+        "required": ["tokens"]
+      }
+    }
+    code: @ts {
+      return {
+        tokens: context.nodes.root.output.length * 2,
+      }
+    }
+  }
+
+  node long_tokens {
+    type: code
+    label: "Estimate tokens (long path)"
+    schema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "tokens": { "type": "number" },
+          "method": { "type": "string" }
+        },
+        "required": ["tokens", "method"]
+      }
+    }
+    code: @ts {
+      return {
+        tokens: Math.ceil(context.nodes.root.output.length / 4),
+        method: "bpe",
+      }
+    }
+  }
+
+  flow {
+    root -> route
+    route -["short"]-> short_tokens
+    route -["long"]-> long_tokens
+  }
+}
+
+stream store_estimated_topic_tokens {
+  label: "Store estimated topic tokens"
+  description: "Switch-based workflow: only one leaf (short_tokens or long_tokens) runs per execution; context.output is keyed by whichever leaf fired."
+
+  workflow: estimate_topic_tokens
+  enabled: true
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "topic": { "type": "string" },
+            "tokens": { "type": "number" },
+            "path": { "type": "string", "enum": ["short", "long"] }
+          },
+          "required": ["topic", "tokens", "path"]
+        }
+      }
+
+      condition: @ts {
+        // Both leaves are independently optional on `context.output` because
+        // each sits downstream of the `route` switch. Persist only when one
+        // of the branches actually produced output.
+        return (
+          context.output.short_tokens !== undefined ||
+          context.output.long_tokens !== undefined
+        )
+      }
+
+      prepare: @ts {
+        const topic = context.nodes.root.output.topic
+
+        if (context.output.short_tokens) {
+          return {
+            topic,
+            tokens: context.output.short_tokens.tokens,
+            path: "short",
+          }
+        }
+
+        if (context.output.long_tokens) {
+          return {
+            topic,
+            tokens: context.output.long_tokens.tokens,
+            path: "long",
+          }
+        }
+
+        // Unreachable under normal operation: the stream `condition` above
+        // guarantees one of the switch branches fired before `prepare` runs.
+        // Throwing narrows the return type without a non-null assertion and
+        // fails loudly if the stream ever drifts out of sync with the graph.
+        throw new Error("estimate_topic_tokens produced no leaf output")
+      }
+    }
+  }
+}

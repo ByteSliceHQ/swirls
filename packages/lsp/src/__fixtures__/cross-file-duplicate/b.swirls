@@ -1,0 +1,10 @@
+version: 1
+agent consumer {
+  label: "Consumer"
+  secrets: dup_secret
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  system: @ts {
+    return "Consumer";
+  }
+}

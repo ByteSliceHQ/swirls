@@ -1,0 +1,30 @@
+// Set telem_research::TELEM_API_KEY in project secrets.
+secret telem_research {
+  vars: [TELEM_API_KEY]
+}
+
+workflow telem_discovery {
+  label: "Discover relevant companies"
+
+  root {
+    type: code
+    label: "Research topic"
+    code: @ts {
+      return { query: "managed IT providers in Colorado" }
+    }
+  }
+
+  node find {
+    type: search
+    label: "Search the web"
+    provider: telem
+    query: @ts {
+      return context.nodes.root.output.query
+    }
+    limit: 10
+  }
+
+  flow {
+    root -> find
+  }
+}

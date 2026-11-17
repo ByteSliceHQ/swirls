@@ -1,0 +1,412 @@
+// Image classification via file values: upload an image, classify with AI vision.
+// Ready file handles in workflow context are auto-materialized as multimodal input on AI nodes.
+//
+// CLI: swirls workflow execute classify_image --input '{"image":{"$file":"./photo.jpg"},"hint":"optional context"}'
+//
+// Surface: deploy and open the `vision_lab` app chat room; attach an image and ask
+// the vision assistant to classify, caption, or extract text.
+
+secret vision_svc {
+  label: "Vision vendor keys"
+  vars: [ OPENROUTER_API_KEY ]
+}
+
+schema image_classify_input {
+  label: "Image classify input"
+  description: "Image file handle plus optional hint for the classifier"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["image"],
+      "properties": {
+        "image": {
+          "$ref": "swirls:file",
+          "contentMediaType": "image/jpeg",
+          "title": "Image",
+          "description": "JPEG, PNG, or WebP image to classify"
+        },
+        "hint": {
+          "type": "string",
+          "title": "Hint (optional)",
+          "description": "Optional context, e.g. expected subject or use case"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema image_only_input {
+  label: "Image input"
+  description: "Single ready image file handle"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["image"],
+      "properties": {
+        "image": {
+          "$ref": "swirls:file",
+          "contentMediaType": "image/jpeg",
+          "title": "Image",
+          "description": "JPEG, PNG, or WebP image"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema remix_input {
+  label: "Image remix input"
+  description: "Source image file handle plus a text prompt describing the remix"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["image", "prompt"],
+      "properties": {
+        "image": {
+          "$ref": "swirls:file",
+          "contentMediaType": "image/jpeg",
+          "title": "Source image",
+          "description": "JPEG, PNG, or WebP image to remix"
+        },
+        "prompt": {
+          "type": "string",
+          "title": "Remix prompt",
+          "description": "Describe how to transform the source image"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+form remix_form {
+  label: "Remix an image"
+  description: "Upload a source image and describe how to transform it"
+  enabled: true
+  schema: remix_input
+}
+
+form image_classify_form {
+  label: "Classify an image"
+  description: "Upload an image and run AI vision classification"
+  enabled: true
+  schema: image_classify_input
+}
+
+workflow classify_image {
+  label: "Classify image"
+  description: "Accept a ready image file handle and classify it with a vision model"
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: image_classify_input
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["image", "hint"],
+        "properties": {
+          "image": { "$ref": "swirls:file" },
+          "hint": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const { image, hint } = context.nodes.root.input
+      if (!image || typeof image !== "object" || image.kind !== "swirls.file") {
+        throw new Error("image must be a ready file handle")
+      }
+      return {
+        image,
+        hint: typeof hint === "string" ? hint.trim() : "",
+      }
+    }
+  }
+
+  node classify {
+    type: ai
+    kind: object
+    label: "Classify image"
+    description: "Vision model reads the uploaded image (auto-attached from context) and returns structured labels."
+    model: "google/gemini-2.5-flash"
+    temperature: 0.2
+    maxTokens: 500
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["summary", "primary_subject", "categories", "confidence"],
+        "properties": {
+          "summary": { "type": "string" },
+          "primary_subject": { "type": "string" },
+          "categories": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    prompt: @ts {
+      const hint = context.nodes.root.output.hint
+      const name = context.nodes.root.output.image?.name ?? "image"
+      const base = `Classify the attached image ("${name}"). Describe what you see and assign topical categories.`
+      return hint ? `${base}\n\nAdditional context from the user: ${hint}` : base
+    }
+  }
+
+  flow {
+    root -> classify
+  }
+}
+
+workflow extract_image_text {
+  label: "Extract image text"
+  description: "OCR / transcription from a ready image file handle"
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: image_only_input
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["image"],
+        "properties": {
+          "image": { "$ref": "swirls:file" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const { image } = context.nodes.root.input
+      if (!image || typeof image !== "object" || image.kind !== "swirls.file") {
+        throw new Error("image must be a ready file handle")
+      }
+      return { image }
+    }
+  }
+
+  node ocr {
+    type: ai
+    kind: object
+    label: "Extract text"
+    description: "Read visible text from the attached image."
+    model: "google/gemini-2.5-flash"
+    temperature: 0.1
+    maxTokens: 1200
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["text", "language"],
+        "properties": {
+          "text": { "type": "string" },
+          "language": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    prompt: @ts {
+      const name = context.nodes.root.output.image?.name ?? "image"
+      return `Extract all readable text from the attached image ("${name}"). Preserve line breaks where helpful.`
+    }
+  }
+
+  flow {
+    root -> ocr
+  }
+}
+
+workflow caption_image {
+  label: "Caption image"
+  description: "Generate a concise one-line caption for a ready image file handle"
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: image_only_input
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["image"],
+        "properties": {
+          "image": { "$ref": "swirls:file" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const { image } = context.nodes.root.input
+      if (!image || typeof image !== "object" || image.kind !== "swirls.file") {
+        throw new Error("image must be a ready file handle")
+      }
+      return { image }
+    }
+  }
+
+  node caption {
+    type: ai
+    kind: object
+    label: "Caption"
+    description: "Write a short caption for the attached image."
+    model: "google/gemini-2.5-flash"
+    temperature: 0.4
+    maxTokens: 120
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["caption"],
+        "properties": {
+          "caption": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    prompt: @ts {
+      const name = context.nodes.root.output.image?.name ?? "image"
+      return `Write one concise caption sentence for the attached image ("${name}").`
+    }
+  }
+
+  flow {
+    root -> caption
+  }
+}
+
+workflow remix_image {
+  label: "Remix image"
+  description: "Accept a ready image file handle and remix it with a text prompt; returns a generated image file handle"
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: remix_input
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["image", "prompt"],
+        "properties": {
+          "image": { "$ref": "swirls:file" },
+          "prompt": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const { image, prompt } = context.nodes.root.input
+      if (!image || typeof image !== "object" || image.kind !== "swirls.file") {
+        throw new Error("image must be a ready file handle")
+      }
+      const trimmed = typeof prompt === "string" ? prompt.trim() : ""
+      if (trimmed === "") {
+        throw new Error("prompt is required")
+      }
+      return { image, prompt: trimmed }
+    }
+  }
+
+  node remix {
+    type: ai
+    kind: image
+    label: "Remix image"
+    description: "Edit-capable image model remixes the uploaded source image using the user prompt."
+    provider: openrouter
+    model: "google/gemini-2.5-flash-image"
+    prompt: @ts {
+      return context.nodes.root.output.prompt
+    }
+  }
+
+  flow {
+    root -> remix
+  }
+}
+
+agent vision_assistant {
+  label: "Vision assistant"
+  description: "Classifies, captions, and extracts text from images attached in chat."
+  secrets: vision_svc
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  maxSteps: 8
+  tools: [ classify_image, extract_image_text, caption_image, remix_image ]
+  system: @ts {
+    return [
+      "You help users understand images they attach in chat.",
+      "When the user attaches an image, call the appropriate tool with the full swirls.file handle object from the attachment context.",
+      "Use classify_image for labels and categories, caption_image for a one-line description, extract_image_text for OCR, remix_image to transform an image with a text prompt.",
+      "If the user asks generally what is in the photo, prefer classify_image.",
+      "Never invent file ids — pass the exact handle object provided.",
+      "When a tool returns a swirls.file handle, do not invent download links or URLs. The chat UI renders preview and download cards automatically; briefly describe what was produced.",
+    ].join("\n")
+  }
+  suggestions: [
+    { label: "Classify this image", message: "Classify the attached image." },
+    { label: "Caption", message: "Write a one-line caption for the attached image." },
+    { label: "Extract text", message: "Extract any readable text from the attached image." },
+  ]
+}
+
+channel vision_room {
+  label: "Vision lab"
+  platform: swirls
+  agent: vision_assistant
+  enabled: true
+  mode: mention
+}
+
+app vision_lab {
+  label: "Vision Lab"
+  description: "Chat with a vision assistant and trigger image workflows from attachments."
+  icon: "image"
+
+  shell {
+    preset: sidebar
+    topbar {
+      right: [widget.user_menu]
+    }
+  }
+
+  nav {
+    section "Lab" {
+      page: room
+      page: remix_lab
+    }
+  }
+
+  page room {
+    label: "Vision chat"
+    icon: "message-square-text"
+    channel: vision_room
+  }
+
+  page remix_lab {
+    label: "Remix"
+    icon: "wand-sparkles"
+    render: @openui {
+      form = WorkflowLauncher("remix_image", [
+        { name: "image", label: "Source image", type: "file", required: true, contentMediaType: "image/jpeg" },
+        { name: "prompt", label: "Remix prompt", type: "string", required: true }
+      ], "Remix", "Transform the uploaded image with a text prompt")
+
+      runs = RunTimeline("remix_image", 10, "Recent remixes")
+      root = Stack([form, runs], "vertical", "md")
+    }
+  }
+}
+
+trigger image_classify_trigger {
+  form:image_classify_form -> classify_image
+  enabled: true
+}
+
+trigger remix_trigger {
+  form:remix_form -> remix_image
+  enabled: true
+}

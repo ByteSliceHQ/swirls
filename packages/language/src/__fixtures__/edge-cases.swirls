@@ -1,0 +1,54 @@
+// Edge cases: empty blocks, escaped strings, unicode, empty fenced blocks.
+
+form empty_form {
+  label: ""
+  enabled: true
+  schema: @json {
+    {}
+  }
+}
+
+workflow edge_graph {
+  label: "Edge cases"
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+    code: @ts {
+      return {}
+    }
+  }
+
+  node with_escapes {
+    type: code
+    label: "Escaped \"quotes\" and \\ backslash and \n newline"
+    code: @ts {
+
+    }
+  }
+
+  node empty_ts {
+    type: code
+    label: "Empty TS block"
+    code: @ts {
+
+    }
+  }
+
+  flow {
+    root -> with_escapes
+    with_escapes -> empty_ts
+  }
+}

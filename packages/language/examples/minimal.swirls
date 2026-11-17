@@ -1,0 +1,71 @@
+// Minimal .swirls: one form, one graph, one trigger
+
+/* Simple contact form with a single email field (name avoids clashing with `named-schema.swirls`'s form `contact`). */
+form minimal_contact {
+  label: "Contact"
+  enabled: true
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["email"],
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+/* Processes the contact submission and normalizes the email. */
+workflow process_contact {
+  label: "Process Contact"
+
+  /* Entry point: reads form payload and lowercases the email. */
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const email = context.nodes.root.input.email ?? ""
+      return { email: email.toLowerCase() }
+    }
+    review: {
+      enabled: true
+      title: "Review submission"
+      description: "Confirm before processing"
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "notes": { "type": "string", "title": "Notes" }
+          }
+        }
+      }
+    }
+  }
+}
+
+/* Runs the process_contact graph when the contact form is submitted. */
+trigger on_minimal_contact {
+  form:minimal_contact -> process_contact
+  enabled: true
+}

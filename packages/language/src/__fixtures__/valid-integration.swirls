@@ -1,0 +1,87 @@
+version: 1
+
+action slack_post_message {
+  label: "Post message"
+  description: "Post a message to a Slack channel, DM, or other conversation."
+  provider: slack
+  method: POST
+  path: "/chat.postMessage"
+  encoding: form
+  scopes: ["chat:write"]
+  input: @json {
+    {
+      "type": "object",
+      "required": ["channel", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "channel": { "type": "string" },
+        "text": { "type": "string" }
+      }
+    }
+  }
+  output: @json {
+    {
+      "type": "object",
+      "required": ["ok"],
+      "additionalProperties": true,
+      "properties": {
+        "ok": { "type": "boolean" },
+        "channel": { "type": "string" },
+        "ts": { "type": "string" }
+      }
+    }
+  }
+}
+
+connection team_slack {
+  label: "Team Slack"
+  provider: slack
+}
+
+workflow notify {
+  label: "Notify"
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["channel", "text"],
+        "properties": {
+          "channel": { "type": "string" },
+          "text": { "type": "string" }
+        }
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "channel": { "type": "string" },
+          "text": { "type": "string" }
+        },
+        "required": ["channel", "text"]
+      }
+    }
+    code: @ts {
+      return context.nodes.root.input
+    }
+  }
+
+  node post_slack {
+    type: integration
+    label: "Post to Slack"
+    connection: team_slack
+    action: slack_post_message
+    params: @ts {
+      return {
+        channel: context.nodes.root.output.channel,
+        text: context.nodes.root.output.text,
+      }
+    }
+  }
+
+  flow {
+    root -> post_slack
+  }
+}

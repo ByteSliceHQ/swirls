@@ -1,0 +1,564 @@
+[
+  {
+    "type": "_statement",
+    "named": true,
+    "subtypes": [
+      {
+        "type": "block",
+        "named": true
+      },
+      {
+        "type": "edge",
+        "named": true
+      },
+      {
+        "type": "field",
+        "named": true
+      },
+      {
+        "type": "grant",
+        "named": true
+      },
+      {
+        "type": "trigger_binding",
+        "named": true
+      }
+    ]
+  },
+  {
+    "type": "_value",
+    "named": true,
+    "subtypes": [
+      {
+        "type": "array",
+        "named": true
+      },
+      {
+        "type": "boolean",
+        "named": true
+      },
+      {
+        "type": "duration",
+        "named": true
+      },
+      {
+        "type": "embedded_block",
+        "named": true
+      },
+      {
+        "type": "file_reference",
+        "named": true
+      },
+      {
+        "type": "null",
+        "named": true
+      },
+      {
+        "type": "number",
+        "named": true
+      },
+      {
+        "type": "object",
+        "named": true
+      },
+      {
+        "type": "path",
+        "named": true
+      },
+      {
+        "type": "reference",
+        "named": true
+      },
+      {
+        "type": "string",
+        "named": true
+      }
+    ]
+  },
+  {
+    "type": "array",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "_value",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "block",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "body",
+            "named": true
+          }
+        ]
+      },
+      "kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "body",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "_statement",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "boolean",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "edge",
+    "named": true,
+    "fields": {
+      "source": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "target": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "labeled_arrow",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "embedded_block",
+    "named": true,
+    "fields": {
+      "content": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "embedded_content",
+            "named": true
+          }
+        ]
+      },
+      "language": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "embedded_language",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "field",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "object",
+            "named": true
+          }
+        ]
+      },
+      "key": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_value",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "file_reference",
+    "named": true,
+    "fields": {
+      "language": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "embedded_language",
+            "named": true
+          }
+        ]
+      },
+      "path": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "grant",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "body",
+            "named": true
+          }
+        ]
+      },
+      "effect": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "role": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "target": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "wildcard",
+            "named": true
+          }
+        ]
+      },
+      "target_kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "labeled_arrow",
+    "named": true,
+    "fields": {
+      "label": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "object",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "_statement",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "reference",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "_statement",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "string",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "escape_sequence",
+          "named": true
+        },
+        {
+          "type": "string_content",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "trigger_binding",
+    "named": true,
+    "fields": {
+      "kind": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "resource": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "workflow": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "\"",
+    "named": false
+  },
+  {
+    "type": ",",
+    "named": false
+  },
+  {
+    "type": "->",
+    "named": false
+  },
+  {
+    "type": "-[",
+    "named": false
+  },
+  {
+    "type": ".",
+    "named": false
+  },
+  {
+    "type": ":",
+    "named": false
+  },
+  {
+    "type": "@",
+    "named": false
+  },
+  {
+    "type": "[",
+    "named": false
+  },
+  {
+    "type": "]",
+    "named": false
+  },
+  {
+    "type": "]->",
+    "named": false
+  },
+  {
+    "type": "block_comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "duration",
+    "named": true
+  },
+  {
+    "type": "embedded_content",
+    "named": true
+  },
+  {
+    "type": "embedded_language",
+    "named": true
+  },
+  {
+    "type": "escape_sequence",
+    "named": true
+  },
+  {
+    "type": "false",
+    "named": false
+  },
+  {
+    "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "line_comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "null",
+    "named": true
+  },
+  {
+    "type": "number",
+    "named": true
+  },
+  {
+    "type": "path",
+    "named": true
+  },
+  {
+    "type": "string_content",
+    "named": true
+  },
+  {
+    "type": "true",
+    "named": false
+  },
+  {
+    "type": "wildcard",
+    "named": true
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
+  }
+]

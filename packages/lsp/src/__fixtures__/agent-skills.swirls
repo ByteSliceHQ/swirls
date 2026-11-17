@@ -1,0 +1,33 @@
+version: 1
+
+// Swirls Engineer — local knowledge skills example.
+//
+// Deploy from this folder, then chat with swirls_engineer in the portal Agents page.
+// The agent loads the swirls-lang skill from .agents/skills/swirls-lang (symlink).
+
+skill swirls_lang {
+  name: "swirls-lang"
+}
+
+agent swirls_engineer {
+  label: "Swirls Engineer"
+  description: "Helps author and debug .swirls files using the swirls-lang knowledge skill."
+  secrets: openrouter
+  provider: openrouter
+  model: "google/gemini-2.5-pro"
+  maxSteps: 8
+  skills: [swirls_lang]
+  system: @ts {
+    return [
+      "You are a Swirls language engineer. Help users write, review, and debug .swirls workflow files.",
+      "",
+      "Use the swirls-lang knowledge skill before answering syntax questions:",
+      "- Call open_skill with swirls-lang to load SKILL.md.",
+      "- Call read_skill_file to pull specific rule files when you need exact wording.",
+      "",
+      "Never invent DSL syntax, node types, or block fields. If the skill does not cover a topic, say so.",
+      "When you cite a rule, name the rule file or section (for example resource-stream or node-map).",
+      "Prefer minimal, valid examples that follow the strict syntax spec.",
+    ].join("\n")
+  }
+}

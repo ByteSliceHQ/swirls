@@ -1,0 +1,54 @@
+/* Doc comment */
+// <- comment
+workflow notify {
+// <- keyword
+//       ^ type
+  label: "Notify"
+  // <- property
+  //     ^ string
+  timeout: "30m"
+  //       ^ string.special
+  retries: 3
+  //       ^ number
+  enabled: true
+  //       ^ boolean
+
+  root {
+    type: code
+    //    ^ constant.builtin
+    code: @ts { return {} }
+    //    ^ keyword.directive
+    //     ^ keyword.directive
+  }
+
+  flow {
+    root -["a\n"]-> send
+    // <- type
+    //   ^ operator
+    //      ^ string
+    //       ^ string.escape
+    //          ^ operator
+    //              ^ type
+  }
+}
+
+trigger t {
+  form:contact -> notify
+  // <- keyword
+  //   ^ type
+  //           ^ operator
+  //              ^ type
+}
+
+policy {
+  allow sales -> agent *
+  // <- keyword
+  //    ^ type
+  //             ^ keyword
+  //                   ^ constant.builtin
+}
+
+action a {
+  path: /v1/users
+  //    ^ string.special.path
+}

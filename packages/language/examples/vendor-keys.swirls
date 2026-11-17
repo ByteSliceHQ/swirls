@@ -1,0 +1,15 @@
+// Shared vendor key declarations for example workflows in this project.
+// Each secret block name must be unique across all .swirls files — declare keys here once.
+// Set values in project secrets (e.g. firecrawl_vendor::FIRECRAWL_API_KEY) or use `type: managed` for Enterprise.
+
+secret parallel_vendor {
+  vars: [PARALLEL_API_KEY]
+}
+
+secret firecrawl_vendor {
+  vars: [FIRECRAWL_API_KEY]
+}
+
+secret email_vendor {
+  vars: [RESEND_API_KEY]
+}

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Swirls TypeScript",
+  "scopeName": "source.ts.swirls",
+  "patterns": [{ "include": "source.ts" }]
+}
