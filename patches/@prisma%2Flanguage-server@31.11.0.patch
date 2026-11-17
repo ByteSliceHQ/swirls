@@ -1,0 +1,15 @@
+diff --git a/package.json b/package.json
+index 12ce57e78d9a3bdb036af3fa30b96aa9685abec3..39c7dc2e93e5d8ece952ebcd0081b9dbca1b6ebb 100644
+--- a/package.json
++++ b/package.json
+@@ -31,6 +31,10 @@
+     "./prisma-next": {
+       "types": "./dist/lib/prismaNext.d.ts",
+       "default": "./dist/lib/prismaNext.js"
++    },
++    "./dist/*": {
++      "types": "./dist/*.d.ts",
++      "default": "./dist/*.js"
+     }
+   },
+   "dependencies": {

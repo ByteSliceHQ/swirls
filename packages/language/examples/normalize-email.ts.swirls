@@ -1,0 +1,5 @@
+// Standalone Swirls TypeScript: body of `code: @ts "./normalize-email.ts.swirls"` in standalone-ts-ref.swirls.
+// Same rules as an inline @ts { } block — use `return` and `context` is typed from the parent graph.
+
+const raw = context.nodes.root.input.email ?? ''
+return { email: raw.trim().toLowerCase() }

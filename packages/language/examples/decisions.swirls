@@ -1,0 +1,86 @@
+secret decision_vendor {
+  vars: [TYPESAFE_API_KEY]
+}
+
+secret language_vendor {
+  vars: [OPENROUTER_API_KEY]
+}
+
+schema support_request {
+  schema: { type: "object", required: ["message"], properties: { message: { type: "string" } }, additionalProperties: false }
+}
+
+decision support_triage {
+  provider: typesafe
+  model: "jev-1.13.0"
+  secrets: decision_vendor
+  inputSchema: support_request
+  questions: {
+    department: { type: choice, instructions: "Which team should handle the request?", criteria: { billing: "Billing and payments", technical: "Product faults or technical help", other: "No listed team fits" } },
+    urgent: { type: noul, instructions: "Does the request describe a time-sensitive issue?" },
+    severity: { type: score, instructions: "How severely is work impaired?", criteria: ["No impairment", "Partial impairment", "Work is blocked"] }
+  }
+}
+
+agent support_writer {
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  secrets: language_vendor
+  system: @ts { return "Draft a support response. Do not perform external actions." }
+}
+
+workflow decision_triage {
+  root {
+    type: code
+    inputSchema: support_request
+    outputSchema: support_request
+    code: @ts { return context.nodes.root.input }
+  }
+  node assess {
+    type: decision
+    decision: support_triage
+    model: @ts { return "jev-1.13.0" }
+    state: @ts { return context.nodes.root.output }
+  }
+  node route {
+    type: switch
+    cases: [automatic, human]
+    router: @ts {
+      const answer = context.nodes.assess.output.answers.department
+      // Illustrative threshold only: validate it on your own labeled examples.
+      return answer.choice !== "other" && answer.probabilities[answer.choice] >= 0.9 ? "automatic" : "human"
+    }
+  }
+  node draft {
+    type: ai
+    kind: text
+    provider: openrouter
+    secrets: { language_vendor: [OPENROUTER_API_KEY] }
+    model: @ts {
+      return context.nodes.assess.output.answers.severity.score >= 1.5 ? "openai/gpt-4o" : "openai/gpt-4o-mini"
+    }
+    prompt: @ts { return `Draft a response to: ${context.nodes.root.output.message}` }
+  }
+  node review_gate {
+    type: code
+    code: @ts { return null }
+    review: {
+      title: "Review support classification"
+      content: @ts { return JSON.stringify(context.nodes.assess.output) }
+      schema: { type: "object", required: ["department", "needsReasoning"], properties: { department: { type: "string", enum: ["billing", "technical", "other"] }, needsReasoning: { type: "boolean" } }, additionalProperties: false }
+    }
+  }
+  node reviewed_draft {
+    type: agent
+    agent: support_writer
+    model: @ts { return context.reviews.review_gate?.needsReasoning ? "openai/gpt-4o" : "openai/gpt-4o-mini" }
+    prompt: @ts { return `Draft for ${context.reviews.review_gate?.department}: ${context.nodes.root.output.message}` }
+  }
+  flow {
+    root -> assess
+    assess -> route
+    route -["automatic"]-> draft
+    route -["human"]-> review_gate
+    review_gate -> reviewed_draft
+  }
+}

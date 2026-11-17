@@ -1,0 +1,111 @@
+/**
+ * Local postgres integration example.
+ * Requires: .flox/scripts/setup-external-db.sh (or equivalent) for the database.
+ *
+ * Run with:
+ *   cli worker start --foreground   (one terminal)
+ *   cli graph execute greet          (another)
+ */
+
+postgres local_pg {
+  label: "Local Postgres"
+  connection: "postgresql://postgres@127.0.0.1:5433/swirls_external"
+
+  table greetings {
+    schema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "greeting":   { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["greeting", "created_at"]
+      }
+    }
+  }
+}
+
+workflow greet {
+  label: "Greetings postgres test"
+
+  root {
+    type: postgres
+    label: "Fetch recent greetings"
+    postgres: local_pg
+    select: @sql {
+      SELECT greeting, created_at
+      FROM greetings
+      ORDER BY created_at DESC
+      LIMIT 5
+    }
+  }
+
+  node make_greeting {
+    type: code
+    label: "Create a new greeting"
+    code: @ts {
+      const count = context.nodes.root.output.length;
+      return {
+        greeting: `Hello from Swirls! (${count} existing greetings at ${new Date().toISOString()})`
+      };
+    }
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["greeting"],
+        "properties": {
+          "greeting": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node save_greeting {
+    type: postgres
+    label: "Save greeting"
+    postgres: local_pg
+    insert: @sql {
+      INSERT INTO greetings (greeting) VALUES ({{greeting}})
+    }
+    params: @ts {
+      return {
+        greeting: context.nodes.make_greeting.output.greeting
+      };
+    }
+  }
+
+  node stamp_greeting {
+    type: postgres
+    label: "Uppercase the saved greeting"
+    postgres: local_pg
+    update: @sql {
+      UPDATE greetings
+      SET greeting = {{greeting}}
+      WHERE greeting = {{original}}
+    }
+    params: @ts {
+      const original = context.nodes.make_greeting.output.greeting;
+      return {
+        greeting: original.toUpperCase(),
+        original: original
+      };
+    }
+  }
+
+  node prune_greetings {
+    type: postgres
+    label: "Prune old greetings"
+    postgres: local_pg
+    delete: @sql {
+      DELETE FROM greetings
+      WHERE created_at < now() - interval '7 days'
+    }
+  }
+
+  flow {
+    root -> make_greeting
+    make_greeting -> save_greeting
+    save_greeting -> stamp_greeting
+    stamp_greeting -> prune_greetings
+  }
+}

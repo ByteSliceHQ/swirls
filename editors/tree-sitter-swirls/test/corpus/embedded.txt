@@ -1,0 +1,275 @@
+================================================================================
+typescript
+================================================================================
+
+node n {
+  code: @ts {
+    const url = context.nodes.root.input.url ?? ""
+    return { body: `stub:${url}` }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content))))))
+
+================================================================================
+typescript braces in strings, comments and templates
+================================================================================
+
+node n {
+  code: @ts {
+    // a } in a line comment
+    /* and a } in a block comment */
+    const a = "}" + '}' + `}${ { b: "}" }.b }}`
+    if (a) { return { ok: true } }
+    return null
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content))))))
+
+================================================================================
+typescript on one line and empty
+================================================================================
+
+node n {
+  code: @ts { return {} }
+  empty: @ts {}
+  blank: @ts {
+
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content)))
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)))
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language))))))
+
+================================================================================
+typescript file reference
+================================================================================
+
+node n {
+  code: @ts "./normalize-email.ts.swirls"
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (file_reference
+          language: (embedded_language)
+          path: (string
+            (string_content)))))))
+
+================================================================================
+json
+================================================================================
+
+form f {
+  schema: @json {
+    {
+      "type": "object",
+      "properties": { "brace": { "const": "}{" } }
+    }
+  }
+  input: @json { {} }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content)))
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content))))))
+
+================================================================================
+sql
+================================================================================
+
+node n {
+  select: @sql {
+    -- a } in a comment
+    SELECT id, 'it''s }' AS note, "odd}col" /* } */
+    FROM leads WHERE email = {{email}}
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content))))))
+
+================================================================================
+prisma
+================================================================================
+
+database app_db {
+  schema: @prisma {
+    // a } in a comment
+    model User {
+      id    Int    @id @default(autoincrement())
+      email String @unique @map("e}mail")
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content))))))
+
+================================================================================
+powershell
+================================================================================
+
+operation o {
+  command: @ps {
+    <# } not the end #>
+    $since = (Get-Date).AddHours(-4) # } nor here
+    $text = @"
+    } still a here-string
+"@
+    Get-WinEvent -FilterHashtable @{ LogName = 'App}'; StartTime = $since } |
+      ConvertTo-Json
+    Write-Output "ok `" }"
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content))))))
+
+================================================================================
+shell
+================================================================================
+
+operation o {
+  command: @sh {
+    # } in a comment
+    if [ $# -gt 0 ]; then echo "{"; fi
+    f() { echo '}'; }
+  }
+  other: @sh "scripts/collect.sh"
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content)))
+      (field
+        key: (identifier)
+        value: (file_reference
+          language: (embedded_language)
+          path: (string
+            (string_content)))))))
+
+================================================================================
+openui
+================================================================================
+
+page home {
+  render: @openui {
+    root = Stack([title])
+    title = Heading("Today {")
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (embedded_block
+          language: (embedded_language)
+          content: (embedded_content))))))

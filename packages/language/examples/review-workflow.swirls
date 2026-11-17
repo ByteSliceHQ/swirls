@@ -1,0 +1,116 @@
+schema content_piece {
+  label: "Content piece"
+  description: "Title and body shared by form, entry, and draft nodes"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "type": "string", "title": "Title" },
+        "body": { "type": "string", "title": "Body" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+form content_request {
+  label: "Content request"
+  enabled: true
+  schema: content_piece
+}
+
+workflow content_pipeline {
+  label: "Content pipeline"
+  description: "Draft content, human review with approval/feedback, then publish"
+  
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: content_piece
+    outputSchema: content_piece
+    code: @ts {
+      const { title, body } = context.nodes.root.input
+      return { title: title?.trim() ?? "", body: body?.trim() ?? "" }
+    }
+  }
+
+  node draft {
+    type: code
+    label: "Draft"
+    schema: content_piece
+    review: {
+      enabled: true
+      title: "Review draft"
+      description: "Approve or request changes"
+      schema: @json {
+        {
+          "type": "object",
+          "required": [
+            "approved"
+          ],
+          "properties": {
+            "approved": {
+              "type": "boolean",
+              "title": "Approved"
+            },
+            "feedback": {
+              "type": "string",
+              "title": "Feedback"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+    code: @ts {
+      const { title, body } = context.nodes.root.output
+      return { title, body: body + "\n\n[Draft - pending review]" }
+    }
+  }
+
+  node publish {
+    type: code
+    label: "Publish"
+    schema: {
+      type: "object"
+      required: ["published", "message"]
+      properties: {
+        published: {
+          type: "boolean"
+        }
+        message: {
+          type: "string"
+        }
+      }
+      additionalProperties: false
+    }
+    code: @ts {
+      const { approved, feedback } = context.reviews.draft
+      
+      if (!approved) {
+        return {
+          published: false,
+          message: `Not published. Reviewer feedback: ${feedback ?? "none"}`,
+        }
+      }
+      
+      const { title, body } = context.nodes.draft.output
+      
+      return {
+        published: true,
+        message: `Published: ${title}.`,
+      }
+    }
+  }
+
+  flow {
+    root -> draft
+    draft -> publish
+  }
+}
+
+trigger on_content_request {
+  form:content_request -> content_pipeline
+  enabled: true
+}

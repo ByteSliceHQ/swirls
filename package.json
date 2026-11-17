@@ -1,41 +1,29 @@
 {
-  "name": "swirls",
-  "version": "0.0.1",
-  "description": "Swirls — standard for authoring and deploying agents and workflows",
-  "author": {
-    "name": "Swirls",
-    "url": "https://swirls.ai"
-  },
-  "license": "MIT",
+  "name": "swirls-workspace",
+  "private": true,
   "type": "module",
-  "main": "./index.js",
-  "bin": {
-    "swirls": "./bin/swirls.js"
+  "description": "The Swirls language: definition schema, parser, validator, language server and editor support.",
+  "license": "MIT",
+  "packageManager": "bun@1.3.14",
+  "workspaces": {
+    "packages": ["packages/*", "editors/vscode"],
+    "catalog": {
+      "@types/bun": "1.3.11",
+      "@types/json-schema": "7.0.15",
+      "ajv": "8.18.0",
+      "tsup": "8.5.1",
+      "typescript": "5.9.3",
+      "zod": "4.3.5"
+    }
   },
-  "files": [
-    "bin",
-    "index.js",
-    "LICENSE"
-  ],
-  "engines": {
-    "node": ">=22"
+  "scripts": {
+    "build": "bun run --filter '@swirls/lsp' build && bun run --filter 'vscode-swirls' build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun run --filter '*' test",
+    "test:grammar": "cd editors/tree-sitter-swirls && npm test",
+    "verify": "bun run typecheck && bun run test"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ByteSliceHQ/swirls.git"
-  },
-  "homepage": "https://swirls.ai",
-  "bugs": {
-    "url": "https://github.com/ByteSliceHQ/swirls/issues",
-    "email": "security@swirls.ai"
-  },
-  "keywords": [
-    "swirls",
-    "agents",
-    "workflows",
-    "cli"
-  ],
-  "publishConfig": {
-    "access": "public"
+  "patchedDependencies": {
+    "@prisma/language-server@31.11.0": "patches/@prisma%2Flanguage-server@31.11.0.patch"
   }
 }

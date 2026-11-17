@@ -1,0 +1,122 @@
+================================================================================
+agent with a profile
+================================================================================
+
+agent concierge {
+  label: "Concierge"
+  secrets: svc
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  maxSteps: 8
+  temperature: 0.2
+  tools: [ tool_fetch, tool_transform ]
+  sandbox: { cpus: 2, autoDeleteMinutes: -1 }
+
+  profile analyst {
+    description: "Transform only."
+    tools: [ tool_transform ]
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (number))
+      (field
+        key: (identifier)
+        value: (number))
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))
+          (reference
+            (identifier))))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (number))
+          (field
+            key: (identifier)
+            value: (number))))
+      (block
+        kind: (identifier)
+        name: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (string
+              (string_content)))
+          (field
+            key: (identifier)
+            value: (array
+              (reference
+                (identifier)))))))))
+
+================================================================================
+channel
+================================================================================
+
+channel slack_orchestrator {
+  label: "Demo orchestrator (Slack)"
+  platform: slack
+  agent: concierge
+  enabled: true
+  mode: mention
+  idleTimeout: "30m"
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (boolean))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content))))))

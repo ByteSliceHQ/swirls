@@ -1,0 +1,2594 @@
+// CRM showcase: a Swirls-managed `database` as the system of record, governed
+// `type: database` workflows for CRUD / pipeline ops, and an agent whose tools
+// are those workflows. Chat via the web channel to create companies, contacts,
+// and deals, search the book, and log activity.
+//
+// Requires OPENROUTER_API_KEY (see `secrets` → `crm_svc`).
+
+secret crm_svc {
+  label: "CRM vendor keys"
+  vars: [ OPENROUTER_API_KEY ]
+}
+
+database crm {
+  label: "CRM"
+  description: "Companies, contacts, deals, and activity for a simple sales CRM."
+  schema: @prisma {
+    enum DealStage {
+      LEAD
+      QUALIFIED
+      PROPOSAL
+      NEGOTIATION
+      WON
+      LOST
+    }
+
+    enum ActivityType {
+      CALL
+      EMAIL
+      MEETING
+      NOTE
+    }
+
+    model Company {
+      id        Int       @id @default(autoincrement())
+      name      String
+      domain    String?   @unique
+      industry  String?
+      createdAt DateTime  @default(now())
+      contacts  Contact[]
+      deals     Deal[]
+
+      @@map("companies")
+    }
+
+    model Contact {
+      id         Int        @id @default(autoincrement())
+      email      String     @unique
+      firstName  String
+      lastName   String
+      title      String?
+      companyId  Int?
+      company    Company?   @relation(fields: [companyId], references: [id])
+      createdAt  DateTime   @default(now())
+      deals      Deal[]
+      activities Activity[]
+
+      @@map("contacts")
+    }
+
+    model Deal {
+      id         Int        @id @default(autoincrement())
+      title      String
+      amount     Int
+      stage      DealStage  @default(LEAD)
+      companyId  Int
+      company    Company    @relation(fields: [companyId], references: [id])
+      contactId  Int?
+      contact    Contact?   @relation(fields: [contactId], references: [id])
+      createdAt  DateTime   @default(now())
+      closedAt   DateTime?
+      activities Activity[]
+
+      @@map("deals")
+    }
+
+    model Activity {
+      id        Int          @id @default(autoincrement())
+      type      ActivityType
+      note      String
+      contactId Int?
+      contact   Contact?     @relation(fields: [contactId], references: [id])
+      dealId    Int?
+      deal      Deal?        @relation(fields: [dealId], references: [id])
+      createdAt DateTime     @default(now())
+
+      @@map("activities")
+    }
+  }
+
+  connection app {
+    label: "CRM application connection"
+  }
+
+  connection analytics {
+    label: "CRM analytics connection"
+  }
+}
+
+migration seed_sample_crm {
+  database: crm
+  order: 0
+  operation: @ts {
+    const existing = await context.db.crm.company.findFirst({
+      where: { domain: "acme.example" },
+    })
+    if (existing) {
+      return { seeded: false, reason: "acme already present", companyId: existing.id }
+    }
+
+    const acme = await context.db.crm.company.create({
+      data: {
+        name: "Acme Robotics",
+        domain: "acme.example",
+        industry: "Manufacturing",
+        contacts: {
+          create: {
+            email: "maya@acme.example",
+            firstName: "Maya",
+            lastName: "Chen",
+            title: "VP Engineering",
+          },
+        },
+      },
+      include: { contacts: true },
+    })
+
+    const contact = acme.contacts[0]!
+    await context.db.crm.deal.create({
+      data: {
+        title: "Acme plant expansion",
+        amount: 12500000,
+        stage: "PROPOSAL",
+        company: { connect: { id: acme.id } },
+        contact: { connect: { id: contact.id } },
+        activities: {
+          create: {
+            type: "MEETING",
+            note: "Discovery call: interested in Q3 rollout.",
+            contact: { connect: { id: contact.id } },
+          },
+        },
+      },
+    })
+
+    return { seeded: true, companyId: acme.id, contactId: contact.id }
+  }
+}
+
+disk crm_assets {
+  label: "Company files"
+}
+
+policy {
+  files {
+    retention: 30d
+  }
+}
+
+/* ---- Agent tool workflows (database-backed) ---- */
+
+schema contact_search_result {
+  label: "Contact search result"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["contacts"],
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "email", "firstName", "lastName"],
+            "properties": {
+              "id": { "type": "integer" },
+              "email": { "type": "string" },
+              "firstName": { "type": "string" },
+              "lastName": { "type": "string" },
+              "title": { "type": ["string", "null"] },
+              "company": {
+                "type": ["object", "null"],
+                "properties": {
+                  "id": { "type": "integer" },
+                  "name": { "type": "string" },
+                  "domain": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema company_search_result {
+  label: "Company search result"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["companies"],
+      "properties": {
+        "companies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name"],
+            "properties": {
+              "id": { "type": "integer" },
+              "name": { "type": "string" },
+              "domain": { "type": ["string", "null"] },
+              "industry": { "type": ["string", "null"] }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema deal_search_result {
+  label: "Deal search result"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["deals"],
+      "properties": {
+        "deals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "amount", "stage"],
+            "properties": {
+              "id": { "type": "integer" },
+              "title": { "type": "string" },
+              "amount": { "type": "integer" },
+              "stage": { "type": "string" },
+              "company": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "integer" },
+                  "name": { "type": "string" },
+                  "domain": { "type": ["string", "null"] }
+                }
+              },
+              "contact": {
+                "type": ["object", "null"],
+                "properties": {
+                  "id": { "type": "integer" },
+                  "email": { "type": "string" },
+                  "firstName": { "type": "string" },
+                  "lastName": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema company_asset_record {
+  label: "Saved company asset"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["companyId", "kind", "title", "path"],
+      "properties": {
+        "companyId": { "type": "integer" },
+        "kind": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "path": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema company_pdf_asset_record {
+  label: "Saved company PDF"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["companyId", "title", "path", "file", "size"],
+      "properties": {
+        "companyId": { "type": "integer" },
+        "title": { "type": "string" },
+        "path": { "type": "string" },
+        "file": { "$ref": "swirls:file" },
+        "size": { "type": "integer" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema company_asset_list {
+  label: "Company asset paths"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["companyId", "paths"],
+      "properties": {
+        "companyId": { "type": "integer" },
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema company_record {
+  label: "Company record"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "integer" },
+        "name": { "type": "string" },
+        "domain": { "type": ["string", "null"] },
+        "industry": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema contact_record {
+  label: "Contact record"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["id", "email", "firstName", "lastName"],
+      "properties": {
+        "id": { "type": "integer" },
+        "email": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "title": { "type": ["string", "null"] },
+        "companyId": { "type": ["integer", "null"] },
+        "companyName": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema deal_record {
+  label: "Deal record"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["id", "title", "amount", "stage", "companyId"],
+      "properties": {
+        "id": { "type": "integer" },
+        "title": { "type": "string" },
+        "amount": { "type": "integer" },
+        "stage": { "type": "string" },
+        "companyId": { "type": "integer" },
+        "contactId": { "type": ["integer", "null"] },
+        "closedAt": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema pipeline_list_result {
+  label: "Pipeline list result"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["deals"],
+      "properties": {
+        "deals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "amount", "stage"],
+            "properties": {
+              "id": { "type": "integer" },
+              "title": { "type": "string" },
+              "amount": { "type": "integer" },
+              "stage": { "type": "string" },
+              "company": { "type": "object" },
+              "contact": { "type": ["object", "null"] }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema activity_record {
+  label: "Activity record"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["id", "type", "note"],
+      "properties": {
+        "id": { "type": "integer" },
+        "type": { "type": "string" },
+        "note": { "type": "string" },
+        "contactId": { "type": ["integer", "null"] },
+        "dealId": { "type": ["integer", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema qualify_lead_result {
+  label: "Qualify lead result"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["companyId", "contactId", "dealId", "companyName", "contactEmail", "dealTitle", "stage", "amount"],
+      "properties": {
+        "companyId": { "type": "integer" },
+        "contactId": { "type": "integer" },
+        "dealId": { "type": "integer" },
+        "companyName": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "dealTitle": { "type": "string" },
+        "stage": { "type": "string" },
+        "amount": { "type": "integer" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+workflow crm_search_contacts {
+  label: "Search contacts"  
+  description: "Find CRM contacts by email substring, name, or company name. Returns matching contacts with their company."
+
+  root {
+    type: code
+    label: "Normalize search"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string", "description": "Email, person name, or company name to search for" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 50 }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["query", "limit"],
+        "properties": {
+          "query": { "type": "string" },
+          "limit": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const q = String(context.nodes.root.input.query ?? "").trim()
+      const limitRaw = context.nodes.root.input.limit
+      const limit = typeof limitRaw === "number" && limitRaw > 0 ? Math.min(limitRaw, 50) : 20
+      return { query: q, limit }
+    }
+  }
+
+  node find_contacts {
+    type: database
+    label: "Query contacts"
+    database: crm
+    operation: query
+    schema: contact_search_result
+    run: @ts {
+      const { query, limit } = context.nodes.root.output
+      if (!query) {
+        return { contacts: [] }
+      }
+      const contacts = await context.db.crm.contact.findMany({
+        where: {
+          OR: [
+            { email: { contains: query, mode: "insensitive" } },
+            { firstName: { contains: query, mode: "insensitive" } },
+            { lastName: { contains: query, mode: "insensitive" } },
+            { company: { name: { contains: query, mode: "insensitive" } } },
+          ],
+        },
+        include: { company: true },
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      })
+      return {
+        contacts: contacts.map((c) => ({
+          id: c.id,
+          email: c.email,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          title: c.title,
+          company: c.company
+            ? { id: c.company.id, name: c.company.name, domain: c.company.domain }
+            : null,
+        })),
+      }
+    }
+  }
+
+  flow {
+    root -> find_contacts
+  }
+}
+
+workflow crm_search_companies {
+  label: "Search companies"
+  description: "Find CRM companies by name, domain, or industry. Returns matching accounts."
+
+  root {
+    type: code
+    label: "Normalize search"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string", "description": "Company name, domain, or industry to search for" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 50 }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["query", "limit"],
+        "properties": {
+          "query": { "type": "string" },
+          "limit": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const q = String(context.nodes.root.input.query ?? "").trim()
+      const limitRaw = context.nodes.root.input.limit
+      const limit = typeof limitRaw === "number" && limitRaw > 0 ? Math.min(limitRaw, 50) : 20
+      return { query: q, limit }
+    }
+  }
+
+  node find_companies {
+    type: database
+    label: "Query companies"
+    database: crm
+    operation: query
+    schema: company_search_result
+    run: @ts {
+      const { query, limit } = context.nodes.root.output
+      if (!query) {
+        return { companies: [] }
+      }
+      const companies = await context.db.crm.company.findMany({
+        where: {
+          OR: [
+            { name: { contains: query, mode: "insensitive" } },
+            { domain: { contains: query, mode: "insensitive" } },
+            { industry: { contains: query, mode: "insensitive" } },
+          ],
+        },
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      })
+      return {
+        companies: companies.map((c) => ({
+          id: c.id,
+          name: c.name,
+          domain: c.domain,
+          industry: c.industry,
+        })),
+      }
+    }
+  }
+
+  flow {
+    root -> find_companies
+  }
+}
+
+workflow crm_search_deals {
+  label: "Search deals"
+  description: "Find CRM deals by title, company name, contact name/email, or stage. Returns matching deals with company and primary contact."
+
+  root {
+    type: code
+    label: "Normalize search"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string", "description": "Deal title, company name, contact name/email, or stage to search for" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 50 }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["query", "limit"],
+        "properties": {
+          "query": { "type": "string" },
+          "limit": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const q = String(context.nodes.root.input.query ?? "").trim()
+      const limitRaw = context.nodes.root.input.limit
+      const limit = typeof limitRaw === "number" && limitRaw > 0 ? Math.min(limitRaw, 50) : 20
+      return { query: q, limit }
+    }
+  }
+
+  node find_deals {
+    type: database
+    label: "Query deals"
+    database: crm
+    operation: query
+    schema: deal_search_result
+    run: @ts {
+      const { query, limit } = context.nodes.root.output
+      if (!query) {
+        return { deals: [] }
+      }
+      const stageMatch =
+        query === "LEAD" ||
+        query === "QUALIFIED" ||
+        query === "PROPOSAL" ||
+        query === "NEGOTIATION" ||
+        query === "WON" ||
+        query === "LOST"
+          ? query
+          : null
+      const deals = await context.db.crm.deal.findMany({
+        where: {
+          OR: [
+            { title: { contains: query, mode: "insensitive" } },
+            { company: { name: { contains: query, mode: "insensitive" } } },
+            { company: { domain: { contains: query, mode: "insensitive" } } },
+            { contact: { email: { contains: query, mode: "insensitive" } } },
+            { contact: { firstName: { contains: query, mode: "insensitive" } } },
+            { contact: { lastName: { contains: query, mode: "insensitive" } } },
+            ...(stageMatch ? [{ stage: stageMatch }] : []),
+          ],
+        },
+        include: {
+          company: { select: { id: true, name: true, domain: true } },
+          contact: { select: { id: true, email: true, firstName: true, lastName: true } },
+        },
+        take: limit,
+        orderBy: [{ amount: "desc" }, { createdAt: "desc" }],
+      })
+      return {
+        deals: deals.map((d) => ({
+          id: d.id,
+          title: d.title,
+          amount: d.amount,
+          stage: d.stage,
+          company: d.company,
+          contact: d.contact,
+        })),
+      }
+    }
+  }
+
+  flow {
+    root -> find_deals
+  }
+}
+
+workflow crm_create_company {
+  label: "Create company"
+  description: "Create a company in the CRM. Optional domain and industry."
+
+  root {
+    type: code
+    label: "Normalize company"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "domain": { "type": "string" },
+          "industry": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["name", "domain", "industry"],
+        "properties": {
+          "name": { "type": "string" },
+          "domain": { "type": ["string", "null"] },
+          "industry": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const i = context.nodes.root.input
+      return {
+        name: String(i.name ?? "").trim(),
+        domain: typeof i.domain === "string" && i.domain.trim() !== "" ? i.domain.trim() : null,
+        industry: typeof i.industry === "string" && i.industry.trim() !== "" ? i.industry.trim() : null,
+      }
+    }
+  }
+
+  node write_company {
+    type: database
+    label: "Insert company"
+    database: crm
+    operation: insert
+    schema: company_record
+    run: @ts {
+      const { name, domain, industry } = context.nodes.root.output
+      const company = await context.db.crm.company.create({
+        data: { name, domain, industry },
+      })
+      return {
+        id: company.id,
+        name: company.name,
+        domain: company.domain,
+        industry: company.industry,
+      }
+    }
+  }
+
+  node ensure_company_folder {
+    type: disk
+    label: "Create company folders"
+    disk: crm_assets
+    command: @ts {
+      const company = context.nodes.write_company.output
+      return "mkdir -p companies/" + company.id + "/notes companies/" + company.id + "/briefs"
+    }
+  }
+
+  node return_company {
+    type: code
+    label: "Return company record"
+    schema: company_record
+    code: @ts {
+      return context.nodes.write_company.output
+    }
+  }
+
+  flow {
+    root -> write_company
+    write_company -> ensure_company_folder
+    ensure_company_folder -> return_company
+  }
+}
+
+workflow crm_create_contact {
+  label: "Create contact"
+  description: "Create a contact (person) in the CRM. Optionally attach them to an existing companyId."
+
+  root {
+    type: code
+    label: "Normalize contact"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["email", "firstName", "lastName"],
+        "properties": {
+          "email": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "title": { "type": "string" },
+          "companyId": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["email", "firstName", "lastName", "title", "companyId"],
+        "properties": {
+          "email": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "title": { "type": ["string", "null"] },
+          "companyId": { "type": ["integer", "null"] }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const i = context.nodes.root.input
+      return {
+        email: String(i.email ?? "").trim().toLowerCase(),
+        firstName: String(i.firstName ?? "").trim(),
+        lastName: String(i.lastName ?? "").trim(),
+        title: typeof i.title === "string" && i.title.trim() !== "" ? i.title.trim() : null,
+        companyId: typeof i.companyId === "number" ? i.companyId : null,
+      }
+    }
+  }
+
+  node write_contact {
+    type: database
+    label: "Insert contact"
+    database: crm
+    operation: insert
+    schema: contact_record
+    run: @ts {
+      const { email, firstName, lastName, title, companyId } = context.nodes.root.output
+      const contact = await context.db.crm.contact.create({
+        data: {
+          email,
+          firstName,
+          lastName,
+          title,
+          company: companyId == null ? undefined : { connect: { id: companyId } },
+        },
+        include: { company: true },
+      })
+      return {
+        id: contact.id,
+        email: contact.email,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        title: contact.title,
+        companyId: contact.companyId,
+        companyName: contact.company?.name ?? null,
+      }
+    }
+  }
+
+  flow {
+    root -> write_contact
+  }
+}
+
+workflow crm_create_deal {
+  label: "Create deal"
+  description: "Open a pipeline deal for a company. Amount is an integer in cents. Stage defaults to LEAD."
+
+  root {
+    type: code
+    label: "Normalize deal"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["title", "amount", "companyId"],
+        "properties": {
+          "title": { "type": "string" },
+          "amount": { "type": "integer", "description": "Deal value in cents (e.g. 5000000 = $50,000)" },
+          "companyId": { "type": "integer" },
+          "contactId": { "type": "integer" },
+          "stage": {
+            "type": "string",
+            "enum": ["LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["title", "amount", "companyId", "contactId", "stage"],
+        "properties": {
+          "title": { "type": "string" },
+          "amount": { "type": "integer" },
+          "companyId": { "type": "integer" },
+          "contactId": { "type": ["integer", "null"] },
+          "stage": {
+            "type": "string",
+            "enum": ["LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const i = context.nodes.root.input
+      const stageRaw = typeof i.stage === "string" ? i.stage : "LEAD"
+      const allowed = ["LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST"]
+      const stage = allowed.includes(stageRaw) ? stageRaw : "LEAD"
+      return {
+        title: String(i.title ?? "").trim(),
+        amount: typeof i.amount === "number" ? Math.trunc(i.amount) : 0,
+        companyId: Number(i.companyId),
+        contactId: typeof i.contactId === "number" ? i.contactId : null,
+        stage,
+      }
+    }
+  }
+
+  node review_deal {
+    type: code
+    label: "Review new deal"
+    code: @ts {
+      return context.nodes.root.output
+    }
+    review: {
+      enabled: true
+      title: @ts {
+        const deal = context.nodes.root.output
+        return `Approve deal: ${String(deal.title ?? "Untitled")}`
+      }
+      description: @ts {
+        const deal = context.nodes.root.output
+        return `Confirm ${String(deal.title ?? "this deal")} before it is added to the pipeline.`
+      }
+      content: @ts {
+        const deal = context.nodes.root.output
+        return [
+          `Title: ${String(deal.title ?? "")}`,
+          `Amount (cents): ${String(deal.amount ?? 0)}`,
+          `Stage: ${String(deal.stage ?? "")}`,
+          "Leave a note for the sales team and choose whether the owner should be notified.",
+        ].join("\n")
+      }
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["reviewNote", "notifyOwner"],
+          "properties": {
+            "reviewNote": {
+              "type": "string",
+              "title": "Review note",
+              "description": "Why this deal is ready to enter the pipeline."
+            },
+            "notifyOwner": {
+              "type": "boolean",
+              "title": "Notify deal owner",
+              "description": "Send a notification after the deal is approved."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+      actions: [
+        { id: "approve_deal", label: "Approve deal", outcome: "approve" },
+        { id: "reject_deal", label: "Reject deal", outcome: "reject" }
+      ]
+    }
+  }
+
+  node write_deal {
+    type: database
+    label: "Insert deal"
+    database: crm
+    operation: insert
+    schema: deal_record
+    run: @ts {
+      const { title, amount, companyId, contactId, stage: stageRaw } = context.nodes.root.output
+      const stage =
+        stageRaw === "LEAD" ||
+        stageRaw === "QUALIFIED" ||
+        stageRaw === "PROPOSAL" ||
+        stageRaw === "NEGOTIATION" ||
+        stageRaw === "WON" ||
+        stageRaw === "LOST"
+          ? stageRaw
+          : "LEAD"
+      const deal = await context.db.crm.deal.create({
+        data: {
+          title,
+          amount,
+          stage,
+          company: { connect: { id: companyId } },
+          contact: contactId == null ? undefined : { connect: { id: contactId } },
+          closedAt: stage === "WON" || stage === "LOST" ? new Date() : null,
+        },
+      })
+      return {
+        id: deal.id,
+        title: deal.title,
+        amount: deal.amount,
+        stage: deal.stage,
+        companyId: deal.companyId,
+        contactId: deal.contactId,
+        closedAt: deal.closedAt ? deal.closedAt.toISOString() : null,
+      }
+    }
+  }
+
+  flow {
+    root -> review_deal
+    review_deal -> write_deal
+  }
+}
+
+workflow crm_update_deal_stage {
+  label: "Update deal stage"
+  description: "Move a deal to a new pipeline stage. Sets closedAt when the stage is WON or LOST."
+
+  root {
+    type: code
+    label: "Normalize stage change"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["dealId", "stage"],
+        "properties": {
+          "dealId": { "type": "integer" },
+          "stage": {
+            "type": "string",
+            "enum": ["LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["dealId", "stage"],
+        "properties": {
+          "dealId": { "type": "integer" },
+          "stage": {
+            "type": "string",
+            "enum": ["LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const i = context.nodes.root.input
+      return {
+        dealId: Number(i.dealId),
+        stage: String(i.stage ?? "LEAD"),
+      }
+    }
+  }
+
+  node advance_deal {
+    type: database
+    label: "Update deal"
+    database: crm
+    operation: update
+    schema: deal_record
+    run: @ts {
+      const { dealId, stage: stageRaw } = context.nodes.root.output
+      const stage =
+        stageRaw === "LEAD" ||
+        stageRaw === "QUALIFIED" ||
+        stageRaw === "PROPOSAL" ||
+        stageRaw === "NEGOTIATION" ||
+        stageRaw === "WON" ||
+        stageRaw === "LOST"
+          ? stageRaw
+          : "LEAD"
+      const closed = stage === "WON" || stage === "LOST"
+      const deal = await context.db.crm.deal.update({
+        where: { id: dealId },
+        data: {
+          stage,
+          closedAt: closed ? new Date() : null,
+        },
+      })
+      return {
+        id: deal.id,
+        title: deal.title,
+        stage: deal.stage,
+        amount: deal.amount,
+        companyId: deal.companyId,
+        contactId: deal.contactId,
+        closedAt: deal.closedAt ? deal.closedAt.toISOString() : null,
+      }
+    }
+  }
+
+  flow {
+    root -> advance_deal
+  }
+}
+
+workflow crm_list_pipeline {
+  label: "List pipeline"
+  description: "List open deals, optionally filtered by stage. Includes company and primary contact."
+
+  root {
+    type: code
+    label: "Normalize filter"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": ["LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST"]
+          },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["stage", "limit"],
+        "properties": {
+          "stage": {
+            "type": ["string", "null"],
+            "enum": ["LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST", null]
+          },
+          "limit": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const i = context.nodes.root.input
+      const limitRaw = i.limit
+      return {
+        stage: typeof i.stage === "string" ? i.stage : null,
+        limit: typeof limitRaw === "number" && limitRaw > 0 ? Math.min(limitRaw, 100) : 25,
+      }
+    }
+  }
+
+  node fetch_pipeline {
+    type: database
+    label: "Query deals"
+    database: crm
+    operation: query
+    schema: pipeline_list_result
+    run: @ts {
+      const { stage, limit } = context.nodes.root.output
+      const deals = await context.db.crm.deal.findMany({
+        where: stage ? { stage } : undefined,
+        include: {
+          company: { select: { id: true, name: true, domain: true } },
+          contact: { select: { id: true, email: true, firstName: true, lastName: true } },
+        },
+        orderBy: [{ stage: "asc" }, { amount: "desc" }],
+        take: limit,
+      })
+      return {
+        deals: deals.map((d) => ({
+          id: d.id,
+          title: d.title,
+          amount: d.amount,
+          stage: d.stage,
+          company: d.company,
+          contact: d.contact,
+        })),
+      }
+    }
+  }
+
+  flow {
+    root -> fetch_pipeline
+  }
+}
+
+workflow crm_log_activity {
+  label: "Log activity"
+  description: "Append a CALL, EMAIL, MEETING, or NOTE activity against a contact and/or deal."
+
+  root {
+    type: code
+    label: "Normalize activity"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["type", "note"],
+        "properties": {
+          "type": { "type": "string", "enum": ["CALL", "EMAIL", "MEETING", "NOTE"] },
+          "note": { "type": "string" },
+          "contactId": { "type": "integer" },
+          "dealId": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["type", "note", "contactId", "dealId"],
+        "properties": {
+          "type": { "type": "string", "enum": ["CALL", "EMAIL", "MEETING", "NOTE"] },
+          "note": { "type": "string" },
+          "contactId": { "type": ["integer", "null"] },
+          "dealId": { "type": ["integer", "null"] }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const i = context.nodes.root.input
+      return {
+        type: String(i.type ?? "NOTE"),
+        note: String(i.note ?? "").trim(),
+        contactId: typeof i.contactId === "number" ? i.contactId : null,
+        dealId: typeof i.dealId === "number" ? i.dealId : null,
+      }
+    }
+  }
+
+  node write_activity {
+    type: database
+    label: "Insert activity"
+    database: crm
+    operation: insert
+    schema: activity_record
+    run: @ts {
+      const { type: typeRaw, note, contactId, dealId } = context.nodes.root.output
+      const type =
+        typeRaw === "CALL" ||
+        typeRaw === "EMAIL" ||
+        typeRaw === "MEETING" ||
+        typeRaw === "NOTE"
+          ? typeRaw
+          : "NOTE"
+      const activity = await context.db.crm.activity.create({
+        data: {
+          type,
+          note,
+          contact: contactId == null ? undefined : { connect: { id: contactId } },
+          deal: dealId == null ? undefined : { connect: { id: dealId } },
+        },
+      })
+      return {
+        id: activity.id,
+        type: activity.type,
+        note: activity.note,
+        contactId: activity.contactId,
+        dealId: activity.dealId,
+      }
+    }
+  }
+
+  flow {
+    root -> write_activity
+  }
+}
+
+workflow crm_qualify_lead {
+  label: "Qualify lead"
+  description: "Atomically create a company, primary contact, and opening LEAD deal in one transaction. Use when onboarding a brand-new account."
+
+  root {
+    type: code
+    label: "Normalize lead"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyName", "email", "firstName", "lastName", "dealTitle"],
+        "properties": {
+          "companyName": { "type": "string" },
+          "domain": { "type": "string" },
+          "industry": { "type": "string" },
+          "email": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "title": { "type": "string" },
+          "dealTitle": { "type": "string" },
+          "amount": { "type": "integer", "description": "Deal value in cents" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyName", "domain", "industry", "email", "firstName", "lastName", "title", "dealTitle", "amount"],
+        "properties": {
+          "companyName": { "type": "string" },
+          "domain": { "type": ["string", "null"] },
+          "industry": { "type": ["string", "null"] },
+          "email": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "title": { "type": ["string", "null"] },
+          "dealTitle": { "type": "string" },
+          "amount": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const i = context.nodes.root.input
+      return {
+        companyName: String(i.companyName ?? "").trim(),
+        domain: typeof i.domain === "string" && i.domain.trim() !== "" ? i.domain.trim() : null,
+        industry: typeof i.industry === "string" && i.industry.trim() !== "" ? i.industry.trim() : null,
+        email: String(i.email ?? "").trim().toLowerCase(),
+        firstName: String(i.firstName ?? "").trim(),
+        lastName: String(i.lastName ?? "").trim(),
+        title: typeof i.title === "string" && i.title.trim() !== "" ? i.title.trim() : null,
+        dealTitle: String(i.dealTitle ?? "").trim(),
+        amount: typeof i.amount === "number" ? Math.trunc(i.amount) : 0,
+      }
+    }
+  }
+
+  node create_lead {
+    type: database
+    label: "Create company, contact, deal"
+    database: crm
+    operation: transaction
+    schema: qualify_lead_result
+    run: @ts {
+      const lead = context.nodes.root.output
+      return await context.db.crm.$transaction(async (tx) => {
+        const company = await tx.company.create({
+          data: {
+            name: lead.companyName,
+            domain: lead.domain,
+            industry: lead.industry,
+          },
+        })
+        const contact = await tx.contact.create({
+          data: {
+            email: lead.email,
+            firstName: lead.firstName,
+            lastName: lead.lastName,
+            title: lead.title,
+            company: { connect: { id: company.id } },
+          },
+        })
+        const deal = await tx.deal.create({
+          data: {
+            title: lead.dealTitle,
+            amount: lead.amount,
+            stage: "LEAD",
+            company: { connect: { id: company.id } },
+            contact: { connect: { id: contact.id } },
+          },
+        })
+        await tx.activity.create({
+          data: {
+            type: "NOTE",
+            note: "Lead qualified via CRM assistant.",
+            contact: { connect: { id: contact.id } },
+            deal: { connect: { id: deal.id } },
+          },
+        })
+        return {
+          companyId: company.id,
+          contactId: contact.id,
+          dealId: deal.id,
+          companyName: company.name,
+          contactEmail: contact.email,
+          dealTitle: deal.title,
+          stage: deal.stage,
+          amount: deal.amount,
+        }
+      })
+    }
+  }
+
+  node ensure_company_folder {
+    type: disk
+    label: "Create company folders"
+    disk: crm_assets
+    command: @ts {
+      const lead = context.nodes.create_lead.output
+      return "mkdir -p companies/" + lead.companyId + "/notes companies/" + lead.companyId + "/briefs"
+    }
+  }
+
+  node return_lead {
+    type: code
+    label: "Return qualification result"
+    schema: qualify_lead_result
+    code: @ts {
+      return context.nodes.create_lead.output
+    }
+  }
+
+  flow {
+    root -> create_lead
+    create_lead -> ensure_company_folder
+    ensure_company_folder -> return_lead
+  }
+}
+
+workflow crm_activity_summary {
+  label: "Activity summary"
+  description: "Turn an activity type and note into a one-line summary for the activity feed."
+
+  root {
+    type: code
+    label: "Summarize"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["type", "note"],
+        "properties": {
+          "type": { "type": "string" },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["summary"],
+        "properties": {
+          "summary": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const type = String(context.nodes.root.input.type ?? "")
+      const note = String(context.nodes.root.input.note ?? "")
+      return { summary: type === "" ? note : `${type}: ${note}` }
+    }
+  }
+}
+
+workflow crm_ensure_company_folder {
+  label: "Ensure company folder"
+  description: "Create notes/ and briefs/ folders for a company on the shared CRM disk."
+
+  root {
+    type: code
+    label: "Normalize company id"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyId"],
+        "properties": {
+          "companyId": { "type": "integer", "description": "Existing CRM company id" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyId"],
+        "properties": {
+          "companyId": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const raw = context.nodes.root.input.companyId
+      const companyId = typeof raw === "number" ? Math.trunc(raw) : Number.parseInt(String(raw ?? ""), 10)
+      if (!Number.isFinite(companyId) || companyId <= 0) {
+        throw new Error("companyId must be a positive integer")
+      }
+      return { companyId }
+    }
+  }
+
+  node verify_company {
+    type: database
+    label: "Verify company exists"
+    database: crm
+    operation: query
+    schema: company_record
+    run: @ts {
+      const { companyId } = context.nodes.root.output
+      const company = await context.db.crm.company.findUnique({
+        where: { id: companyId },
+      })
+      if (!company) {
+        throw new Error("Company " + companyId + " was not found")
+      }
+      return {
+        id: company.id,
+        name: company.name,
+        domain: company.domain,
+        industry: company.industry,
+      }
+    }
+  }
+
+  node ensure_dirs {
+    type: disk
+    label: "Create company folders"
+    disk: crm_assets
+    command: @ts {
+      const company = context.nodes.verify_company.output
+      return "mkdir -p companies/" + company.id + "/notes companies/" + company.id + "/briefs"
+    }
+  }
+
+  node return_company {
+    type: code
+    label: "Return company record"
+    schema: company_record
+    code: @ts {
+      return context.nodes.verify_company.output
+    }
+  }
+
+  flow {
+    root -> verify_company
+    verify_company -> ensure_dirs
+    ensure_dirs -> return_company
+  }
+}
+
+workflow crm_save_company_note {
+  label: "Save company note"
+  description: "Write a markdown note or brief under companies/{companyId}/ on the CRM disk."
+
+  root {
+    type: code
+    label: "Normalize asset"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyId", "kind", "title", "body"],
+        "properties": {
+          "companyId": { "type": "integer" },
+          "kind": { "type": "string", "enum": ["note", "brief"] },
+          "title": { "type": "string" },
+          "body": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyId", "kind", "title", "body", "path"],
+        "properties": {
+          "companyId": { "type": "integer" },
+          "kind": { "type": "string" },
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "path": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const i = context.nodes.root.input
+      const companyId = typeof i.companyId === "number" ? Math.trunc(i.companyId) : Number.parseInt(String(i.companyId ?? ""), 10)
+      const kind = String(i.kind ?? "").trim()
+      const title = String(i.title ?? "").trim()
+      const body = String(i.body ?? "")
+      if (!Number.isFinite(companyId) || companyId <= 0) {
+        throw new Error("companyId must be a positive integer")
+      }
+      if (kind !== "note" && kind !== "brief") {
+        throw new Error('kind must be "note" or "brief"')
+      }
+      if (title === "") {
+        throw new Error("title is required")
+      }
+      const slug = title
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || "untitled"
+      const path = "companies/" + companyId + "/" + kind + "s/" + slug + ".md"
+      return { companyId, kind, title, body, path }
+    }
+  }
+
+  node verify_company {
+    type: database
+    label: "Verify company exists"
+    database: crm
+    operation: query
+    run: @ts {
+      const { companyId } = context.nodes.root.output
+      const company = await context.db.crm.company.findUnique({
+        where: { id: companyId },
+        select: { id: true },
+      })
+      if (!company) {
+        throw new Error("Company " + companyId + " was not found")
+      }
+      return { ok: true }
+    }
+  }
+
+  node write_asset {
+    type: disk
+    label: "Write markdown asset"
+    disk: crm_assets
+    command: @ts {
+      const asset = context.nodes.root.output
+      const header = "# " + asset.title + "\n\n"
+      const payload = header + asset.body
+      const escaped = payload.split("'").join("'\\''")
+      return "mkdir -p companies/" + asset.companyId + "/" + asset.kind + "s && printf '%s' '" + escaped + "' > " + asset.path
+    }
+  }
+
+  node return_asset {
+    type: code
+    label: "Return saved asset metadata"
+    schema: company_asset_record
+    code: @ts {
+      return context.nodes.root.output
+    }
+  }
+
+  flow {
+    root -> verify_company
+    verify_company -> write_asset
+    write_asset -> return_asset
+  }
+}
+
+workflow crm_save_company_asset {
+  label: "Save company PDF"
+  description: "Copy a ready PDF file handle onto the CRM disk under companies/{companyId}/documents/."
+
+  root {
+    type: code
+    label: "Normalize PDF asset"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyId", "title", "file"],
+        "properties": {
+          "companyId": { "type": "integer" },
+          "title": { "type": "string" },
+          "file": {
+            "$ref": "swirls:file",
+            "contentMediaType": "application/pdf"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyId", "title", "file", "path"],
+        "properties": {
+          "companyId": { "type": "integer" },
+          "title": { "type": "string" },
+          "file": { "$ref": "swirls:file" },
+          "path": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const i = context.nodes.root.input
+      const companyId = typeof i.companyId === "number" ? Math.trunc(i.companyId) : Number.parseInt(String(i.companyId ?? ""), 10)
+      const title = String(i.title ?? "").trim()
+      const file = i.file
+      if (!Number.isFinite(companyId) || companyId <= 0) {
+        throw new Error("companyId must be a positive integer")
+      }
+      if (title === "") {
+        throw new Error("title is required")
+      }
+      if (!file || typeof file !== "object" || file.kind !== "swirls.file") {
+        throw new Error("file must be a ready PDF handle")
+      }
+      const slug = title
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || "document"
+      const extMatch = String(file.name ?? "").match(/\.[a-z0-9]+$/i)
+      const ext = extMatch ? extMatch[0].toLowerCase() : ".pdf"
+      const path = "companies/" + companyId + "/documents/" + slug + ext
+      return { companyId, title, file, path }
+    }
+  }
+
+  node verify_company {
+    type: database
+    label: "Verify company exists"
+    database: crm
+    operation: query
+    run: @ts {
+      const { companyId } = context.nodes.root.output
+      const company = await context.db.crm.company.findUnique({
+        where: { id: companyId },
+        select: { id: true },
+      })
+      if (!company) {
+        throw new Error("Company " + companyId + " was not found")
+      }
+      return { ok: true }
+    }
+  }
+
+  node copy_pdf {
+    type: disk
+    label: "Copy PDF to company folder"
+    disk: crm_assets
+    operation: copy_file
+    path: @ts {
+      return context.nodes.root.output.path
+    }
+    file: @ts {
+      return context.nodes.root.output.file
+    }
+  }
+
+  node return_asset {
+    type: code
+    label: "Return saved PDF metadata"
+    schema: company_pdf_asset_record
+    code: @ts {
+      const root = context.nodes.root.output
+      const copied = context.nodes.copy_pdf.output
+      return {
+        companyId: root.companyId,
+        title: root.title,
+        path: copied.path,
+        file: copied.file,
+        size: copied.size,
+      }
+    }
+  }
+
+  flow {
+    root -> verify_company
+    verify_company -> copy_pdf
+    copy_pdf -> return_asset
+  }
+}
+
+workflow crm_list_company_assets {
+  label: "List company assets"
+  description: "List markdown files under a company's folder on the CRM disk."
+
+  root {
+    type: code
+    label: "Normalize company id"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyId"],
+        "properties": {
+          "companyId": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["companyId"],
+        "properties": {
+          "companyId": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const raw = context.nodes.root.input.companyId
+      const companyId = typeof raw === "number" ? Math.trunc(raw) : Number.parseInt(String(raw ?? ""), 10)
+      if (!Number.isFinite(companyId) || companyId <= 0) {
+        throw new Error("companyId must be a positive integer")
+      }
+      return { companyId }
+    }
+  }
+
+  node list_assets {
+    type: disk
+    label: "Find company files"
+    disk: crm_assets
+    command: @ts {
+      const { companyId } = context.nodes.root.output
+      return "find companies/" + companyId + " -type f 2>/dev/null | sort || true"
+    }
+  }
+
+  node return_list {
+    type: code
+    label: "Return asset paths"
+    schema: company_asset_list
+    code: @ts {
+      const { companyId } = context.nodes.root.output
+      const stdout = String(context.nodes.list_assets.output.stdout ?? "")
+      const paths = stdout
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+      return { companyId, paths }
+    }
+  }
+
+  flow {
+    root -> list_assets
+    list_assets -> return_list
+  }
+}
+
+workflow crm_seed_company_assets {
+  label: "Seed demo company assets"
+  description: "Write sample brief and note files for Acme Robotics on the CRM disk."
+
+  root {
+    type: code
+    label: "Start seed"
+    code: @ts {
+      return {}
+    }
+  }
+
+  node find_acme {
+    type: database
+    label: "Find or create Acme Robotics"
+    database: crm
+    operation: transaction
+    run: @ts {
+      return await context.db.crm.$transaction(async (tx) => {
+        let company = await tx.company.findFirst({
+          where: { domain: "acme.example" },
+        })
+        if (!company) {
+          company = await tx.company.create({
+            data: {
+              name: "Acme Robotics",
+              domain: "acme.example",
+              industry: "Manufacturing",
+            },
+          })
+        }
+        return { companyId: company.id, name: company.name }
+      })
+    }
+  }
+
+  node write_seed_files {
+    type: disk
+    label: "Write demo assets"
+    disk: crm_assets
+    command: @ts {
+      const { companyId, name } = context.nodes.find_acme.output
+      const brief = "# " + name + " one-pager\\n\\nAcme Robotics is evaluating Swirls for plant expansion workflows.\\n"
+      const note = "# Discovery recap\\n\\nMaya Chen confirmed interest in a Q3 rollout during the first meeting.\\n"
+      const briefEscaped = brief.split("'").join("'\\''")
+      const noteEscaped = note.split("'").join("'\\''")
+      return "mkdir -p companies/" + companyId + "/briefs companies/" + companyId + "/notes && printf '%s' '" + briefEscaped + "' > companies/" + companyId + "/briefs/one-pager.md && printf '%s' '" + noteEscaped + "' > companies/" + companyId + "/notes/discovery-recap.md"
+    }
+  }
+
+  node return_seed {
+    type: code
+    label: "Return seed result"
+    code: @ts {
+      return context.nodes.find_acme.output
+    }
+  }
+
+  flow {
+    root -> find_acme
+    find_acme -> write_seed_files
+    write_seed_files -> return_seed
+  }
+}
+
+stream crm_activity_events {
+  label: "Activity events"
+  description: "One row per crm_log_activity run."
+  workflow: crm_log_activity
+  enabled: true
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["type", "note"],
+          "properties": {
+            "type": { "type": "string", "enum": ["CALL", "EMAIL", "MEETING", "NOTE"] },
+            "note": { "type": "string" },
+            "contactId": { "type": ["integer", "null"] },
+            "dealId": { "type": ["integer", "null"] }
+          },
+          "additionalProperties": false
+        }
+      }
+      prepare: @ts {
+        const activity = context.output.write_activity
+        return {
+          type: activity.type,
+          note: activity.note,
+          contactId: activity.contactId,
+          dealId: activity.dealId,
+        }
+      }
+    }
+  }
+}
+
+stream crm_qualified_leads {
+  label: "Qualified leads"
+  description: "One row per crm_qualify_lead run."
+  workflow: crm_qualify_lead
+  enabled: true
+  version: v1
+
+  versions: {
+    v1 {
+      schema: qualify_lead_result
+      prepare: @ts {
+        const lead = context.output.create_lead
+        return {
+          companyId: lead.companyId,
+          contactId: lead.contactId,
+          dealId: lead.dealId,
+          companyName: lead.companyName,
+          contactEmail: lead.contactEmail,
+          dealTitle: lead.dealTitle,
+          stage: lead.stage,
+          amount: lead.amount,
+        }
+      }
+    }
+  }
+}
+
+stream crm_deals_opened {
+  label: "Deals opened"
+  description: "One row per approved crm_create_deal run."
+  workflow: crm_create_deal
+  enabled: true
+  version: v1
+
+  versions: {
+    v1 {
+      schema: deal_record
+      prepare: @ts {
+        const deal = context.output.write_deal
+        return {
+          id: deal.id,
+          title: deal.title,
+          amount: deal.amount,
+          stage: deal.stage,
+          companyId: deal.companyId,
+          contactId: deal.contactId,
+          closedAt: deal.closedAt,
+        }
+      }
+    }
+  }
+}
+
+stream crm_deal_stage_changes {
+  label: "Deal stage changes"
+  description: "One row per crm_update_deal_stage run."
+  workflow: crm_update_deal_stage
+  enabled: true
+  version: v1
+
+  versions: {
+    v1 {
+      schema: deal_record
+      prepare: @ts {
+        const deal = context.output.advance_deal
+        return {
+          id: deal.id,
+          title: deal.title,
+          amount: deal.amount,
+          stage: deal.stage,
+          companyId: deal.companyId,
+          contactId: deal.contactId,
+          closedAt: deal.closedAt,
+        }
+      }
+    }
+  }
+}
+
+view crm_activity_feed {
+  label: "Activity feed"
+  description: "Logged calls and notes, qualified leads, opened deals, and stage moves in one timeline."
+  streams: [crm_activity_events, crm_qualified_leads, crm_deals_opened, crm_deal_stage_changes]
+
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["kind", "type", "note"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["ACTIVITY", "LEAD", "DEAL", "STAGE"] },
+        "type": { "type": "string" },
+        "note": { "type": "string" },
+        "contactId": { "type": ["integer", "null"] },
+        "dealId": { "type": ["integer", "null"] },
+        "companyId": { "type": ["integer", "null"] }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  columns: @ts {
+    const activity = context.streams.crm_activity_events?.output
+    if (activity) {
+      return {
+        kind: "ACTIVITY",
+        type: String(activity.type ?? "NOTE"),
+        note: String(activity.note ?? ""),
+        contactId: typeof activity.contactId === "number" ? activity.contactId : null,
+        dealId: typeof activity.dealId === "number" ? activity.dealId : null,
+        companyId: null,
+      }
+    }
+    const lead = context.streams.crm_qualified_leads?.output
+    if (lead) {
+      const company = String(lead.companyName ?? "a company")
+      const deal = String(lead.dealTitle ?? "a deal")
+      return {
+        kind: "LEAD",
+        type: "QUALIFIED",
+        note: `Qualified ${company} — ${deal}`,
+        contactId: typeof lead.contactId === "number" ? lead.contactId : null,
+        dealId: typeof lead.dealId === "number" ? lead.dealId : null,
+        companyId: typeof lead.companyId === "number" ? lead.companyId : null,
+      }
+    }
+    const opened = context.streams.crm_deals_opened?.output
+    if (opened) {
+      return {
+        kind: "DEAL",
+        type: "OPENED",
+        note: `Opened ${String(opened.title ?? "a deal")} at ${String(opened.stage ?? "LEAD")}`,
+        contactId: typeof opened.contactId === "number" ? opened.contactId : null,
+        dealId: typeof opened.id === "number" ? opened.id : null,
+        companyId: typeof opened.companyId === "number" ? opened.companyId : null,
+      }
+    }
+    const moved = context.streams.crm_deal_stage_changes?.output
+    if (moved) {
+      return {
+        kind: "STAGE",
+        type: String(moved.stage ?? "LEAD"),
+        note: `Moved ${String(moved.title ?? "a deal")} to ${String(moved.stage ?? "LEAD")}`,
+        contactId: typeof moved.contactId === "number" ? moved.contactId : null,
+        dealId: typeof moved.id === "number" ? moved.id : null,
+        companyId: typeof moved.companyId === "number" ? moved.companyId : null,
+      }
+    }
+    return {
+      kind: "ACTIVITY",
+      type: "NOTE",
+      note: "",
+      contactId: null,
+      dealId: null,
+      companyId: null,
+    }
+  }
+
+  computed {
+    summary {
+      graph: crm_activity_summary
+      input: @ts {
+        return { type: context.row.type, note: context.row.note }
+      }
+      output: @ts {
+        return context.output.root.summary
+      }
+    }
+  }
+}
+
+/* ---- Agent + channel ---- */
+
+agent crm_assistant {
+  label: "CRM assistant"
+  description: "Helps operators search and update the sales CRM database."
+  secrets: crm_svc
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  maxSteps: 12
+  disks: [crm_assets]
+  tools: [
+    crm_search_contacts,
+    crm_search_companies,
+    crm_search_deals,
+    crm_create_company,
+    crm_create_contact,
+    crm_create_deal,
+    crm_update_deal_stage,
+    crm_list_pipeline,
+    crm_log_activity,
+    crm_qualify_lead,
+    crm_ensure_company_folder,
+    crm_save_company_note,
+    crm_save_company_asset,
+    crm_list_company_assets,
+  ]
+  system: @ts {
+    return [
+      "You are a CRM assistant for a small sales team.",
+      "Use tools to read and write the CRM database. Do not invent ids, emails, or deal amounts.",
+      "Search with crm_search_contacts, crm_search_companies, or crm_search_deals before mutating when the operator names an existing account.",
+      "Deal amounts are integer cents (e.g. 5000000 means $50,000.00).",
+      "Prefer crm_qualify_lead when onboarding a brand-new company + contact + opening deal together.",
+      "Company files live on disk under companies/{companyId}/notes/, companies/{companyId}/briefs/, and companies/{companyId}/documents/. Use crm_ensure_company_folder before saving assets.",
+      "Use crm_save_company_note to write markdown notes or briefs, crm_save_company_asset to copy a ready PDF handle onto disk, and crm_list_company_assets to inspect a company's files.",
+      "After mutations, briefly confirm what changed with the returned ids.",
+    ].join("\n")
+  }
+  suggestions: [
+    { label: "Pipeline snapshot", message: "List the current open pipeline and summarize by stage." },
+    { label: "Find Acme", message: "Search companies and deals for Acme and summarize what you find." },
+    { label: "Qualify a lead", message: "Qualify a new lead for Northwind Labs (domain northwind.example), contact Sam Rivera sam@northwind.example, deal title Pilot rollout, amount 2500000 cents." },
+  ]
+}
+
+channel web_crm {
+  label: "CRM assistant (Web)"
+  platform: web
+  agent: crm_assistant
+  enabled: true
+  mode: dm
+}
+
+// The in-app rooms. `platform: swirls` channels
+// are the only ones an `app` page can put on screen; every rep in the org
+// shares each timeline and the assistant answers when mentioned.
+channel crm_room {
+  label: "Sales room"
+  platform: swirls
+  agent: crm_assistant
+  enabled: true
+  mode: mention
+}
+
+// Second room for opportunity reviews — useful for multi-channel sidebar testing
+// without inventing a second agent surface.
+channel deal_desk {
+  label: "Deal desk"
+  description: "Live opportunity reviews: stage moves, next touches, and close plans."
+  platform: swirls
+  agent: crm_assistant
+  enabled: true
+  mode: mention
+}
+
+query crm_open_pipeline {
+  label: "Open pipeline total"
+  database: crm
+  sql: @sql {
+    SELECT
+      to_char(COALESCE(SUM(amount), 0) / 100.0, 'FM$999,999,999') AS value,
+      COUNT(*)::text || ' deals in flight' AS hint
+    FROM deals
+    WHERE stage NOT IN ('WON', 'LOST')
+  }
+}
+
+query crm_closing_month {
+  label: "Closing this month"
+  database: crm
+  sql: @sql {
+    SELECT
+      to_char(COALESCE(SUM(amount), 0) / 100.0, 'FM$999,999,999') AS value,
+      COUNT(*)::text || ' in negotiation' AS hint
+    FROM deals
+    WHERE stage = 'NEGOTIATION'
+  }
+}
+
+query crm_stale_deals {
+  label: "Stale deals"
+  database: crm
+  sql: @sql {
+    SELECT
+      COUNT(*)::text AS value,
+      'Needs a nudge today' AS hint
+    FROM deals
+    WHERE stage NOT IN ('WON', 'LOST')
+      AND "createdAt" < NOW() - INTERVAL '14 days'
+  }
+}
+
+query crm_deals_by_stage {
+  label: "Deals by stage"
+  database: crm
+  sql: @sql {
+    SELECT stage AS label, COUNT(*)::int AS value
+    FROM deals
+    WHERE stage NOT IN ('WON', 'LOST')
+    GROUP BY stage
+    ORDER BY value DESC
+  }
+}
+
+query crm_pipeline_deals {
+  label: "Pipeline deals"
+  database: crm
+  sql: @sql {
+    SELECT title, amount, stage, "closedAt"
+    FROM deals
+    WHERE stage NOT IN ('WON', 'LOST')
+      AND ({{stage}} = 'ALL' OR stage = {{stage}})
+    ORDER BY amount DESC
+    LIMIT 50
+  }
+}
+
+/* ---- The app a rep actually logs into ---- */
+
+// A slim CRM surface over the same database and workflows the assistant uses.
+// Pages are declared, not generated: preset pages bind a workflow, a room, or a
+// thread center; bespoke pages lay out portal-kit components with an authoring-time
+// `@openui` island. Everything reachable from these pages — the `crm` database, the
+// listed workflows, the portal channels — is the app's authority boundary.
+app crm_desk {
+  label: "CRM Desk"
+  description: "Daily sales desk: pipeline, accounts, and the assistant in one place."
+  icon: "briefcase"
+
+  brand {
+    accent: "#2563EB"
+    theme:  "swirls-light"
+    avatar {
+      variant: "marble"
+      shape: "circle"
+      colors: ["#345e9e", "#4580e6", "#2eb0d0", "#3a9088", "#6868dc", "#9558e8", "#3a9870", "#4588b8"]
+    }
+    tokens {
+      light {
+        canvas: "#eef2f7"
+        text: "#18212f"
+        text_muted: "#657184"
+        text_dim: "#98a1ad"
+        surface: "#f3f5f8"
+        viewport: "#f8fafc"
+        raised: "#ffffff"
+        active: "#e9edf3"
+        field: "#e3e8ef"
+        border: "#dfe3e8"
+        brand: "#2f6feb"
+        brand_foreground: "#ffffff"
+        brand_soft: "#e7efff"
+        warning: "#a66a1f"
+        success: "#2f855a"
+        info: "#4f6fbf"
+        danger: "#c84a5b"
+        radius: "8px"
+      }
+      dark {
+        canvas: "#0c0f13"
+        text: "#f3f4f6"
+        text_muted: "#a0a8b4"
+        text_dim: "#656e7b"
+        surface: "#14171c"
+        viewport: "#101318"
+        raised: "#1b1f25"
+        active: "#22272e"
+        field: "#1e232a"
+        border: "#2d333b"
+        brand: "#5b8def"
+        brand_foreground: "#0c0f13"
+        brand_soft: "#17233a"
+        warning: "#d6a84b"
+        success: "#49a078"
+        info: "#6f83c5"
+        danger: "#df6b75"
+      }
+    }
+  }
+
+  landing {
+    layout: split
+    image: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&q=80"
+    title: "Welcome to CRM Desk"
+    subtitle: "Sign in to manage pipeline, accounts, and deals in one place."
+    sign_in_title: "Sign in to your desk"
+    sign_in_hint: "Continue with SSO to open your CRM Desk."
+    footer: "Need access? Ask your admin for an invitation, then sign in with your company account."
+
+    discover {
+      index: true
+      meta_title: "CRM Desk — Sign in"
+      meta_description: "Sign in to Acme CRM to manage pipeline, accounts, and deals."
+      keywords: ["crm", "sales", "pipeline"]
+      summary: "Acme CRM is the sign-in entry point for sales teams managing pipeline and accounts."
+      audience: "Invited sales and operations team members with company SSO"
+      capabilities: ["Pipeline management", "Account tracking", "Deal workflows"]
+      faq {
+        item {
+          question: "Who can sign in to CRM Desk?"
+          answer: "People who received an invitation and authenticate with the configured identity provider (Clerk SSO)."
+        }
+        item {
+          question: "What can I do after signing in?"
+          answer: "Manage pipeline stages, accounts, deals, and daily sales activity."
+        }
+      }
+      organization: "Acme Corp"
+      application_category: "BusinessApplication"
+    }
+  }
+
+  audience {
+    admission: invite
+    auth: oidc
+    idp: crm_clerk
+  }
+
+  shell {
+    preset: sidebar
+    topbar {
+      right: [widget.user_menu]
+    }
+    rightbar {
+      defaultState: "collapsed"
+      resizable: true
+    }
+  }
+
+  nav {
+    section "Today" {
+      page: home { label: "Dashboard" }
+    }
+    section "Book" {
+      page: pipeline
+      page: accounts
+      page: activity
+      page: activity_feed
+      page: assets { label: "Company files" }
+    }
+    section "Do" {
+      page: qualify { label: "Qualify a lead" }
+      page: log_activity { label: "Log activity" }
+      page: file_asset { label: "Save asset" }
+    }
+    section "Review" {
+      page: approvals { label: "Deal approvals" }
+    }
+    section "Team" {
+      page: threads { label: "Threads" }
+      page: room { label: "Sales room" }
+      page: deal_desk { label: "Deal desk" }
+    }
+  }
+
+  // Morning screen: numbers first, then the deals worth touching today, with
+  // the assistant docked underneath so a rep never has to switch surfaces.
+  page home {
+    label: "Dashboard"
+    icon: "layout-dashboard"
+    render: @openui {
+      open_pipeline = Query("crm_open_pipeline", {}, {rows: [], first: {value: "—", hint: ""}})
+      closing_month = Query("crm_closing_month", {}, {rows: [], first: {value: "—", hint: ""}})
+      stale_deals = Query("crm_stale_deals", {}, {rows: [], first: {value: "—", hint: ""}})
+      by_stage_rows = Query("crm_deals_by_stage", {}, {rows: []})
+
+      kpis = Grid([
+        StatCard("Open pipeline", open_pipeline.first.value, open_pipeline.first.hint, "up"),
+        StatCard("Closing this month", closing_month.first.value, closing_month.first.hint, "up"),
+        StatCard("Untouched > 14d", stale_deals.first.value, stale_deals.first.hint, "down")
+      ], 3)
+
+      by_stage = Chart("bar", null, "label", "value", "Deals by stage", by_stage_rows.rows)
+
+      top_deals = DataTable("crm", "deals", ["title", "amount", "stage"], "Largest open deals")
+
+      live_log = TickerTape("crm_log_activity", 12, "Live activity")
+
+      root = Stack([
+        Markdown("### Good morning — here is the book today"),
+        kpis,
+        live_log,
+        Grid([by_stage, top_deals], 2),
+        Section(
+          [AgentChat("crm_assistant", "Ask the CRM assistant")],
+          "Assistant",
+          "Search the book, qualify a lead, or log a call without leaving this page."
+        )
+      ], "vertical", "lg")
+    }
+  }
+
+  page pipeline {
+    label: "Pipeline"
+    icon: "chart"
+    render: @openui {
+      deals = Query("crm_pipeline_deals", {stage: "ALL"}, {rows: []})
+
+      board = QueryTable(deals, "Pipeline")
+
+      new_deal = WorkflowLauncher("crm_create_deal", [
+        { name: "title", label: "Deal", type: "string", required: true },
+        { name: "amount", label: "Amount (cents)", type: "number", required: true },
+        { name: "companyId", label: "Company", required: true, input: Select({ database: "crm", table: "companies" }) },
+        { name: "stage", label: "Stage", type: "enum", options: ["LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST"] }
+      ], "Open deal", "New deal")
+
+      moves = RunTimeline("crm_update_deal_stage", 10, "Recent stage changes")
+
+      root = Stack([board, Grid([new_deal, moves], 2)], "vertical", "lg")
+    }
+  }
+
+  // Accounts: two tables behind one set of tabs, straight off the managed
+  // database — no view or stream plumbing required.
+  page accounts {
+    label: "Accounts"
+    icon: "accounts"
+    viewport: full
+    render: @openui {
+      root = Gutter([
+        Tabs([
+          {
+            label: "Companies",
+            content: TableEditor("crm", "companies", { title: "Companies", fill: true })
+          },
+          {
+            label: "Contacts",
+            content: TableEditor("crm", "contacts", { title: "Contacts", fill: true })
+          },
+          {
+            label: "Deals",
+            content: TableEditor("crm", "deals", {
+              title: "Pipeline",
+              fill: true,
+              columns: ["title", "amount", "stage", "companyId"],
+              sort: { column: "amount", direction: "desc" },
+              filters: [{ column: "stage", op: "ne", value: "LOST" }]
+            })
+          }
+        ])
+      ], "lg")
+    }
+  }
+
+  page activity {
+    label: "Activity log"
+    icon: "clipboard-list"
+    viewport: full
+    render: @openui {
+      root = Gutter([
+        StreamBrowser("crm_activity_events", {
+          title: "Activity log",
+          fill: true,
+          columns: ["type", "note", "contactId", "dealId"],
+          sort: { column: "created_at", direction: "desc" }
+        })
+      ], "lg")
+    }
+  }
+
+  page activity_feed {
+    label: "Activity feed"
+    icon: "list"
+    viewport: full
+    render: @openui {
+      root = Gutter([
+        ViewBrowser("crm_activity_feed", {
+          title: "Activity feed",
+          fill: true,
+          columns: ["kind", "type", "note", "dealId", "summary"],
+          sort: { column: "kind", direction: "asc" }
+        })
+      ], "lg")
+    }
+  }
+
+  page assets {
+    label: "Company files"
+    icon: "folder"
+    viewport: full
+    render: @openui {
+      root = Gutter([
+        DiskBrowser("crm_assets", {
+          title: "Company files",
+          fill: true,
+          initialPath: "/companies"
+        })
+      ], "lg")
+    }
+  }
+
+  // Preset page replaced by OpenUI WorkflowLauncher with explicit fields.
+  page qualify {
+    label: "Qualify lead"
+    icon: "badge-check"
+    render: @openui {
+      form = WorkflowLauncher("crm_qualify_lead", [
+        { name: "companyName", label: "Company", type: "string", required: true },
+        { name: "domain", label: "Domain", type: "string" },
+        { name: "industry", label: "Industry", type: "string" },
+        { name: "email", label: "Email", type: "string", required: true },
+        { name: "firstName", label: "First name", type: "string", required: true },
+        { name: "lastName", label: "Last name", type: "string", required: true },
+        { name: "title", label: "Title", type: "string" },
+        { name: "dealTitle", label: "Deal title", type: "string", required: true },
+        { name: "amount", label: "Amount (cents)", type: "number" }
+      ], "Qualify lead", "Qualify a new lead")
+
+      root = Stack([
+        form,
+        RunTimeline("crm_qualify_lead", 10, "Recent qualifications")
+      ], "vertical", "md")
+    }
+  }
+
+  page log_activity {
+    label: "Log activity"
+    icon: "clipboard-pen-line"
+    render: @openui {
+      form = WorkflowLauncher("crm_log_activity", [
+        { name: "type", label: "Type", type: "enum", required: true, options: ["CALL", "EMAIL", "MEETING", "NOTE"] },
+        { name: "note", label: "What happened", type: "string", required: true },
+        { name: "contactId", label: "Contact", input: Select({ database: "crm", table: "contacts" }) },
+        { name: "dealId", label: "Deal", input: Select({ database: "crm", table: "deals" }) }
+      ], "Log it", "Log an activity")
+
+      root = Stack([
+        form,
+        TickerTape("crm_log_activity", 12, "Live log")
+      ], "vertical", "md")
+    }
+  }
+
+  page file_asset {
+    label: "Save asset"
+    icon: "file-text"
+    render: @openui {
+      ensure = WorkflowLauncher("crm_ensure_company_folder", [
+        { name: "companyId", label: "Company", required: true, input: Select({ database: "crm", table: "companies" }) }
+      ], "Ensure folders", "Create company folders on disk")
+
+      saveNote = WorkflowLauncher("crm_save_company_note", [
+        { name: "companyId", label: "Company", required: true, input: Select({ database: "crm", table: "companies" }) },
+        { name: "kind", label: "Kind", type: "enum", required: true, options: ["note", "brief"] },
+        { name: "title", label: "Title", type: "string", required: true },
+        { name: "body", label: "Body", type: "string", required: true, contentMediaType: "text/markdown" }
+      ], "Save note", "Write a markdown file")
+
+      savePdf = WorkflowLauncher("crm_save_company_asset", [
+        { name: "companyId", label: "Company", required: true, input: Select({ database: "crm", table: "companies" }) },
+        { name: "title", label: "Title", type: "string", required: true },
+        { name: "file", label: "PDF", type: "file", required: true, contentMediaType: "application/pdf" }
+      ], "Upload PDF", "Copy a PDF onto company disk")
+
+      seed = WorkflowLauncher("crm_seed_company_assets", [], "Seed demo files", "Create Acme if needed and write sample assets")
+
+      root = Stack([
+        ensure,
+        saveNote,
+        savePdf,
+        seed,
+        RunTimeline("crm_save_company_asset", 8, "Recent asset saves")
+      ], "vertical", "md")
+    }
+  }
+
+  page approvals {
+    label: "Deal approvals"
+    icon: "inbox"
+    reviews: [crm_create_deal]
+  }
+
+  // Chat pages: shared rooms, same agent and tools as the web channel.
+  // App-wide thread center (Inbox / My threads / Discover) across both rooms.
+  page threads {
+    label: "Threads"
+    icon: "message-square-text"
+    threads: [crm_room, deal_desk]
+  }
+
+  page room {
+    icon: "hash"
+    channel: crm_room
+  }
+
+  page deal_desk {
+    icon: "chart"
+    channel: deal_desk
+  }
+}

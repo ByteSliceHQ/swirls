@@ -1,0 +1,31 @@
+{
+  "name": "@swirls/language",
+  "version": "0.1.0",
+  "description": "Lexer, parser, AST, validator and serializer for the .swirls language.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ByteSliceHQ/swirls.git",
+    "directory": "packages/language"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./inline-ts-file-refs": "./src/inline-ts-file-refs.ts",
+    "./workspace": "./src/workspace/index.ts",
+    "./postgres/sql-utils": "./src/postgres/sql-utils.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@swirls/definition": "workspace:*",
+    "ajv": "catalog:",
+    "pathe": "2.0.3"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,29 @@
+disk project_disk {
+  label: "Example shared disk"
+  region: "aws-us-east-1"
+}
+
+workflow disk_demo {
+  label: "List files on mounted disk"
+
+  root {
+    label: "Start"
+    type: code
+    code: @ts {
+      return {};
+    }
+  }
+
+  node list_root {
+    label: "List root"
+    type: disk
+    disk: project_disk
+    command: @ts {
+      return 'ls -la';
+    }
+  }
+
+  flow {
+    root -> list_root
+  }
+}

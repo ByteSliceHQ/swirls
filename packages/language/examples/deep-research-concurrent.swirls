@@ -1,0 +1,235 @@
+/**
+ * Concurrent deep-research benchmark:
+ *
+ *   one query
+ *     -> four independent Firecrawl searches
+ *     -> four independent specialist agents
+ *     -> one synthesis agent
+ *
+ * The workflow concurrency cap is intentionally high enough for all four
+ * branches to remain work-conserving. Requires OPENROUTER_API_KEY in research_models and
+ * FIRECRAWL_API_KEY in vendor-keys.swirls (set values in project secrets).
+ */
+
+secret research_models {
+  vars: [OPENROUTER_API_KEY]
+}
+
+agent deep_research_specialist {
+  label: "Research specialist"
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  secrets: research_models
+  temperature: 0.1
+  maxSteps: 3
+  system: @ts {
+    return [
+      "You are a rigorous research analyst.",
+      "Analyze only the supplied search results.",
+      "Identify useful evidence, disagreements, caveats, and source URLs.",
+      "Do not invent facts or citations.",
+      "Return concise markdown notes for another agent to synthesize.",
+    ].join("\n")
+  }
+}
+
+agent deep_research_synthesizer {
+  label: "Research synthesizer"
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  secrets: research_models
+  temperature: 0.1
+  maxSteps: 3
+  system: @ts {
+    return [
+      "You are a senior research editor.",
+      "Combine the supplied specialist reports into one coherent answer.",
+      "Resolve disagreements explicitly and preserve important caveats.",
+      "Cite source URLs inline.",
+      "Use markdown with an executive summary, findings, uncertainties, and sources.",
+      "Do not introduce claims unsupported by the reports.",
+    ].join("\n")
+  }
+}
+
+workflow deep_research_concurrent {
+  label: "Concurrent deep research"
+  description: "Researches one query across web, news, academic, and technical sources using concurrent DAG branches."
+  concurrency: 8
+
+  root {
+    type: code
+    label: "Normalize query"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The research question to investigate."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      return {
+        query: String(context.nodes.root.input.query ?? "").trim(),
+      }
+    }
+  }
+
+  node web_search {
+    type: search
+    label: "Broad web search"
+    query: @ts {
+      return context.nodes.root.output.query
+    }
+    limit: 10
+    sources: ["web"]
+  }
+
+  node news_search {
+    type: search
+    label: "Recent news search"
+    query: @ts {
+      return context.nodes.root.output.query
+    }
+    limit: 10
+    sources: ["news"]
+    tbs: "qdr:m"
+  }
+
+  node research_search {
+    type: search
+    label: "Academic research search"
+    query: @ts {
+      return context.nodes.root.output.query
+    }
+    limit: 10
+    sources: ["web"]
+    categories: ["research", "pdf"]
+  }
+
+  node technical_search {
+    type: search
+    label: "Technical and GitHub search"
+    query: @ts {
+      return context.nodes.root.output.query
+    }
+    limit: 10
+    sources: ["web"]
+    categories: ["github"]
+  }
+
+  node web_analyst {
+    type: agent
+    label: "Analyze broad web results"
+    agent: deep_research_specialist
+    prompt: @ts {
+      return [
+        `Research question: ${context.nodes.root.output.query}`,
+        "",
+        "Analyze these broad web search results:",
+        JSON.stringify(context.nodes.web_search.output, null, 2),
+      ].join("\n")
+    }
+  }
+
+  node news_analyst {
+    type: agent
+    label: "Analyze recent news"
+    agent: deep_research_specialist
+    prompt: @ts {
+      return [
+        `Research question: ${context.nodes.root.output.query}`,
+        "",
+        "Analyze these recent news search results:",
+        JSON.stringify(context.nodes.news_search.output, null, 2),
+      ].join("\n")
+    }
+  }
+
+  node research_analyst {
+    type: agent
+    label: "Analyze academic evidence"
+    agent: deep_research_specialist
+    prompt: @ts {
+      return [
+        `Research question: ${context.nodes.root.output.query}`,
+        "",
+        "Analyze these academic and PDF search results:",
+        JSON.stringify(context.nodes.research_search.output, null, 2),
+      ].join("\n")
+    }
+  }
+
+  node technical_analyst {
+    type: agent
+    label: "Analyze technical evidence"
+    agent: deep_research_specialist
+    prompt: @ts {
+      return [
+        `Research question: ${context.nodes.root.output.query}`,
+        "",
+        "Analyze these technical and GitHub search results:",
+        JSON.stringify(context.nodes.technical_search.output, null, 2),
+      ].join("\n")
+    }
+  }
+
+  node synthesize {
+    type: agent
+    label: "Synthesize final report"
+    agent: deep_research_synthesizer
+    format: markdown
+    prompt: @ts {
+      return [
+        `Research question: ${context.nodes.root.output.query}`,
+        "",
+        "Broad web specialist report:",
+        String(context.nodes.web_analyst.output ?? ""),
+        "",
+        "Recent news specialist report:",
+        String(context.nodes.news_analyst.output ?? ""),
+        "",
+        "Academic specialist report:",
+        String(context.nodes.research_analyst.output ?? ""),
+        "",
+        "Technical specialist report:",
+        String(context.nodes.technical_analyst.output ?? ""),
+        "",
+        "Produce the final deep-research report.",
+      ].join("\n")
+    }
+  }
+
+  flow {
+    root -> web_search
+    root -> news_search
+    root -> research_search
+    root -> technical_search
+
+    web_search -> web_analyst
+    news_search -> news_analyst
+    research_search -> research_analyst
+    technical_search -> technical_analyst
+
+    web_analyst -> synthesize
+    news_analyst -> synthesize
+    research_analyst -> synthesize
+    technical_analyst -> synthesize
+  }
+}

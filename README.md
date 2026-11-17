@@ -34,6 +34,29 @@ Write `.swirls` files and deploy with `swirls deploy` or `git push`.
 - Visit our [website](https://swirls.ai) to learn more about Swirls.
 - Visit the [quickstart](https://swirls.ai/docs/quickstart) to get started.
 
+## Repository
+
+| Path | Holds |
+| --- | --- |
+| [`packages/definition`](./packages/definition) | `@swirls/definition`: the deployment definition schema, the contract between the language and a runtime |
+| [`packages/language`](./packages/language) | `@swirls/language`: lexer, parser, AST, validator, serializer and workspace index |
+| [`packages/lsp`](./packages/lsp) | `@swirls/lsp`: the language server |
+| [`packages/swirls`](./packages/swirls) | The `swirls` npm package |
+| [`editors/vscode`](./editors/vscode) | The VS Code extension |
+| [`editors/tree-sitter-swirls`](./editors/tree-sitter-swirls) | Tree-sitter grammar and queries for Neovim, Helix and Zed |
+| [`cookbook`](./cookbook) | Ready-to-deploy recipes |
+
+The language depends on nothing but the definition. Anything a runtime decides,
+such as which integration providers exist or how an `@openui` block is checked,
+is passed in through `LanguageHost` (see
+[`packages/language/src/host.ts`](./packages/language/src/host.ts)).
+
+```bash
+bun install
+bun run verify   # type check and tests
+bun run build    # language server and VS Code extension
+```
+
 ## Cookbook
 
 Ready-to-deploy `.swirls` recipes live in [`cookbook/`](./cookbook), organized

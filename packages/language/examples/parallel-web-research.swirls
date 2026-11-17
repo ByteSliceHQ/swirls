@@ -1,0 +1,124 @@
+/**
+ * Parallel.ai node example: web search + URL extract in one graph.
+ * Requires: PARALLEL_API_KEY — see vendor-keys.swirls; set parallel_vendor::PARALLEL_API_KEY in project secrets.
+ *
+ * Run with:
+ *   bunx swirls doctor
+ *   bunx swirls graph execute parallel_web_research
+ *     (with CLI worker running if using local execution)
+ */
+
+form research_input {
+  label: "Web Research Input"
+  description: "Provide a topic to search and a URL to extract content from."
+  enabled: true
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["topic", "extractUrl"],
+      "properties": {
+        "topic": { "type": "string", "title": "Research Topic" },
+        "extractUrl": { "type": "string", "title": "URL to Extract" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+workflow parallel_web_research {
+  label: "Parallel search and extract demo"
+  description: "Accepts a topic and URL via form; two parallel nodes call search and extract APIs."
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic", "extractUrl"],
+        "properties": {
+          "topic": { "type": "string" },
+          "extractUrl": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic", "extractUrl"],
+        "properties": {
+          "topic": { "type": "string" },
+          "extractUrl": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      return {
+        topic: context.nodes.root.input.topic,
+        extractUrl: context.nodes.root.input.extractUrl,
+      }
+    }
+  }
+
+  node web_search {
+    type: parallel
+    label: "Parallel web search"
+    operation: search
+    objective: @ts {
+      return context.nodes.root.output.topic
+    }
+    searchQueries: @ts {
+      return ["Founding year UN", "Year of founding United Nations"]
+    }
+    mode: fast
+  }
+
+  node page_extract {
+    type: parallel
+    label: "Parallel URL extract"
+    operation: extract
+    objective: @ts {
+      return context.nodes.root.output.topic
+    }
+    urls: @ts {
+      return [context.nodes.root.output.extractUrl]
+    }
+    excerpts: true
+  }
+
+  node merge_results {
+    type: code
+    label: "Merge API outputs"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["search", "extract"],
+        "properties": {
+          "search": { "type": "object" },
+          "extract": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      return {
+        search: context.nodes.web_search.output,
+        extract: context.nodes.page_extract.output,
+      }
+    }
+  }
+
+  flow {
+    root -> web_search
+    root -> page_extract
+    web_search -> merge_results
+    page_extract -> merge_results
+  }
+}
+
+trigger on_research_input {
+  form:research_input -> parallel_web_research
+  enabled: true
+}

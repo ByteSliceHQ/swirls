@@ -1,0 +1,197 @@
+================================================================================
+version
+================================================================================
+
+version: 1
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (field
+    key: (identifier)
+    value: (number)))
+
+================================================================================
+form
+================================================================================
+
+form contact {
+  label: "Contact"
+  enabled: true
+  visibility: public
+  schema: contact_input
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (boolean))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier))))))
+
+================================================================================
+webhook
+================================================================================
+
+webhook inbound {
+  label: "Inbound Webhook"
+  enabled: true
+  schema: inbound_event_payload
+  secret: hooks.SIGNING_KEY
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (boolean))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)
+          (identifier))))))
+
+================================================================================
+schedule
+================================================================================
+
+schedule daily {
+  label: "Daily run"
+  cron: "0 9 * * *"
+  timezone: "America/New_York"
+  enabled: true
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (boolean)))))
+
+================================================================================
+trigger
+================================================================================
+
+trigger on_form {
+  form:contact -> notify
+  enabled: false
+}
+
+trigger on_hook {
+  webhook: inbound -> notify
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (trigger_binding
+        kind: (identifier)
+        resource: (identifier)
+        workflow: (identifier))
+      (field
+        key: (identifier)
+        value: (boolean))))
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (trigger_binding
+        kind: (identifier)
+        resource: (identifier)
+        workflow: (identifier)))))
+
+================================================================================
+schema
+================================================================================
+
+schema support_request {
+  label: "Support request"
+  schema: { type: "object", required: ["message"], properties: { message: { type: "string" } }, additionalProperties: false }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (string
+              (string_content)))
+          (field
+            key: (identifier)
+            value: (array
+              (string
+                (string_content))))
+          (field
+            key: (identifier)
+            value: (object
+              (field
+                key: (identifier)
+                value: (object
+                  (field
+                    key: (identifier)
+                    value: (string
+                      (string_content)))))))
+          (field
+            key: (identifier)
+            value: (boolean)))))))

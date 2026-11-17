@@ -1,0 +1,97 @@
+// Chat-entry agent with team subagents (runtime auto-generates delegation tools).
+//
+// Powers `swirls chat start researcher`. The `researcher` chat agent declares
+// `team: [ research_specialist ]` so the model can delegate via a hosted subagent
+// tool. The specialist uses its own code-graph tool (`fake_search`).
+//
+// Requires OPENROUTER_API_KEY in the workspace env.
+
+secret research_svc {
+  label: "Research vendor keys"
+  vars: [ OPENROUTER_API_KEY ]
+}
+
+/* Chat entry: `swirls chat start researcher`. */
+agent researcher {
+  label: "Research coordinator"
+  secrets: research_svc
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  maxSteps: 6
+  team: [ research_specialist ]
+  system: @ts {
+    return [
+      "You are a research coordinator.",
+      "When the user asks about a topic, call the research_specialist tool with a clear task describing what to research.",
+      "Relay the specialist's summary plainly; list the sources on the next line when present.",
+    ].join("\n")
+  }
+}
+
+/* Specialist invoked via team subagent tool. */
+agent research_specialist {
+  label: "Research specialist"
+  secrets: research_svc
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  maxSteps: 4
+  tools: [ fake_search ]
+  system: @ts {
+    return [
+      "You are a research specialist.",
+      "Use `fake_search` once to gather stub sources about the requested topic.",
+      "Respond with a short summary and a sources array of titles.",
+    ].join("\n")
+  }
+}
+
+/* Demo-only search tool wired into the specialist. */
+workflow fake_search {
+  label: "Fake search"
+  description: "Returns placeholder source snippets for a query (demo stub, not a real search)."
+
+  root {
+    type: code
+    label: "Canned search"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["results"],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["title", "snippet"],
+              "properties": {
+                "title": { "type": "string" },
+                "snippet": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const q = String(context.nodes.root.input.query ?? "")
+      return {
+        results: [
+          { title: `${q} — overview`, snippet: `Stub snippet about "${q}".` },
+          { title: `${q} — background`, snippet: `Another stub snippet about "${q}".` },
+        ],
+      }
+    }
+  }
+}

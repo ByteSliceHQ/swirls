@@ -1,0 +1,86 @@
+// Example: parent graph calls a child graph via the "graph" node type (subgraph).
+//
+// helper_graph is a small graph with one code node. main_graph has an entry node,
+// a graph node that runs helper_graph, and a result node that uses the subgraph output.
+
+schema subgraph_numeric_value {
+  label: "Numeric value payload"
+  description: "Single number used by the subgraph demo form and graphs"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "value": { "type": "number" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+form subgraph_form {
+  label: "Subgraph demo"
+  enabled: true
+  schema: subgraph_numeric_value
+}
+
+/* Child workflow: doubles the input value. */
+workflow helper_graph {
+  label: "Helper"
+  description: "Called as a subgraph from main_graph."
+
+  root {
+    type: code
+    label: "Double"
+    inputSchema: subgraph_numeric_value
+    outputSchema: subgraph_numeric_value
+    code: @ts {
+      const v = context.nodes.root.input.value
+      return { value: v * 2 }
+    }
+  }
+}
+
+/* Parent workflow: root -> run_helper (graph node) -> result. */
+workflow main_graph {
+  label: "Main"
+  description: "Uses helper_graph as a subgraph."
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: subgraph_numeric_value
+    outputSchema: subgraph_numeric_value
+    code: @ts {
+      return { value: context.nodes.root.input.value }
+    }
+  }
+
+  node run_helper {
+    type: workflow
+    label: "Run helper"
+    workflow: helper_graph
+    input: @ts {
+      return context.nodes.root.input
+    }
+  }
+
+  node result {
+    type: code
+    label: "Result"
+    code: @ts {
+      const out = context.nodes.run_helper.output.root
+      return { doubled: out.value }
+    }
+  }
+
+  flow {
+    root -> run_helper
+    run_helper -> result
+  }
+}
+
+trigger on_subgraph_form {
+  form:subgraph_form -> main_graph
+  enabled: true
+}

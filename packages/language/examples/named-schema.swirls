@@ -1,0 +1,62 @@
+// Example: reusable top-level `schema` blocks and `schema: name` references.
+// Try: bunx swirls doctor (from repo root) or parse in the editor.
+
+version: 1
+
+schema contact_payload {
+  label: "Contact payload"
+  description: "Shared JSON Schema for form + graph nodes"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["name", "email"],
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+form contact {
+  label: "Contact"
+  enabled: true
+  schema: contact_payload
+}
+
+workflow handle_contact {
+  label: "Handle contact"
+  
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: contact_payload
+    outputSchema: contact_payload
+    code: @ts {
+      const { name, email } = context.nodes.root.input
+      return {
+        name: String(name ?? "").trim(),
+        email: String(email ?? "").trim().toLowerCase(),
+      }
+    }
+  }
+
+  node summarize {
+    type: code
+    label: "Echo"
+    schema: contact_payload
+    code: @ts {
+      return context.nodes.root.output
+    }
+  }
+
+  flow {
+    root -> summarize
+  }
+}
+
+trigger on_named_schema_contact {
+  form:contact -> handle_contact
+  enabled: true
+}

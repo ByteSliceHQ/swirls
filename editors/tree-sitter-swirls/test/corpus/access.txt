@@ -1,0 +1,161 @@
+================================================================================
+role
+================================================================================
+
+role sales {
+  match { department: "sales", org_role: admin, team: ["east", "west"] }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (block
+        kind: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (string
+              (string_content)))
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (array
+              (string
+                (string_content))
+              (string
+                (string_content)))))))))
+
+================================================================================
+policy grants
+================================================================================
+
+policy {
+  allow sales -> workflow prepare_quote
+  allow finance -> agent accountant {
+    workflows: [ brex ]
+    tools: [ ledger ]
+  }
+  deny finance -> agent payroll
+  allow org_admin -> agent *
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    body: (body
+      (grant
+        effect: (identifier)
+        role: (identifier)
+        target_kind: (identifier)
+        target: (identifier))
+      (grant
+        effect: (identifier)
+        role: (identifier)
+        target_kind: (identifier)
+        target: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (array
+              (reference
+                (identifier))))
+          (field
+            key: (identifier)
+            value: (array
+              (reference
+                (identifier))))))
+      (grant
+        effect: (identifier)
+        role: (identifier)
+        target_kind: (identifier)
+        target: (identifier))
+      (grant
+        effect: (identifier)
+        role: (identifier)
+        target_kind: (identifier)
+        target: (wildcard)))))
+
+================================================================================
+policy file retention
+================================================================================
+
+policy {
+  files {
+    retention: 30d
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    body: (body
+      (block
+        kind: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (duration)))))))
+
+================================================================================
+network
+================================================================================
+
+network corporate {
+  label: "Corporate"
+
+  expose: {
+    apps: [operations]
+    databases: [
+      {
+        database: crm
+        connections: [application, analytics]
+      }
+    ]
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (array
+              (reference
+                (identifier))))
+          (field
+            key: (identifier)
+            value: (array
+              (object
+                (field
+                  key: (identifier)
+                  value: (reference
+                    (identifier)))
+                (field
+                  key: (identifier)
+                  value: (array
+                    (reference
+                      (identifier))
+                    (reference
+                      (identifier))))))))))))

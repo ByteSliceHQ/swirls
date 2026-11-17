@@ -1,0 +1,105 @@
+// Run only in an isolated release-canary project. Both cases make live Jev calls.
+secret release_customer { vars: [TYPESAFE_API_KEY] }
+secret release_managed { type: managed
+  vars: [TYPESAFE_API_KEY] }
+schema release_message { schema: { type: "string" } }
+
+decision release_customer_decision {
+  provider: typesafe
+  model: "jev-1.13.0"
+  secrets: release_customer
+  inputSchema: release_message
+  questions: {
+    topic: { type: choice, instructions: "Choose a topic", criteria: { billing: "Invoices and payments", other: "Other" } },
+    urgent: { type: noul, instructions: "Does this require immediate action?" },
+    severity: { type: score, instructions: "How severe is the issue?", criteria: ["No impairment", "Work blocked"] }
+  }
+}
+workflow release_customer_smoke {
+  root {
+    type: code
+    code: @ts { return {} }
+  }
+  node assess {
+    type: decision
+    decision: release_customer_decision
+    model: @ts {
+      // Exercise comment-prefixed model code through hosted persistence.
+      return "jev-1.13.0"
+    }
+    state: "return my package please"
+  }
+  node verify {
+    type: code
+    code: @ts {
+      const result = context.nodes.assess.output
+      if (result.provider !== "typesafe" || !result.model || result.usage.input_tokens <= 0) throw new Error("Missing provider metadata")
+      if (result.answers.topic.type !== "choice" || result.answers.urgent.type !== "noul" || result.answers.severity.type !== "score") throw new Error("Missing mixed-question answers")
+      return { verified: true }
+    }
+  }
+  flow {
+    root -> assess
+    assess -> verify
+  }
+}
+
+decision release_managed_decision {
+  provider: typesafe
+  model: "jev-1.13.0"
+  secrets: release_managed
+  inputSchema: release_message
+  questions: {
+    topic: { type: choice, instructions: "Choose a topic", criteria: { billing: "Invoices and payments", other: "Other" } },
+    urgent: { type: noul, instructions: "Does this require immediate action?" },
+    severity: { type: score, instructions: "How severe is the issue?", criteria: ["No impairment", "Work blocked"] }
+  }
+}
+workflow release_managed_smoke {
+  root {
+    type: code
+    code: @ts { return {} }
+  }
+  node assess {
+    type: decision
+    decision: release_managed_decision
+    model: @ts {
+      // Exercise comment-prefixed model code through hosted persistence.
+      return "jev-1.13.0"
+    }
+    state: "return my package please"
+  }
+  node verify {
+    type: code
+    code: @ts {
+      const result = context.nodes.assess.output
+      if (result.provider !== "typesafe" || !result.model || result.usage.input_tokens <= 0) throw new Error("Missing provider metadata")
+      if (result.answers.topic.type !== "choice" || result.answers.urgent.type !== "noul" || result.answers.severity.type !== "score") throw new Error("Missing mixed-question answers")
+      return { verified: true }
+    }
+  }
+  flow {
+    root -> assess
+    assess -> verify
+  }
+}
+
+playbook jev_release {
+  tags: [release_canary]
+  case customer_key {
+    workflow: release_customer_smoke
+    input: @json { {} }
+    timeout: "3m"
+    expect {
+      status: completed
+      output: @json { { "verify": { "verified": true } } } }
+  }
+  case managed_key {
+    workflow: release_managed_smoke
+    input: @json { {} }
+    timeout: "3m"
+    expect {
+      status: completed
+      output: @json { { "verify": { "verified": true } } } }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "name": "@swirls/lsp",
+  "version": "0.1.0",
+  "description": "Language server for .swirls files.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ByteSliceHQ/swirls.git",
+    "directory": "packages/lsp"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    }
+  },
+  "main": "./dist/server.js",
+  "bin": {
+    "swirls-lsp": "./dist/server.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup && bun scripts/copy-wasm.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@prisma/dmmf": "7.8.0",
+    "@prisma/get-dmmf": "7.8.0",
+    "@prisma/language-server": "31.11.0",
+    "@swirls/definition": "workspace:*",
+    "@swirls/language": "workspace:*",
+    "graphql": "16.11.0",
+    "node-sql-parser": "5.4.0",
+    "typescript": "catalog:",
+    "vscode-json-languageservice": "5.7.1",
+    "vscode-languageserver": "^8.1.0",
+    "vscode-languageserver-textdocument": "^1.0.8"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "tsup": "catalog:"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

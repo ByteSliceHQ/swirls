@@ -1,0 +1,200 @@
+================================================================================
+postgres with tables
+================================================================================
+
+postgres my_db {
+  label: "Production Postgres"
+  secrets: db_credentials
+  connection: PG_CONNECTION_STRING
+
+  table leads {
+    schema: lead_row
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (block
+        kind: (identifier)
+        name: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier))))))))
+
+================================================================================
+database and migration
+================================================================================
+
+database app_db {
+  label: "Application database"
+
+  connection app {
+    label: "Application connection"
+  }
+}
+
+migration lowercase_emails {
+  database: app_db
+  order: 0
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (block
+        kind: (identifier)
+        name: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (string
+              (string_content)))))))
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (number)))))
+
+================================================================================
+stream with versions
+================================================================================
+
+stream scored_leads {
+  label: "Scored leads"
+  workflow: score_lead
+  version: v1
+
+  versions: {
+    v1 {
+      schema: lead_row
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (object
+          (block
+            kind: (identifier)
+            body: (body
+              (field
+                key: (identifier)
+                value: (reference
+                  (identifier))))))))))
+
+================================================================================
+view
+================================================================================
+
+view activity_feed {
+  label: "Activity feed"
+  streams: [activity_events, qualified_leads]
+  schema: feed_row
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (array
+          (reference
+            (identifier))
+          (reference
+            (identifier))))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier))))))
+
+================================================================================
+query
+================================================================================
+
+query stale_deals {
+  label: "Stale deals"
+  database: crm
+  params: { days: 14 }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (reference
+          (identifier)))
+      (field
+        key: (identifier)
+        value: (object
+          (field
+            key: (identifier)
+            value: (number)))))))

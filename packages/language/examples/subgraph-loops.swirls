@@ -1,0 +1,215 @@
+// Minimal map + while subgraph demo for Temporal smoke tests (code nodes only).
+//
+// Submit values: [1, 2, 3] on the form. Map doubles each number inline; while
+// appends a pass tag to the merged summary. Use: bunx swirls doctor && deploy/run.
+
+schema loop_numbers_payload {
+  label: "Number batch"
+  description: "Root input: array of numbers to map over"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["values"],
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": { "type": "number" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema loop_number_item {
+  label: "Single map item"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "value": { "type": "number" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema loop_number_doubled {
+  label: "Doubled map item"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "value": { "type": "number" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema loop_draft {
+  label: "While loop state"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["draft"],
+      "properties": {
+        "draft": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+form loop_numbers_form {
+  label: "Subgraph loops demo"
+  description: "Try values [1, 2, 3] to exercise map and while child Temporal runs."
+  enabled: true
+  schema: loop_numbers_payload
+}
+
+workflow loop_smoke {
+  label: "Map and while smoke test"
+  description: "Inline map subgraph then inline while subgraph; no AI or HTTP."
+
+  root {
+    type: code
+    label: "Ingest"
+    inputSchema: loop_numbers_payload
+    outputSchema: loop_numbers_payload
+    code: @ts {
+      const raw = context.nodes.root.input.values
+      const values = Array.isArray(raw) ? raw : []
+      return { values }
+    }
+  }
+
+  node map_each {
+    type: map
+    label: "Double each value"
+    items: @ts {
+      const nums = context.nodes.root.output.values
+      const out: { value: number }[] = []
+      for (let i = 0; i < nums.length; i++) {
+        const n = nums[i]
+        if (typeof n === "number") {
+          out.push({ value: n })
+        }
+      }
+      return out
+    }
+    maxItems: 50
+
+    subgraph {
+      root {
+        type: code
+        label: "Double"
+        inputSchema: loop_number_item
+        outputSchema: loop_number_doubled
+        code: @ts {
+          const v = context.iteration.item.value
+          return { value: v * 2 }
+        }
+      }
+    }
+  }
+
+  node merge_map {
+    type: code
+    label: "Merge map outputs"
+    schema: loop_draft
+    code: @ts {
+      const rows = context.nodes.map_each.output
+      const parts: string[] = []
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        const v = row != null && row.root != null ? row.root.value : null
+        if (typeof v === "number") {
+          parts.push(String(v))
+        }
+      }
+      return { draft: parts.join(",") || "empty" }
+    }
+  }
+
+  node while_refine {
+    type: while
+    label: "Tag digest per pass"
+    input: @ts {
+      return { draft: context.nodes.merge_map.output.draft }
+    }
+    condition: @ts {
+      return context.iteration.index < 2
+    }
+    update: @ts {
+      const fromPrevious = context.iteration.previous?.tag?.draft
+      const fromInput = context.iteration.input.draft
+      const draft = fromPrevious != null ? fromPrevious : fromInput
+      return { draft }
+    }
+    maxIterations: 5
+
+    subgraph {
+      root {
+        type: code
+        label: "Tag pass"
+        inputSchema: loop_draft
+        outputSchema: loop_draft
+        code: @ts {
+          const base = context.iteration.input.draft
+          const pass = context.iteration.index
+          return { draft: base + "|pass" + String(pass) }
+        }
+      }
+
+      node tag {
+        type: code
+        label: "Finalize pass"
+        schema: loop_draft
+        code: @ts {
+          const d = context.nodes.root.output.draft
+          return { draft: d + "|done" }
+        }
+      }
+
+      flow {
+        root -> tag
+      }
+    }
+  }
+
+  node finish {
+    type: code
+    label: "Result"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["summary", "iterations"],
+        "properties": {
+          "summary": { "type": "string" },
+          "iterations": { "type": "number" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const w = context.nodes.while_refine.output
+      const summary = w.lastOutput.tag != null ? w.lastOutput.tag.draft : ""
+      return { summary, iterations: w.iterations }
+    }
+  }
+
+  flow {
+    root -> map_each
+    map_each -> merge_map
+    merge_map -> while_refine
+    while_refine -> finish
+  }
+}
+
+trigger on_loop_numbers {
+  form:loop_numbers_form -> loop_smoke
+  enabled: true
+}

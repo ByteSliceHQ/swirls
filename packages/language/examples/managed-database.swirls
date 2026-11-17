@@ -1,0 +1,108 @@
+// Managed database (RFC 0013) end-to-end example: an @prisma schema island,
+// an ordered data migration, and governed `database` nodes whose `operation`
+// narrows the fully typed context.db client both at runtime (executor bridge)
+// and compile time (LSP type views). context.db is only in scope inside
+// `database` node run: bodies and migration operation: bodies — never in
+// code nodes.
+
+database app_db {
+  label: "Application database"
+  schema: @prisma {
+    enum Role {
+      USER
+      ADMIN
+    }
+
+    model User {
+      id        Int      @id @default(autoincrement())
+      email     String   @unique
+      role      Role     @default(USER)
+      createdAt DateTime @default(now())
+      posts     Post[]
+
+      @@map("users")
+    }
+
+    model Post {
+      id        Int      @id @default(autoincrement())
+      title     String
+      published Boolean  @default(false)
+      author    User     @relation(fields: [authorId], references: [id])
+      authorId  Int
+
+      @@map("posts")
+    }
+  }
+
+  connection app {
+    label: "Application connection"
+  }
+
+  connection analytics {
+    label: "Analytics connection"
+  }
+}
+
+migration lowercase_emails {
+  database: app_db
+  order: 0
+  operation: @ts {
+    const users = await context.db.app_db.user.findMany({})
+    for (const u of users) {
+      await context.db.app_db.user.update({
+        where: { id: u.id },
+        data: { email: u.email.toLowerCase() },
+      })
+    }
+    return users.length
+  }
+}
+
+graph publish_digest {
+  label: "Publish digest"
+
+  root {
+    type: code
+    code: @ts {
+      // Code nodes are pure data transformation: no context.db here.
+      return { take: 10 }
+    }
+  }
+
+  node load_authors {
+    type: database
+    database: app_db
+    operation: query
+    // operation: query narrows the client to reads. Typed model/field
+    // completion, typed where/select/include, wire-accurate result types
+    // (DateTime -> Date).
+    run: @ts {
+      const authors = await context.db.app_db.user.findMany({
+        where: { role: 'ADMIN', posts: { some: { published: true } } },
+        select: { email: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: context.nodes.root.output.take,
+      })
+      return { emails: authors.map((a) => a.email) }
+    }
+  }
+
+  node archive_drafts {
+    type: database
+    database: app_db
+    operation: update
+    // operation: update narrows the client: only update / updateMany /
+    // updateManyAndReturn / upsert type-check here (and only those run).
+    run: @ts {
+      return await context.db.app_db.post.updateMany({
+        where: { published: false },
+        data: { published: true },
+      })
+    }
+  }
+
+  flow {
+    root -> load_authors
+    load_authors -> archive_drafts
+  }
+}

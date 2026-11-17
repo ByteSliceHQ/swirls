@@ -1,0 +1,106 @@
+// Contact form workflow: form -> code -> LLM -> email
+// RESEND_API_KEY: see vendor-keys.swirls (email_vendor::RESEND_API_KEY)
+
+schema contact_message {
+  label: "Contact message"
+  description: "Shared payload for the contact form and process_form graph"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["name", "email", "message"],
+      "properties": {
+        "name": { "type": "string", "title": "Name" },
+        "email": { "type": "string", "title": "Email" },
+        "message": { "type": "string", "title": "Message" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+/* Public contact form: name, email, and message. Submissions trigger process_form. */
+form contact_form {
+  label: "Contact Form"
+  description: "Public contact form: name, email, and message. Submissions trigger process_form."
+  enabled: true
+  schema: contact_message
+}
+
+/*
+ * Full pipeline: normalize input -> LLM summary -> confirmation email.
+ * Hover on this graph or its nodes to see their doc comments.
+ */
+workflow process_form {
+  label: "Process Form"
+  description: "Normalize input, summarize with LLM, send confirmation email"
+
+  /* Normalizes name, email, and message (trim + lowercase email). */
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: contact_message
+    outputSchema: contact_message
+    code: @ts {
+      const { name, email, message } = context.nodes.root.input
+
+      return {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        message: message.trim(),
+      }
+    }
+  }
+
+  /* Uses GPT to summarize the submission in one sentence. */
+  node summarize {
+    type: ai
+    label: "Summarize"
+    description: "Summarize the submission in one sentence."
+    kind: object
+    model: "google/gemini-2.5-flash"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" }
+        }
+      }
+    }
+    prompt: @ts {
+      const { name, email, message } = context.nodes.root.output
+      return `Summarize this contact form submission in one sentence:\n\nFrom: ${name} <${email}>\n\n${message}`
+    }
+  }
+
+  /* Sends the confirmation email to the submitter with the summary. */
+  node notify {
+    type: email
+    label: "Send confirmation"
+    description: "Send the confirmation email to the submitter with the summary."
+    from: @ts {
+      return "noreply@swirls.ai"
+    }
+    to: @ts {
+      return context.nodes.root.output.email
+    }
+    subject: @ts {
+      return "We received your message"
+    }
+    text: @ts {
+      const summary = context.nodes.summarize.output.text ?? ""
+      return `Thanks for reaching out. Summary: ${summary}`
+    }
+  }
+
+  flow {
+    root -> summarize
+    summarize -> notify
+  }
+}
+
+/* Binds the contact form to the process_form graph. */
+trigger contact_trigger {
+  form:contact_form -> process_form
+  enabled: true
+}

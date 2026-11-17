@@ -1,0 +1,127 @@
+// AI node example: kind (text, object, image, video, embed).
+// Shared options (model, prompt, temperature, maxTokens) at root; kind-specific in options.
+
+form ai_demo_form {
+  label: "AI Demo"
+  description: "Submit a topic to run all AI kinds (text, object, image, embed, video)."
+  enabled: true
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["topic"],
+      "properties": {
+        "topic": { "type": "string", "title": "Topic" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+workflow ai_tasks_demo {
+  label: "AI Tasks Demo"
+  description: "One entry feeds four AI nodes: text, object, image, embed, video."
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic"],
+        "properties": {
+          "topic": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic"],
+        "properties": {
+          "topic": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const topic = (context.nodes.root.input?.topic ?? "AI").trim()
+      return { topic }
+    }
+  }
+
+  node gen_text {
+    type: ai
+    label: "Generate text"
+    description: "AI kind: object — structured output with schema."
+    kind: object
+    model: "anthropic/claude-3.5-sonnet"
+    prompt: @ts {
+      const topic = context.nodes.root.output.topic
+      return `Write two sentences about "${topic}" in a neutral tone.`
+    }
+    temperature: 0.7
+    maxTokens: 200
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" }
+        }
+      }
+    }
+  }
+
+  node gen_image {
+    type: ai
+    label: "Generate image"
+    description: "AI kind: image — options only for kind-specific (n, size, aspectRatio)."
+    kind: image
+    model: "openai/dall-e-3"
+    prompt: @ts {
+      const topic = context.nodes.root.output.topic
+      return `A simple, professional illustration of: ${topic}`
+    }
+    options: {
+      n: 1
+      size: "1024x1024"
+    }
+  }
+
+  node embed_text {
+    type: ai
+    label: "Embed"
+    description: "AI kind: embed — no kind-specific options."
+    kind: embed
+    model: "openai/text-embedding-3-small"
+    prompt: @ts {
+      const topic = context.nodes.root.output.topic
+      return [topic, `Summary: ${topic}`]
+    }
+  }
+
+  node gen_video {
+    type: ai
+    label: "Generate video"
+    description: "AI kind: video (requires SDK support for experimental_generateVideo)."
+    kind: video
+    model: "minimax/video-01"
+    prompt: @ts {
+      const topic = context.nodes.root.output.topic
+      return `A short clip about ${topic}`
+    }
+  }
+
+  flow {
+    root -> gen_text
+    root -> gen_image
+    root -> embed_text
+    root -> gen_video
+  }
+}
+
+trigger ai_demo_trigger {
+  form:ai_demo_form -> ai_tasks_demo
+  enabled: true
+}

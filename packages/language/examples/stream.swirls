@@ -1,0 +1,170 @@
+/**
+ * Stream example: graph-to-graph communication via stream blocks and stream nodes.
+ *
+ * This file covers the basic case: a graph with a non-root leaf (`tokens`), persisting
+ * to a stream, then another graph reading from that stream via a `type: stream` node.
+ *
+ * For switch-routed graphs and `context.output` across mutually exclusive branches, see
+ * `stream-switch.swirls`.
+ */
+
+workflow count_topic_tokens {
+  label: "Count tokens for a given topic"
+
+  root {
+    type: code
+    label: "Accept topic"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" }
+        },
+        "required": ["topic"]
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" },
+          "length": { "type": "number" }
+        },
+        "required": ["topic", "length"]
+      }
+    }
+    code: @ts {
+      const { topic } = context.nodes.root.input
+
+      return {
+        topic,
+        length: topic.length,
+      }
+    }
+  }
+
+  node tokens {
+    type: code
+    label: "Count tokens"
+    schema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "tokens": { "type": "number" }
+        },
+        "required": ["tokens"]
+      }
+    }
+    code: @ts {
+      return {
+        tokens: context.nodes.root.output.length * 3,
+      }
+    }
+  }
+
+  flow {
+    root -> tokens
+  }
+}
+
+stream store_topic_tokens {
+  label: "Store topic tokens"
+  description: "One record per successful count_topic_tokens graph execution"
+
+  workflow: count_topic_tokens
+  enabled: true
+  version: v1
+
+  versions: {
+    v1 {
+      schema: @json {
+        {
+          "type": "object",
+          "properties": {
+            "topic": { "type": "string" },
+            "tokens": { "type": "number" }
+          },
+          "required": ["topic", "tokens"]
+        }
+      }
+
+      condition: @ts {
+        return context.output.tokens.tokens > 0
+      }
+
+      prepare: @ts {
+        return {
+          // `root` is not a leaf, so it is not present on `context.output`;
+          // read its fields from `context.nodes` instead.
+          topic: context.nodes.root.output.topic,
+          // Must-run leaf: required on `context.output`, no assertion needed.
+          tokens: context.output.tokens.tokens,
+        }
+      }
+    }
+  }
+}
+
+workflow review_topic_tokens {
+  label: "Review stored topic tokens"
+
+  root {
+    type: code
+    label: "Accept topic"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" }
+        },
+        "required": ["topic"]
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "topic": { "type": "string" }
+        },
+        "required": ["topic"]
+      }
+    }
+    code: @ts {
+      return {
+        topic: context.nodes.root.input.topic,
+      }
+    }
+  }
+
+  node pull {
+    type: stream
+    label: "Pull matching topic tokens"
+    stream: store_topic_tokens
+    version: v1
+
+    filter: @ts {
+      return {
+        topic: { eq: context.nodes.root.output.topic },
+      }
+    }
+  }
+
+  node format {
+    type: code
+    label: "Format results"
+    code: @ts {
+      const { pull } = context.nodes
+
+      return {
+        topic: context.nodes.root.output.topic,
+        count: pull.output.length,
+        total_tokens: pull.output.reduce((total, item) => total + item.tokens, 0),
+      }
+    }
+  }
+
+  flow {
+    root -> pull
+    pull -> format
+  }
+}

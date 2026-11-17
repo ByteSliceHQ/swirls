@@ -1,0 +1,110 @@
+version: 1
+
+schema full_form_payload {
+  label: "Full form payload"
+  schema: @json {
+    { "type": "object", "properties": { "x": { "type": "string" } }, "additionalProperties": false }
+  }
+}
+
+/* Full fixture: form, webhook, schedule, graph with all node types. */
+form full_form {
+  label: "Full Form"
+  description: "Fixture form"
+  enabled: true
+  schema: full_form_payload
+}
+
+webhook full_webhook {
+  label: "Full Webhook"
+  enabled: true
+  schema: @json {
+    { "type": "object", "additionalProperties": true }
+  }
+}
+
+schedule full_schedule {
+  label: "Full Schedule"
+  cron: "0 9 * * *"
+  timezone: "America/New_York"
+  enabled: true
+}
+
+workflow full_graph {
+  label: "Full Workflow"
+  description: "Workflow with multiple node types"
+
+  root {
+    type: code
+    label: "Entry"
+    inputSchema: full_form_payload
+    outputSchema: full_form_payload
+    code: @ts {
+      return context.nodes.root.input ?? {}
+    }
+    review: {
+      enabled: true
+      title: "Review"
+      schema: @json {
+        { "type": "object", "properties": { "ok": { "type": "boolean" } } }
+      }
+    }
+  }
+
+  node ai_node {
+    type: ai
+    label: "AI"
+    kind: text
+    model: "gpt-4o-mini"
+    prompt: @ts {
+      return "hello"
+    }
+  }
+
+  node switch_node {
+    type: switch
+    label: "Switch"
+    cases: ["a", "b"]
+    router: @ts {
+      return "a"
+    }
+  }
+
+  node sink_a {
+    type: code
+    label: "Sink A"
+    code: @ts {
+      return {}
+    }
+  }
+
+  node sink_b {
+    type: code
+    label: "Sink B"
+    code: @ts {
+      return {}
+    }
+  }
+
+  flow {
+    root -> ai_node
+    ai_node -> switch_node
+    switch_node -["a"]-> sink_a
+    switch_node -["b"]-> sink_b
+  }
+}
+
+trigger form_trigger {
+  form:full_form -> full_graph
+  enabled: true
+}
+
+trigger webhook_trigger {
+  webhook:full_webhook -> full_graph
+  enabled: true
+}
+
+trigger schedule_trigger {
+  schedule:full_schedule -> full_graph
+  enabled: true
+}

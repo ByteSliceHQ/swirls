@@ -1,0 +1,48 @@
+// Managed Slack + web test harness: one orchestrator delegates to poem_writer and
+// text_transformer via agent team tools.
+//
+// Prerequisites:
+//   - OPENROUTER_API_KEY in project secrets
+//   - Slack connected in Org settings -> Connections (for Slack channel only)
+//   - Deploy the project (includes poem_writer + text_transformer from sibling examples)
+//
+// In Slack, @-mention @swirls (or pick slack_orchestrator from the agent picker).
+// In Cloud, open Agents and chat with web_orchestrator.
+
+secret orchestrator_svc {
+  label: "Orchestrator vendor keys"
+  vars: [ OPENROUTER_API_KEY ]
+}
+
+agent slack_orchestrator {
+  label: "Slack demo orchestrator"
+  secrets: orchestrator_svc
+  provider: openrouter
+  model: "google/gemini-3.1-flash-lite"
+  maxSteps: 16
+  team: [ poem_writer, text_transformer ]
+  disks: [ project_disk ]
+  system: @ts {
+    return [
+      "You are a Slack demo orchestrator.",
+      "When the user needs a specialist, call the matching team tool with a clear task describing what to do.",
+      "Relay the specialist's answer plainly; do not answer from your own tools when a team tool fits.",
+    ].join("\n")
+  }
+}
+
+channel slack_orchestrator {
+  label: "Demo orchestrator (Slack)"
+  platform: slack
+  agent: slack_orchestrator
+  enabled: true
+  mode: mention
+}
+
+channel web_orchestrator {
+  label: "Demo orchestrator (Web)"
+  platform: web
+  agent: slack_orchestrator
+  enabled: true
+  mode: dm
+}

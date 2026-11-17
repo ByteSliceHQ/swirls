@@ -1,0 +1,127 @@
+================================================================================
+app
+================================================================================
+
+app crm_desk {
+  label: "CRM Desk"
+  icon: "briefcase"
+
+  brand {
+    accent: "#2563EB"
+    tokens {
+      light {
+        canvas: "#eef2f7"
+      }
+    }
+  }
+
+  shell {
+    preset: sidebar
+    topbar {
+      right: [widget.user_menu]
+    }
+  }
+
+  nav {
+    section "Today" {
+      page: home { label: "Dashboard" }
+      page: pipeline
+    }
+  }
+
+  page home {
+    label: "Dashboard"
+    viewport: full
+    render: @openui {
+      root = Stack([title])
+      title = Heading("Today")
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    kind: (identifier)
+    name: (identifier)
+    body: (body
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (field
+        key: (identifier)
+        value: (string
+          (string_content)))
+      (block
+        kind: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (string
+              (string_content)))
+          (block
+            kind: (identifier)
+            body: (body
+              (block
+                kind: (identifier)
+                body: (body
+                  (field
+                    key: (identifier)
+                    value: (string
+                      (string_content)))))))))
+      (block
+        kind: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (block
+            kind: (identifier)
+            body: (body
+              (field
+                key: (identifier)
+                value: (array
+                  (reference
+                    (identifier)
+                    (identifier))))))))
+      (block
+        kind: (identifier)
+        body: (body
+          (block
+            kind: (identifier)
+            name: (string
+              (string_content))
+            body: (body
+              (field
+                key: (identifier)
+                value: (reference
+                  (identifier))
+                body: (object
+                  (field
+                    key: (identifier)
+                    value: (string
+                      (string_content)))))
+              (field
+                key: (identifier)
+                value: (reference
+                  (identifier)))))))
+      (block
+        kind: (identifier)
+        name: (identifier)
+        body: (body
+          (field
+            key: (identifier)
+            value: (string
+              (string_content)))
+          (field
+            key: (identifier)
+            value: (reference
+              (identifier)))
+          (field
+            key: (identifier)
+            value: (embedded_block
+              language: (embedded_language)
+              content: (embedded_content))))))))

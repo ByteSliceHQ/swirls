@@ -1,0 +1,111 @@
+// Parses cleanly but has validation errors: cycles, duplicates, missing required fields, bad references.
+
+form dup_name {
+  label: "One"
+  enabled: true
+  schema: @json {
+    { "type": "object", "additionalProperties": false }
+  }
+}
+
+form dup_name {
+  label: "Two"
+  enabled: true
+  schema: @json {
+    { "type": "object", "additionalProperties": false }
+  }
+}
+
+workflow bad_graph {
+  label: "Bad"
+  root {
+    type: code
+    label: "Root"
+    code: @ts {
+      return {}
+    }
+  }
+  node no_code {
+    type: code
+    label: "Missing code block"
+  }
+  node bad_type {
+    type: invalid_type
+    label: "Invalid"
+  }
+  node downstream {
+    type: code
+    label: "Downstream"
+    schema: @json {
+      { "type": "object" }
+    }
+    code: @ts {
+      return {}
+    }
+  }
+  flow {
+    root -> no_code
+    no_code -> bad_type
+    bad_type -> downstream
+  }
+}
+
+workflow cycle_graph {
+  label: "Cycle"
+  root {
+    type: code
+    label: "Entry"
+    code: @ts {
+      return {}
+    }
+  }
+  node a {
+    type: code
+    label: "A"
+    code: @ts {
+      return {}
+    }
+  }
+  node b {
+    type: code
+    label: "B"
+    code: @ts {
+      return {}
+    }
+  }
+  flow {
+    root -> a
+    a -> b
+    b -> a
+  }
+}
+
+workflow two_roots {
+  label: "Two roots"
+  root {
+    type: code
+    label: "X"
+    code: @ts {
+      return {}
+    }
+  }
+  node y {
+    type: code
+    label: "Y"
+    code: @ts {
+      return {}
+    }
+  }
+  flow {
+  }
+}
+
+trigger ref_nonexistent_form {
+  form:nonexistent_form -> bad_graph
+  enabled: true
+}
+
+trigger ref_nonexistent_graph {
+  form:dup_name -> nonexistent_graph
+  enabled: true
+}

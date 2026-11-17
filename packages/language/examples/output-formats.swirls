@@ -1,0 +1,279 @@
+/**
+ * Output format demo: every leaf in this graph declares a different `format:`
+ * so the cloud UI renders each leaf with its own ContentRenderer branch.
+ *
+ * Run it via the "output_formats_demo" form in the Portal — submit any topic
+ * (e.g. "octopus") and inspect the rendered execution. The Activity / Portal
+ * execution view should show:
+ *
+ *   article         → rendered markdown article
+ *   summary_object  → rendered markdown extracted from { markdown, wordCount }
+ *   page            → rendered HTML
+ *   transcript      → plain text block
+ *   hero_image      → inline <img>
+ *   demo_video      → inline <video controls>
+ *   theme_song      → inline <audio controls>
+ *   bundle          → mixed envelope (markdown + image + html stitched together)
+ *   raw_metrics     → JSON envelope (kind: json) — falls through to the JSON viewer
+ *   stats           → no `format:` declared — legacy raw JSON output (back-compat)
+ */
+
+form output_formats_demo {
+  label: "Output Formats Demo"
+  description: "Submit any topic to render every Content variant"
+  enabled: true
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["topic"],
+      "properties": {
+        "topic": { "type": "string", "title": "Topic" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+workflow output_formats_demo {
+  label: "Output Formats Demo"
+  description: "One leaf per Content variant: markdown / html / text / image / video / audio / mixed / json."
+
+  /* Accept the topic and pre-compute a few derived fields used downstream. */
+  root {
+    type: code
+    label: "Accept topic"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic"],
+        "properties": {
+          "topic": { "type": "string" }
+        }
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic", "slug"],
+        "properties": {
+          "topic": { "type": "string" },
+          "slug":  { "type": "string" }
+        }
+      }
+    }
+    code: @ts {
+      const topic = String(context.nodes.root.input.topic ?? "octopus").trim()
+      const slug = topic.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+      return { topic, slug }
+    }
+  }
+
+  /*
+   * format: markdown — projection rule 1: leaf returns a plain string,
+   * which becomes the markdown source verbatim.
+   */
+  node article {
+    type: code
+    label: "Markdown article (string)"
+    format: markdown
+    code: @ts {
+      const { topic } = context.nodes.root.output
+      return [
+        `# ${topic}: a short field guide`,
+        ``,
+        `_A whirlwind tour of **${topic}**, generated from a graph leaf._`,
+        ``,
+        `## Highlights`,
+        ``,
+        `- Renders inline in the Portal execution view`,
+        `- Supports GitHub-flavored Markdown via remark-gfm`,
+        `- Tables, code blocks, and links all work`,
+        ``,
+        "```ts",
+        `const note = "Markdown leaves carry the source string and nothing else."`,
+        "```",
+      ].join("\n")
+    }
+  }
+
+  /*
+   * format: markdown — projection rule 3: leaf returns an object with a
+   * `markdown` string field. The structured extras land under envelope.data
+   * so API/webhook consumers still see them.
+   */
+  node summary_object {
+    type: code
+    label: "Markdown from { markdown, ... }"
+    format: markdown
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["markdown", "wordCount"],
+        "properties": {
+          "markdown":  { "type": "string", "contentMediaType": "text/markdown" },
+          "wordCount": { "type": "number" }
+        }
+      }
+    }
+    code: @ts {
+      const { topic } = context.nodes.root.output
+      const markdown =
+        `## Why \`${topic}\`?\n\n` +
+        `Because every demo deserves a pithy one-liner.\n\n` +
+        `> Output format projection preserves both rendered text **and** the structured fields.`
+      const wordCount = markdown.split(/\s+/).length
+      return { markdown, wordCount }
+    }
+  }
+
+  /*
+   * format: html — sanitized via DOMPurify in the renderer.
+   */
+  node page {
+    type: code
+    label: "HTML page"
+    format: html
+    code: @ts {
+      const { topic } = context.nodes.root.output
+      return [
+        `<section>`,
+        `  <h2>${topic} (HTML)</h2>`,
+        `  <p>This block is sanitized with DOMPurify before render.</p>`,
+        `  <p><em>Inline styles, scripts, and event handlers are stripped.</em></p>`,
+        `  <ul>`,
+        `    <li>HTML is for trusted-but-formatted output.</li>`,
+        `    <li>Markdown is for plain prose.</li>`,
+        `  </ul>`,
+        `</section>`,
+      ].join("\n")
+    }
+  }
+
+  /* format: text — plain monospace block. */
+  node transcript {
+    type: code
+    label: "Plain text transcript"
+    format: text
+    code: @ts {
+      const { topic } = context.nodes.root.output
+      return [
+        `[transcript]`,
+        `topic    = ${topic}`,
+        `format   = text`,
+        `renders  = <pre> with whitespace preserved`,
+        `purpose  = logs, command output, ascii diagrams`,
+        ``,
+        `       _____`,
+        `      /     \\`,
+        `     | ${topic.padEnd(5).slice(0, 5)} |`,
+        `      \\_____/`,
+      ].join("\n")
+    }
+  }
+
+  /* format: image — string URL form. */
+  node hero_image {
+    type: code
+    label: "Image (URL)"
+    format: image
+    code: @ts {
+      const { slug } = context.nodes.root.output
+      return `https://picsum.photos/seed/${encodeURIComponent(slug)}/720/360`
+    }
+  }
+
+  /* format: video — { url, mime, poster? } object form. */
+  node demo_video {
+    type: code
+    label: "Video (URL)"
+    format: video
+    code: @ts {
+      return {
+        url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        mime: "video/mp4",
+        poster: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg",
+      }
+    }
+  }
+
+  /* format: audio — { url, mime } object form. */
+  node theme_song {
+    type: code
+    label: "Audio (URL)"
+    format: audio
+    code: @ts {
+      return {
+        url: "https://upload.wikimedia.org/wikipedia/commons/c/c8/Example.ogg",
+        mime: "audio/ogg",
+      }
+    }
+  }
+
+  /*
+   * format: mixed — a Content[] is wrapped into { kind: "mixed", parts }.
+   * The renderer recurses so each part picks its own branch.
+   */
+  node bundle {
+    type: code
+    label: "Mixed envelope"
+    format: mixed
+    code: @ts {
+      const { topic, slug } = context.nodes.root.output
+      return [
+        { kind: "markdown", markdown: `### Bundle for *${topic}*\n\nMarkdown + image + html, stitched together.` },
+        { kind: "image", url: `https://picsum.photos/seed/${slug}-mix/600/240`, alt: `Hero for ${topic}` },
+        { kind: "html", html: `<p style="opacity:.7">Inline HTML still flows through DOMPurify.</p>` },
+      ]
+    }
+  }
+
+  /*
+   * format: json — explicit JSON envelope. The UI shows it via the JSON
+   * branch (no rendering attempted), and consumers see `{ kind: "json", value }`.
+   */
+  node raw_metrics {
+    type: code
+    label: "Explicit JSON envelope"
+    format: json
+    code: @ts {
+      const { topic } = context.nodes.root.output
+      return {
+        topic,
+        scores: { clarity: 0.92, brevity: 0.81, whimsy: 0.74 },
+        generatedAt: new Date().toISOString(),
+      }
+    }
+  }
+
+  /*
+   * No `format:` declared — leaf is persisted as raw JSON exactly like before
+   * the feature shipped (back-compat). The cloud UI shows the legacy JSON view.
+   */
+  node stats {
+    type: code
+    label: "Legacy (no format)"
+    code: @ts {
+      const { topic } = context.nodes.root.output
+      return { topic, leafCount: 9, note: "no format declared → raw passthrough!" }
+    }
+  }
+
+  flow {
+    root -> article
+    root -> summary_object
+    root -> page
+    root -> transcript
+    root -> hero_image
+    root -> demo_video
+    root -> theme_song
+    root -> bundle
+    root -> raw_metrics
+    root -> stats
+  }
+}
+
+/* Form submission triggers the demo graph. */
+trigger run_output_formats_demo {
+  form:output_formats_demo -> output_formats_demo
+  enabled: true
+}

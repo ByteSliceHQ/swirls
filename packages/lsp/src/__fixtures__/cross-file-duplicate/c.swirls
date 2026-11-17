@@ -1,0 +1,5 @@
+version: 1
+secret dup_secret {
+  label: "Secret B"
+  vars: [ KEY_B ]
+}

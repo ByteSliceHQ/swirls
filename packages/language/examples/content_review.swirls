@@ -1,0 +1,281 @@
+// RESEND_API_KEY: see vendor-keys.swirls (email_vendor::RESEND_API_KEY)
+
+schema article_submission_input {
+  label: "Article submission input"
+  description: "Form payload and graph root input"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["title", "body", "author_email"],
+      "properties": {
+        "title": { "type": "string", "title": "Title" },
+        "body": { "type": "string", "title": "Body" },
+        "author_email": { "type": "string", "title": "Author Email", "format": "email" },
+        "category": { "type": "string", "title": "Category", "enum": ["engineering", "product", "culture", "announcement"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+form article_submission {
+  label: "Article submission"
+  description: "Submit a draft article for editorial review and publishing"
+  enabled: true
+  schema: article_submission_input
+}
+
+workflow publish_article {
+  label: "Publish article"
+  description: "Screen article with AI, present to an editor for review, then publish or notify author"
+
+  root {
+    type: code
+    label: "Normalize submission"
+    inputSchema: article_submission_input
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["title", "body", "author_email", "category", "word_count", "submitted_at"],
+        "properties": {
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "author_email": { "type": "string" },
+          "category": { "type": "string" },
+          "word_count": { "type": "integer" },
+          "submitted_at": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const { title, body, author_email, category } = context.nodes.root.input
+
+      return {
+        title: title.trim(),
+        body: body.trim(),
+        author_email: author_email.toLowerCase().trim(),
+        category: category ?? "engineering",
+        word_count: body.split(/\s+/).length,
+        submitted_at: new Date().toISOString(),
+      }
+    }
+  }
+
+  node ai_screen {
+    type: ai
+    kind: object
+    label: "AI content screen"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["summary", "tone", "suggested_tags", "flags"],
+        "properties": {
+          "summary": { "type": "string" },
+          "tone": { "type": "string" },
+          "suggested_tags": { "type": "array", "items": { "type": "string" } },
+          "flags": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+    model: "google/gemini-2.5-flash"
+    prompt: @ts {
+      const { title, body, category } = context.nodes.root.output
+      return [
+        "You are an editorial assistant. Analyze this article submission and return:",
+        "- summary: a 1-2 sentence summary",
+        "- tone: the overall tone (professional, casual, technical, etc.)",
+        "- suggested_tags: up to 5 topic tags",
+        "- flags: any concerns (empty array if none). Flag things like: off-topic for category, inflammatory language, missing attribution, factual claims that need sources.",
+        "",
+        "Category: " + category,
+        "Title: " + title,
+        "Body: " + body,
+      ].join("\n")
+    }
+  }
+
+  node editorial_review {
+    type: code
+    label: "Editorial review"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["title", "summary", "flags", "word_count"],
+        "properties": {
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "flags": { "type": "array", "items": { "type": "string" } },
+          "word_count": { "type": "integer" }
+        }
+      }
+    }
+    code: @ts {
+      const { title, word_count } = context.nodes.root.output
+      const { summary, flags } = context.nodes.ai_screen.output
+
+      return { title, summary, flags, word_count }
+    }
+    review: {
+      enabled: true
+      title: "Editorial review"
+      description: "Review the article and AI analysis before publishing"
+      schema: @json {
+        {
+          "type": "object",
+          "required": ["decision"],
+          "properties": {
+            "decision": {
+              "type": "string",
+              "title": "Decision",
+              "enum": ["approve", "revise", "reject"]
+            },
+            "editor_notes": {
+              "type": "string",
+              "title": "Editor Notes"
+            },
+            "publish_category_override": {
+              "type": "string",
+              "title": "Category Override",
+              "enum": ["engineering", "product", "culture", "announcement"]
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+      actions: [
+        { id: "approve", label: "Approve & Publish", outcome: "approve" },
+        { id: "revise", label: "Request Revisions", outcome: "reject" },
+        { id: "reject", label: "Reject", outcome: "reject" }
+      ]
+    }
+  }
+
+  node route_decision {
+    type: switch
+    label: "Route decision"
+    cases: ["publish", "request_revisions", "rejected"]
+    router: @ts {
+      const decision = context.reviews.editorial_review?.decision
+      if (decision === "approve") return "publish"
+      if (decision === "revise") return "request_revisions"
+      return "rejected"
+    }
+  }
+
+  node publish {
+    type: code
+    label: "Publish article"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["article_id", "title", "category", "status", "published_at"],
+        "properties": {
+          "article_id": { "type": "string" },
+          "title": { "type": "string" },
+          "category": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "status": { "type": "string" },
+          "published_at": { "type": "string" }
+        }
+      }
+    }
+    code: @ts {
+      const { title, category } = context.nodes.root.output
+      const override = context.reviews.editorial_review?.publish_category_override
+      const { suggested_tags } = context.nodes.ai_screen.output
+
+      return {
+        article_id: "ART-" + String(Date.now()),
+        title,
+        category: override ?? category,
+        tags: suggested_tags,
+        status: "published",
+        published_at: new Date().toISOString(),
+      }
+    }
+  }
+
+  node notify_published {
+    type: email
+    label: "Notify author published"
+    from: @ts { return "editors@swirls.ai" }
+    to: @ts { return context.nodes.root.output.author_email }
+    subject: @ts {
+      return "Your article has been published: " + context.nodes.publish.output.title
+    }
+    text: @ts {
+      const p = context.nodes.publish.output
+      const notes = context.reviews.editorial_review?.editor_notes
+      return [
+        "Your article \"" + p.title + "\" has been published.",
+        "",
+        "Article ID: " + p.article_id,
+        "Category: " + p.category,
+        notes ? "\nEditor notes: " + notes : "",
+      ].join("\n")
+    }
+  }
+
+  node notify_revisions {
+    type: email
+    label: "Request revisions"
+    from: @ts { return "editors@swirls.ai" }
+    to: @ts { return context.nodes.root.output.author_email }
+    subject: @ts {
+      return "Revisions requested: " + context.nodes.root.output.title
+    }
+    text: @ts {
+      const { title } = context.nodes.root.output
+      const notes = context.reviews.editorial_review?.editor_notes ?? "No additional notes."
+      const { flags } = context.nodes.ai_screen.output
+      return [
+        "Your article \"" + title + "\" needs revisions before it can be published.",
+        "",
+        "Editor notes:",
+        notes,
+        "",
+        flags.length > 0 ? "AI flags:\n- " + flags.join("\n- ") : "",
+        "",
+        "Please resubmit when ready.",
+      ].join("\n")
+    }
+  }
+
+  node notify_rejected {
+    type: email
+    label: "Notify rejection"
+    from: @ts { return "editors@swirls.ai" }
+    to: @ts { return context.nodes.root.output.author_email }
+    subject: @ts {
+      return "Article not accepted: " + context.nodes.root.output.title
+    }
+    text: @ts {
+      const { title } = context.nodes.root.output
+      const notes = context.reviews.editorial_review?.editor_notes ?? "No additional details."
+      return [
+        "Your article \"" + title + "\" was not accepted for publication.",
+        "",
+        "Editor notes:",
+        notes,
+        "",
+        "If you have questions, reply to this email.",
+      ].join("\n")
+    }
+  }
+
+  flow {
+    root -> ai_screen
+    ai_screen -> editorial_review
+    editorial_review -> route_decision
+    route_decision -["publish"]-> publish
+    route_decision -["request_revisions"]-> notify_revisions
+    route_decision -["rejected"]-> notify_rejected
+    publish -> notify_published
+  }
+}
+
+trigger on_article_submission {
+  form:article_submission -> publish_article
+  enabled: true
+}

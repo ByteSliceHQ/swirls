@@ -1,0 +1,165 @@
+// E2E test target for `swirls graph execute`: parent graph runs an `agent` node
+// whose agent has a single graph-backed tool that performs a basic string
+// transformation (reverse). Verifies that graph execute -> agent node -> graph
+// tool delegation works end to end. When the agent node has `schema:`, the
+// runtime auto-injects tool catalog + structured-output instructions (no
+// submit_output mentions needed in user prompts).
+//
+// Run it:
+//   swirls graph execute transform_via_agent --input '{"text":"hello"}'
+//
+// Expected: the result node returns { original: "hello", transformed: "olleh" }
+// where the agent has called reverse_text once and the framework captured
+// structured output matching transform_result_shape.
+//
+// Requires OPENROUTER_API_KEY in the workspace env.
+
+secret transformer_svc {
+  label: "Transformer vendor keys"
+  vars: [ OPENROUTER_API_KEY ]
+}
+
+/* Shared shape for the agent node's structured output. */
+schema transform_result_shape {
+  label: "Transform result"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["transformed"],
+      "properties": {
+        "transformed": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+/* Agent under test: a single graph-backed tool.
+   Tool catalog and structured-output instructions are injected by the runtime. */
+agent text_transformer {
+  label: "Text transformer"
+  secrets: transformer_svc
+  provider: openrouter
+  model: "google/gemini-3.1-flash-lite"
+  maxSteps: 4
+  tools: [ reverse_text ]
+  system: @ts {
+    return [
+      "You transform text on behalf of the caller.",
+      "Use the available tools to perform the requested transformation; do not invent results.",
+    ].join("\n")
+  }
+}
+
+/* The single tool: a basic code transformation (string reversal). */
+workflow reverse_text {
+  label: "Reverse text"
+  description: "Reverses a string and returns the reversed value (Unicode-naive; tests basic code transformation)."
+
+  root {
+    type: code
+    label: "Reverse"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["reversed"],
+        "properties": {
+          "reversed": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const t = String(context.nodes.root.input.text ?? "")
+      const reversed = t.split("").reverse().join("")
+      return { reversed }
+    }
+  }
+}
+
+/* Entry-point graph for `swirls graph execute transform_via_agent`. */
+workflow transform_via_agent {
+  label: "Transform via agent"
+  description: "Parent workflow: prepares text, delegates to an agent node, then formats the result. E2E target for `swirls graph execute`."
+
+  root {
+    type: code
+    label: "Prepare"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const text = String(context.nodes.root.input.text ?? "")
+      return { text }
+    }
+  }
+
+  node delegate {
+    type: agent
+    label: "Delegate to text_transformer"
+    agent: text_transformer
+    schema: transform_result_shape
+    prompt: @ts {
+      const text = String(context.nodes.root.output.text ?? "")
+      return [
+        "Transform the following text.",
+        "Input text:",
+        text,
+      ].join("\n")
+    }
+  }
+
+  node result {
+    type: code
+    label: "Format result"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["original", "transformed"],
+        "properties": {
+          "original": { "type": "string" },
+          "transformed": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const original = String(context.nodes.root.output.text ?? "")
+      const out = context.nodes.delegate.output
+      const transformed = String(out?.transformed ?? "")
+      return { original, transformed }
+    }
+  }
+
+  flow {
+    root -> delegate
+    delegate -> result
+  }
+}

@@ -1,0 +1,305 @@
+// Example: batch processing with map + while — multi-node subgraphs on both loops.
+//
+// Story: a portal submits an array of support tickets. Each ticket runs through an inline
+// pipeline (normalize → triage → package). Results are merged into one digest, then a while
+// loop refines that digest across iterations (multi-node child graph), stopping when the
+// condition says to or when maxIterations is hit.
+//
+// Demonstrates: context.iteration.item (map), context.iteration.input / previous (while),
+// subgraph { } without a colon, flow { } inside subgraphs, and caps (maxItems / maxIterations).
+
+schema ticket_batch_payload {
+  label: "Ticket batch"
+  description: "Form submission and graph root payload"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["tickets"],
+      "properties": {
+        "tickets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "body"],
+            "properties": {
+              "id": { "type": "string" },
+              "body": { "type": "string" },
+              "channel": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema support_ticket_item {
+  label: "Support ticket (map item input)"
+  description: "One ticket before normalize"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["id", "body"],
+      "properties": {
+        "id": { "type": "string" },
+        "body": { "type": "string" },
+        "channel": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema support_ticket_normalized {
+  label: "Support ticket (normalized)"
+  description: "Ticket after channel defaulting"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["id", "body", "channel"],
+      "properties": {
+        "id": { "type": "string" },
+        "body": { "type": "string" },
+        "channel": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+schema digest_draft {
+  label: "Digest draft"
+  description: "Merged digest text passed into the while loop"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["draft"],
+      "properties": {
+        "draft": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+form ticket_batch {
+  label: "Support ticket batch"
+  description: "Array of tickets to process in one run (demo payload for the batch pipeline)."
+  enabled: true
+  schema: ticket_batch_payload
+}
+
+workflow support_ticket_batch {
+  label: "Batch ticket pipeline"
+  description: "Fan out over tickets (3-node subgraph), merge, then while-refine digest (2-node subgraph)."
+
+  root {
+    type: code
+    label: "Ingest batch"
+    inputSchema: ticket_batch_payload
+    outputSchema: ticket_batch_payload
+    code: @ts {
+      const t = context.nodes.root.input.tickets
+      return { tickets: Array.isArray(t) ? t : [] }
+    }
+  }
+
+  node per_ticket {
+    type: fanout
+    label: "Process tickets concurrently"
+    items: @ts {
+      return context.nodes.root.output.tickets
+    }
+    maxItems: 100
+    concurrency: 2
+    
+    subgraph {
+      root {
+        type: code
+        label: "Normalize"
+        inputSchema: support_ticket_item
+        outputSchema: support_ticket_normalized
+        code: @ts {
+          const item = context.iteration.item
+          const ch = item.channel && item.channel.length > 0 ? item.channel : "email"
+          
+          return {
+            id: item.id,
+            body: item.body.trim(),
+            channel: ch,
+          }
+        }
+      }
+
+      node triage {
+        type: code
+        label: "Priority triage"
+        schema: @json {
+          {
+            "type": "object",
+            "required": ["priority", "reason"],
+            "properties": {
+              "priority": { "type": "number" },
+              "reason": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+        code: @ts {
+          const body = context.nodes.root.output.body
+          const urgent = /urgent|down|outage|critical/i.test(body)
+          const priority = urgent ? 3 : 1
+          const reason = urgent ? "matched escalation keywords" : "standard queue"
+          
+          return { priority, reason }
+        }
+      }
+
+      node handoff {
+        type: code
+        label: "Package row"
+        schema: @json {
+          {
+            "type": "object",
+            "required": ["ticketId", "priority", "preview"],
+            "properties": {
+              "ticketId": { "type": "string" },
+              "priority": { "type": "number" },
+              "preview": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+        code: @ts {
+          const id = context.nodes.root.output.id
+          const preview = context.nodes.root.output.body.slice(0, 120)
+          const priority = context.nodes.triage.output.priority
+          
+          return { ticketId: id, priority, preview }
+        }
+      }
+
+      flow {
+        root -> triage
+        triage -> handoff
+      }
+    }
+  }
+
+  node merge_digest {
+    type: code
+    label: "Merge map results"
+    schema: digest_draft
+    code: @ts {
+      const rows = context.nodes.per_ticket.output
+      const lines: string[] = []
+      for (let i = 0; i < rows.length; i++) {
+        const h = rows[i]?.handoff
+        if (h != null) {
+          lines.push(`[${h.ticketId}] P${h.priority}: ${h.preview ?? ""}`)
+        }
+      }
+      return { draft: lines.join("\n") || "(no tickets)" }
+    }
+  }
+
+  node refine_digest {
+    type: while
+    label: "Iteratively tighten digest"
+    input: @ts {
+      return { draft: context.nodes.merge_digest.output.draft }
+    }
+    condition: @ts {
+      return context.iteration.index < 2
+    }
+    update: @ts {
+      const nextDraft =
+        context.iteration.previous?.polish?.text ??
+        context.iteration.input.draft
+      
+      return { draft: nextDraft }
+    }
+    maxIterations: 5
+
+    subgraph {
+      root {
+        type: code
+        label: "Expand digest"
+        inputSchema: digest_draft
+        outputSchema: @json {
+          {
+            "type": "object",
+            "required": ["blob"],
+            "properties": {
+              "blob": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+        code: @ts {
+          const d = context.iteration.input.draft
+          return { blob: `=== batch digest (pass ${context.iteration.index}) ===\n${d}` }
+        }
+      }
+
+      node polish {
+        type: code
+        label: "Polish text"
+        schema: @json {
+          {
+            "type": "object",
+            "required": ["text"],
+            "properties": {
+              "text": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+        code: @ts {
+          const b = context.nodes.root.output.blob
+          const text = b.split("\n").filter((line) => line.length > 0).length + " lines\n" + b
+          return { text }
+        }
+      }
+
+      flow {
+        root -> polish
+      }
+    }
+  }
+
+  node done {
+    type: code
+    label: "Final payload"
+    schema: @json {
+      {
+        "type": "object",
+        "required": ["summary"],
+        "properties": {
+          "summary": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const summary =
+        context.nodes.refine_digest.output.lastOutput.polish?.text ?? ""
+      
+      return { summary }
+    }
+  }
+
+  flow {
+    root -> per_ticket
+    per_ticket -> merge_digest
+    merge_digest -> refine_digest
+    refine_digest -> done
+  }
+}
+
+trigger on_ticket_batch {
+  form:ticket_batch -> support_ticket_batch
+  enabled: true
+}

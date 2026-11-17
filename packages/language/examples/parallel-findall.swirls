@@ -1,0 +1,136 @@
+/**
+ * Parallel.ai FindAll: Reddit lead-gen — discover threads worth engaging with (polls until complete).
+ * Requires: PARALLEL_API_KEY — see vendor-keys.swirls; set parallel_vendor::PARALLEL_API_KEY in project secrets.
+ *
+ * Form `reddit_lead_findall` feeds this graph via `on_reddit_lead_findall`.
+ * CLI runs without a form use sensible defaults for empty root input.
+ *
+ * Run with:
+ *   bunx swirls doctor
+ */
+
+form reddit_lead_findall {
+  label: "Reddit lead discovery (FindAll)"
+  description: "Describe your ICP and what counts as a qualified thread—Parallel runs a FindAll job across the public web (including Reddit) and returns structured candidates."
+  enabled: true
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["lead_brief", "match_criterion"],
+      "properties": {
+        "lead_brief": {
+          "type": "string",
+          "title": "Who are you trying to reach?",
+          "description": "Product, ICP, and pain (e.g. solo founders comparing analytics stacks).",
+          "minLength": 12
+        },
+        "communities": {
+          "type": "string",
+          "title": "Subreddits or communities (optional)",
+          "description": "Comma-separated hints, e.g. r/SaaS, r/startups, r/devops"
+        },
+        "match_criterion": {
+          "type": "string",
+          "title": "What makes a post worth replying to?",
+          "description": "Your qualification rule—e.g. OP asks for tool recs, not just rants.",
+          "minLength": 8
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+workflow reddit_lead_findall {
+  label: "Find qualified Reddit-style discussion threads"
+
+  root {
+    type: code
+    label: "Build FindAll objective"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "properties": {
+          "lead_brief": { "type": "string" },
+          "communities": { "type": "string" },
+          "match_criterion": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["topic", "entity_type", "match_criterion"],
+        "properties": {
+          "topic": { "type": "string" },
+          "entity_type": { "type": "string" },
+          "match_criterion": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const input = context.nodes.root.input
+
+      const brief = input.lead_brief?.trim() ?? ""
+      const lead_brief =
+        brief.length >= 12
+          ? brief
+          : "Indie hackers and small-team founders asking for recommendations on billing, usage metering, or Stripe alternatives in startup and SaaS communities"
+
+      const communities = input.communities?.trim() ?? ""
+
+      const matchRaw = input.match_criterion?.trim() ?? ""
+      const match_criterion =
+        matchRaw.length >= 8
+          ? matchRaw
+          : "Original poster is actively seeking product or vendor suggestions (not memes or pure complaints with no ask)"
+
+      const scopeLine = communities
+        ? ` Prioritize discussions in or adjacent to: ${communities}.`
+        : ""
+
+      const topic = `Find public Reddit posts and similar forum threads where people match this lead profile and intent: ${lead_brief}.${scopeLine} Return individual posts or threads (not whole subreddits) that a sales or founder could reply to helpfully.`
+
+      const entity_type = "reddit_post"
+
+      return { topic, entity_type, match_criterion }
+    }
+  }
+
+  node discover {
+    type: parallel
+    label: "FindAll: surface matching posts"
+    operation: findall
+    objective: @ts {
+      return context.nodes.root.output.topic
+    }
+    entityType: @ts {
+      return context.nodes.root.output.entity_type
+    }
+    generator: "base"
+    matchLimit: 10
+    matchConditions: @ts {
+      return [
+        {
+          name: "lead_quality",
+          description: context.nodes.root.output.match_criterion,
+        },
+      ]
+    }
+    pollInterval: 15
+    pollIntervalUnit: "seconds"
+    pollTimeout: 300
+    pollTimeoutUnit: "seconds"
+  }
+
+  flow {
+    root -> discover
+  }
+}
+
+trigger on_reddit_lead_findall {
+  form:reddit_lead_findall -> reddit_lead_findall
+  enabled: true
+}

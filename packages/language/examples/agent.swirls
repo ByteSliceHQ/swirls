@@ -1,0 +1,181 @@
+// Example: webhook → `agent` node with graph-backed tools and role-specific tool sets.
+//
+// Requires OPENROUTER_API_KEY (see `secrets` → `svc` mapping). Tools are trivial code graphs
+// with graph `description` + root JSON `inputSchema`, as required for LLM tools.
+
+secret svc {
+  label: "Vendor keys"
+  vars: [ OPENROUTER_API_KEY ]
+}
+
+agent concierge {
+  label: "Concierge"
+  secrets: svc
+  provider: openrouter
+  model: "openai/gpt-4o-mini"
+  maxSteps: 8
+  system: @ts {
+    return "You help format user requests. Prefer tools over guessing.";
+  }
+  tools: [ tool_fetch_stub, tool_transform_stub ]
+
+  profile analyst {
+    description: "Narrow tooling: transform only."
+    tools: [ tool_transform_stub ]
+    system: @ts {
+      return "Act as an analyst — keep intermediate reasoning short.";
+    }
+  }
+}
+
+/* Tool subgraph: fake fetch — maps URL → placeholder body text. */
+workflow tool_fetch_stub {
+  label: "Fetch stub tool"
+  description: "Loads placeholder content representing a fetched URL."
+
+  root {
+    type: code
+    label: "Fetch stub"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["body"],
+        "properties": {
+          "body": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const url = context.nodes.root.input.url ?? ""
+      return { body: `stub-fetch:${url}` }
+    }
+  }
+}
+
+/* Tool subgraph: text transform demo. */
+workflow tool_transform_stub {
+  label: "Transform stub tool"
+  description: "Normalizes whitespace and uppercases a short text snippet."
+
+  root {
+    type: code
+    label: "Transform stub"
+    inputSchema: @json {
+      {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    outputSchema: @json {
+      {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+    code: @ts {
+      const t = context.nodes.root.input.text ?? ""
+      return { text: t.trim().toUpperCase() }
+    }
+  }
+}
+
+schema inbound_url {
+  label: "Inbound URL demo"
+  schema: @json {
+    {
+      "type": "object",
+      "required": ["hint"],
+      "properties": {
+        "hint": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
+
+webhook ingest_default {
+  label: "Agent demo (both tools)"
+  enabled: true
+  schema: inbound_url
+}
+
+webhook ingest_analyst {
+  label: "Agent demo (analyst role)"
+  enabled: true
+  schema: inbound_url
+}
+
+/* Default persona: inherits full agent tools list (fetch + transform). */
+workflow demo_agent_open {
+  label: "Open agent persona"
+
+  root {
+    type: agent
+    label: "Orchestrator"
+    agent: concierge
+    inputSchema: inbound_url
+    prompt: @ts {
+      const i = context.nodes.root.input
+      const url = typeof i.url === "string" && i.url.trim() !== "" ? i.url : "https://example.com"
+      return [
+        `User hint: ${i.hint ?? ""}`,
+        `Call fetch tool for "${url}", then summarize for the operator.`,
+      ].join("\n")
+    }
+  }
+}
+
+/* Analyst persona: role narrows usable tools down to transform only (see `role analyst`). */
+workflow demo_agent_analyst_role {
+  label: "Analyst-role agent"
+
+  root {
+    type: agent
+    label: "Analyst orchestrator"
+    agent: concierge
+    profile: analyst
+    inputSchema: inbound_url
+    prompt: @ts {
+      const hint = context.nodes.root.input.hint ?? ""
+      return (
+        `Analyst persona. User hint: ${hint}. Use transform tool once on "${hint}".`
+      )
+    }
+  }
+}
+
+channel web_concierge {
+  label: "Concierge (Web)"
+  platform: web
+  agent: concierge
+  enabled: true
+  mode: dm
+}
+
+trigger on_demo_default {
+  webhook:ingest_default -> demo_agent_open
+}
+
+trigger on_demo_analyst {
+  webhook:ingest_analyst -> demo_agent_analyst_role
+}
