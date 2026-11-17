@@ -1007,7 +1007,11 @@ function serializeSubgraphBody(sg: NonNullable<NodeDecl['subgraph']>): string {
   const nest = '    '
   const parts: string[] = [`${nest}subgraph {`]
   for (const node of sg.nodes) {
-    const block = node.isRoot ? serializeRoot(node) : serializeNode(node)
+    const block = withDoc(
+      node,
+      node.isRoot ? serializeRoot(node) : serializeNode(node),
+      '  ',
+    )
     const indented = block
       .split('\n')
       .map((line) =>
@@ -1471,7 +1475,9 @@ function serializeWorkflow(w: WorkflowDecl): string {
   }
 
   for (const n of w.nodes) {
-    lines.push(n.isRoot ? serializeRoot(n) : serializeNode(n))
+    lines.push(
+      withDoc(n, n.isRoot ? serializeRoot(n) : serializeNode(n), '  '),
+    )
   }
 
   if (w.edges.length > 0) {
@@ -1906,6 +1912,26 @@ function serializePlaybook(p: PlaybookDecl): string {
   return `${lines.join('\n')}\n`
 }
 
+/**
+ * The `/** … *\/` comment written above a block. The AST keeps its text
+ * without the delimiters.
+ */
+function docCommentFor(decl: object, indent: string): string {
+  const doc =
+    'docComment' in decl && typeof decl.docComment === 'string'
+      ? decl.docComment
+      : ''
+  if (doc === '') {
+    return ''
+  }
+  const close = doc.includes('\n') ? `\n${indent} */` : ' */'
+  return `${indent}/*${doc}${close}\n`
+}
+
+function withDoc(decl: object, text: string, indent = ''): string {
+  return docCommentFor(decl, indent) + text
+}
+
 export function serialize(ast: SwirlsFile): string {
   const parts: string[] = []
 
@@ -1914,127 +1940,128 @@ export function serialize(ast: SwirlsFile): string {
   }
 
   for (const sch of ast.schemas ?? []) {
-    parts.push(serializeSchemaDecl(sch))
+    parts.push(withDoc(sch, serializeSchemaDecl(sch)))
   }
 
   for (const f of ast.forms) {
-    parts.push(serializeForm(f))
+    parts.push(withDoc(f, serializeForm(f)))
   }
 
   for (const w of ast.webhooks) {
-    parts.push(serializeWebhook(w))
+    parts.push(withDoc(w, serializeWebhook(w)))
   }
 
   for (const s of ast.schedules) {
-    parts.push(serializeSchedule(s))
+    parts.push(withDoc(s, serializeSchedule(s)))
   }
 
   for (const sec of ast.secrets ?? []) {
-    parts.push(serializeSecrets(sec))
+    parts.push(withDoc(sec, serializeSecrets(sec)))
   }
 
   for (const a of ast.auths ?? []) {
-    parts.push(serializeAuth(a))
+    parts.push(withDoc(a, serializeAuth(a)))
   }
 
   for (const c of ast.connections ?? []) {
-    parts.push(serializeConnection(c))
+    parts.push(withDoc(c, serializeConnection(c)))
   }
 
   for (const c of ast.connector ?? []) {
-    parts.push(serializeConnector(c))
+    parts.push(withDoc(c, serializeConnector(c)))
   }
 
   for (const a of ast.actions ?? []) {
-    parts.push(serializeAction(a))
+    parts.push(withDoc(a, serializeAction(a)))
   }
 
   for (const r of ast.postgres ?? []) {
-    parts.push(serializePostgres(r))
+    parts.push(withDoc(r, serializePostgres(r)))
   }
 
   for (const d of ast.databases ?? []) {
-    parts.push(serializeDatabase(d))
+    parts.push(withDoc(d, serializeDatabase(d)))
   }
 
   for (const m of ast.migrations ?? []) {
-    parts.push(serializeMigration(m))
+    parts.push(withDoc(m, serializeMigration(m)))
   }
 
   for (const r of ast.disk ?? []) {
-    parts.push(serializeDisk(r))
+    parts.push(withDoc(r, serializeDisk(r)))
   }
 
   for (const computer of ast.computer ?? []) {
-    parts.push(serializeComputer(computer))
+    parts.push(withDoc(computer, serializeComputer(computer)))
   }
 
   for (const operation of ast.operations ?? []) {
-    parts.push(serializeOperation(operation))
+    parts.push(withDoc(operation, serializeOperation(operation)))
   }
 
   for (const s of ast.skill ?? []) {
-    parts.push(serializeSkill(s))
+    parts.push(withDoc(s, serializeSkill(s)))
   }
 
   for (const r of ast.agent ?? []) {
-    parts.push(serializeAgent(r))
+    parts.push(withDoc(r, serializeAgent(r)))
   }
 
   for (const m of ast.mcp ?? []) {
-    parts.push(serializeMcp(m))
+    parts.push(withDoc(m, serializeMcp(m)))
   }
 
   for (const network of ast.networks ?? []) {
-    parts.push(serializeNetwork(network))
+    parts.push(withDoc(network, serializeNetwork(network)))
   }
 
   for (const ch of ast.channels ?? []) {
-    parts.push(serializeChannel(ch))
+    parts.push(withDoc(ch, serializeChannel(ch)))
   }
 
   for (const q of ast.queries ?? []) {
-    parts.push(serializeQuery(q))
+    parts.push(withDoc(q, serializeQuery(q)))
   }
 
   for (const g of ast.workflows) {
-    parts.push(serializeWorkflow(g))
+    parts.push(withDoc(g, serializeWorkflow(g)))
   }
 
   for (const st of ast.streams ?? []) {
-    parts.push(serializeStream(st))
+    parts.push(withDoc(st, serializeStream(st)))
   }
 
   for (const v of ast.views ?? []) {
-    parts.push(serializeView(v))
+    parts.push(withDoc(v, serializeView(v)))
   }
 
   for (const t of ast.triggers) {
-    parts.push(serializeTrigger(t))
+    parts.push(withDoc(t, serializeTrigger(t)))
   }
 
   for (const role of ast.roles ?? []) {
-    parts.push(serializeRole(role))
+    parts.push(withDoc(role, serializeRole(role)))
   }
 
   for (const p of ast.policies ?? []) {
-    parts.push(serializePolicy(p))
+    parts.push(withDoc(p, serializePolicy(p)))
   }
 
   for (const a of ast.apps ?? []) {
-    parts.push(serializeApp(a))
+    parts.push(withDoc(a, serializeApp(a)))
   }
 
   for (const m of ast.mocks ?? []) {
-    parts.push(serializeMock(m))
+    parts.push(withDoc(m, serializeMock(m)))
   }
 
   for (const p of ast.playbooks ?? []) {
-    parts.push(serializePlaybook(p))
+    parts.push(withDoc(p, serializePlaybook(p)))
   }
 
   for (const d of ast.decisions ?? []) {
     parts.push(
+      docCommentFor(d, '') +
       `decision ${d.name} {\n${Object.entries(d.fields)
         .map(
           ([k, v]) =>

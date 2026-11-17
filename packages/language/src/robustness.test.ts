@@ -137,4 +137,15 @@ describe('serialize is stable', () => {
     expect(once).toContain('      return `line one\n  line two`\n')
     expect(serialize(parse(once).ast)).toBe(once)
   })
+
+  test('doc comments on blocks and nodes are written back', () => {
+    const source =
+      '/**\n * Intake form\n */\nform f {\n  label: "F"\n}\n\nworkflow w {\n  label: "W"\n  /** entry */\n  root {\n    type: code\n    label: "root"\n    code: @ts { return 1 }\n  }\n}\n'
+    const once = serialize(parse(source).ast)
+    expect(once).toContain('/**\n * Intake form\n */\nform f {')
+    expect(once).toContain('  /** entry */\n  root {')
+    const again = parse(once)
+    expect(again.ast.forms[0]?.docComment).toBe(parse(source).ast.forms[0]?.docComment)
+    expect(serialize(again.ast)).toBe(once)
+  })
 })
