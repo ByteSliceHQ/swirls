@@ -1,0 +1,48 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install
+        run: bun install --frozen-lockfile
+      # With changesets waiting, this opens or updates the version pull request and stops.
+      - name: Open or update the version pull request
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: bun run version-packages
+          title: 'chore(release): version the VS Code extension'
+          commit: 'chore(release): version the VS Code extension'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # With none waiting, the version on main is the one to ship, unless its tag already exists.
+      - name: Publish the VS Code extension
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: bun run release:extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

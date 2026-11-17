@@ -20,22 +20,29 @@
   "type": "module",
   "scripts": {
     "build": "bun run --filter '@swirls/lsp' build && bun run --filter 'vscode-swirls' build",
-    "typecheck": "bun run --filter '*' typecheck",
+    "typecheck": "bun run --filter '*' typecheck && tsc -p scripts/tsconfig.json",
     "test": "bun run --filter '*' test",
     "test:grammar": "cd editors/tree-sitter-swirls && npm test",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "lint": "oxlint . --deny-warnings && bun run lint:deprecated",
     "lint:deprecated": "oxlint packages editors/vscode --type-aware -A all -D typescript/no-deprecated",
-    "verify": "bun run typecheck && bun run test && bun run lint && bun run fmt:check"
+    "verify": "bun run typecheck && bun run test && bun run lint && bun run fmt:check",
+    "changeset": "changeset",
+    "check:changeset": "bun run scripts/check-changeset.ts",
+    "version-packages": "changeset version && bun install --lockfile-only && oxfmt editors/vscode/CHANGELOG.md editors/vscode/package.json",
+    "release:extension": "bun run scripts/release-extension.ts"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.8",
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
     "@stylistic/eslint-plugin": "5.10.0",
+    "@types/bun": "catalog:",
     "oxfmt": "0.67.0",
     "oxlint": "1.81.0",
-    "oxlint-tsgolint": "^7.0.2007"
+    "oxlint-tsgolint": "^7.0.2007",
+    "typescript": "catalog:"
   },
   "engines": {
     "bun": ">=1.3.0"

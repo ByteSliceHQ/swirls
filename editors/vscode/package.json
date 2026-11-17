@@ -2,6 +2,7 @@
   "name": "vscode-swirls",
   "displayName": "Swirls",
   "version": "0.0.115",
+  "private": true,
   "description": "Syntax highlighting and language support for .swirls files",
   "categories": [
     "Programming Languages"
@@ -29,8 +30,7 @@
     "publish:vsce": "vsce publish --packagePath dist/*.vsix --pat $VSCE_PAT",
     "publish:ovsx": "ovsx publish dist/*.vsix --pat $OVSX_PAT",
     "publish": "bun run package && bun run publish:vsce && bun run publish:ovsx",
-    "version": "bun run scripts/version.ts",
-    "typecheck": "tsc -p . --noEmit && tsc -p scripts/tsconfig.json --noEmit",
+    "typecheck": "tsc -p . --noEmit",
     "test": "true"
   },
   "dependencies": {

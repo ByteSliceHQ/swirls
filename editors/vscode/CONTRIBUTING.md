@@ -28,4 +28,4 @@ How to run the extension from this repository, so changes to `packages/lsp` or `
 
 ## Release
 
-`bun run version [patch|minor|major]` in `editors/vscode` bumps the extension version, commits and creates a `vscode-v*` tag. Run it on `main` with a clean working tree. Publishing is manual for now: `bun run publish` in `editors/vscode`, with `VSCE_PAT` and `OVSX_PAT` set.
+Releases go through Changesets and the `release` workflow. See [RELEASE.md](../../RELEASE.md).

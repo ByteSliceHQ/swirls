@@ -32,6 +32,16 @@ Commit messages and pull request titles follow [Conventional Commits](https://ww
 bun x commitlint --from origin/main --to HEAD --verbose
 ```
 
+## Changesets
+
+A change that someone using the VS Code extension can notice needs a changeset:
+
+```bash
+bun run changeset
+```
+
+CI fails a pull request that changes extension, language server, language or definition source without one. Use the `skip-changeset` label when users will not notice the change. [RELEASE.md](./RELEASE.md) describes how a release is cut.
+
 ## Editor extension
 
 See [`editors/vscode/CONTRIBUTING.md`](./editors/vscode/CONTRIBUTING.md) for running the VS Code extension from this repository.
