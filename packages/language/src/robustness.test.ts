@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { parse } from './parser'
 import { serialize } from './serializer'
+import { collectSwirlsFiles } from './workspace/collect'
 
 const FORM_B = 'form b {\n  label: "B"\n}\n'
 
@@ -85,10 +86,7 @@ describe('shipped .swirls files parse cleanly', () => {
     path.join(import.meta.dir, '../../../cookbook'),
   ]
   const files = roots.flatMap((root) =>
-    fs
-      .readdirSync(root, { recursive: true, encoding: 'utf8' })
-      .filter((f) => f.endsWith('.swirls') && !f.endsWith('.ts.swirls'))
-      .map((f) => path.join(root, f)),
+    collectSwirlsFiles({ cwd: root }).map((f) => path.join(root, f)),
   )
   test(`${files.length} files`, () => {
     expect(files.length).toBeGreaterThan(50)
