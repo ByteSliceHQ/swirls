@@ -1,7 +1,7 @@
 {
   "name": "vscode-swirls",
   "displayName": "Swirls",
-  "version": "0.0.115",
+  "version": "0.1.0",
   "private": true,
   "description": "Syntax highlighting and language support for .swirls files",
   "categories": [
