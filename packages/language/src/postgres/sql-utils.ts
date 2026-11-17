@@ -19,31 +19,40 @@ export const INSERT_COLUMNS_BEFORE_VALUES_RE =
 export function extractTablesFromSql(sql: string): string[] {
   const tables: string[] = []
   const insert = sql.match(/\bINSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)/i)
+
   if (insert) {
     tables.push(insert[1]!)
   }
+
   const update = sql.match(/^\s*UPDATE\s+(?:ONLY\s+)?([a-zA-Z_][a-zA-Z0-9_]*)/i)
+
   if (update) {
     tables.push(update[1]!)
   }
+
   const from = sql.match(/\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)/i)
+
   if (from) {
     tables.push(from[1]!)
   }
+
   return tables
 }
 
 /** Parses `INSERT INTO t (a, b) VALUES` column names; null if no explicit list. */
 export function parseInsertExplicitColumns(sql: string): string[] | null {
   const m = INSERT_COLUMNS_BEFORE_VALUES_RE.exec(sql)
+
   if (!m) {
     return null
   }
+
   const cols =
     m[1]
       ?.split(',')
       .map((c) => c.trim().split(/\s+/).pop() ?? c.trim())
       .filter((c) => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c)) ?? []
+
   return cols.length > 0 ? cols : null
 }
 
@@ -55,14 +64,17 @@ export function parseInsertExplicitColumns(sql: string): string[] | null {
  */
 export function parseUpdateSetColumns(sql: string): string[] | null {
   const m = /\bSET\b([\s\S]*?)(?:\bWHERE\b|\bFROM\b|\bRETURNING\b|$)/i.exec(sql)
+
   if (!m) {
     return null
   }
+
   const cols =
     m[1]
       ?.split(',')
       .map((fragment) => /^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=/.exec(fragment)?.[1])
       .filter((c): c is string => c !== undefined) ?? []
+
   return cols.length > 0 ? cols : null
 }
 
@@ -77,12 +89,16 @@ export function sqlHasWhereClause(sql: string): boolean {
  */
 export function insertValuesRowOpensWithParen(sql: string): boolean {
   const m = /\bVALUES\b/i.exec(sql)
+
   if (!m) {
     return true
   }
+
   let i = m.index + m[0].length
+
   while (i < sql.length && /\s/.test(sql[i]!)) {
     i++
   }
+
   return i < sql.length && sql[i] === '('
 }

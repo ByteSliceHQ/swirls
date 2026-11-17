@@ -1,26 +1,51 @@
 {
   "name": "vscode-swirls",
   "displayName": "Swirls",
-  "description": "Syntax highlighting and language support for .swirls files",
   "version": "0.0.115",
-  "publisher": "swirlsai",
+  "description": "Syntax highlighting and language support for .swirls files",
+  "categories": [
+    "Programming Languages"
+  ],
+  "homepage": "https://github.com/ByteSliceHQ/swirls/blob/main/editors/vscode/README.md",
+  "bugs": {
+    "url": "https://github.com/ByteSliceHQ/swirls/issues"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/ByteSliceHQ/swirls",
     "directory": "editors/vscode"
   },
-  "homepage": "https://github.com/ByteSliceHQ/swirls/blob/main/editors/vscode/README.md",
-  "bugs": {
-    "url": "https://github.com/ByteSliceHQ/swirls/issues"
-  },
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "categories": [
-    "Programming Languages"
-  ],
+  "publisher": "swirlsai",
   "main": "./out/extension.js",
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -p . -w",
+    "build:server": "mkdir -p server && cp ../../packages/lsp/dist/server.js server/ && cp ../../packages/lsp/dist/prisma_schema_build_bg.wasm server/ && rm -rf server/typescript-lib && mkdir -p server/typescript-lib && cp -L node_modules/typescript/lib/lib*.d.ts server/typescript-lib/",
+    "build:client": "node esbuild.mjs",
+    "build": "bun run build:server && bun run build:client",
+    "package:vsix": "mkdir -p dist && rm -f dist/*.vsix && vsce package --no-dependencies --out dist",
+    "package": "bun run build && bun run package:vsix",
+    "publish:vsce": "vsce publish --packagePath dist/*.vsix --pat $VSCE_PAT",
+    "publish:ovsx": "ovsx publish dist/*.vsix --pat $OVSX_PAT",
+    "publish": "bun run package && bun run publish:vsce && bun run publish:ovsx",
+    "version": "bun run scripts/version.ts",
+    "typecheck": "tsc -p . --noEmit && tsc -p scripts/tsconfig.json --noEmit",
+    "test": "true"
+  },
+  "dependencies": {
+    "@swirls/lsp": "workspace:*",
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/node": "20.0.0",
+    "@types/vscode": "1.85.0",
+    "@vscode/vsce": "3.7.1",
+    "esbuild": "0.24.0",
+    "ovsx": "0.10.9",
+    "typescript": "catalog:"
+  },
   "contributes": {
     "languages": [
       {
@@ -63,32 +88,7 @@
       }
     ]
   },
-  "scripts": {
-    "compile": "tsc -p .",
-    "watch": "tsc -p . -w",
-    "build:server": "mkdir -p server && cp ../../packages/lsp/dist/server.js server/ && cp ../../packages/lsp/dist/prisma_schema_build_bg.wasm server/ && rm -rf server/typescript-lib && mkdir -p server/typescript-lib && cp -L node_modules/typescript/lib/lib*.d.ts server/typescript-lib/",
-    "build:client": "node esbuild.mjs",
-    "build": "bun run build:server && bun run build:client",
-    "package:vsix": "mkdir -p dist && rm -f dist/*.vsix && vsce package --no-dependencies --out dist",
-    "package": "bun run build && bun run package:vsix",
-    "publish:vsce": "vsce publish --packagePath dist/*.vsix --pat $VSCE_PAT",
-    "publish:ovsx": "ovsx publish dist/*.vsix --pat $OVSX_PAT",
-    "publish": "bun run package && bun run publish:vsce && bun run publish:ovsx",
-    "version": "bun run scripts/version.ts",
-    "typecheck": "tsc -p . --noEmit && tsc -p scripts/tsconfig.json --noEmit",
-    "test": "true"
-  },
-  "devDependencies": {
-    "@types/bun": "catalog:",
-    "@types/node": "20.0.0",
-    "@types/vscode": "1.85.0",
-    "@vscode/vsce": "3.7.1",
-    "esbuild": "0.24.0",
-    "ovsx": "0.10.9",
-    "typescript": "catalog:"
-  },
-  "dependencies": {
-    "@swirls/lsp": "workspace:*",
-    "vscode-languageclient": "9.0.1"
+  "engines": {
+    "vscode": "^1.85.0"
   }
 }

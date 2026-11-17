@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+
 import { parse } from '@swirls/language'
+
 import {
   blockDiagnosticsStats,
   clearBlockDiagnosticsCache,
@@ -13,9 +15,7 @@ function diagnose(source: string) {
   expect(errors).toEqual([])
   const blocks = collectTsBlocks(ast)
   const virtual = getVirtualDiagnostics(blocks.map(buildVirtualTsContent))
-  return blocks.flatMap((block, i) =>
-    toDocumentDiagnostics(block, virtual[i] ?? []),
-  )
+  return blocks.flatMap((block, i) => toDocumentDiagnostics(block, virtual[i] ?? []))
 }
 
 const workflow = (body: string) =>
@@ -34,9 +34,7 @@ describe('@ts block diagnostics', () => {
     const d = diags.find((x) => x.message.includes('nope1'))
     expect(d).toBeDefined()
     const line = source.split('\n')[d!.range.start.line] ?? ''
-    expect(line.slice(d!.range.start.character, d!.range.end.character)).toBe(
-      'nope1',
-    )
+    expect(line.slice(d!.range.start.character, d!.range.end.character)).toBe('nope1')
   })
 
   test('a diagnostic in a multi-line block lands on the offending token', () => {
@@ -44,9 +42,7 @@ describe('@ts block diagnostics', () => {
     const d = diagnose(source).find((x) => x.message.includes('nope2'))
     expect(d).toBeDefined()
     const line = source.split('\n')[d!.range.start.line] ?? ''
-    expect(line.slice(d!.range.start.character, d!.range.end.character)).toBe(
-      'nope2',
-    )
+    expect(line.slice(d!.range.start.character, d!.range.end.character)).toBe('nope2')
   })
 
   test('TypeScript syntax errors are reported', () => {

@@ -8,15 +8,11 @@
  */
 
 import type { AppBrandTokenKey } from '@swirls/definition/app-brand-tokens'
+
 import type { SourceRange } from '../ast'
 
 /** Shell presets shipped in Phase 0. */
-export const APP_SHELL_PRESETS = [
-  'sidebar',
-  'topnav',
-  'chat',
-  'canvas',
-] as const
+export const APP_SHELL_PRESETS = ['sidebar', 'topnav', 'chat', 'canvas'] as const
 
 export type AppShellPreset = (typeof APP_SHELL_PRESETS)[number]
 
@@ -74,9 +70,7 @@ export interface AppBrandTokenEntry {
   range: SourceRange
 }
 
-export type AppBrandTokenMap = Partial<
-  Record<AppBrandTokenKey, AppBrandTokenEntry>
->
+export type AppBrandTokenMap = Partial<Record<AppBrandTokenKey, AppBrandTokenEntry>>
 
 export interface AppBrandTokens {
   light?: AppBrandTokenMap

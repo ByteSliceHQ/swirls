@@ -1,16 +1,11 @@
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import {
-  resolveTsRefFullPath,
-  type SourceRange,
-} from '@swirls/language'
-import { parse } from './parse-cache'
-import type {
-  DocumentLink,
-  Location,
-  Position,
-  Range,
-} from 'vscode-languageserver'
+
+import type { DocumentLink, Location, Position, Range } from 'vscode-languageserver'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
+
+import { resolveTsRefFullPath, type SourceRange } from '@swirls/language'
+
+import { parse } from './parse-cache'
 import { isDslSwirlsUri } from './ts-bindings'
 import { positionInRange } from './ts-service/virtual-docs'
 
@@ -39,6 +34,7 @@ export function getTsFileRefDefinition(
   const result = parse(document.getText())
 
   let parentPath: string
+
   try {
     parentPath = fileURLToPath(uri)
   } catch {
@@ -54,9 +50,11 @@ export function getTsFileRefDefinition(
         if (cv.kind !== 'ts_file_ref') {
           continue
         }
+
         if (!positionInRange(line, character, cv.range)) {
           continue
         }
+
         const abs = resolveTsRefFullPath(parentPath, cv.path.trim())
         const href = pathToFileURL(abs).href
         return {
@@ -76,9 +74,11 @@ export function getTsFileRefDefinition(
         if (cv?.kind !== 'ts_file_ref') {
           continue
         }
+
         if (!positionInRange(line, character, cv.range)) {
           continue
         }
+
         const abs = resolveTsRefFullPath(parentPath, cv.path.trim())
         const href = pathToFileURL(abs).href
         return {
@@ -98,10 +98,7 @@ export function getTsFileRefDefinition(
 /**
  * Document links for every `@ts "path.ts.swirls"` in the file (node config, stream condition/prepare).
  */
-export function getTsFileRefDocumentLinks(
-  document: TextDocument,
-  uri: string,
-): DocumentLink[] {
+export function getTsFileRefDocumentLinks(document: TextDocument, uri: string): DocumentLink[] {
   if (!isDslSwirlsUri(uri)) {
     return []
   }
@@ -109,6 +106,7 @@ export function getTsFileRefDocumentLinks(
   const result = parse(document.getText())
 
   let parentPath: string
+
   try {
     parentPath = fileURLToPath(uri)
   } catch {
@@ -123,7 +121,9 @@ export function getTsFileRefDocumentLinks(
         if (cv.kind !== 'ts_file_ref') {
           continue
         }
+
         const abs = resolveTsRefFullPath(parentPath, cv.path.trim())
+
         links.push({
           range: sourceRangeToLspRange(cv.range),
           target: pathToFileURL(abs).href,
@@ -138,7 +138,9 @@ export function getTsFileRefDocumentLinks(
         if (cv?.kind !== 'ts_file_ref') {
           continue
         }
+
         const abs = resolveTsRefFullPath(parentPath, cv.path.trim())
+
         links.push({
           range: sourceRangeToLspRange(cv.range),
           target: pathToFileURL(abs).href,

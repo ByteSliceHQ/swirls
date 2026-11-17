@@ -5,6 +5,7 @@
 import { getLanguageService } from 'vscode-json-languageservice'
 import type { Diagnostic } from 'vscode-languageserver'
 import { TextDocument } from 'vscode-languageserver-textdocument'
+
 import type { JsonBlockInfo } from '../ts-service/virtual-docs'
 import { jsonVirtualToOriginal } from '../ts-service/virtual-docs'
 
@@ -39,21 +40,14 @@ export async function getJsonBlockDiagnostics(
 
   return diagnostics.map((diagnostic) => ({
     ...diagnostic,
-    message:
-      typeof diagnostic.message === 'string'
-        ? diagnostic.message
-        : diagnostic.message.value,
+    message: typeof diagnostic.message === 'string' ? diagnostic.message : diagnostic.message.value,
     range: {
       start: jsonVirtualToOriginal(
         block,
         diagnostic.range.start.line,
         diagnostic.range.start.character,
       ),
-      end: jsonVirtualToOriginal(
-        block,
-        diagnostic.range.end.line,
-        diagnostic.range.end.character,
-      ),
+      end: jsonVirtualToOriginal(block, diagnostic.range.end.line, diagnostic.range.end.character),
     },
   }))
 }

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 
 describe('mcp block parser', () => {
@@ -11,9 +12,11 @@ mcp axiom_observability {
   auth: static
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.mcp).toHaveLength(1)
+
     expect(ast.mcp[0]).toMatchObject({
       name: 'axiom_observability',
       label: 'Axiom',
@@ -30,6 +33,7 @@ mcp axiom_observability {
   auth: interactive
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.mcp[0]?.url).toBe('https://mcp.axiom.co/mcp')
@@ -43,6 +47,7 @@ mcp bare {
   auth: static
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.mcp).toHaveLength(1)
@@ -56,11 +61,10 @@ mcp bad {
   foo: "bar"
 }
 `
+
     const { ast, errors } = parse(src)
     expect(ast.mcp).toHaveLength(1)
-    expect(errors.some((e) => e.message.includes('Unknown mcp property'))).toBe(
-      true,
-    )
+    expect(errors.some((e) => e.message.includes('Unknown mcp property'))).toBe(true)
   })
 
   test('rejects provider key (catalog deferred)', () => {
@@ -71,10 +75,9 @@ mcp axiom {
   auth: interactive
 }
 `
+
     const { errors } = parse(src)
-    expect(
-      errors.some((e) => e.message.includes('Unknown mcp property "provider"')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('Unknown mcp property "provider"'))).toBe(true)
   })
 
   test('flags duplicate property within a block', () => {
@@ -86,10 +89,9 @@ mcp dupe {
   label: "Two"
 }
 `
+
     const { errors } = parse(src)
-    expect(
-      errors.some((e) => e.message.includes('Duplicate mcp property')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('Duplicate mcp property'))).toBe(true)
   })
 
   test('captures the doc comment above the block', () => {
@@ -101,6 +103,7 @@ mcp axiom {
   auth: static
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.mcp[0]?.docComment).toContain('Observability MCP')

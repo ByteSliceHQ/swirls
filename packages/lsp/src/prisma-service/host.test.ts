@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '@swirls/language'
+
 import { collectPrismaBlocks, findPrismaBlockAtPosition } from './blocks'
 import {
   getPrismaBlockCompletions,
@@ -62,9 +64,11 @@ describe('collectPrismaBlocks', () => {
 describe('position mapping', () => {
   test('round-trips a position through virtual coords', () => {
     const block = blocksFor(VALID_SOURCE)[0]
+
     if (!block) {
       throw new Error('expected a prisma block')
     }
+
     const virt = prismaOriginalToVirtual(block, 3, 12)
     const back = prismaVirtualToOriginal(block, virt.line, virt.character)
     expect(back).toEqual({ line: 3, character: 12 })
@@ -72,9 +76,11 @@ describe('position mapping', () => {
 
   test('clamps header positions to the island start', () => {
     const block = blocksFor(VALID_SOURCE)[0]
+
     if (!block) {
       throw new Error('expected a prisma block')
     }
+
     const clamped = prismaVirtualToOriginal(block, 0, 5)
     expect(clamped.line).toBe(block.contentRange.start.line - 1)
   })
@@ -83,17 +89,21 @@ describe('position mapping', () => {
 describe('getPrismaBlockDiagnostics', () => {
   test('valid island has no diagnostics', () => {
     const block = blocksFor(VALID_SOURCE)[0]
+
     if (!block) {
       throw new Error('expected a prisma block')
     }
+
     expect(getPrismaBlockDiagnostics(block)).toHaveLength(0)
   })
 
   test('unknown type is flagged at the .swirls position', () => {
     const block = blocksFor(BROKEN_SOURCE)[0]
+
     if (!block) {
       throw new Error('expected a prisma block')
     }
+
     const diags = getPrismaBlockDiagnostics(block)
     expect(diags.length).toBeGreaterThan(0)
     const diag = diags[0]
@@ -104,6 +114,7 @@ describe('getPrismaBlockDiagnostics', () => {
     const lines = BROKEN_SOURCE.split('\n')
     const col = diag?.range.start.character
     expect(col).toBeDefined()
+
     if (col !== undefined) {
       expect(lines[9]?.slice(col, col + 5)).toBe('Strin')
     }
@@ -113,9 +124,11 @@ describe('getPrismaBlockDiagnostics', () => {
 describe('getPrismaBlockCompletions', () => {
   test('field type position offers scalars and sibling models', () => {
     const block = blocksFor(BROKEN_SOURCE)[0]
+
     if (!block) {
       throw new Error('expected a prisma block')
     }
+
     // End of `Strin` on line 9: `      title    Strin` → character 20.
     const list = getPrismaBlockCompletions(block, { line: 9, character: 20 })
     const labels = (list?.items ?? []).map((i) => i.label)
@@ -125,21 +138,22 @@ describe('getPrismaBlockCompletions', () => {
   })
 
   test('@ triggers attribute completions', () => {
-    const source = VALID_SOURCE.replace(
-      'email String @unique',
-      'email String @',
-    )
+    const source = VALID_SOURCE.replace('email String @unique', 'email String @')
     const block = blocksFor(source)[0]
+
     if (!block) {
       throw new Error('expected a prisma block')
     }
+
     const line = 4
     const character = source.split('\n')[line]?.length ?? 0
+
     const list = getPrismaBlockCompletions(
       block,
       { line, character },
       { triggerKind: 2, triggerCharacter: '@' },
     )
+
     const labels = (list?.items ?? []).map((i) => i.label)
     expect(labels).toContain('@unique')
     expect(labels).toContain('@default')
@@ -149,9 +163,11 @@ describe('getPrismaBlockCompletions', () => {
 describe('getPrismaBlockHover', () => {
   test('hover over a relation type resolves the model', () => {
     const block = blocksFor(VALID_SOURCE)[0]
+
     if (!block) {
       throw new Error('expected a prisma block')
     }
+
     // `posts Post[]` on 0-based line 5; `Post` starts at character 12.
     const hover = getPrismaBlockHover(block, { line: 5, character: 13 })
     expect(hover).not.toBeNull()
@@ -163,14 +179,12 @@ describe('getPrismaBlockHover', () => {
 describe('getPrismaBlockDefinition', () => {
   test('go-to-definition on a relation type lands on the model decl', () => {
     const block = blocksFor(VALID_SOURCE)[0]
+
     if (!block) {
       throw new Error('expected a prisma block')
     }
-    const defs = getPrismaBlockDefinition(
-      block,
-      { line: 5, character: 13 },
-      'file:///test.swirls',
-    )
+
+    const defs = getPrismaBlockDefinition(block, { line: 5, character: 13 }, 'file:///test.swirls')
     expect(defs).not.toBeNull()
     expect(defs?.[0]?.uri).toBe('file:///test.swirls')
     // `model Post {` is on 0-based line 7.

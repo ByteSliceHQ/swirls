@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { createLanguageServiceFromMap } from './host'
 import {
   type DbClientScopeKind,
@@ -45,10 +46,13 @@ function diagnose(
   databases: DbSchemaInput[] = [APP_DB],
 ): { count: number; messages: string[] } {
   const rendered = renderDbContextField(databases, scope)
+
   if (rendered === null) {
     throw new Error('expected non-null rendered client')
   }
+
   const fileName = '__prisma_client_block.ts'
+
   const content = `${rendered.declarations}
 declare const db: ${rendered.dbType}
 async function _run() {
@@ -57,17 +61,14 @@ ${usage}
 void _run
 export {}
 `
+
   const map = new Map<string, string>([[fileName, content]])
   const ls = createLanguageServiceFromMap(map)
-  const errors = ls
-    .getSemanticDiagnostics(fileName)
-    .filter((d) => d.category === 1)
+  const errors = ls.getSemanticDiagnostics(fileName).filter((d) => d.category === 1)
   return {
     count: errors.length,
     messages: errors.map((d) =>
-      typeof d.messageText === 'string'
-        ? d.messageText
-        : d.messageText.messageText,
+      typeof d.messageText === 'string' ? d.messageText : d.messageText.messageText,
     ),
   }
 }
@@ -81,9 +82,7 @@ describe('renderDbContextField', () => {
     const rendered = renderDbContextField([APP_DB], 'query')
     expect(rendered).not.toBeNull()
     expect(rendered?.dbType).toBe('{ app_db: Db$app_db.ClientQuery }')
-    expect(rendered?.declarations.startsWith('namespace Db$app_db {')).toBe(
-      true,
-    )
+    expect(rendered?.declarations.startsWith('namespace Db$app_db {')).toBe(true)
   })
 
   test('1. valid findMany with where / relation-filter / orderBy / take compiles clean (code scope)', () => {
@@ -95,6 +94,7 @@ describe('renderDbContextField', () => {
       })`,
       'code',
     )
+
     expect(result.messages).toEqual([])
     expect(result.count).toBe(0)
   })
@@ -106,6 +106,7 @@ describe('renderDbContextField', () => {
        void e`,
       'code',
     )
+
     expect(ok.count).toBe(0)
 
     const bad = diagnose(
@@ -114,6 +115,7 @@ describe('renderDbContextField', () => {
        void i`,
       'code',
     )
+
     expect(bad.count).toBeGreaterThan(0)
   })
 
@@ -124,6 +126,7 @@ describe('renderDbContextField', () => {
        void t`,
       'code',
     )
+
     expect(result.messages).toEqual([])
     expect(result.count).toBe(0)
   })
@@ -138,6 +141,7 @@ describe('renderDbContextField', () => {
        void [d, b, dec, av]`,
       'code',
     )
+
     expect(ok.messages).toEqual([])
     expect(ok.count).toBe(0)
 
@@ -147,6 +151,7 @@ describe('renderDbContextField', () => {
        void wrong`,
       'code',
     )
+
     expect(bad.count).toBeGreaterThan(0)
   })
 
@@ -155,12 +160,10 @@ describe('renderDbContextField', () => {
       `await db.app_db.user.create({ data: { email: 'a', balance: '1', views: 1n, role: 'USER' } })`,
       'query',
     )
+
     expect(queryCreate.count).toBeGreaterThan(0)
 
-    const codeTransaction = diagnose(
-      `await db.app_db.$transaction(async () => 1)`,
-      'code',
-    )
+    const codeTransaction = diagnose(`await db.app_db.$transaction(async () => 1)`, 'code')
     expect(codeTransaction.count).toBeGreaterThan(0)
 
     const txReachable = diagnose(
@@ -169,21 +172,16 @@ describe('renderDbContextField', () => {
       })`,
       'transaction',
     )
+
     expect(txReachable.messages).toEqual([])
     expect(txReachable.count).toBe(0)
 
-    const txNoDirectModel = diagnose(
-      `await db.app_db.user.findMany()`,
-      'transaction',
-    )
+    const txNoDirectModel = diagnose(`await db.app_db.user.findMany()`, 'transaction')
     expect(txNoDirectModel.count).toBeGreaterThan(0)
   })
 
   test('6. an invalid where field name is a type error', () => {
-    const result = diagnose(
-      `await db.app_db.user.findMany({ where: { nonexistent: 1 } })`,
-      'code',
-    )
+    const result = diagnose(`await db.app_db.user.findMany({ where: { nonexistent: 1 } })`, 'code')
     expect(result.count).toBeGreaterThan(0)
   })
 
@@ -201,6 +199,7 @@ describe('renderDbContextField', () => {
       name: 'broken_db',
       schemaSource: 'model X { id Strin }',
     }
+
     expect(() => renderDbContextField([APP_DB, broken], 'code')).not.toThrow()
     const rendered = renderDbContextField([APP_DB, broken], 'code')
     expect(rendered).not.toBeNull()
@@ -214,6 +213,7 @@ describe('renderDbContextField', () => {
       'code',
       [APP_DB, broken],
     )
+
     expect(result.messages).toEqual([])
     expect(result.count).toBe(0)
   })
@@ -226,6 +226,7 @@ describe('renderDbContextField', () => {
       name: 'broken_db',
       schemaSource: 'model X { id Strin }',
     }
+
     const rendered = renderDbContextField([broken], 'code')
     expect(rendered).not.toBeNull()
     expect(rendered?.dbType).toContain('broken_db: Db$broken_db.ClientFull')

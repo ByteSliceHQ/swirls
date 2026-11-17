@@ -7,14 +7,14 @@ import { join } from 'node:path'
  */
 async function runWithGuard(code: string) {
   const guardPath = join(import.meta.dir, 'stdio-guard.ts')
-  const proc = Bun.spawn(
-    ['bun', '-e', `await import(${JSON.stringify(guardPath)})\n${code}`],
-    { stdout: 'pipe', stderr: 'pipe' },
-  )
-  const [stdout, stderr] = await Promise.all([
-    Bun.readableStreamToText(proc.stdout),
-    Bun.readableStreamToText(proc.stderr),
-  ])
+
+  const proc = Bun.spawn(['bun', '-e', `await import(${JSON.stringify(guardPath)})\n${code}`], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
+
+  const [stdout, stderr] = await Promise.all([proc.stdout.text(), proc.stderr.text()])
+
   await proc.exited
   return { stdout, stderr }
 }
@@ -24,6 +24,7 @@ describe('stdio-guard', () => {
     const { stdout, stderr } = await runWithGuard(
       `console.log('from log'); console.info('from info'); console.debug('from debug')`,
     )
+
     expect(stdout).toBe('')
     expect(stderr).toContain('from log')
     expect(stderr).toContain('from info')
@@ -31,9 +32,7 @@ describe('stdio-guard', () => {
   })
 
   test('process.stdout writes are untouched so JSON-RPC frames still flow', async () => {
-    const { stdout } = await runWithGuard(
-      `process.stdout.write('Content-Length: 2\\r\\n\\r\\n{}')`,
-    )
+    const { stdout } = await runWithGuard(`process.stdout.write('Content-Length: 2\\r\\n\\r\\n{}')`)
     expect(stdout).toBe('Content-Length: 2\r\n\r\n{}')
   })
 })

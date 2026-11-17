@@ -1,4 +1,5 @@
 import { connectionModePairError } from '@swirls/definition/connection-mode'
+
 import type { Diagnostic, SwirlsFile } from '../ast'
 import { isProviderKey, type LanguageHost } from '../host'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
@@ -12,14 +13,13 @@ function diag(
   return { message, range, severity }
 }
 
-function authNameLookup(
-  ast: SwirlsFile,
-  workspace?: WorkspaceResourceIndex,
-): Set<string> {
+function authNameLookup(ast: SwirlsFile, workspace?: WorkspaceResourceIndex): Set<string> {
   const names = new Set((ast.auths ?? []).map((a) => a.name))
+
   for (const name of workspace?.auths.keys() ?? []) {
     names.add(name)
   }
+
   return names
 }
 
@@ -41,6 +41,7 @@ export function validateConnectionBlocks(
 
   for (const c of connections) {
     const sameName = connections.filter((x) => x.name === c.name)
+
     if (sameName.length > 1) {
       out.push(diag(`Duplicate connection block name "${c.name}"`, c.range))
     }
@@ -57,10 +58,12 @@ export function validateConnectionBlocks(
           c.providerRange ?? c.range,
         ),
       )
+
       continue
     }
 
     const pairError = connectionModePairError(c.name, c.baseUrl, c.authRef)
+
     if (pairError) {
       out.push(diag(pairError, c.baseUrlRange ?? c.authRefRange ?? c.range))
     }
@@ -74,9 +77,11 @@ export function validateConnectionBlocks(
           ),
         )
       }
+
       if (c.baseUrl) {
         try {
           const parsed = new URL(c.baseUrl)
+
           if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
             out.push(
               diag(
@@ -94,6 +99,7 @@ export function validateConnectionBlocks(
           )
         }
       }
+
       continue
     }
 

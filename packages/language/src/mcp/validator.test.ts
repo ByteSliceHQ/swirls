@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { validateAgentMcpRefs, validateMcpBlocks } from './validator'
 
@@ -16,17 +17,17 @@ mcp axiom {
   auth: static
 }
 `
+
     const { ast } = parse(src)
     const diags = validateMcpBlocks(ast)
-    expect(
-      diags.some((d) => d.message.includes('Duplicate mcp block name')),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('Duplicate mcp block name'))).toBe(true)
   })
 
   test('rejects invalid handle format', () => {
     // A hyphenated handle is not a lexable identifier, so exercise the
     // name-format rule against a decl built directly (mirrors connection/skill).
     const { ast } = parse('')
+
     ast.mcp = [
       {
         name: 'bad-name',
@@ -38,6 +39,7 @@ mcp axiom {
         },
       },
     ]
+
     const diags = validateMcpBlocks(ast)
     expect(diags.some((d) => d.message.includes('MCP block name'))).toBe(true)
   })
@@ -50,6 +52,7 @@ mcp axiom_observability {
   auth: static
 }
 `
+
     const { ast } = parse(src)
     expect(validateMcpBlocks(ast)).toEqual([])
   })
@@ -61,6 +64,7 @@ mcp axiom_observability {
   auth: static
 }
 `
+
     const { ast } = parse(src)
     const diags = validateMcpBlocks(ast)
     expect(diags.some((d) => d.message.includes('requires "url"'))).toBe(true)
@@ -72,6 +76,7 @@ mcp axiom_observability {
   url: "https://mcp.example.com/mcp"
 }
 `
+
     const { ast } = parse(src)
     const diags = validateMcpBlocks(ast)
     expect(diags.some((d) => d.message.includes('requires "auth:'))).toBe(true)
@@ -84,6 +89,7 @@ mcp axiom_observability {
   auth: interactive
 }
 `
+
     const { ast } = parse(src)
     const diags = validateMcpBlocks(ast)
     expect(diags.some((d) => d.message.includes('https URL'))).toBe(true)
@@ -99,12 +105,12 @@ agent sre_assistant {
   mcp: [missing_slot]
 }
 `
+
     const { ast } = parse(src)
     const diags = validateAgentMcpRefs(ast)
+
     expect(
-      diags.some((d) =>
-        d.message.includes('references undefined mcp block "missing_slot"'),
-      ),
+      diags.some((d) => d.message.includes('references undefined mcp block "missing_slot"')),
     ).toBe(true)
   })
 
@@ -121,6 +127,7 @@ agent sre_assistant {
   mcp: [axiom_observability]
 }
 `
+
     const { ast } = parse(src)
     expect(validateAgentMcpRefs(ast)).toEqual([])
   })
@@ -147,12 +154,12 @@ agent sre_assistant {
   }
 }
 `
+
     const { ast } = parse(src)
     const diags = validateAgentMcpRefs(ast)
+
     expect(
-      diags.some((d) =>
-        d.message.includes('is not listed on agent "sre_assistant" mcp:'),
-      ),
+      diags.some((d) => d.message.includes('is not listed on agent "sre_assistant" mcp:')),
     ).toBe(true)
   })
 
@@ -173,6 +180,7 @@ agent sre_assistant {
   }
 }
 `
+
     const { ast } = parse(src)
     expect(validateAgentMcpRefs(ast)).toEqual([])
   })

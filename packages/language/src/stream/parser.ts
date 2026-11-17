@@ -2,12 +2,7 @@
  * Parsing functions for stream blocks. Called from the main parser via delegation.
  */
 
-import type {
-  ConfigValue,
-  JsonBlockInfo,
-  JsonSchemaLiteral,
-  SourceRange,
-} from '../ast'
+import type { ConfigValue, JsonBlockInfo, JsonSchemaLiteral, SourceRange } from '../ast'
 import type { Token } from '../lexer'
 import type { ResourceParserDelegate } from '../parser-delegate'
 import type { StreamDecl, StreamVersionDecl } from './ast'
@@ -21,25 +16,26 @@ function rangeFromTokens(start: Token, end: Token): SourceRange {
 
 function parseSchemaTail(
   d: ResourceParserDelegate,
-): Pick<
-  StreamVersionDecl,
-  'schema' | 'schemaBlock' | 'schemaRef' | 'schemaRefRange'
-> {
+): Pick<StreamVersionDecl, 'schema' | 'schemaBlock' | 'schemaRef' | 'schemaRefRange'> {
   let schema: Record<string, unknown> | undefined
   let schemaBlock: JsonBlockInfo | undefined
   let schemaRef: string | undefined
   let schemaRefRange: SourceRange | undefined
 
   const next = d.peek()
+
   if (next?.kind === 'fenced_block' && next.fencedLang === 'json') {
     const tok = d.advance()!
     let parsed: JsonSchemaLiteral = {}
+
     try {
       parsed = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
     } catch {
       d.error('Invalid JSON in schema block', tok)
     }
+
     schema = parsed
+
     if (tok.fencedContentRange) {
       schemaBlock = {
         code: tok.fencedContent ?? '',
@@ -70,6 +66,7 @@ function parseStreamVersionBody(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -80,6 +77,7 @@ function parseStreamVersionBody(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -101,18 +99,22 @@ function parseStreamVersionBody(
     if (key === 'condition') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv) {
         condition = cv
       }
+
       continue
     }
 
     if (key === 'prepare') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv) {
         prepare = cv
       }
+
       continue
     }
 
@@ -120,6 +122,7 @@ function parseStreamVersionBody(
       `Unexpected key "${key}" in stream versions block — only schema, condition, and prepare are allowed`,
       d.peek(),
     )
+
     d.parseValue()
   }
 
@@ -136,6 +139,7 @@ function parseVersionsBlock(d: ResourceParserDelegate): StreamVersionDecl[] {
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -148,10 +152,7 @@ function parseVersionsBlock(d: ResourceParserDelegate): StreamVersionDecl[] {
     const verTok = d.advance()
 
     if (!verTok || verTok.kind !== 'identifier') {
-      d.error(
-        'Expected version key (v1, v2, ...) in versions block',
-        verTok ?? d.peek(),
-      )
+      d.error('Expected version key (v1, v2, ...) in versions block', verTok ?? d.peek())
       d.parseValue()
       continue
     }
@@ -184,10 +185,12 @@ function parseBareVersionPointer(d: ResourceParserDelegate): {
   versionRange: SourceRange
 } | null {
   const valTok = d.advance()
+
   if (!valTok || valTok.kind !== 'identifier') {
     d.error('Expected stream version identifier (e.g. v1)', valTok ?? d.peek())
     return null
   }
+
   return {
     version: valTok.value as string,
     versionRange: { ...valTok.range },
@@ -199,11 +202,13 @@ export function parseStreamBlock(
   docComment: string | undefined,
 ): StreamDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'stream') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected stream name', nameTok)
     d.skipToNextBlock()
@@ -227,6 +232,7 @@ export function parseStreamBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -237,6 +243,7 @@ export function parseStreamBlock(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -251,21 +258,26 @@ export function parseStreamBlock(
         `top-level "${key}" is invalid on stream blocks — use versions { v1 { schema, condition?, prepare } }`,
         t,
       )
+
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       // If parseConfigValue could not consume (e.g. bad token), swallow with parseValue
       if (!cv) {
         d.parseValue()
       }
+
       continue
     }
 
     if (key === 'version') {
       const vp = parseBareVersionPointer(d)
+
       if (vp) {
         version = vp.version
         versionRange = vp.versionRange
       }
+
       continue
     }
 
@@ -276,31 +288,38 @@ export function parseStreamBlock(
 
     if (key === 'label') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         label = v
       }
+
       continue
     }
 
     if (key === 'description') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         description = v
       }
+
       continue
     }
 
     if (key === 'enabled') {
       const v = d.parseValue()
+
       if (typeof v === 'boolean') {
         enabled = v
       }
+
       continue
     }
 
     if (key === 'graph' || key === 'workflow') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv?.kind === 'string') {
         workflowName = cv.value
         workflowNameRange = cv.range
@@ -310,6 +329,7 @@ export function parseStreamBlock(
           peeked ?? d.peek(),
         )
       }
+
       continue
     }
 

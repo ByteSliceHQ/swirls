@@ -1,8 +1,3 @@
-import { validateDecisions } from './decision'
-/**
- * Post-parse validation for .swirls AST. Reuses schemas from @swirls/definition.
- */
-
 import {
   aiKindSchema,
   aiProviderSchema,
@@ -14,6 +9,10 @@ import {
   searchProviderSchema,
   TELEM_UNSUPPORTED_SEARCH_FIELDS,
 } from '@swirls/definition/schemas'
+/**
+ * Post-parse validation for .swirls AST. Reuses schemas from @swirls/definition.
+ */
+
 import { validateActionBlocks } from './action/validator'
 import { validateAgentBlocks, validateAgentNodes } from './agent/validator'
 import { validateAppBlocks } from './app/validator'
@@ -30,40 +29,29 @@ import type {
   WorkflowDecl,
 } from './ast'
 import { validateChannelBlocks } from './channel/validator'
-import {
-  validateComputerBlocks,
-  validateShellNodes,
-} from './computer/validator'
+import { validateComputerBlocks, validateShellNodes } from './computer/validator'
 import { validateConnectionBlocks } from './connection/validator'
-import type { LanguageHost } from './host'
 import { validateConnectorBlocks } from './connector/validator'
 import {
   validateDatabaseBlocks,
   validateDatabaseNodes,
   validateMigrationBlocks,
 } from './database/validator'
+import { validateDecisions } from './decision'
 import { validateDiskBlocks, validateDiskNodes } from './disk/validator'
 import { DURATION_SYNTAX_HINT, parseDurationSeconds } from './duration'
 import {
   resolvedOutputSchemaLiteralForNode,
   schemaCompatibleWithOutputFormat,
 } from './format-output-compat'
+import type { LanguageHost } from './host'
 import { validateIntegrationNodes } from './integration/validator'
 import { validateAgentMcpRefs, validateMcpBlocks } from './mcp/validator'
 import { validateMockBlocks } from './mock/validator'
-import {
-  validateNetworkBlocks,
-  validateNetworkConsumerReference,
-} from './network/validator'
-import {
-  validateDeviceNodes,
-  validateOperationBlocks,
-} from './operation/validator'
+import { validateNetworkBlocks, validateNetworkConsumerReference } from './network/validator'
+import { validateDeviceNodes, validateOperationBlocks } from './operation/validator'
 import { validatePlaybookBlocks } from './playbook/validator'
-import {
-  validatePostgresBlocks,
-  validatePostgresNodes,
-} from './postgres/validator'
+import { validatePostgresBlocks, validatePostgresNodes } from './postgres/validator'
 import { validateQueryBlocks } from './query/validator'
 import { resolveNamedSchemasFromDecls, validateSchemaFieldRefs } from './schema'
 import {
@@ -125,11 +113,9 @@ function configStringValue(cv: ConfigValue | undefined): string | undefined {
   return cv.value
 }
 
-function validateAuthBlockFields(
-  a: AuthDecl,
-  varsInBlock: Set<string> | null,
-): Diagnostic[] {
+function validateAuthBlockFields(a: AuthDecl, varsInBlock: Set<string> | null): Diagnostic[] {
   const out: Diagnostic[] = []
+
   const checkVarRef = (field: string) => {
     const cv = a.configFields[field]
 
@@ -171,9 +157,7 @@ function validateAuthBlockFields(
     const hasQuery = 'query_param' in a.configFields
 
     if (!hasHeader && !hasQuery) {
-      out.push(
-        diag('Auth type api_key requires "header" or "query_param"', a.range),
-      )
+      out.push(diag('Auth type api_key requires "header" or "query_param"', a.range))
     }
 
     checkVarRef('key')
@@ -243,11 +227,7 @@ function diag(
   return { message, range, severity }
 }
 
-function validateResourceName(
-  name: string,
-  range: SourceRange,
-  kind: string,
-): Diagnostic[] {
+function validateResourceName(name: string, range: SourceRange, kind: string): Diagnostic[] {
   const result = resourceNameSchema.safeParse(name)
 
   if (result.success) {
@@ -271,9 +251,7 @@ function validateNodeType(typeVal: string, range: SourceRange): Diagnostic[] {
 
   return [
     diag(
-      `Invalid node type "${typeVal}". Must be one of: ${Object.keys(
-        nodeTypeMap,
-      )
+      `Invalid node type "${typeVal}". Must be one of: ${Object.keys(nodeTypeMap)
         .sort()
         .join(', ')}`,
       range,
@@ -298,37 +276,24 @@ function dagValidation(
 
   for (const edge of edges) {
     if (!nodeNames.has(edge.source)) {
-      out.push(
-        diag(
-          `Edge references non-existent source node "${edge.source}"`,
-          edge.range,
-        ),
-      )
+      out.push(diag(`Edge references non-existent source node "${edge.source}"`, edge.range))
     }
+
     if (!nodeNames.has(edge.target)) {
-      out.push(
-        diag(
-          `Edge references non-existent target node "${edge.target}"`,
-          edge.range,
-        ),
-      )
+      out.push(diag(`Edge references non-existent target node "${edge.target}"`, edge.range))
     }
+
     if (edge.source === edge.target) {
       out.push(diag('Edge cannot connect a node to itself', edge.range))
     }
-    if (
-      nodeNames.has(edge.source) &&
-      nodeNames.has(edge.target) &&
-      edge.source !== edge.target
-    ) {
+
+    if (nodeNames.has(edge.source) && nodeNames.has(edge.target) && edge.source !== edge.target) {
       adjacentList.get(edge.source)?.push(edge.target)
       inDegree.set(edge.target, (inDegree.get(edge.target) ?? 0) + 1)
     }
   }
 
-  const roots = [...inDegree.entries()]
-    .filter(([, d]) => d === 0)
-    .map(([id]) => id)
+  const roots = [...inDegree.entries()].filter(([, d]) => d === 0).map(([id]) => id)
 
   if (roots.length === 0 && nodes.length > 0) {
     out.push(
@@ -338,6 +303,7 @@ function dagValidation(
       ),
     )
   }
+
   if (roots.length > 1) {
     out.push(
       diag(
@@ -349,8 +315,10 @@ function dagValidation(
 
   if (roots.length === 1) {
     const rootName = roots[0]
+
     if (rootName !== undefined) {
       const entryNode = nodes.find((n) => n.name === rootName)
+
       if (!entryNode?.isRoot) {
         out.push(
           diag(
@@ -365,11 +333,14 @@ function dagValidation(
   const sorted: string[] = []
   const queue = [...roots]
   const inDegreeCopy = new Map(inDegree)
+
   while (queue.length > 0) {
     const current = queue.shift()
+
     if (current === undefined) {
       break
     }
+
     sorted.push(current)
 
     for (const neighbor of adjacentList.get(current) ?? []) {
@@ -381,37 +352,28 @@ function dagValidation(
       }
     }
   }
+
   if (sorted.length !== nodes.length && nodes.length > 0) {
-    out.push(
-      diag(
-        'Workflow contains a cycle - DAG workflows cannot have cycles',
-        graphRange,
-      ),
-    )
+    out.push(diag('Workflow contains a cycle - DAG workflows cannot have cycles', graphRange))
   }
 
   return out
 }
 
-function loopRootMustHaveInputSchema(
-  bodyNodes: NodeDecl[],
-  range: SourceRange,
-): Diagnostic[] {
+function loopRootMustHaveInputSchema(bodyNodes: NodeDecl[], range: SourceRange): Diagnostic[] {
   const root = bodyNodes.find((n) => n.isRoot)
+
   const hasLiteral =
-    root?.inputSchema &&
-    typeof root.inputSchema === 'object' &&
-    !Array.isArray(root.inputSchema)
-  const hasRef =
-    root?.inputSchemaRef !== undefined && root.inputSchemaRef !== ''
+    root?.inputSchema && typeof root.inputSchema === 'object' && !Array.isArray(root.inputSchema)
+
+  const hasRef = root?.inputSchemaRef !== undefined && root.inputSchemaRef !== ''
+
   if (!hasLiteral && !hasRef) {
     return [
-      diag(
-        'map/fanout/while subgraph root must declare inputSchema for typed iteration',
-        range,
-      ),
+      diag('map/fanout/while subgraph root must declare inputSchema for typed iteration', range),
     ]
   }
+
   return []
 }
 
@@ -419,9 +381,11 @@ function workflowRefFromConfigFields(
   configFields: Record<string, ConfigValue>,
 ): { name: string; range: SourceRange } | undefined {
   const cv = configFields.workflow ?? configFields.graph
+
   if (cv?.kind === 'string' && String(cv.value).trim() !== '') {
     return { name: String(cv.value).trim(), range: cv.range }
   }
+
   return undefined
 }
 
@@ -444,12 +408,7 @@ function validateNodeAuthConnection(
     const authName = configStringValue(authCv)
 
     if (authCv !== undefined && authName === undefined) {
-      out.push(
-        diag(
-          'HTTP node "auth" must be a connection or auth block name',
-          authCv.range,
-        ),
-      )
+      out.push(diag('HTTP node "auth" must be a connection or auth block name', authCv.range))
     } else if (authName !== undefined && !authNameLookup.has(authName)) {
       out.push(
         diag(
@@ -469,12 +428,7 @@ function validateNodeAuthConnection(
     const connName = configStringValue(connCv)
 
     if (connCv !== undefined && connName === undefined) {
-      out.push(
-        diag(
-          'HTTP node "connection" must be a connection block name',
-          connCv.range,
-        ),
-      )
+      out.push(diag('HTTP node "connection" must be a connection block name', connCv.range))
     } else if (connName !== undefined && !connectionNameLookup.has(connName)) {
       out.push(
         diag(
@@ -490,12 +444,7 @@ function validateNodeAuthConnection(
     const connName = configStringValue(connCv)
 
     if (connCv !== undefined && connName === undefined) {
-      out.push(
-        diag(
-          'Integration node "connection" must be a connection block name',
-          connCv.range,
-        ),
-      )
+      out.push(diag('Integration node "connection" must be a connection block name', connCv.range))
     } else if (connName !== undefined && !connectionNameLookup.has(connName)) {
       out.push(
         diag(
@@ -506,17 +455,8 @@ function validateNodeAuthConnection(
     }
   }
 
-  if (
-    node.type !== 'http' &&
-    node.type !== 'integration' &&
-    'connection' in node.configFields
-  ) {
-    out.push(
-      diag(
-        '"connection" is only valid on http and integration nodes',
-        node.range,
-      ),
-    )
+  if (node.type !== 'http' && node.type !== 'integration' && 'connection' in node.configFields) {
+    out.push(diag('"connection" is only valid on http and integration nodes', node.range))
   }
 
   if ('auth' in node.configFields && 'connection' in node.configFields) {
@@ -531,6 +471,7 @@ function validateNodeAuthConnection(
   if ('network' in node.configFields) {
     const networkValue = node.configFields.network
     const networkName = configStringValue(networkValue)
+
     if (node.type !== 'http') {
       out.push(
         diag(
@@ -540,10 +481,7 @@ function validateNodeAuthConnection(
       )
     } else if (!networkName) {
       out.push(
-        diag(
-          'HTTP node "network" must be a network block name',
-          networkValue?.range ?? node.range,
-        ),
+        diag('HTTP node "network" must be a network block name', networkValue?.range ?? node.range),
       )
     } else {
       if (!networkNameLookup.has(networkName)) {
@@ -554,7 +492,9 @@ function validateNodeAuthConnection(
           ),
         )
       }
+
       const urlValue = node.configFields.url
+
       if (urlValue?.kind !== 'string') {
         out.push(
           diag(
@@ -565,21 +505,12 @@ function validateNodeAuthConnection(
       } else {
         try {
           const parsed = new URL(urlValue.value)
+
           if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-            out.push(
-              diag(
-                'Network-aware HTTP node url must use http or https',
-                urlValue.range,
-              ),
-            )
+            out.push(diag('Network-aware HTTP node url must use http or https', urlValue.range))
           }
         } catch {
-          out.push(
-            diag(
-              'Network-aware HTTP nodes require a valid absolute url',
-              urlValue.range,
-            ),
-          )
+          out.push(diag('Network-aware HTTP nodes require a valid absolute url', urlValue.range))
         }
       }
     }
@@ -613,32 +544,21 @@ function validateMapWhileNode(
         node.range,
       ),
     )
+
     return out
   }
 
   if (hasSubgraph && node.subgraph) {
-    out.push(
-      ...dagValidation(
-        node.subgraph.nodes,
-        node.subgraph.edges,
-        node.subgraph.range,
-      ),
-    )
-    out.push(
-      ...loopRootMustHaveInputSchema(node.subgraph.nodes, node.subgraph.range),
-    )
+    out.push(...dagValidation(node.subgraph.nodes, node.subgraph.edges, node.subgraph.range))
+    out.push(...loopRootMustHaveInputSchema(node.subgraph.nodes, node.subgraph.range))
 
     // Subgraph nodes are not visited by the top-level node loop, so run the
     // per-node auth/connection checks here too (recursively for nested loops).
     for (const sub of node.subgraph.nodes) {
       out.push(
-        ...validateNodeAuthConnection(
-          sub,
-          authNameLookup,
-          connectionNameLookup,
-          networkNameLookup,
-        ),
+        ...validateNodeAuthConnection(sub, authNameLookup, connectionNameLookup, networkNameLookup),
       )
+
       if (sub.type === 'map' || sub.type === 'fanout' || sub.type === 'while') {
         out.push(
           ...validateMapWhileNode(
@@ -665,9 +585,9 @@ function validateMapWhileNode(
       )
     } else {
       const w =
-        (ast.workflows.find((x) => x.name === workflowName) as
-          | WorkflowDecl
-          | undefined) ?? workspace?.workflowBlocks.get(workflowName)
+        (ast.workflows.find((x) => x.name === workflowName) as WorkflowDecl | undefined) ??
+        workspace?.workflowBlocks.get(workflowName)
+
       if (w) {
         out.push(...loopRootMustHaveInputSchema(w.nodes, w.range))
       }
@@ -676,20 +596,13 @@ function validateMapWhileNode(
 
   if (node.type === 'map') {
     const maxCv = node.configFields.maxItems
-    if (
-      !maxCv ||
-      maxCv.kind !== 'number' ||
-      typeof maxCv.value !== 'number' ||
-      maxCv.value < 1
-    ) {
-      out.push(
-        diag(
-          'map node requires maxItems as a positive number',
-          maxCv?.range ?? node.range,
-        ),
-      )
+
+    if (!maxCv || maxCv.kind !== 'number' || typeof maxCv.value !== 'number' || maxCv.value < 1) {
+      out.push(diag('map node requires maxItems as a positive number', maxCv?.range ?? node.range))
     }
+
     const conc = node.configFields.concurrency
+
     if (conc !== undefined) {
       out.push(
         diag(
@@ -702,6 +615,7 @@ function validateMapWhileNode(
 
   if (node.type === 'fanout') {
     const maxCv = node.configFields.maxItems
+
     if (
       !maxCv ||
       maxCv.kind !== 'number' ||
@@ -710,13 +624,12 @@ function validateMapWhileNode(
       !Number.isInteger(maxCv.value)
     ) {
       out.push(
-        diag(
-          'fanout node requires maxItems as a positive integer',
-          maxCv?.range ?? node.range,
-        ),
+        diag('fanout node requires maxItems as a positive integer', maxCv?.range ?? node.range),
       )
     }
+
     const conc = node.configFields.concurrency
+
     if (
       !conc ||
       conc.kind !== 'number' ||
@@ -736,6 +649,7 @@ function validateMapWhileNode(
 
   if (node.type === 'while') {
     const maxIt = node.configFields.maxIterations
+
     if (
       !maxIt ||
       maxIt.kind !== 'number' ||
@@ -744,10 +658,7 @@ function validateMapWhileNode(
       !Number.isInteger(maxIt.value)
     ) {
       out.push(
-        diag(
-          'while node requires maxIterations as a positive integer',
-          maxIt?.range ?? node.range,
-        ),
+        diag('while node requires maxIterations as a positive integer', maxIt?.range ?? node.range),
       )
     }
   }
@@ -773,10 +684,7 @@ export type ValidateOptions = {
   host?: LanguageHost
 }
 
-export function validate(
-  ast: SwirlsFile,
-  options?: ValidateOptions,
-): Diagnostic[] {
+export function validate(ast: SwirlsFile, options?: ValidateOptions): Diagnostic[] {
   const out: Diagnostic[] = []
 
   const workspace = options?.workspace
@@ -788,11 +696,10 @@ export function validate(
 
   out.push(
     ...validateSchemaFieldRefs(ast, {
-      workspaceSchemaNames: workspace
-        ? new Set(workspace.schemas.keys())
-        : undefined,
+      workspaceSchemaNames: workspace ? new Set(workspace.schemas.keys()) : undefined,
     }),
   )
+
   const namedSchemaResolution = resolveNamedSchemasFromDecls(ast.schemas ?? [])
   out.push(...namedSchemaResolution.diagnostics)
   const resolvedSchemaLiterals = namedSchemaResolution.map
@@ -809,6 +716,7 @@ export function validate(
   const streamNameLookup = nameLookup(localStreamNames, workspace?.streams)
   const secretsBlocks = ast.secrets ?? []
   const authBlocks = ast.auths ?? []
+
   const secretsByName = new Map<
     string,
     {
@@ -817,22 +725,23 @@ export function validate(
       type?: SecretsDecl['type']
     }
   >()
+
   const authNames = new Set(authBlocks.map((a) => a.name))
   const authNameLookup = nameLookup(authNames, workspace?.auths)
 
   const connectionBlocks = ast.connections ?? []
   const connectionNames = new Set(connectionBlocks.map((c) => c.name))
-  const connectionNameLookup = nameLookup(
-    connectionNames,
-    workspace?.connections,
-  )
+  const connectionNameLookup = nameLookup(connectionNames, workspace?.connections)
+
   const networkNameLookup = nameLookup(
     new Set((ast.networks ?? []).map((network) => network.name)),
     workspace?.networks,
   )
+
   for (const c of connectionBlocks) {
     out.push(...validateResourceName(c.name, c.range, 'Connection block'))
   }
+
   out.push(...validateConnectionBlocks(ast, { workspace, host }))
   out.push(...validateActionBlocks(ast, { host }))
 
@@ -865,39 +774,44 @@ export function validate(
 
   for (const s of secretsBlocks) {
     const seenInBlock = new Set<string>()
+
     for (const v of s.vars) {
       if (!SECRET_KEY_PATTERN.test(v)) {
         continue
       }
+
       if (seenInBlock.has(v)) {
-        out.push(
-          diag(`Duplicate var "${v}" in secret block "${s.name}"`, s.range),
-        )
+        out.push(diag(`Duplicate var "${v}" in secret block "${s.name}"`, s.range))
         continue
       }
+
       seenInBlock.add(v)
     }
   }
 
   function secretDeclFor(
     blockName: string,
-  ):
-    | { vars: string[]; range: SourceRange; type?: SecretsDecl['type'] }
-    | undefined {
+  ): { vars: string[]; range: SourceRange; type?: SecretsDecl['type'] } | undefined {
     const local = secretsByName.get(blockName)
+
     if (local) {
       return local
     }
+
     const w = workspace?.secrets.get(blockName)
+
     if (!w) {
       return undefined
     }
+
     const site = w.sites[0]
     const line = site?.line ?? 0
+
     const range: SourceRange = {
       start: { line, column: 0, offset: 0 },
       end: { line, column: 0, offset: 0 },
     }
+
     return { vars: w.vars, range, type: w.type }
   }
 
@@ -911,20 +825,14 @@ export function validate(
 
     if (!a.authType || !AUTH_TYPES.has(a.authType)) {
       out.push(
-        diag(
-          `Auth block "${a.name}" requires type: oauth, api_key, basic, or bearer`,
-          a.range,
-        ),
+        diag(`Auth block "${a.name}" requires type: oauth, api_key, basic, or bearer`, a.range),
       )
     }
 
     if (a.secretsRef !== undefined && a.secretsRef !== '') {
       if (!secretDeclFor(a.secretsRef)) {
         out.push(
-          diag(
-            `Auth "${a.name}" references undefined secret block "${a.secretsRef}"`,
-            a.range,
-          ),
+          diag(`Auth "${a.name}" references undefined secret block "${a.secretsRef}"`, a.range),
         )
       }
     }
@@ -947,6 +855,7 @@ export function validate(
   // `basic`) only runs when the auth block lives in this file. Deploy /
   // workspace validation does a stricter check once it has the full AST set.
   const localAuthsByName = new Map<string, AuthDecl>()
+
   for (const a of authBlocks) {
     localAuthsByName.set(a.name, a)
   }
@@ -961,15 +870,12 @@ export function validate(
 
     if (forms.authRef) {
       const { name: authName, range } = forms.authRef
+
       if (!authNameLookup.has(authName)) {
-        out.push(
-          diag(
-            `Form "${forms.name}" references undefined auth block "${authName}"`,
-            range,
-          ),
-        )
+        out.push(diag(`Form "${forms.name}" references undefined auth block "${authName}"`, range))
       } else {
         const local = localAuthsByName.get(authName)
+
         if (local && local.authType !== 'basic') {
           out.push(
             diag(
@@ -994,9 +900,9 @@ export function validate(
     const hasHeader = webhook.header !== undefined
 
     if (hasSecret !== hasHeader) {
-      const offender =
-        webhook.secretRef?.range ?? webhook.header?.range ?? webhook.range
+      const offender = webhook.secretRef?.range ?? webhook.header?.range ?? webhook.range
       const missing = hasSecret ? 'header' : 'secret'
+
       out.push(
         diag(
           `Webhook "${webhook.name}" has "${hasSecret ? 'secret' : 'header'}" but is missing "${missing}". Both must be set to require request verification, or neither for an explicitly unauthenticated endpoint.`,
@@ -1017,12 +923,10 @@ export function validate(
 
     if (webhook.header) {
       const lower = webhook.header.value.trim().toLowerCase()
+
       if (!lower) {
         out.push(
-          diag(
-            `Webhook "${webhook.name}" header name must not be empty`,
-            webhook.header.range,
-          ),
+          diag(`Webhook "${webhook.name}" header name must not be empty`, webhook.header.range),
         )
       } else if (RESERVED_WEBHOOK_HEADERS.has(lower)) {
         out.push(
@@ -1040,10 +944,7 @@ export function validate(
 
       if (!decl) {
         out.push(
-          diag(
-            `Webhook "${webhook.name}" references undefined secret block "${blockName}"`,
-            range,
-          ),
+          diag(`Webhook "${webhook.name}" references undefined secret block "${blockName}"`, range),
         )
       } else if (!decl.vars.includes(varName)) {
         out.push(
@@ -1061,9 +962,7 @@ export function validate(
     const sameName = ast.schedules.filter((x) => x.name === schedule.name)
 
     if (sameName.length > 1) {
-      out.push(
-        diag(`Duplicate schedule name "${schedule.name}"`, schedule.range),
-      )
+      out.push(diag(`Duplicate schedule name "${schedule.name}"`, schedule.range))
     }
   }
 
@@ -1075,12 +974,12 @@ export function validate(
 
   out.push(...validateNetworkBlocks(ast, { workspace }))
 
-  const mockSchemaLiterals = new Map<string, JsonSchemaLiteral>(
-    workspace?.schemaLiterals ?? [],
-  )
+  const mockSchemaLiterals = new Map<string, JsonSchemaLiteral>(workspace?.schemaLiterals ?? [])
+
   for (const [name, lit] of resolvedSchemaLiterals) {
     mockSchemaLiterals.set(name, lit)
   }
+
   out.push(
     ...validateMockBlocks(ast, {
       workspace,
@@ -1100,10 +999,8 @@ export function validate(
         workspace,
       }),
     )
-    if (
-      connection.networkRef &&
-      (connection.baseUrl == null || connection.authRef == null)
-    ) {
+
+    if (connection.networkRef && (connection.baseUrl == null || connection.authRef == null)) {
       out.push(
         diag(
           `Connection "${connection.name}" can use a network only in self-managed mode with base_url and auth`,
@@ -1112,6 +1009,7 @@ export function validate(
       )
     }
   }
+
   for (const mcp of ast.mcp ?? []) {
     out.push(
       ...validateNetworkConsumerReference({
@@ -1123,6 +1021,7 @@ export function validate(
       }),
     )
   }
+
   for (const postgres of ast.postgres ?? []) {
     out.push(
       ...validateNetworkConsumerReference({
@@ -1137,43 +1036,30 @@ export function validate(
 
   for (const workflow of ast.workflows) {
     out.push(...validateResourceName(workflow.name, workflow.range, 'Workflow'))
+
     if (
       workflow.concurrency !== undefined &&
       (!Number.isInteger(workflow.concurrency) ||
         workflow.concurrency < 1 ||
         workflow.concurrency > 64)
     ) {
-      out.push(
-        diag(
-          'Workflow concurrency must be an integer between 1 and 64',
-          workflow.range,
-        ),
-      )
+      out.push(diag('Workflow concurrency must be an integer between 1 and 64', workflow.range))
     }
+
     if (workflow.executionTokenTtl !== undefined) {
       const seconds = parseDurationSeconds(workflow.executionTokenTtl)
+
       if (seconds === null) {
-        out.push(
-          diag(
-            `Workflow executionTokenTtl must be ${DURATION_SYNTAX_HINT}`,
-            workflow.range,
-          ),
-        )
+        out.push(diag(`Workflow executionTokenTtl must be ${DURATION_SYNTAX_HINT}`, workflow.range))
       } else if (seconds < 5 * 60 || seconds > 24 * 60 * 60) {
-        out.push(
-          diag(
-            'Workflow executionTokenTtl must be between 5m and 24h',
-            workflow.range,
-          ),
-        )
+        out.push(diag('Workflow executionTokenTtl must be between 5m and 24h', workflow.range))
       }
     }
+
     const sameName = ast.workflows.filter((x) => x.name === workflow.name)
 
     if (sameName.length > 1) {
-      out.push(
-        diag(`Duplicate workflow name "${workflow.name}"`, workflow.range),
-      )
+      out.push(diag(`Duplicate workflow name "${workflow.name}"`, workflow.range))
     }
 
     const nodeNameSet = new Set<string>()
@@ -1183,19 +1069,16 @@ export function validate(
       out.push(...validateNodeType(node.type, node.range))
 
       if (nodeNameSet.has(node.name)) {
-        out.push(
-          diag(`Duplicate node name "${node.name}" in workflow`, node.range),
-        )
+        out.push(diag(`Duplicate node name "${node.name}" in workflow`, node.range))
       }
 
       nodeNameSet.add(node.name)
 
-      out.push(
-        ...validateInferredVendorKeyDeclaration(node, declaredVendorVars, diag),
-      )
+      out.push(...validateInferredVendorKeyDeclaration(node, declaredVendorVars, diag))
 
       if (node.outputFormat != null && node.outputFormat.trim() !== '') {
         const parsedFmt = outputFormatSchema.safeParse(node.outputFormat.trim())
+
         if (!parsedFmt.success) {
           out.push(
             diag(
@@ -1204,10 +1087,8 @@ export function validate(
             ),
           )
         } else {
-          const resolvedOut = resolvedOutputSchemaLiteralForNode(
-            node,
-            resolvedSchemaLiterals,
-          )
+          const resolvedOut = resolvedOutputSchemaLiteralForNode(node, resolvedSchemaLiterals)
+
           if (
             resolvedOut != null &&
             parsedFmt.data !== 'json' &&
@@ -1217,9 +1098,7 @@ export function validate(
             out.push(
               diag(
                 `Output schema is incompatible with format "${parsedFmt.data}" (expect top-level string, a { markdown | html | text | url } string field, or contentMediaType hint).`,
-                node.outputSchemaBlock?.innerRange ??
-                  node.outputSchemaRefRange ??
-                  node.range,
+                node.outputSchemaBlock?.innerRange ?? node.outputSchemaRefRange ?? node.range,
               ),
             )
           }
@@ -1235,6 +1114,7 @@ export function validate(
                 node.range,
               ),
             )
+
             continue
           }
 
@@ -1247,6 +1127,7 @@ export function validate(
                 node.range,
               ),
             )
+
             continue
           }
 
@@ -1260,6 +1141,7 @@ export function validate(
                   node.range,
                 ),
               )
+
               continue
             }
 
@@ -1294,18 +1176,12 @@ export function validate(
               : field in node.configFields
 
           if (!has) {
-            out.push(
-              diag(`Node type "${node.type}" requires "${field}"`, node.range),
-            )
+            out.push(diag(`Node type "${node.type}" requires "${field}"`, node.range))
           }
         }
       }
 
-      if (
-        node.type === 'map' ||
-        node.type === 'fanout' ||
-        node.type === 'while'
-      ) {
+      if (node.type === 'map' || node.type === 'fanout' || node.type === 'while') {
         out.push(
           ...validateMapWhileNode(
             node,
@@ -1340,6 +1216,7 @@ export function validate(
             ),
           )
         }
+
         if ('querySql' in node.configFields || 'query' in node.configFields) {
           out.push(
             diag(
@@ -1378,9 +1255,8 @@ export function validate(
               ),
             )
           } else if (streamDecl) {
-            const hasKey = streamDecl.versions.some(
-              (v) => v.key === versionPinRaw,
-            )
+            const hasKey = streamDecl.versions.some((v) => v.key === versionPinRaw)
+
             if (!hasKey) {
               out.push(
                 diag(
@@ -1395,12 +1271,7 @@ export function validate(
         if (filterCv) {
           if (filterCv.kind === 'ts_block') {
             if (!filterCv.code.trim()) {
-              out.push(
-                diag(
-                  'Stream node filter must be a non-empty @ts block',
-                  filterCv.range,
-                ),
-              )
+              out.push(diag('Stream node filter must be a non-empty @ts block', filterCv.range))
             }
           } else if (filterCv.kind !== 'ts_file_ref') {
             out.push(
@@ -1416,6 +1287,7 @@ export function validate(
       if (node.type === 'parallel') {
         const opCv = node.configFields.operation
         const opVal = configStringValue(opCv)
+
         if (
           opVal !== undefined &&
           opVal !== 'search' &&
@@ -1429,24 +1301,28 @@ export function validate(
             ),
           )
         }
+
         if (opVal === 'search' && !('searchQueries' in node.configFields)) {
           out.push(diag('Parallel search requires "searchQueries"', node.range))
         }
+
         if (opVal === 'extract' && !('urls' in node.configFields)) {
           out.push(diag('Parallel extract requires "urls"', node.range))
         }
+
         if (opVal === 'findall') {
           if (!('entityType' in node.configFields)) {
             out.push(diag('Parallel findall requires "entityType"', node.range))
           }
+
           if (!('generator' in node.configFields)) {
             out.push(diag('Parallel findall requires "generator"', node.range))
           }
+
           if (!('matchConditions' in node.configFields)) {
-            out.push(
-              diag('Parallel findall requires "matchConditions"', node.range),
-            )
+            out.push(diag('Parallel findall requires "matchConditions"', node.range))
           }
+
           if (!('matchLimit' in node.configFields)) {
             out.push(diag('Parallel findall requires "matchLimit"', node.range))
           }
@@ -1455,6 +1331,7 @@ export function validate(
 
       if (node.type === 'search') {
         const providerCv = node.configFields.provider
+
         if (
           providerCv &&
           (providerCv.kind !== 'string' ||
@@ -1467,9 +1344,11 @@ export function validate(
             ),
           )
         }
+
         if (providerCv?.kind === 'string' && providerCv.value === 'telem') {
           for (const field of TELEM_UNSUPPORTED_SEARCH_FIELDS) {
             const cv = node.configFields[field]
+
             if (cv) {
               out.push(
                 diag(
@@ -1479,7 +1358,9 @@ export function validate(
               )
             }
           }
+
           const sources = node.configFields.sources
+
           if (
             sources &&
             (sources.kind !== 'array' ||
@@ -1495,27 +1376,22 @@ export function validate(
             )
           }
         }
+
         const SEARCH_SOURCES = new Set(['web', 'news', 'images'])
         const SEARCH_CATEGORIES = new Set(['github', 'research', 'pdf'])
 
-        const validateStringEnumArray = (
-          field: string,
-          allowed: Set<string>,
-          label: string,
-        ) => {
+        const validateStringEnumArray = (field: string, allowed: Set<string>, label: string) => {
           const cv = node.configFields[field]
+
           if (!cv) {
             return
           }
+
           if (cv.kind !== 'array') {
-            out.push(
-              diag(
-                `Search "${field}" must be an array of strings`,
-                cv.range ?? node.range,
-              ),
-            )
+            out.push(diag(`Search "${field}" must be an array of strings`, cv.range ?? node.range))
             return
           }
+
           for (const item of cv.value) {
             if (item.kind !== 'string') {
               out.push(
@@ -1524,8 +1400,10 @@ export function validate(
                   item.range ?? cv.range ?? node.range,
                 ),
               )
+
               continue
             }
+
             if (!allowed.has(item.value)) {
               out.push(
                 diag(
@@ -1540,24 +1418,18 @@ export function validate(
         validateStringEnumArray('sources', SEARCH_SOURCES, 'source')
         validateStringEnumArray('categories', SEARCH_CATEGORIES, 'category')
 
-        for (const field of [
-          'includeDomains',
-          'excludeDomains',
-          'scrapeFormats',
-        ] as const) {
+        for (const field of ['includeDomains', 'excludeDomains', 'scrapeFormats'] as const) {
           const cv = node.configFields[field]
+
           if (!cv) {
             continue
           }
+
           if (cv.kind !== 'array') {
-            out.push(
-              diag(
-                `Search "${field}" must be an array of strings`,
-                cv.range ?? node.range,
-              ),
-            )
+            out.push(diag(`Search "${field}" must be an array of strings`, cv.range ?? node.range))
             continue
           }
+
           for (const item of cv.value) {
             if (item.kind !== 'string') {
               out.push(
@@ -1571,19 +1443,11 @@ export function validate(
         }
 
         const limitCv = node.configFields.limit
+
         if (limitCv) {
           if (limitCv.kind !== 'number') {
-            out.push(
-              diag(
-                'Search "limit" must be a number',
-                limitCv.range ?? node.range,
-              ),
-            )
-          } else if (
-            !Number.isFinite(limitCv.value) ||
-            limitCv.value < 1 ||
-            limitCv.value > 20
-          ) {
+            out.push(diag('Search "limit" must be a number', limitCv.range ?? node.range))
+          } else if (!Number.isFinite(limitCv.value) || limitCv.value < 1 || limitCv.value > 20) {
             out.push(
               diag(
                 'Search "limit" must be an integer between 1 and 20',
@@ -1611,12 +1475,14 @@ export function validate(
 
       if (node.type === 'ai') {
         const kindCv = node.configFields.kind
-        const kindVal =
-          kindCv && kindCv.kind === 'string' ? kindCv.value : undefined
+        const kindVal = kindCv && kindCv.kind === 'string' ? kindCv.value : undefined
+
         if (kindVal !== undefined && kindCv) {
           const kindResult = aiKindSchema.safeParse(kindVal)
+
           if (!kindResult.success) {
             const range = kindCv.range
+
             out.push(
               diag(
                 `Invalid ai kind "${kindVal}". Must be one of: text, object, image, video, embed`,
@@ -1626,10 +1492,7 @@ export function validate(
           }
         }
 
-        if (
-          kindVal === 'text' &&
-          (node.outputSchema != null || node.outputSchemaRef != null)
-        ) {
+        if (kindVal === 'text' && (node.outputSchema != null || node.outputSchemaRef != null)) {
           out.push(
             diag(
               'AI node with kind "text" produces a plain string output; remove "schema" or use kind "object" for structured JSON.',
@@ -1640,8 +1503,10 @@ export function validate(
         }
 
         const providerCv = node.configFields.provider
+
         if (providerCv?.kind === 'string' && providerCv.value.trim() !== '') {
           const pv = aiProviderSchema.safeParse(providerCv.value.trim())
+
           if (!pv.success) {
             out.push(
               diag(
@@ -1666,9 +1531,7 @@ export function validate(
           for (const issue of result.error.issues) {
             const path = issue.path.filter(Boolean).join('.')
 
-            const msg = path
-              ? `review: ${path} — ${issue.message}`
-              : `review: ${issue.message}`
+            const msg = path ? `review: ${path} — ${issue.message}` : `review: ${issue.message}`
 
             out.push(diag(msg, node.range))
           }
@@ -1682,6 +1545,7 @@ export function validate(
 
   for (const t of ast.triggers) {
     out.push(...validateResourceName(t.name, t.range, 'Trigger'))
+
     const resourceSet =
       t.resourceType === 'form'
         ? formNameLookup
@@ -1690,6 +1554,7 @@ export function validate(
           : t.resourceType === 'schedule'
             ? scheduleNameLookup
             : new Set<string>()
+
     if (!resourceSet.has(t.resourceName)) {
       out.push(
         diag(
@@ -1698,12 +1563,10 @@ export function validate(
         ),
       )
     }
+
     if (!workflowNameLookup.has(t.workflowName)) {
       out.push(
-        diag(
-          `Trigger references workflow "${t.workflowName}" which is not defined`,
-          t.range,
-        ),
+        diag(`Trigger references workflow "${t.workflowName}" which is not defined`, t.range),
       )
     }
   }
@@ -1716,6 +1579,7 @@ export function validate(
   out.push(...validateIntegrationNodes(ast, { workspace }))
   out.push(...validateDiskBlocks(ast, { workspace }))
   out.push(...validateDiskNodes(ast, { workspace }))
+
   out.push(
     ...validateComputerBlocks(ast, {
       workspace,
@@ -1723,6 +1587,7 @@ export function validate(
       host,
     }),
   )
+
   out.push(...validateShellNodes(ast, { workspace }))
   out.push(...validateOperationBlocks(ast))
   out.push(...validateDeviceNodes(ast, { workspace }))
@@ -1738,12 +1603,16 @@ export function validate(
   out.push(...validateDecisions(ast, workspace))
 
   const roleNamesSeen = new Set<string>()
+
   for (const role of ast.roles) {
     out.push(...validateResourceName(role.name, role.range, 'Role'))
+
     if (roleNamesSeen.has(role.name)) {
       out.push(diag(`Duplicate role name "${role.name}"`, role.range))
     }
+
     roleNamesSeen.add(role.name)
+
     if (role.match.length === 0) {
       out.push(
         diag(
@@ -1762,24 +1631,14 @@ export function validate(
         !ast.workflows.some((workflow) => workflow.name === grant.workflow) &&
         !workspace?.workflowBlocks.has(grant.workflow)
       ) {
-        out.push(
-          diag(
-            `Policy references unknown workflow "${grant.workflow}"`,
-            grant.agentRange,
-          ),
-        )
+        out.push(diag(`Policy references unknown workflow "${grant.workflow}"`, grant.agentRange))
       }
     }
   }
 
   if (ast.policies.length > 1) {
     for (const policy of ast.policies.slice(1)) {
-      out.push(
-        diag(
-          'Only one policy { } block is allowed per workspace',
-          policy.range,
-        ),
-      )
+      out.push(diag('Only one policy { } block is allowed per workspace', policy.range))
     }
   }
 

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+
 import { parse } from '../parser'
 import { serialize } from '../serializer'
 import { validate } from '../validator'
@@ -15,6 +16,7 @@ connection slack_sales {
   provider: slack
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.connections.length).toBe(1)
@@ -30,6 +32,7 @@ connection broken {
   label: "x"
 }
 `
+
     const { ast, errors } = parse(source)
     expect(ast.connections.length).toBe(1)
     // The parser no longer double-reports the missing provider; the validator
@@ -44,11 +47,9 @@ connection broken {
 connection slack_sales { provider: slack }
 connection slack_support { provider: slack }
 `)
+
     expect(errors).toEqual([])
-    expect(ast.connections.map((c) => c.name)).toEqual([
-      'slack_sales',
-      'slack_support',
-    ])
+    expect(ast.connections.map((c) => c.name)).toEqual(['slack_sales', 'slack_support'])
   })
 })
 
@@ -75,19 +76,20 @@ connection petstore {
   auth: petstore_bearer
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const c = ast.connections[0]!
     expect(c.provider).toBe('petstore')
     expect(c.baseUrl).toBe('https://petstore.example.com/v2')
     expect(c.authRef).toBe('petstore_bearer')
+
     const diags = validate(ast, {
       host: { providers: new Set(['slack']) },
     })
+
     expect(diags.filter((d) => d.severity === 'error')).toEqual([])
-    expect(
-      diags.filter((d) => /not in the integration catalog/.test(d.message)),
-    ).toEqual([])
+    expect(diags.filter((d) => /not in the integration catalog/.test(d.message))).toEqual([])
   })
 
   test('a provider outside the host catalog warns; with no host it is accepted', () => {
@@ -96,21 +98,20 @@ connection crm {
   provider: acme_crm
 }
 `)
+
     expect(errors).toEqual([])
+
     const isCatalogWarning = (d: { message: string; severity?: string }) =>
-      d.severity === 'warning' &&
-      /not in the integration catalog/.test(d.message)
+      d.severity === 'warning' && /not in the integration catalog/.test(d.message)
 
     expect(validate(ast).filter(isCatalogWarning)).toEqual([])
+
     expect(
-      validate(ast, { host: { providers: new Set(['slack']) } }).filter(
-        isCatalogWarning,
-      ),
+      validate(ast, { host: { providers: new Set(['slack']) } }).filter(isCatalogWarning),
     ).toHaveLength(1)
+
     expect(
-      validate(ast, { host: { providers: new Set(['acme_crm']) } }).filter(
-        isCatalogWarning,
-      ),
+      validate(ast, { host: { providers: new Set(['acme_crm']) } }).filter(isCatalogWarning),
     ).toEqual([])
   })
 
@@ -121,10 +122,9 @@ connection petstore {
   base_url: "https://petstore.example.com/v2"
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) => /requires both base_url and auth/.test(d.message)),
-    ).toBe(true)
+    expect(diags.some((d) => /requires both base_url and auth/.test(d.message))).toBe(true)
   })
 
   test('self-managed connection must resolve auth block', () => {
@@ -135,11 +135,11 @@ connection petstore {
   auth: missing_auth
 }
 `)
+
     const diags = validate(ast)
+
     expect(
-      diags.some((d) =>
-        /references undefined auth block "missing_auth"/.test(d.message),
-      ),
+      diags.some((d) => /references undefined auth block "missing_auth"/.test(d.message)),
     ).toBe(true)
   })
 
@@ -154,10 +154,9 @@ connection petstore {
 connection dup { provider: slack }
 connection dup { provider: linear }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) => /Duplicate connection block name/.test(d.message)),
-    ).toBe(true)
+    expect(diags.some((d) => /Duplicate connection block name/.test(d.message))).toBe(true)
   })
 
   test('http node may reference a connection by name', () => {
@@ -173,6 +172,7 @@ workflow w {
   }
 }
 `)
+
     const diags = validate(ast)
     expect(diags).toEqual([])
   })
@@ -189,10 +189,9 @@ workflow w {
   }
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) => /undefined connection "missing"/.test(d.message)),
-    ).toBe(true)
+    expect(diags.some((d) => /undefined connection "missing"/.test(d.message))).toBe(true)
   })
 
   test('auth and connection on the same node are mutually exclusive', () => {
@@ -210,10 +209,9 @@ workflow w {
   }
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) => /set "auth" or "connection", not both/.test(d.message)),
-    ).toBe(true)
+    expect(diags.some((d) => /set "auth" or "connection", not both/.test(d.message))).toBe(true)
   })
 
   test('connection is only valid on http nodes', () => {
@@ -229,13 +227,11 @@ workflow w {
   }
 }
 `)
+
     const diags = validate(ast)
+
     expect(
-      diags.some((d) =>
-        /"connection" is only valid on http and integration nodes/.test(
-          d.message,
-        ),
-      ),
+      diags.some((d) => /"connection" is only valid on http and integration nodes/.test(d.message)),
     ).toBe(true)
   })
 
@@ -250,6 +246,7 @@ channel sales {
   connection: slack_sales
 }
 `)
+
     const diags = validate(ast)
     expect(diags.filter((d) => /connection/i.test(d.message))).toEqual([])
   })
@@ -265,10 +262,9 @@ channel sales {
   connection: slack_sales
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) => /must match platform "linear"/.test(d.message)),
-    ).toBe(true)
+    expect(diags.some((d) => /must match platform "linear"/.test(d.message))).toBe(true)
   })
 })
 
@@ -279,6 +275,7 @@ describe('connection serialization', () => {
   provider: slack
 }
 `
+
     const { ast } = parse(source)
     const out = serialize(ast)
     const reparsed = parse(out)
@@ -304,6 +301,7 @@ connection petstore {
   auth: petstore_bearer
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const out = serialize(ast)
@@ -311,13 +309,9 @@ connection petstore {
     expect(out).toContain('auth: petstore_bearer')
     const reparsed = parse(out)
     expect(reparsed.errors).toEqual([])
-    expect(reparsed.ast.connections[0]?.baseUrl).toBe(
-      'https://petstore.example.com/v2',
-    )
+    expect(reparsed.ast.connections[0]?.baseUrl).toBe('https://petstore.example.com/v2')
     expect(reparsed.ast.connections[0]?.authRef).toBe('petstore_bearer')
-    expect(
-      validate(reparsed.ast).filter((d) => d.severity === 'error'),
-    ).toEqual([])
+    expect(validate(reparsed.ast).filter((d) => d.severity === 'error')).toEqual([])
   })
 
   test('serialize emits channel blocks and round-trips connection bindings', () => {
@@ -337,6 +331,7 @@ channel sales {
   mode: dm
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
 
@@ -352,9 +347,7 @@ channel sales {
     expect(ch?.connection).toBe('slack_sales')
     expect(ch?.mode).toBe('dm')
     // The channel→connection binding survives validation after the round-trip.
-    expect(
-      validate(reparsed.ast).filter((d) => /connection/i.test(d.message)),
-    ).toEqual([])
+    expect(validate(reparsed.ast).filter((d) => /connection/i.test(d.message))).toEqual([])
   })
 })
 
@@ -362,9 +355,8 @@ describe('connection parser hardening', () => {
   test('emits an error for an unclosed connection block at EOF', () => {
     const { errors } = parse(`connection broken {
   provider: slack`)
-    expect(
-      errors.some((e) => /Expected } to close connection/.test(e.message)),
-    ).toBe(true)
+
+    expect(errors.some((e) => /Expected } to close connection/.test(e.message))).toBe(true)
   })
 
   test('flags a duplicate provider field', () => {
@@ -373,11 +365,10 @@ describe('connection parser hardening', () => {
   provider: linear
 }
 `)
-    expect(
-      errors.some((e) =>
-        /Duplicate connection property "provider"/.test(e.message),
-      ),
-    ).toBe(true)
+
+    expect(errors.some((e) => /Duplicate connection property "provider"/.test(e.message))).toBe(
+      true,
+    )
   })
 
   test('errors on a non-string connection value on an http node', () => {
@@ -393,12 +384,12 @@ workflow w {
   }
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) =>
-        /"connection" must be a connection block name/.test(d.message),
-      ),
-    ).toBe(true)
+
+    expect(diags.some((d) => /"connection" must be a connection block name/.test(d.message))).toBe(
+      true,
+    )
   })
 
   test('errors on a missing channel connection value', () => {
@@ -410,10 +401,9 @@ channel sales {
   connection:
 }
 `)
+
     expect(
-      errors.some((e) =>
-        /channel connection must be a connection block name/.test(e.message),
-      ),
+      errors.some((e) => /channel connection must be a connection block name/.test(e.message)),
     ).toBe(true)
   })
 })
@@ -449,11 +439,10 @@ workflow w {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast)
-    expect(
-      diags.some((d) => /undefined connection "missing_conn"/.test(d.message)),
-    ).toBe(true)
+    expect(diags.some((d) => /undefined connection "missing_conn"/.test(d.message))).toBe(true)
   })
 
   test('http node in a map subgraph resolves a defined connection', () => {
@@ -487,17 +476,17 @@ workflow w {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast)
-    expect(diags.filter((d) => /undefined connection/.test(d.message))).toEqual(
-      [],
-    )
+    expect(diags.filter((d) => /undefined connection/.test(d.message))).toEqual([])
   })
 })
 
 describe('connection cross-file resolution', () => {
   test('node and channel connection refs resolve across files via workspace', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-conn-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'connections.swirls'),
@@ -508,6 +497,7 @@ describe('connection cross-file resolution', () => {
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'consumer.swirls'),
         `agent triage {
@@ -533,20 +523,16 @@ workflow w {
       )
 
       const workspace = buildWorkspaceResourceIndex({ cwd: dir })
-      const consumer = fs.readFileSync(
-        path.join(dir, 'consumer.swirls'),
-        'utf-8',
-      )
+      const consumer = fs.readFileSync(path.join(dir, 'consumer.swirls'), 'utf-8')
       const { ast, errors } = parse(consumer)
       expect(errors).toEqual([])
 
       // Without the workspace, the connection lives in another file and fails.
       const diagsLocal = validate(ast)
-      expect(
-        diagsLocal.some((d) =>
-          /undefined connection "slack_sales"/.test(d.message),
-        ),
-      ).toBe(true)
+
+      expect(diagsLocal.some((d) => /undefined connection "slack_sales"/.test(d.message))).toBe(
+        true,
+      )
 
       // With the workspace index, both the node and channel refs resolve, and
       // the provider-match check (slack == slack) passes.
@@ -559,6 +545,7 @@ workflow w {
 
   test('cross-file channel connection provider mismatch is reported', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-conn-mm-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'connections.swirls'),
@@ -566,6 +553,7 @@ workflow w {
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'consumer.swirls'),
         `agent triage { provider: anthropic model: "claude" }
@@ -579,13 +567,9 @@ channel sales {
       )
 
       const workspace = buildWorkspaceResourceIndex({ cwd: dir })
-      const { ast } = parse(
-        fs.readFileSync(path.join(dir, 'consumer.swirls'), 'utf-8'),
-      )
+      const { ast } = parse(fs.readFileSync(path.join(dir, 'consumer.swirls'), 'utf-8'))
       const diagsWs = validate(ast, { workspace })
-      expect(
-        diagsWs.some((d) => /must match platform "linear"/.test(d.message)),
-      ).toBe(true)
+      expect(diagsWs.some((d) => /must match platform "linear"/.test(d.message))).toBe(true)
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }

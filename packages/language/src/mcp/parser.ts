@@ -52,6 +52,7 @@ export function parseMcpBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -63,6 +64,7 @@ export function parseMcpBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -70,6 +72,7 @@ export function parseMcpBlock(
     if (seenKeys.has(key)) {
       d.error(`Duplicate mcp property "${key}"`, keyTok)
     }
+
     seenKeys.add(key)
 
     if (!d.expect('colon')) {
@@ -80,73 +83,77 @@ export function parseMcpBlock(
     if (key === 'label') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         label = val
         labelRange = valTok?.range
       }
+
       continue
     }
 
     if (key === 'description') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         description = val
         descriptionRange = valTok?.range
       }
+
       continue
     }
 
     if (key === 'url') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         url = val
         urlRange = valTok?.range
       }
+
       continue
     }
 
     if (key === 'auth') {
       const valTok = d.peek()
+
       // Bare identifier: auth: static | auth: interactive
       if (valTok?.kind === 'identifier') {
         d.advance()
         const raw = valTok.value as string
+
         if (raw === 'static' || raw === 'interactive') {
           auth = raw
           authRange = valTok.range
         } else {
-          d.error(
-            `MCP auth must be "static" or "interactive", got "${raw}"`,
-            valTok,
-          )
+          d.error(`MCP auth must be "static" or "interactive", got "${raw}"`, valTok)
         }
+
         continue
       }
+
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         if (val === 'static' || val === 'interactive') {
           auth = val
           authRange = valTok?.range
         } else {
-          d.error(
-            `MCP auth must be "static" or "interactive", got ${JSON.stringify(val)}`,
-            valTok,
-          )
+          d.error(`MCP auth must be "static" or "interactive", got ${JSON.stringify(val)}`, valTok)
         }
       } else {
         d.error('Expected auth: static or auth: interactive', valTok)
       }
+
       continue
     }
 
     if (key === 'network') {
       const valueToken = d.peek()
-      if (
-        valueToken &&
-        (valueToken.kind === 'identifier' || valueToken.kind === 'keyword')
-      ) {
+
+      if (valueToken && (valueToken.kind === 'identifier' || valueToken.kind === 'keyword')) {
         d.advance()
         networkRef = valueToken.value as string
         networkRefRange = valueToken.range
@@ -154,6 +161,7 @@ export function parseMcpBlock(
         d.error('MCP network must be a network block name', valueToken)
         d.parseValue()
       }
+
       continue
     }
 
@@ -163,11 +171,13 @@ export function parseMcpBlock(
   }
 
   const closing = d.expect('rbrace')
+
   if (!closing) {
     // Anchor the error to a real token (`d.peek()` is null at EOF, which the
     // delegate would silently drop). `start` always exists here.
     d.error('Expected } to close mcp block', d.peek() ?? start)
   }
+
   const end = closing ?? d.peek()
 
   return {

@@ -11,14 +11,14 @@ const diagnostics = errors.length > 0 ? [] : validate(ast)
 
 ## What is in the package
 
-| Piece | Entry point | What it does |
-|---|---|---|
-| Lexer | `tokenize`, `Lexer` | Source text to tokens with line, column and offset. Embedded blocks (`@ts { }`, `@json { }`, `@sql { }`, `@prisma { }`, `@openui { }`) are one token each, with the range of their body. |
-| Parser | `parse` | Tokens to a `SwirlsFile` AST plus a list of `ParseError`. Hand-written recursive descent. |
-| Validator | `validate` | Semantic checks on an AST: names, references, graph shape, per-block rules. Returns `Diagnostic[]` with `error` or `warning` severity. |
-| Serializer | `serialize` | An AST back to source. |
-| Workspace | `@swirls/language/workspace` | Find the `.swirls` files of a project and index their resources, so references resolve across files. |
-| Parse cache | `createParseCache` | A content-keyed LRU around `parse`, for callers that parse the same text repeatedly (an editor, a watcher). |
+| Piece       | Entry point                  | What it does                                                                                                                                                                             |
+| ----------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lexer       | `tokenize`, `Lexer`          | Source text to tokens with line, column and offset. Embedded blocks (`@ts { }`, `@json { }`, `@sql { }`, `@prisma { }`, `@openui { }`) are one token each, with the range of their body. |
+| Parser      | `parse`                      | Tokens to a `SwirlsFile` AST plus a list of `ParseError`. Hand-written recursive descent.                                                                                                |
+| Validator   | `validate`                   | Semantic checks on an AST: names, references, graph shape, per-block rules. Returns `Diagnostic[]` with `error` or `warning` severity.                                                   |
+| Serializer  | `serialize`                  | An AST back to source.                                                                                                                                                                   |
+| Workspace   | `@swirls/language/workspace` | Find the `.swirls` files of a project and index their resources, so references resolve across files.                                                                                     |
+| Parse cache | `createParseCache`           | A content-keyed LRU around `parse`, for callers that parse the same text repeatedly (an editor, a watcher).                                                                              |
 
 Every AST node carries a `range`, which is what editor features and diagnostics are built on.
 

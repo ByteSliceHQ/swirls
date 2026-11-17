@@ -28,10 +28,7 @@ export function getLeafNodes(workflow: WorkflowDecl): NodeDecl[] {
 /**
  * Build the set of all ancestor node names (full lineage): direct upstream plus their ancestors, transitively.
  */
-export function getLineageNodeNames(
-  workflow: WorkflowDecl,
-  nodeName: string,
-): string[] {
+export function getLineageNodeNames(workflow: WorkflowDecl, nodeName: string): string[] {
   const lineage = new Set<string>()
   const worklist: string[] = [nodeName]
   const seen = new Set<string>([nodeName])
@@ -59,11 +56,10 @@ export function getLineageNodeNames(
  * Used conservatively: everything on a switch branch is treated as may-run for typing.
  */
 function getNamesBelowAnySwitch(workflow: WorkflowDecl): Set<string> {
-  const switchNames = new Set(
-    workflow.nodes.filter((n) => n.type === 'switch').map((n) => n.name),
-  )
+  const switchNames = new Set(workflow.nodes.filter((n) => n.type === 'switch').map((n) => n.name))
   const below = new Set<string>()
   const adj = new Map<string, string[]>()
+
   for (const e of workflow.edges) {
     const list = adj.get(e.source) ?? []
     list.push(e.target)
@@ -74,7 +70,9 @@ function getNamesBelowAnySwitch(workflow: WorkflowDecl): Set<string> {
     if (below.has(name)) {
       return
     }
+
     below.add(name)
+
     for (const t of adj.get(name) ?? []) {
       dfs(t)
     }
@@ -106,34 +104,42 @@ const mustRunCache = new WeakMap<WorkflowDecl, ReadonlySet<string>>()
 function computeMustRunNodeNames(workflow: WorkflowDecl): Set<string> {
   const belowSwitch = getNamesBelowAnySwitch(workflow)
   const incoming = new Map<string, string[]>()
+
   for (const n of workflow.nodes) {
     incoming.set(n.name, [])
   }
+
   for (const e of workflow.edges) {
     incoming.get(e.target)?.push(e.source)
   }
 
   const mustRun = new Set<string>()
   const roots = getRootNodeNames(workflow)
+
   for (const r of roots) {
     mustRun.add(r)
   }
 
   let changed = true
+
   while (changed) {
     changed = false
+
     for (const node of workflow.nodes) {
       if (mustRun.has(node.name)) {
         continue
       }
+
       if (belowSwitch.has(node.name)) {
         continue
       }
 
       const parents = incoming.get(node.name) ?? []
+
       if (parents.length === 0) {
         continue
       }
+
       if (parents.every((p) => mustRun.has(p))) {
         mustRun.add(node.name)
         changed = true
@@ -144,13 +150,13 @@ function computeMustRunNodeNames(workflow: WorkflowDecl): Set<string> {
   return mustRun
 }
 
-export function getMustRunNodeNames(
-  workflow: WorkflowDecl,
-): ReadonlySet<string> {
+export function getMustRunNodeNames(workflow: WorkflowDecl): ReadonlySet<string> {
   const cached = mustRunCache.get(workflow)
+
   if (cached) {
     return cached
   }
+
   const result = computeMustRunNodeNames(workflow)
   mustRunCache.set(workflow, result)
   return result

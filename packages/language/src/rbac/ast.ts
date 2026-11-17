@@ -5,6 +5,7 @@
  */
 
 import type { FileRetention } from '@swirls/definition/file-values'
+
 import type { SourceRange } from '../ast'
 
 /**

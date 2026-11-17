@@ -9,9 +9,11 @@ export function resolveActionInputSchema(
   if (action.input) {
     return action.input
   }
+
   if (action.inputRef && workspace?.schemaLiterals) {
     return workspace.schemaLiterals.get(action.inputRef)
   }
+
   return undefined
 }
 
@@ -23,16 +25,15 @@ export function resolveActionOutputSchema(
   if (action.output) {
     return action.output
   }
+
   if (action.outputRef && workspace?.schemaLiterals) {
     return workspace.schemaLiterals.get(action.outputRef)
   }
+
   return undefined
 }
 
 /** Find an action block by name across local AST and workspace index. */
-export function findActionDecl(
-  actions: ActionDecl[],
-  name: string,
-): ActionDecl | undefined {
+export function findActionDecl(actions: ActionDecl[], name: string): ActionDecl | undefined {
   return actions.find((a) => a.name === name)
 }

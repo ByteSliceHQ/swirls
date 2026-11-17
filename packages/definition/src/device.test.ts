@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import {
   type DeviceSelector,
   deviceInstallCommands,
@@ -16,15 +17,12 @@ const laptop = {
 }
 
 describe('deviceTagSchema', () => {
-  test.each([
-    'front-office',
-    'site:denver',
-    'win11',
-    'tier_1',
-    'v2.0',
-  ])('should accept %s', (tag) => {
-    expect(deviceTagSchema.safeParse(tag).success).toBe(true)
-  })
+  test.each(['front-office', 'site:denver', 'win11', 'tier_1', 'v2.0'])(
+    'should accept %s',
+    (tag) => {
+      expect(deviceTagSchema.safeParse(tag).success).toBe(true)
+    },
+  )
 
   test.each([
     ['Front-Office', 'an uppercase letter'],
@@ -50,9 +48,7 @@ describe('deviceTagsSchema', () => {
 
 describe('deviceSelectorSchema', () => {
   test('should accept tags alone', () => {
-    expect(deviceSelectorSchema.safeParse({ tags: ['kiosk'] }).success).toBe(
-      true,
-    )
+    expect(deviceSelectorSchema.safeParse({ tags: ['kiosk'] }).success).toBe(true)
   })
 
   test('should accept an os alone', () => {
@@ -132,6 +128,7 @@ describe('deviceInstallCommands', () => {
     apiUrl: 'https://swirls.ai/api',
     webUrl: 'https://swirls.ai',
   })
+
   const staging = deviceInstallCommands({
     token: 'swe_abc',
     apiUrl: 'https://staging.example.test/api/',

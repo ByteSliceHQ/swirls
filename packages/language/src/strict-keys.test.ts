@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from './parser'
 
-const messages = (source: string): string[] =>
-  parse(source).errors.map((e) => e.message)
+const messages = (source: string): string[] => parse(source).errors.map((e) => e.message)
 
 describe('blocks reject keys they do not define', () => {
   test('unknown form property', () => {
@@ -21,12 +21,15 @@ describe('blocks reject keys they do not define', () => {
     expect(messages('schedule s {\n  cron: "0 0 * * *"\n  tz: "UTC"\n}\n')).toEqual([
       'Unknown schedule property "tz"; expected label, description, cron, timezone, enabled',
     ])
+
     expect(messages('secret s {\n  vars: [A]\n  kind: 1\n}\n')).toEqual([
       'Unknown secret property "kind"; expected label, description, type, vars',
     ])
+
     expect(messages('role r {\n  descripton: "x"\n}\n')).toEqual([
       'Unknown role property "descripton"; expected description, match',
     ])
+
     expect(messages('workflow w {\n  lable: "W"\n}\n')).toEqual([
       'Unknown workflow property "lable"',
     ])
@@ -45,10 +48,7 @@ describe('a key given twice in one block is an error', () => {
       messages(
         'workflow w {\n  label: "A"\n  label: "B"\n  root {\n    type: code\n    code: @ts { return {} }\n    code: @ts { return 1 }\n  }\n}\n',
       ),
-    ).toEqual([
-      'Duplicate workflow property "label"',
-      'Duplicate node property "code"',
-    ])
+    ).toEqual(['Duplicate workflow property "label"', 'Duplicate node property "code"'])
   })
 
   test('any other block, once per duplicate', () => {
@@ -61,6 +61,7 @@ describe('a key given twice in one block is an error', () => {
     const errors = messages(
       'app a {\n  nav {\n    section "S" {\n      page: one\n      page: two\n    }\n  }\n}\n',
     )
+
     expect(errors.filter((m) => m.startsWith('Duplicate'))).toEqual([])
   })
 })

@@ -2,22 +2,10 @@
  * Validation for `operation` blocks and `type: device` nodes.
  */
 
-import {
-  deviceOsSchema,
-  deviceSelectorSchema,
-  deviceTagSchema,
-} from '@swirls/definition/device'
-import {
-  DEVICE_NODE_WAIT_SECONDS_MAX,
-  resourceNameSchema,
-} from '@swirls/definition/schemas'
-import type {
-  ConfigValue,
-  Diagnostic,
-  NodeDecl,
-  SourceRange,
-  SwirlsFile,
-} from '../ast'
+import { deviceOsSchema, deviceSelectorSchema, deviceTagSchema } from '@swirls/definition/device'
+import { DEVICE_NODE_WAIT_SECONDS_MAX, resourceNameSchema } from '@swirls/definition/schemas'
+
+import type { ConfigValue, Diagnostic, NodeDecl, SourceRange, SwirlsFile } from '../ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import type { OperationDecl } from './ast'
 
@@ -45,12 +33,15 @@ function operationBlockMap(
   workspace?: WorkspaceResourceIndex,
 ): Map<string, OperationDecl> {
   const operations = new Map<string, OperationDecl>()
+
   for (const operation of ast.operations ?? []) {
     operations.set(operation.name, operation)
   }
+
   for (const [name, operation] of workspace?.operationBlocks ?? []) {
     operations.set(name, operation)
   }
+
   return operations
 }
 
@@ -60,25 +51,24 @@ export function validateOperationBlocks(ast: SwirlsFile): Diagnostic[] {
 
   for (const operation of ast.operations ?? []) {
     const name = resourceNameSchema.safeParse(operation.name)
+
     if (!name.success) {
       const reason = name.error.issues[0]?.message ?? 'Invalid name'
       out.push(diag(`Operation name: ${reason}`, operation.nameRange))
     } else if (operation.name.length > MAX_NAME_CHARS) {
       out.push(
-        diag(
-          `Operation name must be at most ${MAX_NAME_CHARS} characters`,
-          operation.nameRange,
-        ),
+        diag(`Operation name must be at most ${MAX_NAME_CHARS} characters`, operation.nameRange),
       )
     }
+
     if (seen.has(operation.name)) {
-      out.push(
-        diag(`Duplicate operation "${operation.name}"`, operation.nameRange),
-      )
+      out.push(diag(`Duplicate operation "${operation.name}"`, operation.nameRange))
     }
+
     seen.add(operation.name)
 
     const { command } = operation
+
     if (!command) {
       out.push(
         diag(
@@ -88,62 +78,41 @@ export function validateOperationBlocks(ast: SwirlsFile): Diagnostic[] {
       )
     } else if (command.path !== undefined) {
       const extension = SCRIPT_EXTENSIONS[command.lang]
+
       if (!command.path.trim().toLowerCase().endsWith(extension)) {
         out.push(
-          diag(
-            `${SCRIPT_LABELS[command.lang]} must reference a ${extension} file`,
-            command.range,
-          ),
+          diag(`${SCRIPT_LABELS[command.lang]} must reference a ${extension} file`, command.range),
         )
       }
     }
+
     if (command?.script !== undefined) {
       if (command.script.trim() === '') {
-        out.push(
-          diag(
-            `Operation "${operation.name}" has an empty command`,
-            command.range,
-          ),
-        )
+        out.push(diag(`Operation "${operation.name}" has an empty command`, command.range))
       } else if (command.script.length > MAX_SCRIPT_CHARS) {
         out.push(
-          diag(
-            `Operation command must be at most ${MAX_SCRIPT_CHARS} characters`,
-            command.range,
-          ),
+          diag(`Operation command must be at most ${MAX_SCRIPT_CHARS} characters`, command.range),
         )
       } else if (command.script.includes('\u0000')) {
-        out.push(
-          diag(
-            'Operation command must not contain a NUL character',
-            command.range,
-          ),
-        )
+        out.push(diag('Operation command must not contain a NUL character', command.range))
       }
     }
 
     if (operation.platform !== undefined) {
       const range = operation.platformRange ?? operation.range
+
       if (!deviceOsSchema.safeParse(operation.platform).success) {
-        out.push(
-          diag('Operation "platform" must be windows, linux or macos', range),
-        )
+        out.push(diag('Operation "platform" must be windows, linux or macos', range))
       } else if (operation.platform === 'windows' && command?.lang === 'sh') {
-        out.push(
-          diag(
-            'An @sh command cannot run on windows. Use @ps, or another platform.',
-            range,
-          ),
-        )
+        out.push(diag('An @sh command cannot run on windows. Use @ps, or another platform.', range))
       }
     }
 
     if (operation.runAs !== undefined) {
       const range = operation.runAsRange ?? operation.range
+
       if (!RUN_AS.includes(operation.runAs)) {
-        out.push(
-          diag('Operation "runAs" must be system or signed_in_user', range),
-        )
+        out.push(diag('Operation "runAs" must be system or signed_in_user', range))
       } else if (operation.runAs === 'signed_in_user') {
         out.push(
           diag(
@@ -169,6 +138,7 @@ export function validateOperationBlocks(ast: SwirlsFile): Diagnostic[] {
       )
     }
   }
+
   return out
 }
 
@@ -191,10 +161,7 @@ function literalOf(cv: ConfigValue): unknown {
   }
 }
 
-function validateSelector(
-  cv: ConfigValue,
-  operation: OperationDecl | undefined,
-): Diagnostic[] {
+function validateSelector(cv: ConfigValue, operation: OperationDecl | undefined): Diagnostic[] {
   if (cv.kind !== 'object') {
     return [
       diag(
@@ -203,16 +170,21 @@ function validateSelector(
       ),
     ]
   }
+
   const out: Diagnostic[] = []
+
   for (const [key, value] of Object.entries(cv.value)) {
     if (key !== 'tags' && key !== 'os') {
       out.push(diag(`Unknown selector field "${key}"`, value.range))
     }
   }
+
   const tags = cv.value.tags
+
   if (tags && tags.kind !== 'array') {
     out.push(diag('Selector "tags" must be a list of tags', tags.range))
   }
+
   if (tags?.kind === 'array') {
     for (const tag of tags.value) {
       if (!deviceTagSchema.safeParse(literalOf(tag)).success) {
@@ -225,15 +197,19 @@ function validateSelector(
       }
     }
   }
+
   const os = cv.value.os
+
   if (os && !deviceOsSchema.safeParse(literalOf(os)).success) {
     out.push(diag('Selector "os" must be windows, linux or macos', os.range))
   }
+
   if (out.length > 0) {
     return out
   }
 
   const selector = deviceSelectorSchema.safeParse(literalOf(cv))
+
   if (!selector.success) {
     return [
       diag(
@@ -242,6 +218,7 @@ function validateSelector(
       ),
     ]
   }
+
   if (
     operation?.platform !== undefined &&
     selector.data.os !== undefined &&
@@ -254,6 +231,7 @@ function validateSelector(
       ),
     ]
   }
+
   return []
 }
 
@@ -268,6 +246,7 @@ export function validateDeviceNodes(
     for (const child of node.subgraph?.nodes ?? []) {
       checkNode(child)
     }
+
     if (node.type !== 'device') {
       return
     }
@@ -275,6 +254,7 @@ export function validateDeviceNodes(
     if (node.outputFormat) {
       out.push(diag('Node type "device" does not accept "format"', node.range))
     }
+
     // A review replaces a node's own work with the approval form, so a
     // device node carrying one would never reach a device.
     if (node.reviewConfig?.enabled) {
@@ -288,16 +268,15 @@ export function validateDeviceNodes(
 
     let operation: OperationDecl | undefined
     const operationCv = node.configFields.operation
+
     if (operationCv) {
       if (operationCv.kind !== 'string' || !operationCv.value.trim()) {
         out.push(
-          diag(
-            'Device node "operation" must name a top-level operation block',
-            operationCv.range,
-          ),
+          diag('Device node "operation" must name a top-level operation block', operationCv.range),
         )
       } else {
         operation = operations.get(operationCv.value.trim())
+
         if (!operation) {
           out.push(
             diag(
@@ -311,6 +290,7 @@ export function validateDeviceNodes(
 
     const deviceCv = node.configFields.device
     const devicesCv = node.configFields.devices
+
     if (deviceCv && devicesCv) {
       out.push(
         diag(
@@ -320,12 +300,10 @@ export function validateDeviceNodes(
       )
     } else if (!deviceCv && !devicesCv) {
       out.push(
-        diag(
-          'Device node requires "device" (one device id) or "devices" (a selector)',
-          node.range,
-        ),
+        diag('Device node requires "device" (one device id) or "devices" (a selector)', node.range),
       )
     }
+
     if (
       deviceCv &&
       deviceCv.kind !== 'string' &&
@@ -339,26 +317,24 @@ export function validateDeviceNodes(
         ),
       )
     }
+
     if (devicesCv) {
       out.push(...validateSelector(devicesCv, operation))
     }
 
     const inputCv = node.configFields.input
+
     if (
       inputCv &&
       inputCv.kind !== 'object' &&
       inputCv.kind !== 'ts_block' &&
       inputCv.kind !== 'ts_file_ref'
     ) {
-      out.push(
-        diag(
-          'Device node "input" must be an object, or @ts returning one',
-          inputCv.range,
-        ),
-      )
+      out.push(diag('Device node "input" must be an object, or @ts returning one', inputCv.range))
     }
 
     const waitCv = node.configFields.waitSeconds
+
     if (
       waitCv &&
       (waitCv.kind !== 'number' ||
@@ -380,5 +356,6 @@ export function validateDeviceNodes(
       checkNode(node)
     }
   }
+
   return out
 }

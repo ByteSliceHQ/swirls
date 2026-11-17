@@ -33,10 +33,7 @@
 function embedded($, names, content) {
   return seq(
     '@',
-    field(
-      'language',
-      alias(names.length > 1 ? choice(...names) : names[0], $.embedded_language),
-    ),
+    field('language', alias(names.length > 1 ? choice(...names) : names[0], $.embedded_language)),
     '{',
     optional(field('content', alias(content, $.embedded_content))),
     '}',
@@ -67,8 +64,7 @@ module.exports = grammar({
   rules: {
     source_file: ($) => repeat($._statement),
 
-    _statement: ($) =>
-      choice($.block, $.field, $.edge, $.trigger_binding, $.grant),
+    _statement: ($) => choice($.block, $.field, $.edge, $.trigger_binding, $.grant),
 
     // workflow notify { ... } / root { ... } / section "Today" { ... }
     block: ($) =>
@@ -85,10 +81,7 @@ module.exports = grammar({
       seq(
         field('key', choice($.identifier, $.string)),
         ':',
-        choice(
-          field('value', $._value),
-          seq(field('value', $.reference), field('body', $.object)),
-        ),
+        choice(field('value', $._value), seq(field('value', $.reference), field('body', $.object))),
       ),
 
     // root -> send / route -["urgent"]-> escalate
@@ -168,11 +161,7 @@ module.exports = grammar({
       ),
 
     string: ($) =>
-      seq(
-        '"',
-        repeat(choice($.string_content, $.escape_sequence)),
-        token.immediate('"'),
-      ),
+      seq('"', repeat(choice($.string_content, $.escape_sequence)), token.immediate('"')),
 
     // Strings may span lines; the Swirls lexer only stops at an unescaped quote.
     string_content: (_) => token.immediate(prec(1, /[^"\\]+/)),
@@ -190,7 +179,7 @@ module.exports = grammar({
     null: (_) => 'null',
 
     // Unquoted request path: /chat.postMessage, /v1/users
-    path: (_) => /\/([a-zA-Z0-9_.\-][a-zA-Z0-9_.\/\-]*)?/,
+    path: (_) => /\/([a-zA-Z0-9_.-][a-zA-Z0-9_./-]*)?/,
 
     identifier: (_) => /[a-zA-Z_][a-zA-Z0-9_]*/,
 

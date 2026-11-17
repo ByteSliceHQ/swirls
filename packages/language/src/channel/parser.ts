@@ -28,14 +28,17 @@ function parseEnumOrStringValue(
   d: ResourceParserDelegate,
 ): { value: string; range?: SourceRange } | null {
   const tok = d.peek()
+
   if (tok && (tok.kind === 'identifier' || tok.kind === 'keyword')) {
     d.advance()
     return { value: tok.value as string, range: tok.range as SourceRange }
   }
+
   if (tok?.kind === 'string') {
     d.advance()
     return { value: tok.value as string, range: tok.range as SourceRange }
   }
+
   return null
 }
 
@@ -62,17 +65,21 @@ function parseDurationValue(
   if (tok?.kind === 'number') {
     d.advance()
     const unitTok = d.peek()
+
     if (
       unitTok?.kind === 'identifier' &&
       Object.hasOwn(DURATION_UNIT_SECONDS, String(unitTok.value))
     ) {
       d.advance()
+
       d.error(
         `channel ${key} must be ${DURATION_SYNTAX_HINT} — quote it as "${tok.value}${unitTok.value}"`,
         tok,
       )
+
       return null
     }
+
     d.error(`channel ${key} must be ${DURATION_SYNTAX_HINT}`, tok)
     return null
   }
@@ -131,6 +138,7 @@ export function parseChannelBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -141,6 +149,7 @@ export function parseChannelBlock(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -154,152 +163,176 @@ export function parseChannelBlock(
 
     if (key === 'label') {
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         label = val
       }
+
       continue
     }
 
     if (key === 'description') {
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         description = val
       }
+
       continue
     }
 
     if (key === 'platform') {
       const parsed = parseEnumOrStringValue(d)
+
       if (parsed?.value === 'portal') {
         d.error('channel platform "portal" was renamed to "swirls"', d.peek())
       } else if (parsed && isChannelPlatform(parsed.value)) {
         platform = parsed.value
         platformRange = parsed.range
       } else {
-        d.error(
-          `channel platform must be one of ${CHANNEL_PLATFORMS.join(', ')}`,
-          d.peek(),
-        )
+        d.error(`channel platform must be one of ${CHANNEL_PLATFORMS.join(', ')}`, d.peek())
       }
+
       continue
     }
 
     if (key === 'agent') {
       const parsed = parseEnumOrStringValue(d)
+
       if (parsed) {
         agent = parsed.value
         agentRange = parsed.range
       }
+
       continue
     }
 
     if (key === 'workflows') {
       const startList = d.expect('lbracket')
+
       if (!startList) {
-        d.error(
-          'channel workflows must be an array of workflow names',
-          valueTok,
-        )
+        d.error('channel workflows must be an array of workflow names', valueTok)
         d.parseValue()
         continue
       }
+
       workflows = []
       workflowsRanges = []
+
       while (!d.eof() && d.peek()?.kind !== 'rbracket') {
         if (d.peek()?.kind === 'block_comment') {
           d.advance()
           continue
         }
+
         const name = parseEnumOrStringValue(d)
+
         if (!name) {
           d.error('Expected a workflow name', d.peek())
           d.parseValue()
           break
         }
+
         workflows.push(name.value)
+
         if (name.range) {
           workflowsRanges.push(name.range)
         }
+
         d.expect('comma')
       }
+
       const endList = d.expect('rbracket')
+
       if (!endList) {
         d.error('Expected ] after workflows', d.peek())
       }
+
       workflowsRange = rangeFromTokens(startList, endList ?? startList)
       continue
     }
 
     if (key === 'enabled') {
       const val = d.parseValue()
+
       if (typeof val === 'boolean') {
         enabled = val
       }
+
       continue
     }
 
     if (key === 'connection') {
       const parsed = parseEnumOrStringValue(d)
+
       if (parsed) {
         connection = parsed.value
         connectionRange = parsed.range
       } else {
         d.error('channel connection must be a connection block name', d.peek())
       }
+
       continue
     }
 
     if (key === 'connector') {
       const parsed = parseEnumOrStringValue(d)
+
       if (parsed) {
         connector = parsed.value
         connectorRange = parsed.range
       } else {
         d.error('channel connector must be a connector block name', d.peek())
       }
+
       continue
     }
 
     if (key === 'mode') {
       const parsed = parseEnumOrStringValue(d)
+
       if (parsed && isChannelMode(parsed.value)) {
         mode = parsed.value
         modeRange = parsed.range
       } else {
         d.error('channel mode must be mention, dm, all, or ambient', d.peek())
       }
+
       continue
     }
 
     if (key === 'engagement_timeout') {
       const parsed = parseDurationValue(d, key)
+
       if (parsed) {
         engagementTimeout = parsed.value
         engagementTimeoutRange = parsed.range
       }
+
       continue
     }
 
     if (key === 'cooldown') {
       const parsed = parseDurationValue(d, key)
+
       if (parsed) {
         cooldown = parsed.value
         cooldownRange = parsed.range
       }
+
       continue
     }
 
     if (key === 'max_unprompted_per_hour') {
       const val = d.parseValue()
+
       if (typeof val === 'number') {
         maxUnpromptedPerHour = val
         maxUnpromptedPerHourRange = valueTok?.range
       } else {
-        d.error(
-          'channel max_unprompted_per_hour must be a whole number of 0 or more',
-          valueTok,
-        )
+        d.error('channel max_unprompted_per_hour must be a whole number of 0 or more', valueTok)
       }
+
       continue
     }
 
@@ -312,14 +345,13 @@ export function parseChannelBlock(
   if (!platform) {
     d.error('channel must declare platform', start)
   }
+
   if (!agent && platform !== 'mcp') {
     d.error('channel must declare agent', start)
   }
+
   if (platform === 'mcp' && !agent && !workflows?.length) {
-    d.error(
-      'MCP channel must declare an agent or a non-empty workflows list',
-      start,
-    )
+    d.error('MCP channel must declare an agent or a non-empty workflows list', start)
   }
 
   return {

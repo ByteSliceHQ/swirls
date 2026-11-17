@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+
 import { createParseCache } from './parse-cache'
 import { parse } from './parser'
 import { buildWorkspaceResourceIndex } from './workspace/workspace-resources'
@@ -41,13 +42,14 @@ describe('createParseCache', () => {
 describe('buildWorkspaceResourceIndex with a parse cache', () => {
   test('a rebuild after one edit parses only the edited file', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-parse-cache-'))
+
     try {
       for (const name of ['a', 'b', 'c', 'd']) {
         fs.writeFileSync(path.join(dir, `${name}.swirls`), FORM(name))
       }
+
       const cache = createParseCache()
-      const build = () =>
-        buildWorkspaceResourceIndex({ cwd: dir, parse: cache.parse })
+      const build = () => buildWorkspaceResourceIndex({ cwd: dir, parse: cache.parse })
 
       const cold = build()
       expect([...cold.forms.keys()].sort()).toEqual(['a', 'b', 'c', 'd'])
@@ -59,9 +61,9 @@ describe('buildWorkspaceResourceIndex with a parse cache', () => {
       expect(cache.stats).toEqual({ hits: 3, misses: 5 })
 
       // Same answer as an uncached build.
-      expect([...buildWorkspaceResourceIndex({ cwd: dir }).forms.keys()]).toEqual(
-        [...warm.forms.keys()],
-      )
+      expect([...buildWorkspaceResourceIndex({ cwd: dir }).forms.keys()]).toEqual([
+        ...warm.forms.keys(),
+      ])
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }

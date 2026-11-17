@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
 import * as esbuild from 'esbuild'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))

@@ -2,14 +2,12 @@
  * Validate stream node SQL block: ensure SELECT result columns match outputSchema.items (array output).
  */
 
-import type { SwirlsFile } from '@swirls/language'
 import type { Diagnostic } from 'vscode-languageserver'
 import { DiagnosticSeverity } from 'vscode-languageserver'
-import {
-  getStreamNodeOutputRowSchema,
-  resolveStreamSchema,
-  type SqlBlockInfo,
-} from './blocks'
+
+import type { SwirlsFile } from '@swirls/language'
+
+import { getStreamNodeOutputRowSchema, resolveStreamSchema, type SqlBlockInfo } from './blocks'
 import { getSelectResultColumns } from './parse-select'
 
 /** Convert AST range (1-based line/column) to LSP range (0-based line/character). */
@@ -39,10 +37,7 @@ function normalizeColumnName(name: string): string {
  * from the stream node's outputSchema.items (when outputSchema is an array). Returns diagnostics (errors for missing
  * required columns, optionally one warning for parse errors).
  */
-export function getSqlBlockDiagnostics(
-  block: SqlBlockInfo,
-  ast: SwirlsFile,
-): Diagnostic[] {
+export function getSqlBlockDiagnostics(block: SqlBlockInfo, ast: SwirlsFile): Diagnostic[] {
   const diagnostics: Diagnostic[] = []
   const range = toLspRange(block.innerRange)
 
@@ -64,6 +59,7 @@ export function getSqlBlockDiagnostics(
       range,
       severity: DiagnosticSeverity.Warning,
     })
+
     return diagnostics
   }
 
@@ -85,6 +81,7 @@ export function getSqlBlockDiagnostics(
     const streamCols = streamName
       ? resolveStreamSchema(ast, streamName, versionPinRaw || undefined)
       : null
+
     actualColumns = streamCols ?? []
   } else {
     actualColumns = parseResult.columns

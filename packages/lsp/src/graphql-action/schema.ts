@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto'
+
 import { buildClientSchema, buildSchema, type GraphQLSchema } from 'graphql'
-import {
-  GRAPHQL_SCHEMA_JSON_FILENAME,
-  GRAPHQL_SCHEMA_SDL_FILENAME,
-} from './constants'
+
+import { GRAPHQL_SCHEMA_JSON_FILENAME, GRAPHQL_SCHEMA_SDL_FILENAME } from './constants'
 
 function tryParseJson(raw: string): unknown | undefined {
   try {
@@ -25,14 +24,17 @@ export function clearGraphqlSchemaCache(): void {
 
 export function loadGraphqlSchemaFromContent(raw: string): GraphQLSchema {
   const json = tryParseJson(raw)
+
   if (json && typeof json === 'object' && 'data' in json) {
     const data = (json as { data?: { __schema?: unknown } }).data
+
     if (data?.__schema) {
       return buildClientSchema(data as Parameters<typeof buildClientSchema>[0])
     }
   }
 
   const trimmed = raw.trim()
+
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     throw new Error('GraphQL content is not a valid introspection result')
   }
@@ -40,15 +42,14 @@ export function loadGraphqlSchemaFromContent(raw: string): GraphQLSchema {
   return buildSchema(raw)
 }
 
-export function loadGraphqlSchemaFromContentCached(
-  sourceKey: string,
-  raw: string,
-): GraphQLSchema {
+export function loadGraphqlSchemaFromContentCached(sourceKey: string, raw: string): GraphQLSchema {
   const cacheKey = `${sourceKey}:${hashContent(raw)}`
   const cached = schemaCache.get(cacheKey)
+
   if (cached) {
     return cached
   }
+
   const schema = loadGraphqlSchemaFromContent(raw)
   schemaCache.set(cacheKey, schema)
   return schema
@@ -73,15 +74,10 @@ export function readSiblingGraphqlSchemaContent(args: {
   readFile: (relativePath: string) => string | undefined
 }): string | undefined {
   const paths = siblingGraphqlSchemaPaths(args.actionRelativePath)
-  return (
-    args.readFile(paths.sdlPath) ?? args.readFile(paths.jsonPath) ?? undefined
-  )
+  return args.readFile(paths.sdlPath) ?? args.readFile(paths.jsonPath) ?? undefined
 }
 
-function loadGraphqlSchemaFromRaw(
-  sourceKey: string,
-  raw: string,
-): GraphQLSchema | undefined {
+function loadGraphqlSchemaFromRaw(sourceKey: string, raw: string): GraphQLSchema | undefined {
   try {
     return loadGraphqlSchemaFromContentCached(sourceKey, raw)
   } catch {
@@ -95,9 +91,11 @@ export function loadSiblingGraphqlSchema(args: {
 }): GraphQLSchema | undefined {
   const paths = siblingGraphqlSchemaPaths(args.actionRelativePath)
   const raw = readSiblingGraphqlSchemaContent(args)
+
   if (!raw) {
     return undefined
   }
+
   return loadGraphqlSchemaFromRaw(paths.sdlPath, raw)
 }
 
@@ -117,9 +115,7 @@ export function readProviderGraphqlSchemaContent(args: {
   readFile: (relativePath: string) => string | undefined
 }): string | undefined {
   const paths = providerGraphqlSchemaContentPaths(args.provider)
-  return (
-    args.readFile(paths.sdlPath) ?? args.readFile(paths.jsonPath) ?? undefined
-  )
+  return args.readFile(paths.sdlPath) ?? args.readFile(paths.jsonPath) ?? undefined
 }
 
 export function loadProviderGraphqlSchema(args: {
@@ -128,8 +124,10 @@ export function loadProviderGraphqlSchema(args: {
 }): GraphQLSchema | undefined {
   const paths = providerGraphqlSchemaContentPaths(args.provider)
   const raw = readProviderGraphqlSchemaContent(args)
+
   if (!raw) {
     return undefined
   }
+
   return loadGraphqlSchemaFromRaw(paths.sdlPath, raw)
 }

@@ -21,13 +21,9 @@ export const MANAGED_DATABASE_MIGRATION_STATUSES = [
   'failed',
 ] as const
 
-export const managedDatabaseMigrationStatusSchema = z.enum(
-  MANAGED_DATABASE_MIGRATION_STATUSES,
-)
+export const managedDatabaseMigrationStatusSchema = z.enum(MANAGED_DATABASE_MIGRATION_STATUSES)
 
-export type ManagedDatabaseMigrationStatus = z.infer<
-  typeof managedDatabaseMigrationStatusSchema
->
+export type ManagedDatabaseMigrationStatus = z.infer<typeof managedDatabaseMigrationStatusSchema>
 
 /**
  * Decrypted `enc_connection` payload for a managed database. `directUrl` is
@@ -44,11 +40,7 @@ export type ManagedDatabaseConnectionPayload = z.infer<
   typeof managedDatabaseConnectionPayloadSchema
 >
 
-export const MANAGED_DATABASE_CONNECTION_SYNC_STATUSES = [
-  'pending',
-  'synced',
-  'failed',
-] as const
+export const MANAGED_DATABASE_CONNECTION_SYNC_STATUSES = ['pending', 'synced', 'failed'] as const
 
 export const managedDatabaseConnectionSyncStatusSchema = z.enum(
   MANAGED_DATABASE_CONNECTION_SYNC_STATUSES,
@@ -105,12 +97,7 @@ const QUERY_ACTIONS = [
 
 const INSERT_ACTIONS = ['create', 'createMany', 'createManyAndReturn'] as const
 
-const UPDATE_ACTIONS = [
-  'update',
-  'updateMany',
-  'updateManyAndReturn',
-  'upsert',
-] as const
+const UPDATE_ACTIONS = ['update', 'updateMany', 'updateManyAndReturn', 'upsert'] as const
 
 const DELETE_ACTIONS = ['delete', 'deleteMany'] as const
 

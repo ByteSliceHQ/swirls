@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+
 import type { Diagnostic, FormVisibility } from './ast'
 import { parse } from './parser'
 import { validateTsFileRefs } from './validate-ts-file-refs'
@@ -51,6 +52,7 @@ workflow parent {
   }
   flow { root -> workers }
 }`)
+
     expect(valid.errors).toEqual([])
     expect(validate(valid.ast)).toEqual([])
 
@@ -81,30 +83,23 @@ workflow bad {
     root -> bad_fanout
   }
 }`)
+
     const diagnostics = validate(invalid.ast)
+
     expect(
-      hasDiagnostic(
-        diagnostics,
-        'Workflow concurrency must be an integer between 1 and 64',
-      ),
+      hasDiagnostic(diagnostics, 'Workflow concurrency must be an integer between 1 and 64'),
     ).toBe(true)
+
     expect(
-      hasDiagnostic(
-        diagnostics,
-        'map node concurrency is not supported; use type: fanout',
-      ),
+      hasDiagnostic(diagnostics, 'map node concurrency is not supported; use type: fanout'),
     ).toBe(true)
+
+    expect(hasDiagnostic(diagnostics, 'fanout node requires maxItems as a positive integer')).toBe(
+      true,
+    )
+
     expect(
-      hasDiagnostic(
-        diagnostics,
-        'fanout node requires maxItems as a positive integer',
-      ),
-    ).toBe(true)
-    expect(
-      hasDiagnostic(
-        diagnostics,
-        'fanout node requires concurrency as an integer between 1 and 64',
-      ),
+      hasDiagnostic(diagnostics, 'fanout node requires concurrency as an integer between 1 and 64'),
     ).toBe(true)
   })
 
@@ -118,6 +113,7 @@ workflow long_running {
     code: @ts { return {} }
   }
 }`)
+
     expect(valid.errors).toEqual([])
     expect(validate(valid.ast)).toEqual([])
 
@@ -130,6 +126,7 @@ workflow too_short {
     code: @ts { return {} }
   }
 }`)
+
     expect(
       hasDiagnostic(
         validate(tooShort.ast),
@@ -146,6 +143,7 @@ workflow malformed {
     code: @ts { return {} }
   }
 }`)
+
     expect(
       hasDiagnostic(
         validate(malformed.ast),
@@ -196,10 +194,7 @@ workflow malformed {
 
   describe('valid fixture valid-integration.swirls', () => {
     test('produces zero diagnostics', () => {
-      const { ast, errors } = loadAndParse(
-        FIXTURES_DIR,
-        'valid-integration.swirls',
-      )
+      const { ast, errors } = loadAndParse(FIXTURES_DIR, 'valid-integration.swirls')
       expect(errors.length).toBe(0)
       const diags = validate(ast)
       expect(diags).toEqual([])
@@ -217,10 +212,7 @@ workflow malformed {
 
   describe('invalid-semantics.swirls produces expected diagnostics', () => {
     test('duplicate form name', () => {
-      const { ast, errors } = loadAndParse(
-        FIXTURES_DIR,
-        'invalid-semantics.swirls',
-      )
+      const { ast, errors } = loadAndParse(FIXTURES_DIR, 'invalid-semantics.swirls')
       expect(errors.length).toBe(0)
       const diags = validate(ast)
       expect(hasDiagnostic(diags, 'Duplicate form name')).toBe(true)
@@ -261,6 +253,7 @@ workflow g {
   flow { x -> y }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -311,6 +304,7 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -332,6 +326,7 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.secrets[0]?.type).toBe('managed')
@@ -354,12 +349,11 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(hasDiagnostic(diags, 'is not a manageable platform key')).toBe(
-        true,
-      )
+      expect(hasDiagnostic(diags, 'is not a manageable platform key')).toBe(true)
     })
 
     test('warns when ai node needs undeclared vendor key', () => {
@@ -374,9 +368,11 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
+
       expect(
         diags.some(
           (d) =>
@@ -402,12 +398,11 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'Duplicate var "X" in secret block "dup"'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'Duplicate var "X" in secret block "dup"')).toBe(true)
     })
 
     test('invalid secret var characters produce diagnostic', () => {
@@ -430,6 +425,7 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -451,14 +447,13 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
+
       expect(
-        hasDiagnostic(
-          diags,
-          'Parallel "operation" must be "search", "extract", or "findall"',
-        ),
+        hasDiagnostic(diags, 'Parallel "operation" must be "search", "extract", or "findall"'),
       ).toBe(true)
     })
 
@@ -474,21 +469,14 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'Parallel findall requires "entityType"'),
-      ).toBe(true)
-      expect(
-        hasDiagnostic(diags, 'Parallel findall requires "generator"'),
-      ).toBe(true)
-      expect(
-        hasDiagnostic(diags, 'Parallel findall requires "matchConditions"'),
-      ).toBe(true)
-      expect(
-        hasDiagnostic(diags, 'Parallel findall requires "matchLimit"'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'Parallel findall requires "entityType"')).toBe(true)
+      expect(hasDiagnostic(diags, 'Parallel findall requires "generator"')).toBe(true)
+      expect(hasDiagnostic(diags, 'Parallel findall requires "matchConditions"')).toBe(true)
+      expect(hasDiagnostic(diags, 'Parallel findall requires "matchLimit"')).toBe(true)
     })
 
     test('rejects user output schema (vendor-managed)', () => {
@@ -504,20 +492,16 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"')).toBe(true)
     })
   })
 
   describe('search node', () => {
-    function searchDiagnostics(
-      fields: string,
-      secrets = 'secret web { vars: [TELEM_API_KEY] }',
-    ) {
+    function searchDiagnostics(fields: string, secrets = 'secret web { vars: [TELEM_API_KEY] }') {
       const parsed = parse(`${secrets}
 workflow g {
   root {
@@ -527,36 +511,31 @@ workflow g {
     ${fields}
   }
 }`)
+
       expect(parsed.errors).toEqual([])
       return validate(parsed.ast)
     }
 
     test('accepts Telem with inferred user and managed credentials', () => {
       expect(searchDiagnostics('provider: telem\nsources: ["web"]')).toEqual([])
+
       expect(
-        searchDiagnostics(
-          'provider: telem',
-          'secret web { type: managed vars: [TELEM_API_KEY] }',
-        ),
+        searchDiagnostics('provider: telem', 'secret web { type: managed vars: [TELEM_API_KEY] }'),
       ).toEqual([])
     })
 
     test('infers the credential from the provider, not available secret declarations', () => {
       expect(
         hasDiagnostic(
-          searchDiagnostics(
-            'provider: telem',
-            'secret web { vars: [FIRECRAWL_API_KEY] }',
-          ),
+          searchDiagnostics('provider: telem', 'secret web { vars: [FIRECRAWL_API_KEY] }'),
           'requires vendor key "TELEM_API_KEY"',
         ),
       ).toBe(true)
-      expect(
-        hasDiagnostic(
-          searchDiagnostics(''),
-          'requires vendor key "FIRECRAWL_API_KEY"',
-        ),
-      ).toBe(true)
+
+      expect(hasDiagnostic(searchDiagnostics(''), 'requires vendor key "FIRECRAWL_API_KEY"')).toBe(
+        true,
+      )
+
       expect(
         searchDiagnostics(
           'provider: firecrawl\nsources: ["news"]\ntbs: "qdr:m"',
@@ -565,18 +544,17 @@ workflow g {
       ).toEqual([])
     })
 
-    test.each([
-      'other',
-      '42',
-      '@ts { return "telem" }',
-    ])('rejects invalid provider %s', (provider) => {
-      expect(
-        hasDiagnostic(
-          searchDiagnostics(`provider: ${provider}`),
-          '"provider" must be firecrawl or telem',
-        ),
-      ).toBe(true)
-    })
+    test.each(['other', '42', '@ts { return "telem" }'])(
+      'rejects invalid provider %s',
+      (provider) => {
+        expect(
+          hasDiagnostic(
+            searchDiagnostics(`provider: ${provider}`),
+            '"provider" must be firecrawl or telem',
+          ),
+        ).toBe(true)
+      },
+    )
 
     test.each([
       'categories: []',
@@ -595,20 +573,17 @@ workflow g {
       ).toBe(true)
     })
 
-    test.each([
-      '[]',
-      '["news"]',
-      '["images"]',
-      '["web", "news"]',
-      '["web", "web"]',
-    ])('rejects Telem sources %s', (sources) => {
-      expect(
-        hasDiagnostic(
-          searchDiagnostics(`provider: telem\nsources: ${sources}`),
-          'Telem search only supports sources: ["web"]',
-        ),
-      ).toBe(true)
-    })
+    test.each(['[]', '["news"]', '["images"]', '["web", "news"]', '["web", "web"]'])(
+      'rejects Telem sources %s',
+      (sources) => {
+        expect(
+          hasDiagnostic(
+            searchDiagnostics(`provider: telem\nsources: ${sources}`),
+            'Telem search only supports sources: ["web"]',
+          ),
+        ).toBe(true)
+      },
+    )
 
     test('requires query', () => {
       const source = `
@@ -620,6 +595,7 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -637,6 +613,7 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -654,6 +631,7 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -674,6 +652,7 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -694,12 +673,11 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"')).toBe(true)
     })
 
     test('search: rejects schema', () => {
@@ -713,12 +691,11 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"')).toBe(true)
     })
 
     test('email: rejects schema', () => {
@@ -734,12 +711,11 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"')).toBe(true)
     })
 
     test('disk: rejects schema on node', () => {
@@ -755,12 +731,11 @@ workflow g {
   flow {}
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"')).toBe(true)
     })
 
     test('disk: rejects outputSchema on root', () => {
@@ -775,12 +750,11 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'vendor-managed output schema; remove "schema"')).toBe(true)
     })
 
     test('disk: exec without operation field is valid', () => {
@@ -794,6 +768,7 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -819,6 +794,7 @@ workflow g {
   flow { root -> mkdir }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -844,6 +820,7 @@ workflow g {
   flow { root -> copy }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -864,7 +841,9 @@ workflow g {
         start: { line, column: col, offset: 0 },
         end: { line, column: col + 1, offset: 1 },
       })
+
       const internal: FormVisibility = 'internal'
+
       const ast = {
         schemas: [],
         forms: [
@@ -905,7 +884,9 @@ workflow g {
         mocks: [],
         playbooks: [],
       }
+
       const diags = validate(ast)
+
       expect(
         hasDiagnostic(diags, 'Form name') ||
           hasDiagnostic(diags, 'letters, numbers') ||
@@ -922,6 +903,7 @@ form f {
   schema: does_not_exist
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -939,6 +921,7 @@ schema a {
   schema: @json { { "type": "object" } }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -962,6 +945,7 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -983,6 +967,7 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1002,19 +987,15 @@ workflow g {
   flow { }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(hasDiagnostic(diags, 'Workflow node requires "workflow"')).toBe(
-        true,
-      )
+      expect(hasDiagnostic(diags, 'Workflow node requires "workflow"')).toBe(true)
     })
 
     test('graph node without input produces diagnostic', () => {
-      const { ast, errors } = loadAndParse(
-        EXAMPLES_DIR,
-        'subgraph-workflow.swirls',
-      )
+      const { ast, errors } = loadAndParse(EXAMPLES_DIR, 'subgraph-workflow.swirls')
       expect(errors.length).toBe(0)
       const mainGraph = ast.workflows.find((g) => g.name === 'main_graph')
       const runHelper = mainGraph?.nodes.find((n) => n.name === 'run_helper')
@@ -1038,9 +1019,11 @@ workflow g {
   flow { }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
+
       expect(
         hasDiagnostic(
           diags,
@@ -1095,6 +1078,7 @@ workflow g2 {
   flow { root -> q }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1144,6 +1128,7 @@ workflow g2 {
   flow { root -> q }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1191,6 +1176,7 @@ workflow g2 {
   flow { root -> q }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1228,6 +1214,7 @@ workflow g2 {
   flow { root -> q }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1275,12 +1262,11 @@ workflow g2 {
   flow { root -> q }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'does not declare that version under versions'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'does not declare that version under versions')).toBe(true)
     })
 
     test('stream node with streamId is rejected', () => {
@@ -1326,6 +1312,7 @@ workflow g2 {
   flow { root -> q }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1350,14 +1337,13 @@ workflow g2 {
   flow { root -> q }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
+
       expect(
-        hasDiagnostic(
-          diags,
-          'references stream block "missing_stream" which is not defined',
-        ),
+        hasDiagnostic(diags, 'references stream block "missing_stream" which is not defined'),
       ).toBe(true)
     })
   })
@@ -1378,6 +1364,7 @@ workflow g {
   flow { }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1400,6 +1387,7 @@ workflow g {
   flow { }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1424,12 +1412,11 @@ workflow g {
   flow { }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      const w = diags.find((d) =>
-        d.message.includes('kind "text" produces a plain string'),
-      )
+      const w = diags.find((d) => d.message.includes('kind "text" produces a plain string'))
       expect(w).toBeDefined()
       expect(w?.severity).toBe('warning')
     })
@@ -1460,12 +1447,11 @@ webhook wh {
   header: "${name}"
 }
 `
+
         const { ast, errors } = parse(source)
         expect(errors.length).toBe(0)
         const diags = validate(ast)
-        expect(hasDiagnostic(diags, 'is reserved and cannot be used')).toBe(
-          true,
-        )
+        expect(hasDiagnostic(diags, 'is reserved and cannot be used')).toBe(true)
       })
     }
 
@@ -1480,6 +1466,7 @@ webhook wh {
   header: "CoOkIe"
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1497,6 +1484,7 @@ webhook wh {
   header: "Authorization"
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1512,15 +1500,11 @@ webhook wh {
   header: "X-Sig"
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(
-          diags,
-          'references undefined secret block "missing_block"',
-        ),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'references undefined secret block "missing_block"')).toBe(true)
     })
 
     test('var not in secret block is rejected', () => {
@@ -1534,12 +1518,11 @@ webhook wh {
   header: "X-Sig"
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      expect(
-        hasDiagnostic(diags, 'references var "MISSING_VAR" not declared'),
-      ).toBe(true)
+      expect(hasDiagnostic(diags, 'references var "MISSING_VAR" not declared')).toBe(true)
     })
 
     test('secret without header is rejected (both-or-neither)', () => {
@@ -1552,6 +1535,7 @@ webhook wh {
   secret: sec.KEY
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1565,6 +1549,7 @@ webhook wh {
   header: "X-Sig"
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1577,12 +1562,11 @@ webhook wh {
   label: "W"
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
-      const w = diags.find((d) =>
-        d.message.includes('will accept any POST without verification'),
-      )
+      const w = diags.find((d) => d.message.includes('will accept any POST without verification'))
       expect(w).toBeDefined()
       expect(w?.severity).toBe('warning')
       const errorDiags = diags.filter((d) => d.severity !== 'warning')
@@ -1600,6 +1584,7 @@ webhook wh {
   header: "Stripe-Security"
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const diags = validate(ast)
@@ -1629,32 +1614,25 @@ workflow g {
     const { ast, errors } = parse(consumerOnlySource)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
-    expect(
-      hasDiagnostic(
-        diags,
-        'Stream node references stream block "remote_stream"',
-      ),
-    ).toBe(true)
+    expect(hasDiagnostic(diags, 'Stream node references stream block "remote_stream"')).toBe(true)
   })
 
   test('stream node accepts cross-file stream name when workspace index includes streams', () => {
     const { ast, errors } = parse(consumerOnlySource)
     expect(errors.length).toBe(0)
+
     const diags = validate(ast, {
       workspace: workspaceIndexFromStreamNames(new Set(['remote_stream'])),
     })
-    expect(
-      hasDiagnostic(
-        diags,
-        'Stream node references stream block "remote_stream"',
-      ),
-    ).toBe(false)
+
+    expect(hasDiagnostic(diags, 'Stream node references stream block "remote_stream"')).toBe(false)
   })
 })
 
 describe('workspace-scoped cross-file references', () => {
   test('graph node, stream graph binding, trigger, schema, http auth, secrets map, postgres', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-val-ws-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'consumer.swirls'),
@@ -1710,6 +1688,7 @@ trigger tr1 {
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'provider.swirls'),
         `version: 1
@@ -1752,46 +1731,26 @@ postgres other_pg {
       )
 
       const workspace = buildWorkspaceResourceIndex({ cwd: dir })
-      const consumer = fs.readFileSync(
-        path.join(dir, 'consumer.swirls'),
-        'utf-8',
-      )
+      const consumer = fs.readFileSync(path.join(dir, 'consumer.swirls'), 'utf-8')
       const { ast, errors } = parse(consumer)
       expect(errors.length).toBe(0)
 
       const diagsLocal = validate(ast)
+
+      expect(hasDiagnostic(diagsLocal, 'references workflow "other_g" which is not defined')).toBe(
+        true,
+      )
+
+      expect(hasDiagnostic(diagsLocal, 'references undefined auth block "other_auth"')).toBe(true)
+      expect(hasDiagnostic(diagsLocal, 'references undefined postgres block "other_pg"')).toBe(true)
+      expect(hasDiagnostic(diagsLocal, 'undefined secret block "other_secret"')).toBe(true)
+
       expect(
-        hasDiagnostic(
-          diagsLocal,
-          'references workflow "other_g" which is not defined',
-        ),
+        hasDiagnostic(diagsLocal, 'Stream references workflow "other_g" which is not defined'),
       ).toBe(true)
+
       expect(
-        hasDiagnostic(
-          diagsLocal,
-          'references undefined auth block "other_auth"',
-        ),
-      ).toBe(true)
-      expect(
-        hasDiagnostic(
-          diagsLocal,
-          'references undefined postgres block "other_pg"',
-        ),
-      ).toBe(true)
-      expect(
-        hasDiagnostic(diagsLocal, 'undefined secret block "other_secret"'),
-      ).toBe(true)
-      expect(
-        hasDiagnostic(
-          diagsLocal,
-          'Stream references workflow "other_g" which is not defined',
-        ),
-      ).toBe(true)
-      expect(
-        hasDiagnostic(
-          diagsLocal,
-          'Trigger references form "other_form" which is not defined',
-        ),
+        hasDiagnostic(diagsLocal, 'Trigger references form "other_form" which is not defined'),
       ).toBe(true)
 
       const diagsWs = validate(ast, { workspace })
@@ -1804,6 +1763,7 @@ postgres other_pg {
 
   test('node inputSchema schemaRef resolves across files', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-val-sch-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'a.swirls'),
@@ -1821,6 +1781,7 @@ workflow g {
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'b.swirls'),
         `version: 1
@@ -1831,19 +1792,14 @@ schema remote_shape {
 `,
         'utf-8',
       )
+
       const workspace = buildWorkspaceResourceIndex({ cwd: dir })
-      const { ast, errors } = parse(
-        fs.readFileSync(path.join(dir, 'a.swirls'), 'utf-8'),
-      )
+      const { ast, errors } = parse(fs.readFileSync(path.join(dir, 'a.swirls'), 'utf-8'))
       expect(errors.length).toBe(0)
       const diagsLocal = validate(ast)
-      expect(
-        hasDiagnostic(diagsLocal, 'references undefined schema "remote_shape"'),
-      ).toBe(true)
+      expect(hasDiagnostic(diagsLocal, 'references undefined schema "remote_shape"')).toBe(true)
       const diagsWs = validate(ast, { workspace })
-      expect(
-        hasDiagnostic(diagsWs, 'references undefined schema "remote_shape"'),
-      ).toBe(false)
+      expect(hasDiagnostic(diagsWs, 'references undefined schema "remote_shape"')).toBe(false)
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }
@@ -1862,12 +1818,11 @@ workflow g {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
-    expect(hasDiagnostic(diags, 'undefined agent block "missing_one"')).toBe(
-      true,
-    )
+    expect(hasDiagnostic(diags, 'undefined agent block "missing_one"')).toBe(true)
   })
 
   test('role tools must be subset of agent tools list', () => {
@@ -1907,9 +1862,11 @@ agent dup_role {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
+
     expect(
       hasDiagnostic(
         diags,
@@ -1929,6 +1886,7 @@ agent dup {
   profile z { }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
@@ -1944,6 +1902,7 @@ agent badprov {
   model: "gpt-4o-mini"
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
@@ -1996,9 +1955,11 @@ workflow gn {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
+
     expect(
       hasDiagnostic(
         diags,
@@ -2039,9 +2000,11 @@ agent ag {
   tools: [ bare_tool ]
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
+
     expect(
       hasDiagnostic(
         diags,
@@ -2077,9 +2040,11 @@ agent ag2 {
   tools: [ bad_root ]
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
+
     expect(
       hasDiagnostic(
         diags,
@@ -2139,9 +2104,11 @@ agent ag3 {
   tools: [ named_tool ]
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
+
     expect(
       hasDiagnostic(
         diags,
@@ -2168,12 +2135,11 @@ workflow gx {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
-    expect(
-      hasDiagnostic(diags, 'Agent "ar" has no profile named "nope_profile"'),
-    ).toBe(true)
+    expect(hasDiagnostic(diags, 'Agent "ar" has no profile named "nope_profile"')).toBe(true)
   })
 
   test('profile sandbox without agent sandbox is allowed', () => {
@@ -2189,15 +2155,15 @@ agent ar {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
-    expect(
-      hasDiagnostic(
-        diags,
-        'declares sandbox but agent "ar" has no top-level sandbox',
-      ),
-    ).toBe(false)
+
+    expect(hasDiagnostic(diags, 'declares sandbox but agent "ar" has no top-level sandbox')).toBe(
+      false,
+    )
+
     expect(ast.agent?.[0]?.profiles?.[0]?.sandbox?.autoStopMinutes).toBe(10)
   })
 })
@@ -2213,12 +2179,15 @@ workflow g {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
+
     const diags = validateTsFileRefs(ast, {
       swirlsFilePath: '/project/app.swirls',
       existsSync: () => false,
     })
+
     expect(diags.length).toBeGreaterThan(0)
     expect(hasDiagnostic(diags, 'not found')).toBe(true)
   })

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { validate } from '../validator'
 
@@ -27,6 +28,7 @@ network corporate {
   }
 }
 `)
+
     expect(diagnostics).toEqual([])
   })
 
@@ -39,12 +41,9 @@ network corporate {
   }
 }
 `)
-    expect(diagnostics).toContain(
-      'Network "corporate" exposes duplicate form "intake"',
-    )
-    expect(diagnostics).toContain(
-      'Network "corporate" references undefined form "missing"',
-    )
+
+    expect(diagnostics).toContain('Network "corporate" exposes duplicate form "intake"')
+    expect(diagnostics).toContain('Network "corporate" references undefined form "missing"')
   })
 
   test('requires an explicitly declared database connection', () => {
@@ -59,6 +58,7 @@ network corporate {
   }
 }
 `)
+
     expect(diagnostics).toContain(
       'Network "corporate" references undefined database connection "crm.analytics"',
     )
@@ -76,6 +76,7 @@ workflow call_internal {
   }
 }
 `)
+
     expect(diagnostics).toEqual([])
   })
 })

@@ -8,13 +8,7 @@
 
 import type { JsonBlockInfo, JsonSchemaLiteral, SourceRange } from '../ast'
 
-export const ACTION_HTTP_METHODS = [
-  'GET',
-  'POST',
-  'PUT',
-  'DELETE',
-  'PATCH',
-] as const
+export const ACTION_HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const
 
 export type ActionHttpMethod = (typeof ACTION_HTTP_METHODS)[number]
 

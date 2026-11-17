@@ -20,29 +20,35 @@ function parseBump(argv: string[]): Bump {
       return arg
     }
   }
+
   return 'patch'
 }
 
 /** `bun pm pkg get version` prints a JSON-encoded string; validate before use. */
 function parsePkgVersionOutput(output: string): string {
   let parsed: unknown
+
   try {
     parsed = JSON.parse(output.trim())
   } catch {
     throw new Error('bun pm pkg get version did not return valid JSON')
   }
+
   if (typeof parsed !== 'string') {
     throw new Error(`Expected a JSON string for version, got ${typeof parsed}`)
   }
+
   return parsed
 }
 
 /** Next X.Y.Z for major | minor | patch (no prerelease). */
 function bumpSemver(version: string, kind: Bump): string {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
+
   if (!match) {
     throw new Error(`Invalid semver version: ${version}`)
   }
+
   const major = Number(match[1])
   const minor = Number(match[2])
   const patch = Number(match[3])
@@ -50,9 +56,11 @@ function bumpSemver(version: string, kind: Bump): string {
   if (kind === 'major') {
     return `${major + 1}.0.0`
   }
+
   if (kind === 'minor') {
     return `${major}.${minor + 1}.0`
   }
+
   return `${major}.${minor}.${patch + 1}`
 }
 
@@ -64,13 +72,10 @@ async function readPackageVersion(packageRoot: string): Promise<string> {
 
 /** Refuse to version off main (release commits belong on main after merge). */
 async function requireOnMain(repoRoot: string): Promise<void> {
-  const branch = (
-    await Bun.$`git branch --show-current`.cwd(repoRoot).text()
-  ).trim()
+  const branch = (await Bun.$`git branch --show-current`.cwd(repoRoot).text()).trim()
+
   if (branch !== 'main') {
-    console.error(
-      `Must be on main to version (current branch: ${branch || 'detached HEAD'}).`,
-    )
+    console.error(`Must be on main to version (current branch: ${branch || 'detached HEAD'}).`)
     process.exit(1)
   }
 }
@@ -78,6 +83,7 @@ async function requireOnMain(repoRoot: string): Promise<void> {
 /** Refuse to run with uncommitted changes (avoids mixing release with local edits). */
 async function requireCleanWorkingTree(repoRoot: string): Promise<void> {
   const output = await Bun.$`git status --porcelain`.cwd(repoRoot).text()
+
   if (output.trim().length > 0) {
     console.error('Working tree is not clean. Commit or stash changes first.')
     process.exit(1)
@@ -87,6 +93,7 @@ async function requireCleanWorkingTree(repoRoot: string): Promise<void> {
 /** Avoid overwriting an existing release tag. */
 async function requireTagMissing(repoRoot: string, tag: string): Promise<void> {
   const output = await Bun.$`git tag -l ${tag}`.cwd(repoRoot).text()
+
   if (output.trim() === tag) {
     console.error(`Tag already exists: ${tag}`)
     process.exit(1)
@@ -126,18 +133,15 @@ if (dryRun) {
 
 await requireTagMissing(REPO_ROOT, tag)
 
-await Bun.$`bun pm version ${bump} --no-git-tag-version --ignore-scripts`.cwd(
-  EXTENSION_ROOT,
-)
+await Bun.$`bun pm version ${bump} --no-git-tag-version --ignore-scripts`.cwd(EXTENSION_ROOT)
 
 // Refresh the root lockfile after the package.json edit.
 await Bun.$`bun install`.cwd(REPO_ROOT)
 
 const extensionVersion = await readPackageVersion(EXTENSION_ROOT)
+
 if (extensionVersion !== nextVersion) {
-  throw new Error(
-    `Version mismatch after bump: got ${extensionVersion}, expected ${nextVersion}`,
-  )
+  throw new Error(`Version mismatch after bump: got ${extensionVersion}, expected ${nextVersion}`)
 }
 
 await Bun.$`git add ${LOCKFILE} ${EXTENSION_PKG}`.cwd(REPO_ROOT)

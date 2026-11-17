@@ -33,18 +33,13 @@ export const MANAGEABLE_VENDOR_KEYS = [
 
 export type ManageableVendorKey = (typeof MANAGEABLE_VENDOR_KEYS)[number]
 
-export const MANAGEABLE_VENDOR_KEY_SET: ReadonlySet<string> = new Set(
-  MANAGEABLE_VENDOR_KEYS,
-)
+export const MANAGEABLE_VENDOR_KEY_SET: ReadonlySet<string> = new Set(MANAGEABLE_VENDOR_KEYS)
 
 /**
  * Every platform vendor key name the engine knows about (manageable + platform-only).
  * Hosts iterate this to build `platformSecrets` from operator env.
  */
-export const PLATFORM_VENDOR_KEYS = [
-  ...MANAGEABLE_VENDOR_KEYS,
-  ARCHIL_API_KEY,
-] as const
+export const PLATFORM_VENDOR_KEYS = [...MANAGEABLE_VENDOR_KEYS, ARCHIL_API_KEY] as const
 
 export type PlatformVendorKey = (typeof PLATFORM_VENDOR_KEYS)[number]
 
@@ -59,9 +54,7 @@ export const AI_LLM_PLATFORM_VENDOR_KEYS = [
 export type AiProviderName = 'openrouter' | 'anthropic' | 'openai' | 'google'
 
 /** Platform-env/vault key name backing the inferred default for each AI `provider`. */
-export function platformVendorKeyForAiProvider(
-  provider: AiProviderName,
-): ManageableVendorKey {
+export function platformVendorKeyForAiProvider(provider: AiProviderName): ManageableVendorKey {
   switch (provider) {
     case 'openrouter':
       return OPENROUTER_API_KEY
@@ -71,9 +64,10 @@ export function platformVendorKeyForAiProvider(
       return OPENAI_API_KEY
     case 'google':
       return GOOGLE_GENERATIVE_AI_API_KEY
+
     default: {
-      const _exhaustive: never = provider
-      return _exhaustive
+      const exhaustive: never = provider
+      return exhaustive
     }
   }
 }
@@ -100,15 +94,18 @@ export function getInferredVendorKeyForNode(node: {
       ) {
         return TELEM_API_KEY
       }
+
       return FIRECRAWL_API_KEY
     case 'parallel':
       return PARALLEL_API_KEY
     case 'email':
       return RESEND_API_KEY
+
     case 'ai': {
       const provider = parseAiProviderFromConfig(node.config)
       return platformVendorKeyForAiProvider(provider)
     }
+
     default:
       return null
   }
@@ -126,15 +123,12 @@ export function parseAiProviderFromConfig(config: unknown): AiProviderName {
     typeof (config as { provider: unknown }).provider === 'string'
   ) {
     const p = (config as { provider: string }).provider
-    if (
-      p === 'openrouter' ||
-      p === 'anthropic' ||
-      p === 'openai' ||
-      p === 'google'
-    ) {
+
+    if (p === 'openrouter' || p === 'anthropic' || p === 'openai' || p === 'google') {
       return p
     }
   }
+
   return 'openrouter'
 }
 

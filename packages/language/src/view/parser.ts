@@ -2,12 +2,7 @@
  * Parsing functions for view blocks. Called from the main parser via delegation.
  */
 
-import type {
-  ConfigValue,
-  JsonBlockInfo,
-  JsonSchemaLiteral,
-  SourceRange,
-} from '../ast'
+import type { ConfigValue, JsonBlockInfo, JsonSchemaLiteral, SourceRange } from '../ast'
 import type { Token } from '../lexer'
 import type { ResourceParserDelegate } from '../parser-delegate'
 import type { ViewComputedColumnDecl, ViewDecl, ViewStreamRef } from './ast'
@@ -28,15 +23,19 @@ function parseSchemaTail(
   let schemaRefRange: SourceRange | undefined
 
   const next = d.peek()
+
   if (next?.kind === 'fenced_block' && next.fencedLang === 'json') {
     const tok = d.advance()!
     let parsed: JsonSchemaLiteral = {}
+
     try {
       parsed = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
     } catch {
       d.error('Invalid JSON in schema block', tok)
     }
+
     schema = parsed
+
     if (tok.fencedContentRange) {
       schemaBlock = {
         code: tok.fencedContent ?? '',
@@ -71,10 +70,7 @@ function parseStreamsList(d: ResourceParserDelegate): ViewStreamRef[] {
   }
 
   if (cv.kind !== 'array') {
-    d.error(
-      'view streams must be a list of stream names (e.g. streams: [my_stream])',
-      peeked,
-    )
+    d.error('view streams must be a list of stream names (e.g. streams: [my_stream])', peeked)
     return refs
   }
 
@@ -99,6 +95,7 @@ function parseComputedColumnBody(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -109,6 +106,7 @@ function parseComputedColumnBody(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -121,6 +119,7 @@ function parseComputedColumnBody(
     if (key === 'graph' || key === 'workflow') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv?.kind === 'string') {
         workflowName = cv.value
         workflowNameRange = cv.range
@@ -130,24 +129,29 @@ function parseComputedColumnBody(
           peeked ?? d.peek(),
         )
       }
+
       continue
     }
 
     if (key === 'input') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv) {
         input = cv
       }
+
       continue
     }
 
     if (key === 'output') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv) {
         output = cv
       }
+
       continue
     }
 
@@ -155,15 +159,14 @@ function parseComputedColumnBody(
       `Unexpected key "${key}" in computed column block — only graph, input, and output are allowed`,
       d.peek(),
     )
+
     d.parseValue()
   }
 
   return { workflowName, workflowNameRange, input, output }
 }
 
-function parseComputedBlock(
-  d: ResourceParserDelegate,
-): ViewComputedColumnDecl[] {
+function parseComputedBlock(d: ResourceParserDelegate): ViewComputedColumnDecl[] {
   const columns: ViewComputedColumnDecl[] = []
 
   if (!d.expect('lbrace')) {
@@ -173,6 +176,7 @@ function parseComputedBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -184,14 +188,8 @@ function parseComputedBlock(
 
     const nameTok = d.advance()
 
-    if (
-      !nameTok ||
-      (nameTok.kind !== 'identifier' && nameTok.kind !== 'keyword')
-    ) {
-      d.error(
-        'Expected computed column name in computed block',
-        nameTok ?? d.peek(),
-      )
+    if (!nameTok || (nameTok.kind !== 'identifier' && nameTok.kind !== 'keyword')) {
+      d.error('Expected computed column name in computed block', nameTok ?? d.peek())
       d.parseValue()
       continue
     }
@@ -221,11 +219,13 @@ export function parseViewBlock(
   docComment: string | undefined,
 ): ViewDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'view') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected view name', nameTok)
     d.skipToNextBlock()
@@ -251,6 +251,7 @@ export function parseViewBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -261,6 +262,7 @@ export function parseViewBlock(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -268,9 +270,11 @@ export function parseViewBlock(
     // `computed { ... }` is a block (no colon); everything else is `key: value`.
     if (key === 'computed') {
       const next = d.peek()
+
       if (next?.kind === 'colon') {
         d.advance()
       }
+
       computed = parseComputedBlock(d)
       continue
     }
@@ -297,33 +301,41 @@ export function parseViewBlock(
     if (key === 'columns') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv) {
         columns = cv
       }
+
       continue
     }
 
     if (key === 'label') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         label = v
       }
+
       continue
     }
 
     if (key === 'description') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         description = v
       }
+
       continue
     }
 
     if (key === 'enabled') {
       const v = d.parseValue()
+
       if (typeof v === 'boolean') {
         enabled = v
       }
+
       continue
     }
 

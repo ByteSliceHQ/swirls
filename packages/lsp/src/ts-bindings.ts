@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
 import type {
   DatabaseDecl,
   NodeDecl,
@@ -8,9 +9,8 @@ import type {
   StreamVersionDecl,
   WorkflowDecl,
 } from '@swirls/language'
-import {
-  resolveTsRefFullPath,
-} from '@swirls/language'
+import { resolveTsRefFullPath } from '@swirls/language'
+
 import { parse } from './parse-cache'
 import { getRootNode } from './ts-service/context-types'
 
@@ -46,8 +46,9 @@ export function isDslSwirlsUri(uri: string): boolean {
 }
 
 export function removeBindingsForParent(parentUri: string): void {
-  for (const [key, arr] of [...bindingMap.entries()]) {
+  for (const [key, arr] of Array.from(bindingMap.entries())) {
     const next = arr.filter((b) => b.parentUri !== parentUri)
+
     if (next.length === 0) {
       bindingMap.delete(key)
     } else {
@@ -71,6 +72,7 @@ export function indexDslDocument(parentUri: string, text: string): void {
   const result = parse(text)
 
   let parentPath: string
+
   try {
     parentPath = fileURLToPath(parentUri)
   } catch {
@@ -83,7 +85,9 @@ export function indexDslDocument(parentUri: string, text: string): void {
         if (cv.kind !== 'ts_file_ref') {
           continue
         }
+
         const abs = resolveTsRefFullPath(parentPath, cv.path)
+
         addBinding(abs, {
           parentUri,
           workflowName: graph.name,
@@ -101,23 +105,28 @@ export function indexDslDocument(parentUri: string, text: string): void {
   }
 
   for (const stream of result.ast.streams ?? []) {
-    const refGraph = result.ast.workflows.find(
-      (g) => g.name === stream.workflowName,
-    )
+    const refGraph = result.ast.workflows.find((g) => g.name === stream.workflowName)
+
     if (!refGraph) {
       continue
     }
+
     const rootNode = getRootNode(refGraph) ?? refGraph.nodes[0]
+
     if (!rootNode) {
       continue
     }
+
     for (const sv of stream.versions ?? []) {
       for (const configKey of ['condition', 'prepare'] as const) {
         const cv = sv[configKey]
+
         if (cv?.kind !== 'ts_file_ref') {
           continue
         }
+
         const abs = resolveTsRefFullPath(parentPath, cv.path)
+
         addBinding(abs, {
           parentUri,
           workflowName: refGraph.name,

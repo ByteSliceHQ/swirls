@@ -1,7 +1,6 @@
 import {
   type DocumentNode,
   type GraphQLField,
-  type GraphQLObjectType,
   type GraphQLOutputType,
   type GraphQLSchema,
   type GraphQLType,
@@ -25,6 +24,7 @@ function operationFromDocument(
   documentSource: string,
 ): ParsedGraphqlOperation | undefined {
   let document: DocumentNode
+
   try {
     document = parse(documentSource)
   } catch {
@@ -32,6 +32,7 @@ function operationFromDocument(
   }
 
   let operation: OperationDefinitionNode | undefined
+
   visit(document, {
     OperationDefinition(node) {
       if (!operation) {
@@ -39,24 +40,26 @@ function operationFromDocument(
       }
     },
   })
+
   if (!operation || operation.selectionSet.selections.length !== 1) {
     return undefined
   }
 
   const selection = operation.selectionSet.selections[0]
+
   if (!selection || selection.kind !== 'Field') {
     return undefined
   }
 
   const rootType =
-    operation.operation === 'mutation'
-      ? schema.getMutationType()
-      : schema.getQueryType()
+    operation.operation === 'mutation' ? schema.getMutationType() : schema.getQueryType()
+
   if (!rootType || !isObjectType(rootType)) {
     return undefined
   }
 
   const rootField = rootType.getFields()[selection.name.value]
+
   if (!rootField) {
     return undefined
   }
@@ -77,9 +80,7 @@ export function parseGraphqlActionOperation(
   return operationFromDocument(schema, documentSource)
 }
 
-export function rootFieldOutputType(
-  parsed: ParsedGraphqlOperation,
-): GraphQLOutputType {
+export function rootFieldOutputType(parsed: ParsedGraphqlOperation): GraphQLOutputType {
   return parsed.returnType
 }
 

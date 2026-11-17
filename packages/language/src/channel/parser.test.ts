@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 
 describe('channel parsing', () => {
@@ -12,6 +13,7 @@ channel support_slack {
   mode: mention
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.channels.length).toBe(1)
@@ -32,6 +34,7 @@ channel linear_bot {
   agent: researcher
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.channels[0]?.mode).toBe('mention')
@@ -45,12 +48,9 @@ channel support_slack {
   integration: slack
 }
 `
+
     const { errors } = parse(source)
-    expect(
-      errors.some((e) =>
-        /Unknown channel property "integration"/.test(e.message),
-      ),
-    ).toBe(true)
+    expect(errors.some((e) => /Unknown channel property "integration"/.test(e.message))).toBe(true)
   })
 
   test('parses platform mcp with a connector field', () => {
@@ -61,6 +61,7 @@ channel finance {
   connector: client_portal
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const ch = ast.channels[0]!
@@ -81,6 +82,7 @@ channel ops {
   max_unprompted_per_hour: 6
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const ch = ast.channels[0]
@@ -101,6 +103,7 @@ channel ops {
   cooldown: "1h"
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const ch = ast.channels[0]
@@ -117,6 +120,7 @@ channel ops {
   mode: all
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const ch = ast.channels[0]
@@ -134,6 +138,7 @@ channel ops {
   max_unprompted_per_hour: 0
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.channels[0]?.maxUnpromptedPerHour).toBe(0)
@@ -148,6 +153,7 @@ channel ops {
   max_unprompted_per_hour: 6
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.some((e) => /quote it as "30m"/.test(e.message))).toBe(true)
     // The stray unit token is consumed, so the keys after it still land.
@@ -163,12 +169,13 @@ channel ops {
   cooldown: true
 }
 `
+
     const { ast, errors } = parse(source)
-    expect(
-      errors.some((e) =>
-        /channel cooldown must be a quoted duration/.test(e.message),
-      ),
-    ).toBe(true)
+
+    expect(errors.some((e) => /channel cooldown must be a quoted duration/.test(e.message))).toBe(
+      true,
+    )
+
     expect(ast.channels[0]?.cooldown).toBeUndefined()
   })
 
@@ -180,12 +187,13 @@ channel ops {
   max_unprompted_per_hour: "six"
 }
 `
+
     const { ast, errors } = parse(source)
+
     expect(
-      errors.some((e) =>
-        /max_unprompted_per_hour must be a whole number/.test(e.message),
-      ),
+      errors.some((e) => /max_unprompted_per_hour must be a whole number/.test(e.message)),
     ).toBe(true)
+
     expect(ast.channels[0]?.maxUnpromptedPerHour).toBeUndefined()
   })
 
@@ -197,6 +205,7 @@ channel finance {
   connector: client_portal
 }
 `
+
     const { ast } = parse(source)
     const ch = ast.channels[0]!
     expect(ch.modeRange).toBeUndefined()
@@ -210,12 +219,13 @@ channel ops {
   agent: support
 }
 `
+
     const { ast, errors } = parse(source)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('channel platform "portal" was renamed to "swirls"'),
-      ),
+      errors.some((e) => e.message.includes('channel platform "portal" was renamed to "swirls"')),
     ).toBe(true)
+
     expect(ast.channels[0]?.platform).not.toBe('portal')
   })
 })

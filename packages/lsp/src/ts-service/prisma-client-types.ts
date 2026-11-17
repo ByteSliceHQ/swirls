@@ -1,5 +1,6 @@
 import type * as DMMF from '@prisma/dmmf'
 import { getDMMF, uncapitalize } from '@prisma/get-dmmf'
+
 import {
   DATABASE_OPERATION_ACTIONS,
   PRISMA_SCHEMA_HEADER,
@@ -94,6 +95,7 @@ function applyList(type: string, isList: boolean): string {
   if (!isList) {
     return type
   }
+
   return needsParensForList(type) ? `(${type})[]` : `${type}[]`
 }
 
@@ -115,8 +117,7 @@ function sanitizeNamespace(name: string): string {
 
 /** Render a datamodel enum or schema enum as a literal-union type alias. */
 function renderEnum(name: string, values: readonly string[]): string {
-  const union =
-    values.length > 0 ? values.map((v) => `'${v}'`).join(' | ') : 'never'
+  const union = values.length > 0 ? values.map((v) => `'${v}'`).join(' | ') : 'never'
   return `  export type ${name} = ${union}`
 }
 
@@ -127,6 +128,7 @@ function renderInputTypeRef(ref: DMMF.InputTypeRef): string | null {
       const mapped = INPUT_SCALAR_TS[ref.type]
       return mapped === undefined ? null : applyList(mapped, ref.isList)
     }
+
     case 'enumTypes':
     case 'inputObjectTypes':
       return applyList(ref.type, ref.isList)
@@ -139,16 +141,21 @@ function renderInputTypeRef(ref: DMMF.InputTypeRef): string | null {
 /** Render one input field (`SchemaArg`) as a `key?: T` member line. */
 function renderInputField(field: DMMF.SchemaArg): string {
   const alternatives: string[] = []
+
   for (const ref of field.inputTypes) {
     const rendered = renderInputTypeRef(ref)
+
     if (rendered !== null && !alternatives.includes(rendered)) {
       alternatives.push(rendered)
     }
   }
+
   let value = alternatives.length > 0 ? alternatives.join(' | ') : 'never'
+
   if (field.isNullable) {
     value = `${value} | null`
   }
+
   const optional = field.isRequired ? '' : '?'
   return `${objectKey(field.name)}${optional}: ${value}`
 }
@@ -158,9 +165,8 @@ function renderInputType(input: DMMF.InputType): string {
   if (input.fields.length === 0) {
     return `  export type ${input.name} = {}`
   }
-  const members = input.fields
-    .map((f) => `    ${renderInputField(f)}`)
-    .join('\n')
+
+  const members = input.fields.map((f) => `    ${renderInputField(f)}`).join('\n')
   return `  export type ${input.name} = {\n${members}\n  }`
 }
 
@@ -173,27 +179,27 @@ interface Relation {
 
 /** Map a scalar / enum model field to its wire TS type (with null / list). */
 function renderModelScalarField(field: DMMF.Field): string {
-  const base =
-    field.kind === 'enum'
-      ? field.type
-      : (WIRE_SCALAR_TS[field.type] ?? 'unknown')
+  const base = field.kind === 'enum' ? field.type : (WIRE_SCALAR_TS[field.type] ?? 'unknown')
+
   if (field.isList) {
     return applyList(base, true)
   }
+
   return field.isRequired ? base : `${base} | null`
 }
 
 /** Render the base scalar/output type for a model (relations excluded). */
 function renderModelType(model: DMMF.Model): string {
-  const scalarFields = model.fields.filter(
-    (f) => f.kind === 'scalar' || f.kind === 'enum',
-  )
+  const scalarFields = model.fields.filter((f) => f.kind === 'scalar' || f.kind === 'enum')
+
   if (scalarFields.length === 0) {
     return `  export type ${model.name} = {}`
   }
+
   const members = scalarFields
     .map((f) => `    ${objectKey(f.name)}: ${renderModelScalarField(f)}`)
     .join('\n')
+
   return `  export type ${model.name} = {\n${members}\n  }`
 }
 
@@ -218,9 +224,11 @@ function modelRelations(model: DMMF.Model): Relation[] {
 function relationPayloadExpr(rel: Relation, carrier: 'S' | 'I'): string {
   const src = `${carrier}[K]`
   const base = `(${src} extends object ? ${rel.relatedModel}GetPayload<${src}> : ${rel.relatedModel})`
+
   if (rel.isList) {
     return `${base}[]`
   }
+
   return rel.isRequired ? base : `${base} | null`
 }
 
@@ -236,16 +244,11 @@ function renderGetPayload(model: DMMF.Model, relations: Relation[]): string {
   const m = model.name
 
   const selectRelationBranches = relations
-    .map(
-      (rel) =>
-        `        K extends '${rel.name}' ? ${relationPayloadExpr(rel, 'S')}\n        :`,
-    )
+    .map((rel) => `        K extends '${rel.name}' ? ${relationPayloadExpr(rel, 'S')}\n        :`)
     .join('\n')
+
   const includeRelationBranches = relations
-    .map(
-      (rel) =>
-        `        K extends '${rel.name}' ? ${relationPayloadExpr(rel, 'I')}\n        :`,
-    )
+    .map((rel) => `        K extends '${rel.name}' ? ${relationPayloadExpr(rel, 'I')}\n        :`)
     .join('\n')
 
   const selectBody = `      [K in keyof S as S[K] ${TRUTHY_FILTER}]:
@@ -296,22 +299,17 @@ function actionSignatures(m: string): Record<string, string> {
 /** Per-model helper arg types (select/include carriers + concrete bases). */
 function renderModelArgTypes(model: DMMF.Model, relations: Relation[]): string {
   const m = model.name
-  const scalarFields = model.fields.filter(
-    (f) => f.kind === 'scalar' || f.kind === 'enum',
-  )
+  const scalarFields = model.fields.filter((f) => f.kind === 'scalar' || f.kind === 'enum')
+
   const selectMembers = [
     ...scalarFields.map((f) => `    ${objectKey(f.name)}?: boolean`),
-    ...relations.map(
-      (r) => `    ${objectKey(r.name)}?: boolean | ${r.relatedModel}FindArgs`,
-    ),
+    ...relations.map((r) => `    ${objectKey(r.name)}?: boolean | ${r.relatedModel}FindArgs`),
   ].join('\n')
+
   const includeMembers =
     relations.length > 0
       ? relations
-          .map(
-            (r) =>
-              `    ${objectKey(r.name)}?: boolean | ${r.relatedModel}FindArgs`,
-          )
+          .map((r) => `    ${objectKey(r.name)}?: boolean | ${r.relatedModel}FindArgs`)
           .join('\n')
       : ''
 
@@ -341,12 +339,12 @@ function renderModelDelegates(model: DMMF.Model): string {
   const m = model.name
   const signatures = actionSignatures(m)
   const blocks: string[] = []
+
   for (const [suffix, actions] of DELEGATE_SETS) {
-    const methods = actions
-      .map((action) => `    ${signatures[action]}`)
-      .join('\n')
+    const methods = actions.map((action) => `    ${signatures[action]}`).join('\n')
     blocks.push(`  export interface ${m}Delegate${suffix} {\n${methods}\n  }`)
   }
+
   return blocks.join('\n')
 }
 
@@ -354,13 +352,12 @@ function renderModelDelegates(model: DMMF.Model): string {
 function renderClients(models: readonly DMMF.Model[]): string {
   const clientType = (suffix: string): string => {
     const members = models
-      .map(
-        (model) =>
-          `${uncapitalize(model.name)}: ${model.name}Delegate${suffix}`,
-      )
+      .map((model) => `${uncapitalize(model.name)}: ${model.name}Delegate${suffix}`)
       .join('; ')
+
     return `  export type Client${suffix} = { ${members} }`
   }
+
   return [
     clientType('Full'),
     clientType('Query'),
@@ -392,6 +389,7 @@ function renderNamespaceBody(dmmf: DMMF.Document): string {
   // 1. Enums (datamodel first, then schema enums, deduped by name).
   for (const e of dmmf.datamodel.enums) {
     emittedTypeNames.add(e.name)
+
     parts.push(
       renderEnum(
         e.name,
@@ -399,14 +397,17 @@ function renderNamespaceBody(dmmf: DMMF.Document): string {
       ),
     )
   }
+
   const schemaEnums = [
     ...(dmmf.schema.enumTypes.prisma ?? []),
     ...(dmmf.schema.enumTypes.model ?? []),
   ]
+
   for (const e of schemaEnums) {
     if (emittedTypeNames.has(e.name)) {
       continue
     }
+
     emittedTypeNames.add(e.name)
     parts.push(renderEnum(e.name, e.values))
   }
@@ -421,6 +422,7 @@ function renderNamespaceBody(dmmf: DMMF.Document): string {
     ...(dmmf.schema.inputObjectTypes.prisma ?? []),
     ...(dmmf.schema.inputObjectTypes.model ?? []),
   ]
+
   for (const input of inputTypes) {
     parts.push(renderInputType(input))
   }
@@ -481,18 +483,22 @@ const resultCache = new Map<string, { declarations: string; dbType: string }>()
 /** Read from an LRU-ordered map, refreshing recency on hit. */
 function lruGet<V>(cache: Map<string, V>, key: string): V | undefined {
   const value = cache.get(key)
+
   if (value !== undefined) {
     cache.delete(key)
     cache.set(key, value)
   }
+
   return value
 }
 
 /** Write to an LRU-ordered map, evicting the oldest entry past the cap. */
 function lruSet<V>(cache: Map<string, V>, key: string, value: V): void {
   cache.set(key, value)
+
   if (cache.size > MAX_CACHE_ENTRIES) {
     const oldest = cache.keys().next().value
+
     if (oldest !== undefined) {
       cache.delete(oldest)
     }
@@ -502,11 +508,13 @@ function lruSet<V>(cache: Map<string, V>, key: string, value: V): void {
 /** Compile a single schema source to its rendered namespace body (cached). */
 function renderBodyForSource(schemaSource: string): string {
   const cached = lruGet(bodyCache, schemaSource)
+
   if (cached !== undefined) {
     return cached
   }
 
   let body: string
+
   try {
     const dmmf = getDMMF({ datamodel: PRISMA_SCHEMA_HEADER + schemaSource })
     body = 'type' in dmmf ? FALLBACK_NAMESPACE_BODY : renderNamespaceBody(dmmf)
@@ -520,10 +528,7 @@ function renderBodyForSource(schemaSource: string): string {
 }
 
 /** Stable cache key over the scope and the ordered (name, source) list. */
-function resultCacheKey(
-  databases: readonly DbSchemaInput[],
-  scope: DbClientScopeKind,
-): string {
+function resultCacheKey(databases: readonly DbSchemaInput[], scope: DbClientScopeKind): string {
   const dbSig = databases.map((d) => `${d.name}${d.schemaSource}`).join('')
   return `${scope}\u0000${dbSig}`
 }
@@ -553,6 +558,7 @@ export function renderDbContextField(
 
   const key = resultCacheKey(databases, scope)
   const cachedResult = lruGet(resultCache, key)
+
   if (cachedResult !== undefined) {
     return cachedResult
   }
@@ -569,15 +575,14 @@ export function renderDbContextField(
     const body = renderBodyForSource(database.schemaSource)
     const namespaceName = sanitizeNamespace(database.name)
     namespaceBlocks.push(`namespace ${namespaceName} {\n${body}\n}`)
-    dbTypeEntries.push(
-      `${objectKey(database.name)}: ${namespaceName}.${clientTypeName}`,
-    )
+    dbTypeEntries.push(`${objectKey(database.name)}: ${namespaceName}.${clientTypeName}`)
   }
 
   const result = {
     declarations: namespaceBlocks.join('\n'),
     dbType: `{ ${dbTypeEntries.join('; ')} }`,
   }
+
   lruSet(resultCache, key, result)
   return result
 }

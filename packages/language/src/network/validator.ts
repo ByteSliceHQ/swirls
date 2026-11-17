@@ -1,14 +1,11 @@
 import { resourceNameSchema } from '@swirls/definition/schemas'
+
 import type { Diagnostic, SourceRange, SwirlsFile } from '../ast'
 import type { ChannelDecl } from '../channel/ast'
 import type { DatabaseDecl } from '../database/ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import { nameLookup } from '../workspace/workspace-resources'
-import type {
-  NetworkDatabaseExposureDecl,
-  NetworkDecl,
-  NetworkNamedExposureRef,
-} from './ast'
+import type { NetworkDatabaseExposureDecl, NetworkDecl, NetworkNamedExposureRef } from './ast'
 
 function diag(message: string, range: SourceRange): Diagnostic {
   return { message, range, severity: 'error' }
@@ -16,15 +13,12 @@ function diag(message: string, range: SourceRange): Diagnostic {
 
 function validateName(name: string, range: SourceRange): Diagnostic[] {
   const parsed = resourceNameSchema.safeParse(name)
+
   if (parsed.success) {
     return []
   }
-  return [
-    diag(
-      `Network name: ${parsed.error.issues[0]?.message ?? 'Invalid name'}`,
-      range,
-    ),
-  ]
+
+  return [diag(`Network name: ${parsed.error.issues[0]?.message ?? 'Invalid name'}`, range)]
 }
 
 function validateNamedRefs(args: {
@@ -35,6 +29,7 @@ function validateNamedRefs(args: {
 }): Diagnostic[] {
   const out: Diagnostic[] = []
   const seen = new Set<string>()
+
   for (const ref of args.refs) {
     if (seen.has(ref.name)) {
       out.push(
@@ -44,7 +39,9 @@ function validateNamedRefs(args: {
         ),
       )
     }
+
     seen.add(ref.name)
+
     if (!args.available.has(ref.name)) {
       out.push(
         diag(
@@ -54,6 +51,7 @@ function validateNamedRefs(args: {
       )
     }
   }
+
   return out
 }
 
@@ -62,12 +60,15 @@ function databaseBlockMap(
   workspace?: WorkspaceResourceIndex,
 ): Map<string, DatabaseDecl> {
   const result = new Map<string, DatabaseDecl>()
+
   for (const database of ast.databases ?? []) {
     result.set(database.name, database)
   }
+
   for (const [name, database] of workspace?.databaseBlocks ?? []) {
     result.set(name, database)
   }
+
   return result
 }
 
@@ -76,12 +77,15 @@ function channelBlockMap(
   workspace?: WorkspaceResourceIndex,
 ): Map<string, ChannelDecl> {
   const result = new Map<string, ChannelDecl>()
+
   for (const channel of ast.channels ?? []) {
     result.set(channel.name, channel)
   }
+
   for (const [name, channel] of workspace?.channelBlocks ?? []) {
     result.set(name, channel)
   }
+
   return result
 }
 
@@ -92,6 +96,7 @@ function validateDatabaseExposures(
 ): Diagnostic[] {
   const out: Diagnostic[] = []
   const seenDatabases = new Set<string>()
+
   for (const ref of refs) {
     if (seenDatabases.has(ref.database)) {
       out.push(
@@ -101,9 +106,11 @@ function validateDatabaseExposures(
         ),
       )
     }
+
     seenDatabases.add(ref.database)
 
     const database = databases.get(ref.database)
+
     if (!database) {
       out.push(
         diag(
@@ -111,8 +118,10 @@ function validateDatabaseExposures(
           ref.databaseRange ?? ref.range,
         ),
       )
+
       continue
     }
+
     if (ref.connections.length === 0) {
       out.push(
         diag(
@@ -120,13 +129,13 @@ function validateDatabaseExposures(
           ref.range,
         ),
       )
+
       continue
     }
 
-    const availableConnections = new Set(
-      database.connections.map((connection) => connection.name),
-    )
+    const availableConnections = new Set(database.connections.map((connection) => connection.name))
     const seenConnections = new Set<string>()
+
     for (const connection of ref.connections) {
       if (seenConnections.has(connection.name)) {
         out.push(
@@ -136,7 +145,9 @@ function validateDatabaseExposures(
           ),
         )
       }
+
       seenConnections.add(connection.name)
+
       if (!availableConnections.has(connection.name)) {
         out.push(
           diag(
@@ -147,6 +158,7 @@ function validateDatabaseExposures(
       }
     }
   }
+
   return out
 }
 
@@ -157,34 +169,31 @@ export function validateNetworkBlocks(
   const out: Diagnostic[] = []
   const workspace = options?.workspace
   const networks = ast.networks ?? []
-  const apps = nameLookup(
-    new Set((ast.apps ?? []).map((app) => app.name)),
-    workspace?.apps,
-  )
-  const forms = nameLookup(
-    new Set((ast.forms ?? []).map((form) => form.name)),
-    workspace?.forms,
-  )
+  const apps = nameLookup(new Set((ast.apps ?? []).map((app) => app.name)), workspace?.apps)
+  const forms = nameLookup(new Set((ast.forms ?? []).map((form) => form.name)), workspace?.forms)
+
   const webhooks = nameLookup(
     new Set((ast.webhooks ?? []).map((webhook) => webhook.name)),
     workspace?.webhooks,
   )
+
   const channels = channelBlockMap(ast, workspace)
   const databases = databaseBlockMap(ast, workspace)
   const networkNameCounts = new Map<string, number>()
+
   for (const network of networks) {
-    networkNameCounts.set(
-      network.name,
-      (networkNameCounts.get(network.name) ?? 0) + 1,
-    )
+    networkNameCounts.set(network.name, (networkNameCounts.get(network.name) ?? 0) + 1)
   }
 
   for (const network of networks) {
     out.push(...validateName(network.name, network.range))
+
     if ((networkNameCounts.get(network.name) ?? 0) > 1) {
       out.push(diag(`Duplicate network name "${network.name}"`, network.range))
     }
+
     const expose = network.expose
+
     if (!expose) {
       continue
     }
@@ -211,6 +220,7 @@ export function validateNetworkBlocks(
     )
 
     const channelNames = new Set(channels.keys())
+
     out.push(
       ...validateNamedRefs({
         network,
@@ -219,8 +229,10 @@ export function validateNetworkBlocks(
         available: channelNames,
       }),
     )
+
     for (const ref of expose.channels) {
       const channel = channels.get(ref.name)
+
       if (
         channel &&
         channel.platform !== 'mcp' &&
@@ -261,13 +273,16 @@ export function validateNetworkConsumerReference(args: {
   if (!args.network) {
     return []
   }
+
   const available = nameLookup(
     new Set((args.ast.networks ?? []).map((network) => network.name)),
     args.workspace?.networks,
   )
+
   if (available.has(args.network)) {
     return []
   }
+
   return [
     diag(
       `${args.owner} references undefined network "${args.network}"`,

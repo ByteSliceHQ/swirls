@@ -18,6 +18,7 @@
  */
 
 import { isSelfManagedConnectionBlock } from '@swirls/definition/connection-mode'
+
 import type { SourceRange } from '../ast'
 
 export { isSelfManagedConnectionBlock as isSelfManagedConnection }

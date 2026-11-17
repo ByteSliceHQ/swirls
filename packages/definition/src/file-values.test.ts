@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import {
   FILE_HANDLE_KIND,
   fileHandleSchema,
@@ -20,6 +21,7 @@ describe('fileHandleSchema', () => {
       size: 12345,
       sha256: 'abc',
     }
+
     expect(fileHandleSchema.parse(handle)).toEqual(handle)
     expect(isFileHandle(handle)).toBe(true)
   })
@@ -44,9 +46,9 @@ describe('schemaNodeMarksFileValue', () => {
   })
 
   test('matches contentMediaType', () => {
-    expect(
-      schemaNodeMarksFileValue({ type: 'string', contentMediaType: 'application/pdf' }),
-    ).toBe(true)
+    expect(schemaNodeMarksFileValue({ type: 'string', contentMediaType: 'application/pdf' })).toBe(
+      true,
+    )
   })
 
   test('does not match plain strings', () => {

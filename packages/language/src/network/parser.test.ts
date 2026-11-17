@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { serialize } from '../serializer'
 
@@ -30,18 +31,19 @@ network corporate {
     expect(network?.name).toBe('corporate')
     expect(network?.label).toBe('Corporate')
     expect(network?.expose?.apps.map((ref) => ref.name)).toEqual(['operations'])
-    expect(network?.expose?.services.map((ref) => ref.name)).toEqual([
-      'sales_ops',
-    ])
+    expect(network?.expose?.services.map((ref) => ref.name)).toEqual(['sales_ops'])
     expect(network?.expose?.databases[0]?.database).toBe('crm')
-    expect(
-      network?.expose?.databases[0]?.connections.map((ref) => ref.name),
-    ).toEqual(['application', 'analytics'])
+
+    expect(network?.expose?.databases[0]?.connections.map((ref) => ref.name)).toEqual([
+      'application',
+      'analytics',
+    ])
   })
 
   test('allows a declaration with no exposed interfaces', () => {
     const result = parse('network corporate { expose: { } }')
     expect(result.errors).toEqual([])
+
     expect(result.ast.networks?.[0]?.expose).toMatchObject({
       apps: [],
       channels: [],
@@ -61,20 +63,17 @@ network corporate {
   }
 }
 `)
+
     expect(first.errors).toEqual([])
     const second = parse(serialize(first.ast))
     expect(second.errors).toEqual([])
     expect(second.ast.networks?.[0]?.expose?.forms[0]?.name).toBe('intake')
-    expect(
-      second.ast.networks?.[0]?.expose?.databases[0]?.connections[0]?.name,
-    ).toBe('application')
+    expect(second.ast.networks?.[0]?.expose?.databases[0]?.connections[0]?.name).toBe('application')
   })
 
   test('requires expose to use property syntax', () => {
     const result = parse('network corporate { expose { apps: [] } }')
 
-    expect(result.errors.map((error) => error.message)).toContain(
-      'Expected : after expose',
-    )
+    expect(result.errors.map((error) => error.message)).toContain('Expected : after expose')
   })
 })

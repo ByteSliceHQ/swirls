@@ -21,11 +21,13 @@ export function parseDiskBlock(
   docComment: string | undefined,
 ): DiskDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'disk') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected disk block name', nameTok)
     d.skipToNextBlock()
@@ -44,6 +46,7 @@ export function parseDiskBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -54,6 +57,7 @@ export function parseDiskBlock(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -68,34 +72,36 @@ export function parseDiskBlock(
         `Disk block no longer accepts "${key}:" — the platform provisions Archil disks at deploy time`,
         t,
       )
+
       d.parseValue()
       continue
     }
 
     if (key === 'label') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         label = v
       }
+
       continue
     }
 
     if (key === 'region') {
       const valTok = d.peek()
+
       if (valTok?.kind === 'string') {
         d.advance()
         region = valTok.value as string
         regionRange = valTok.range
-      } else if (
-        valTok &&
-        (valTok.kind === 'identifier' || valTok.kind === 'keyword')
-      ) {
+      } else if (valTok && (valTok.kind === 'identifier' || valTok.kind === 'keyword')) {
         d.advance()
         region = valTok.value as string
         regionRange = valTok.range
       } else {
         d.error('Expected region (string or identifier)', valTok)
       }
+
       continue
     }
 

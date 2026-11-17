@@ -3,6 +3,7 @@
  */
 
 import { resourceNameSchema } from '@swirls/definition/schemas'
+
 import type {
   AgentDecl,
   ConfigValue,
@@ -13,9 +14,9 @@ import type {
   SwirlsFile,
   WorkflowDecl,
 } from '../ast'
+import type { HarnessCatalog, LanguageHost } from '../host'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import type { ComputerDecl } from './ast'
-import type { HarnessCatalog, LanguageHost } from '../host'
 
 /** Flox catalog attribute names. */
 const SOFTWARE_PACKAGE_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/
@@ -31,15 +32,13 @@ function diag(
   return { message, range, severity }
 }
 
-function validateResourceName(
-  name: string,
-  range: SourceRange,
-  kind: string,
-): Diagnostic[] {
+function validateResourceName(name: string, range: SourceRange, kind: string): Diagnostic[] {
   const result = resourceNameSchema.safeParse(name)
+
   if (result.success) {
     return []
   }
+
   const msg = result.error.issues[0]?.message ?? 'Invalid name'
   return [diag(`${kind} name: ${msg}`, range)]
 }
@@ -48,15 +47,19 @@ function commandPresent(cv: ConfigValue | undefined): boolean {
   if (!cv) {
     return false
   }
+
   if (cv.kind === 'string') {
     return Boolean(cv.value.trim())
   }
+
   if (cv.kind === 'ts_block') {
     return Boolean(cv.code?.trim())
   }
+
   if (cv.kind === 'ts_file_ref') {
     return Boolean(cv.path?.trim())
   }
+
   return false
 }
 
@@ -74,17 +77,12 @@ export function validateComputerBlocks(
   const diskByName = diskBlockMap(ast, options?.workspace)
 
   for (const computer of blocks) {
-    out.push(
-      ...validateResourceName(computer.name, computer.range, 'Computer block'),
-    )
+    out.push(...validateResourceName(computer.name, computer.range, 'Computer block'))
+
     if (names.has(computer.name)) {
-      out.push(
-        diag(
-          `Duplicate computer block name "${computer.name}"`,
-          computer.range,
-        ),
-      )
+      out.push(diag(`Duplicate computer block name "${computer.name}"`, computer.range))
     }
+
     names.add(computer.name)
 
     for (const pin of computer.software ?? []) {
@@ -96,6 +94,7 @@ export function validateComputerBlocks(
           ),
         )
       }
+
       if (!pin.pin.trim()) {
         out.push(
           diag(
@@ -114,24 +113,22 @@ export function validateComputerBlocks(
     }
 
     const seenDisks = new Set<string>()
+
     for (let i = 0; i < (computer.disks ?? []).length; i++) {
       const diskName = computer.disks?.[i] ?? ''
       const range = computer.disksRanges?.[i] ?? computer.range
+
       if (seenDisks.has(diskName)) {
         out.push(
-          diag(
-            `Computer "${computer.name}" lists duplicate disk "${diskName}" in disks:`,
-            range,
-          ),
+          diag(`Computer "${computer.name}" lists duplicate disk "${diskName}" in disks:`, range),
         )
       }
+
       seenDisks.add(diskName)
+
       if (!diskByName.has(diskName)) {
         out.push(
-          diag(
-            `Computer "${computer.name}" references undefined disk block "${diskName}"`,
-            range,
-          ),
+          diag(`Computer "${computer.name}" references undefined disk block "${diskName}"`, range),
         )
       }
     }
@@ -145,6 +142,7 @@ export function validateComputerBlocks(
 
   if (options?.includeUnboundComputerWarnings) {
     const bound = boundComputerNames(ast, options.workspace)
+
     for (const computer of blocks) {
       if (!bound.has(computer.name)) {
         out.push(
@@ -163,19 +161,20 @@ export function validateComputerBlocks(
 
 function validateResources(computer: ComputerDecl): Diagnostic[] {
   const resources = computer.resources
+
   if (!resources) {
     return []
   }
+
   const out: Diagnostic[] = []
   const label = `Computer "${computer.name}"`
+
   if (resources.cpus !== undefined && resources.cpus < 1) {
     out.push(
-      diag(
-        `${label}: resources.cpus must be at least 1`,
-        resources.cpusRange ?? resources.range,
-      ),
+      diag(`${label}: resources.cpus must be at least 1`, resources.cpusRange ?? resources.range),
     )
   }
+
   if (resources.memoryMiB !== undefined && resources.memoryMiB < 128) {
     out.push(
       diag(
@@ -184,6 +183,7 @@ function validateResources(computer: ComputerDecl): Diagnostic[] {
       ),
     )
   }
+
   if (resources.diskGiB !== undefined && resources.diskGiB < 1) {
     out.push(
       diag(
@@ -192,6 +192,7 @@ function validateResources(computer: ComputerDecl): Diagnostic[] {
       ),
     )
   }
+
   return out
 }
 
@@ -217,9 +218,8 @@ function validateHarness(
 
   // Which harnesses exist is the runtime's call. With no catalog any bare
   // name passes and the package rules below have nothing to go on.
-  const providerEntry = catalog?.providers.find(
-    (entry) => entry.name === harness?.provider,
-  )
+  const providerEntry = catalog?.providers.find((entry) => entry.name === harness?.provider)
+
   if (harness && catalog) {
     if (!catalog.types.some((entry) => entry.name === harness.type)) {
       out.push(
@@ -229,6 +229,7 @@ function validateHarness(
         ),
       )
     }
+
     if (!providerEntry) {
       out.push(
         diag(
@@ -238,9 +239,9 @@ function validateHarness(
       )
     }
   }
+
   const harnessPackage = providerEntry?.package
-  const offersClaude =
-    catalog?.providers.some((entry) => entry.name === 'claude') ?? false
+  const offersClaude = catalog?.providers.some((entry) => entry.name === 'claude') ?? false
 
   for (const pin of computer.software ?? []) {
     if (harness && pin.packageName === harnessPackage) {
@@ -250,8 +251,10 @@ function validateHarness(
           pin.range,
         ),
       )
+
       continue
     }
+
     if (offersClaude && pin.packageName === NIX_CLAUDE_CODE_PACKAGE) {
       out.push(
         diag(
@@ -264,9 +267,11 @@ function validateHarness(
   }
 
   const resources = computer.resources
+
   if (!harness || !resources) {
     return out
   }
+
   if (resources.cpus !== undefined && resources.cpus < HARNESS_MIN_CPUS) {
     out.push(
       diag(
@@ -276,10 +281,8 @@ function validateHarness(
       ),
     )
   }
-  if (
-    resources.memoryMiB !== undefined &&
-    resources.memoryMiB < HARNESS_MIN_MEMORY_MIB
-  ) {
+
+  if (resources.memoryMiB !== undefined && resources.memoryMiB < HARNESS_MIN_MEMORY_MIB) {
     out.push(
       diag(
         `${label} runs the ${harness.provider} harness with resources.memoryMiB: ${resources.memoryMiB}; coding harnesses need at least ${HARNESS_MIN_MEMORY_MIB} MiB`,
@@ -288,22 +291,23 @@ function validateHarness(
       ),
     )
   }
+
   return out
 }
 
-function diskBlockMap(
-  ast: SwirlsFile,
-  workspace?: WorkspaceResourceIndex,
-): Map<string, DiskDecl> {
+function diskBlockMap(ast: SwirlsFile, workspace?: WorkspaceResourceIndex): Map<string, DiskDecl> {
   const m = new Map<string, DiskDecl>()
+
   for (const disk of ast.disk ?? []) {
     m.set(disk.name, disk)
   }
+
   if (workspace?.diskBlocks) {
     for (const [name, decl] of workspace.diskBlocks) {
       m.set(name, decl)
     }
   }
+
   return m
 }
 
@@ -312,67 +316,73 @@ function computerBlockMap(
   workspace?: WorkspaceResourceIndex,
 ): Map<string, ComputerDecl> {
   const m = new Map<string, ComputerDecl>()
+
   for (const computer of ast.computer ?? []) {
     m.set(computer.name, computer)
   }
+
   if (workspace?.computerBlocks) {
     for (const [name, decl] of workspace.computerBlocks) {
       m.set(name, decl)
     }
   }
+
   return m
 }
 
-function workflowsForBindings(
-  ast: SwirlsFile,
-  workspace?: WorkspaceResourceIndex,
-): WorkflowDecl[] {
+function workflowsForBindings(ast: SwirlsFile, workspace?: WorkspaceResourceIndex): WorkflowDecl[] {
   const byName = new Map<string, WorkflowDecl>()
+
   for (const workflow of workspace?.workflowBlocks?.values() ?? []) {
     byName.set(workflow.name, workflow)
   }
+
   for (const workflow of ast.workflows ?? []) {
     byName.set(workflow.name, workflow)
   }
+
   return [...byName.values()]
 }
 
-function agentsForBindings(
-  ast: SwirlsFile,
-  workspace?: WorkspaceResourceIndex,
-): AgentDecl[] {
+function agentsForBindings(ast: SwirlsFile, workspace?: WorkspaceResourceIndex): AgentDecl[] {
   const byName = new Map<string, AgentDecl>()
+
   for (const agent of workspace?.agentBlocks?.values() ?? []) {
     byName.set(agent.name, agent)
   }
+
   for (const agent of ast.agent ?? []) {
     byName.set(agent.name, agent)
   }
+
   return [...byName.values()]
 }
 
-function boundComputerNames(
-  ast: SwirlsFile,
-  workspace?: WorkspaceResourceIndex,
-): Set<string> {
+function boundComputerNames(ast: SwirlsFile, workspace?: WorkspaceResourceIndex): Set<string> {
   const names = new Set<string>()
+
   for (const workflow of workflowsForBindings(ast, workspace)) {
     for (const node of workflow.nodes) {
       if (node.type !== 'shell') {
         continue
       }
+
       const cv = node.configFields.computer
+
       if (cv?.kind === 'string' && cv.value.trim()) {
         names.add(cv.value.trim())
       }
     }
   }
+
   for (const agent of agentsForBindings(ast, workspace)) {
     const name = agent.computer?.trim()
+
     if (name) {
       names.add(name)
     }
   }
+
   return names
 }
 
@@ -380,20 +390,24 @@ function boundComputerNames(
 function validateShellSecretVarsUnique(node: NodeDecl): Diagnostic[] {
   const out: Diagnostic[] = []
   const firstBlock = new Map<string, string>()
+
   for (const [blockName, vars] of Object.entries(node.secretsMap ?? {})) {
     for (const name of vars) {
       const first = firstBlock.get(name)
+
       if (first === undefined) {
         firstBlock.set(name, blockName)
         continue
       }
+
       if (first === blockName) {
         continue
       }
+
       const range =
-        node.secretsMapBlockRanges?.find(
-          (entry) => entry.blockName === blockName,
-        )?.range ?? node.range
+        node.secretsMapBlockRanges?.find((entry) => entry.blockName === blockName)?.range ??
+        node.range
+
       out.push(
         diag(
           `secret var "${name}" is listed by both "${first}" and "${blockName}"; a shell guest gets one value per name`,
@@ -402,6 +416,7 @@ function validateShellSecretVarsUnique(node: NodeDecl): Diagnostic[] {
       )
     }
   }
+
   return out
 }
 
@@ -422,13 +437,11 @@ export function validateShellNodes(
     }
 
     const computerCv = node.configFields.computer
+
     if (computerCv) {
       if (computerCv.kind !== 'string' || !computerCv.value.trim()) {
         out.push(
-          diag(
-            'Shell node "computer" must name a top-level computer block',
-            computerCv.range,
-          ),
+          diag('Shell node "computer" must name a top-level computer block', computerCv.range),
         )
       } else if (!computers.has(computerCv.value.trim())) {
         out.push(
@@ -441,12 +454,10 @@ export function validateShellNodes(
     }
 
     const commandCv = node.configFields.command
+
     if (commandCv && !commandPresent(commandCv)) {
       out.push(
-        diag(
-          'Shell node requires a non-empty "command" field',
-          commandCv.range ?? node.range,
-        ),
+        diag('Shell node requires a non-empty "command" field', commandCv.range ?? node.range),
       )
     }
 

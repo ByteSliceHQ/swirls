@@ -47,6 +47,7 @@ export function parseConnectorBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -58,6 +59,7 @@ export function parseConnectorBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -65,6 +67,7 @@ export function parseConnectorBlock(
     if (seenKeys.has(key)) {
       d.error(`Duplicate connector property "${key}"`, keyTok)
     }
+
     seenKeys.add(key)
 
     if (!d.expect('colon')) {
@@ -75,20 +78,24 @@ export function parseConnectorBlock(
     if (key === 'label') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         label = val
         labelRange = valTok?.range
       }
+
       continue
     }
 
     if (key === 'description') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         description = val
         descriptionRange = valTok?.range
       }
+
       continue
     }
 
@@ -98,11 +105,13 @@ export function parseConnectorBlock(
   }
 
   const closing = d.expect('rbrace')
+
   if (!closing) {
     // Anchor the error to a real token (`d.peek()` is null at EOF, which the
     // delegate would silently drop). `start` always exists here.
     d.error('Expected } to close connector block', d.peek() ?? start)
   }
+
   const end = closing ?? d.peek()
 
   return {

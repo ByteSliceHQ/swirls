@@ -36,15 +36,15 @@ Write `.swirls` files and deploy with `swirls deploy` or `git push`.
 
 ## Repository
 
-| Path | Holds |
-| --- | --- |
-| [`packages/definition`](./packages/definition) | `@swirls/definition`: the deployment definition schema, the contract between the language and a runtime |
-| [`packages/language`](./packages/language) | `@swirls/language`: lexer, parser, AST, validator, serializer and workspace index |
-| [`packages/lsp`](./packages/lsp) | `@swirls/lsp`: the language server |
-| [`packages/swirls`](./packages/swirls) | The `swirls` npm package |
-| [`editors/vscode`](./editors/vscode) | The VS Code extension |
-| [`editors/tree-sitter-swirls`](./editors/tree-sitter-swirls) | Tree-sitter grammar and queries for Neovim, Helix and Zed |
-| [`cookbook`](./cookbook) | Ready-to-deploy recipes |
+| Path                                                         | Holds                                                                                                   |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| [`packages/definition`](./packages/definition)               | `@swirls/definition`: the deployment definition schema, the contract between the language and a runtime |
+| [`packages/language`](./packages/language)                   | `@swirls/language`: lexer, parser, AST, validator, serializer and workspace index                       |
+| [`packages/lsp`](./packages/lsp)                             | `@swirls/lsp`: the language server                                                                      |
+| [`packages/swirls`](./packages/swirls)                       | The `swirls` npm package                                                                                |
+| [`editors/vscode`](./editors/vscode)                         | The VS Code extension                                                                                   |
+| [`editors/tree-sitter-swirls`](./editors/tree-sitter-swirls) | Tree-sitter grammar and queries for Neovim, Helix and Zed                                               |
+| [`cookbook`](./cookbook)                                     | Ready-to-deploy recipes                                                                                 |
 
 The language depends on nothing but the definition. Anything a runtime decides,
 such as which integration providers exist or how an `@openui` block is checked,

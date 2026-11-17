@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 
 describe('disk blocks', () => {
@@ -27,6 +28,7 @@ workflow g {
   flow { root -> x }
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.disk?.length).toBe(1)
@@ -44,6 +46,7 @@ disk proj {
   region: "aws-us-east-1"
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.disk?.[0]?.label).toBe('Proj disk')
@@ -57,13 +60,10 @@ disk proj {
   secrets: disk_creds
 }
 `
+
     const { errors } = parse(src)
-    expect(
-      errors.some((e) => e.message.includes('no longer accepts "id:"')),
-    ).toBe(true)
-    expect(
-      errors.some((e) => e.message.includes('no longer accepts "secrets:"')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('no longer accepts "id:"'))).toBe(true)
+    expect(errors.some((e) => e.message.includes('no longer accepts "secrets:"'))).toBe(true)
   })
 })
 
@@ -78,6 +78,7 @@ agent helper {
   disks: [ shared_a ]
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.agent?.[0]?.disks).toEqual(['shared_a'])

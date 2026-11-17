@@ -10,6 +10,7 @@ import type { ComputerDecl } from './computer/ast'
 import type { ConnectionDecl } from './connection/ast'
 import type { ConnectorDecl } from './connector/ast'
 import type { DatabaseDecl, MigrationDecl } from './database/ast'
+import type { DecisionDecl } from './decision'
 import type { DiskDecl } from './disk/ast'
 import type { McpDecl } from './mcp/ast'
 import type { MockDecl } from './mock/ast'
@@ -21,11 +22,7 @@ import type { QueryDecl } from './query/ast'
 import type { PolicyDecl, RoleDecl } from './rbac/ast'
 import type { SkillDecl } from './skill/ast'
 import type { StreamDecl, StreamVersionDecl } from './stream/ast'
-import type {
-  ViewComputedColumnDecl,
-  ViewDecl,
-  ViewStreamRef,
-} from './view/ast'
+import type { ViewComputedColumnDecl, ViewDecl, ViewStreamRef } from './view/ast'
 
 export type {
   AgentContextDecl,
@@ -36,11 +33,7 @@ export type {
 } from './agent/ast'
 export type { ComputerDecl, ComputerHarnessDecl } from './computer/ast'
 export type { ConnectorDecl } from './connector/ast'
-export type {
-  DatabaseDecl,
-  MigrationDecl,
-  PrismaBlockInfo,
-} from './database/ast'
+export type { DatabaseDecl, MigrationDecl, PrismaBlockInfo } from './database/ast'
 export type { DiskDecl } from './disk/ast'
 export type { McpAuthMode, McpDecl } from './mcp/ast'
 export type {
@@ -50,18 +43,8 @@ export type {
   NetworkNamedExposureRef,
 } from './network/ast'
 export type { OperationCommandDecl, OperationDecl } from './operation/ast'
-export type {
-  PostgresDecl,
-  PostgresTableDecl,
-  SqlBlock,
-  TsBlock,
-} from './postgres/ast'
-export type {
-  ClaimCondition,
-  PolicyDecl,
-  PolicyGrant,
-  RoleDecl,
-} from './rbac/ast'
+export type { PostgresDecl, PostgresTableDecl, SqlBlock, TsBlock } from './postgres/ast'
+export type { ClaimCondition, PolicyDecl, PolicyGrant, RoleDecl } from './rbac/ast'
 export type { SkillDecl } from './skill/ast'
 
 export type { StreamDecl, StreamVersionDecl }
@@ -226,11 +209,7 @@ export type {
 } from './app/ast'
 export { APP_SHELL_PRESETS, isAppShellPreset } from './app/ast'
 
-export type {
-  ChannelDecl,
-  ChannelMode,
-  ChannelPlatform,
-} from './channel/ast'
+export type { ChannelDecl, ChannelMode, ChannelPlatform } from './channel/ast'
 export type { ConnectionDecl, ConnectionProvider } from './connection/ast'
 export type { QueryDecl } from './query/ast'
 
@@ -384,7 +363,7 @@ export interface AuthDecl {
 }
 
 export interface SwirlsFile {
-  decisions?: import('./decision').DecisionDecl[]
+  decisions?: DecisionDecl[]
   version?: number
   schemas: SchemaDecl[]
   forms: FormDecl[]

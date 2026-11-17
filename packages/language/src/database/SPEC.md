@@ -16,12 +16,12 @@ in the Prisma schema language inside an `@prisma { }` island.
 
 This is deliberately distinct from the `postgres` block:
 
-| | `database` (this spec) | `postgres` |
-|---|---|---|
-| Ownership | **Swirls-managed** — provisioned and operated by Swirls | **Bring-your-own** — the customer owns and operates it |
-| Connection | Swirls-held, keyset-encrypted via the Anvil SDK; never customer-managed | Customer-supplied `connection:` (secret ref or literal) |
-| Schema | Prisma schema language (`@prisma`), migrated as real DDL | Hand-written JSON Schema per `table { }`, validation-only |
-| Queries | Generated typed Prisma client (`context.db.<name>`) | Raw `@sql` with `{{key}}` + `params:` |
+|            | `database` (this spec)                                                  | `postgres`                                                |
+| ---------- | ----------------------------------------------------------------------- | --------------------------------------------------------- |
+| Ownership  | **Swirls-managed** — provisioned and operated by Swirls                 | **Bring-your-own** — the customer owns and operates it    |
+| Connection | Swirls-held, keyset-encrypted via the Anvil SDK; never customer-managed | Customer-supplied `connection:` (secret ref or literal)   |
+| Schema     | Prisma schema language (`@prisma`), migrated as real DDL                | Hand-written JSON Schema per `table { }`, validation-only |
+| Queries    | Generated typed Prisma client (`context.db.<name>`)                     | Raw `@sql` with `{{key}}` + `params:`                     |
 
 The two coexist; this spec is only about the managed one. Swirls does **not** reinterpret
 the `@prisma` island — it hands the schema to Prisma's own toolchain for validation,
@@ -58,11 +58,11 @@ database <name> {
 
 ### Fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `label` | no | Human-readable label. |
-| `description` | no | Human-readable description. |
-| `schema` | yes | `@prisma` island: the Prisma schema language, verbatim (models, enums, relations, attributes). |
+| Field         | Required | Description                                                                                    |
+| ------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `label`       | no       | Human-readable label.                                                                          |
+| `description` | no       | Human-readable description.                                                                    |
+| `schema`      | yes      | `@prisma` island: the Prisma schema language, verbatim (models, enums, relations, attributes). |
 
 ### Nested `connection` blocks
 
@@ -75,10 +75,10 @@ connection app {
 }
 ```
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `label` | no | Human-readable label. |
-| `description` | no | Human-readable description. |
+| Field         | Required | Description                 |
+| ------------- | -------- | --------------------------- |
+| `label`       | no       | Human-readable label.       |
+| `description` | no       | Human-readable description. |
 
 ### The `@prisma` island
 
@@ -116,11 +116,11 @@ migration <name> {
 
 ### Fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `database` | yes | Bare identifier naming a declared `database` block. |
-| `order` | yes | Non-negative integer; unique per target database. Migrations apply in ascending order. |
-| `operation` | yes | `@ts` island holding the typed Prisma data-migration body. |
+| Field       | Required | Description                                                                            |
+| ----------- | -------- | -------------------------------------------------------------------------------------- |
+| `database`  | yes      | Bare identifier naming a declared `database` block.                                    |
+| `order`     | yes      | Non-negative integer; unique per target database. Migrations apply in ascending order. |
+| `operation` | yes      | `@ts` island holding the typed Prisma data-migration body.                             |
 
 ---
 
@@ -149,12 +149,12 @@ The declared `operation` mints a capability-narrowed view of the generated clien
 compile-time type error in the `@ts` island, enforced by per-operation type views over
 the one generated client.
 
-| `operation` | Client exposes |
-|---|---|
-| `query` | `findMany`, `findFirst`, `count`, `aggregate` |
-| `insert` | `create`, `createMany` |
-| `update` | `update`, `updateMany`, `upsert` |
-| `delete` | `delete`, `deleteMany` |
+| `operation`   | Client exposes                                 |
+| ------------- | ---------------------------------------------- |
+| `query`       | `findMany`, `findFirst`, `count`, `aggregate`  |
+| `insert`      | `create`, `createMany`                         |
+| `update`      | `update`, `updateMany`, `upsert`               |
+| `delete`      | `delete`, `deleteMany`                         |
 | `transaction` | the full client, inside a `$transaction` scope |
 
 ---
@@ -191,9 +191,9 @@ are indexed.
 
 ## 7. Design decisions
 
-| Decision | Choice |
-|----------|--------|
-| Top-level keyword | `database` — domain-specific, no conditional `type` field, distinct from `postgres`. |
-| Schema language | Prisma schema language via `@prisma`, delegated to Prisma's toolchain (not reinterpreted). |
-| Data migrations | Declared `migration` block, ordered, in `.swirls` (repo-local, deploy-atomic, diff-visible). |
-| Mutation governance | First-class `type: database` node with `operation` capability narrowing. |
+| Decision            | Choice                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| Top-level keyword   | `database` — domain-specific, no conditional `type` field, distinct from `postgres`.         |
+| Schema language     | Prisma schema language via `@prisma`, delegated to Prisma's toolchain (not reinterpreted).   |
+| Data migrations     | Declared `migration` block, ordered, in `.swirls` (repo-local, deploy-atomic, diff-visible). |
+| Mutation governance | First-class `type: database` node with `operation` capability narrowing.                     |

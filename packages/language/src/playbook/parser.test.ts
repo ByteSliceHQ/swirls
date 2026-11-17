@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
-import { validate } from '../validator'
 import { serialize } from '../serializer'
+import { validate } from '../validator'
 
 describe('mock + playbook DSL', () => {
   test('parses mock with workflow and node pins', () => {
@@ -20,6 +21,7 @@ mock review_gate {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.mocks[0]?.workflow).toBe('demo')
@@ -40,6 +42,7 @@ mock linkedin_create_post {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.mocks).toHaveLength(2)
@@ -85,6 +88,7 @@ playbook smoke {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.playbooks).toHaveLength(1)
@@ -95,6 +99,7 @@ playbook smoke {
     expect(pb.cases[0]?.workflow).toBe('process_contact')
     expect(pb.cases[0]?.timeout).toBe('2m')
     expect(pb.cases[0]?.timeoutSeconds).toBe(120)
+
     expect(pb.cases[0]?.expect?.assertions.map((a) => a.kind)).toEqual([
       'status',
       'duration',
@@ -158,6 +163,7 @@ playbook quality {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const pb = ast.playbooks[0]!
@@ -192,6 +198,7 @@ playbook smoke {
   }
 }
 `
+
     const first = parse(source)
     expect(first.errors).toEqual([])
     const second = parse(serialize(first.ast))

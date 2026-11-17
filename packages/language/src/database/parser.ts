@@ -6,12 +6,7 @@
 import type { ConfigValue, SourceRange } from '../ast'
 import type { Token } from '../lexer'
 import type { ResourceParserDelegate } from '../parser-delegate'
-import type {
-  DatabaseConnectionDecl,
-  DatabaseDecl,
-  MigrationDecl,
-  PrismaBlockInfo,
-} from './ast'
+import type { DatabaseConnectionDecl, DatabaseDecl, MigrationDecl, PrismaBlockInfo } from './ast'
 
 function rangeFromTokens(start: Token, end: Token): SourceRange {
   return {
@@ -24,15 +19,20 @@ function rangeFromTokens(start: Token, end: Token): SourceRange {
 function skipNamedNestedBlock(d: ResourceParserDelegate): void {
   d.advance()
   d.advance()
+
   if (!d.expect('lbrace')) {
     return
   }
+
   let depth = 1
+
   while (!d.eof() && depth > 0) {
     const t = d.advance()
+
     if (!t) {
       break
     }
+
     if (t.kind === 'lbrace') {
       depth++
     } else if (t.kind === 'rbrace') {
@@ -41,19 +41,16 @@ function skipNamedNestedBlock(d: ResourceParserDelegate): void {
   }
 }
 
-function parseDatabaseConnectionDecl(
-  d: ResourceParserDelegate,
-): DatabaseConnectionDecl | null {
+function parseDatabaseConnectionDecl(d: ResourceParserDelegate): DatabaseConnectionDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'connection') {
     return null
   }
 
   const nameTok = d.advance()
-  if (
-    !nameTok ||
-    (nameTok.kind !== 'identifier' && nameTok.kind !== 'keyword')
-  ) {
+
+  if (!nameTok || (nameTok.kind !== 'identifier' && nameTok.kind !== 'keyword')) {
     d.error('Expected connection name', nameTok)
     d.skipToNextBlock()
     return null
@@ -70,6 +67,7 @@ function parseDatabaseConnectionDecl(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -80,6 +78,7 @@ function parseDatabaseConnectionDecl(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -91,17 +90,21 @@ function parseDatabaseConnectionDecl(
 
     if (key === 'label') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         label = v
       }
+
       continue
     }
 
     if (key === 'description') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         description = v
       }
+
       continue
     }
 
@@ -123,11 +126,13 @@ export function parseDatabaseBlock(
   docComment: string | undefined,
 ): DatabaseDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'database') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected database block name', nameTok)
     d.skipToNextBlock()
@@ -148,6 +153,7 @@ export function parseDatabaseBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -162,19 +168,23 @@ export function parseDatabaseBlock(
         'Nested "role" blocks were removed; use "connection <name> { }" inside database blocks instead',
         t,
       )
+
       skipNamedNestedBlock(d)
       continue
     }
 
     if (t.kind === 'keyword' && t.value === 'connection') {
       const connectionDecl = parseDatabaseConnectionDecl(d)
+
       if (connectionDecl) {
         connections.push(connectionDecl)
       }
+
       continue
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -186,25 +196,31 @@ export function parseDatabaseBlock(
 
     if (key === 'label') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         label = v
       }
+
       continue
     }
 
     if (key === 'description') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         description = v
       }
+
       continue
     }
 
     if (key === 'schema') {
       const next = d.peek()
+
       if (next?.kind === 'fenced_block' && next.fencedLang === 'prisma') {
         const tok = d.advance()!
         schemaSource = tok.fencedContent ?? ''
+
         if (tok.fencedContentRange) {
           schemaBlock = {
             content: schemaSource,
@@ -217,6 +233,7 @@ export function parseDatabaseBlock(
       } else {
         d.error('database schema must be an @prisma { } block', next)
       }
+
       continue
     }
 
@@ -242,11 +259,13 @@ export function parseMigrationBlock(
   docComment: string | undefined,
 ): MigrationDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'migration') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected migration block name', nameTok)
     d.skipToNextBlock()
@@ -267,6 +286,7 @@ export function parseMigrationBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -277,6 +297,7 @@ export function parseMigrationBlock(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -288,34 +309,37 @@ export function parseMigrationBlock(
 
     if (key === 'database') {
       const refTok = d.advance()
-      if (
-        refTok &&
-        (refTok.kind === 'identifier' || refTok.kind === 'keyword')
-      ) {
+
+      if (refTok && (refTok.kind === 'identifier' || refTok.kind === 'keyword')) {
         database = refTok.value as string
         databaseRange = { ...refTok.range }
       } else {
         d.error('migration database must be a database block name', refTok)
       }
+
       continue
     }
 
     if (key === 'order') {
       const v = d.parseValue()
+
       if (typeof v === 'number') {
         order = v
       } else {
         d.error('migration order must be a number', d.peek())
       }
+
       continue
     }
 
     if (key === 'operation') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv) {
         operation = cv
       }
+
       continue
     }
 

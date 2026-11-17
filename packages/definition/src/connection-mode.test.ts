@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import {
   connectionModePairError,
   hasPartialSelfManagedFields,
@@ -14,22 +15,23 @@ describe('connection mode helpers', () => {
         authRef: 'my_auth',
       }),
     ).toBe(true)
+
     expect(
       isSelfManagedConnectionBlock({
         baseUrl: 'https://api.example.com',
         authRef: null,
       }),
     ).toBe(false)
+
     expect(isSelfManagedConnectionBlock({})).toBe(false)
   })
 
   test('connectionModePairError rejects partial self-managed fields', () => {
-    expect(
-      connectionModePairError('slack', 'https://api.example.com', undefined),
-    ).toContain('both base_url and auth')
-    expect(
-      connectionModePairError('slack', undefined, undefined),
-    ).toBeUndefined()
+    expect(connectionModePairError('slack', 'https://api.example.com', undefined)).toContain(
+      'both base_url and auth',
+    )
+
+    expect(connectionModePairError('slack', undefined, undefined)).toBeUndefined()
   })
 
   test('hasPartialSelfManagedFields detects mismatched pair', () => {
@@ -39,6 +41,7 @@ describe('connection mode helpers', () => {
         authRef: null,
       }),
     ).toBe(true)
+
     expect(
       hasPartialSelfManagedFields({
         baseUrl: 'https://api.example.com',

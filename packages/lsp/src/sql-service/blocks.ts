@@ -11,6 +11,7 @@ import type {
   WorkflowDecl,
 } from '@swirls/language'
 import { BRACE_PLACEHOLDER_RE } from '@swirls/language/postgres/sql-utils'
+
 import { positionInRange } from '../ts-service/virtual-docs'
 
 export interface SqlBlockInfo {
@@ -31,37 +32,32 @@ type SchemaLike = Record<string, unknown>
 
 function flattenSchemaPaths(schema: SchemaLike, prefix = ''): string[] {
   const paths: string[] = []
-  if (
-    schema.type !== 'object' ||
-    !schema.properties ||
-    typeof schema.properties !== 'object'
-  ) {
+
+  if (schema.type !== 'object' || !schema.properties || typeof schema.properties !== 'object') {
     return paths
   }
+
   for (const [key, value] of Object.entries(schema.properties)) {
     if (!value || typeof value !== 'object') {
       continue
     }
+
     const child = value as SchemaLike
     const childPath = prefix ? `${prefix}.${key}` : key
-    if (
-      child.type === 'object' &&
-      child.properties &&
-      typeof child.properties === 'object'
-    ) {
+
+    if (child.type === 'object' && child.properties && typeof child.properties === 'object') {
       paths.push(...flattenSchemaPaths(child, childPath))
     } else {
       paths.push(childPath)
     }
   }
+
   return paths
 }
 
 function getLeafNodeNames(graph: WorkflowDecl): Set<string> {
   const sources = new Set(graph.edges.map((e) => e.source))
-  return new Set(
-    graph.nodes.filter((n) => !sources.has(n.name)).map((n) => n.name),
-  )
+  return new Set(graph.nodes.filter((n) => !sources.has(n.name)).map((n) => n.name))
 }
 
 /**
@@ -71,17 +67,22 @@ function getLeafNodeNames(graph: WorkflowDecl): Set<string> {
 function computeStreamSchemaFromGraph(graph: WorkflowDecl): string[] {
   const leafNames = getLeafNodeNames(graph)
   const paths: string[] = []
+
   for (const node of graph.nodes) {
     if (!leafNames.has(node.name)) {
       continue
     }
+
     const outputSchema = node.outputSchema
+
     if (!outputSchema || typeof outputSchema !== 'object') {
       continue
     }
+
     const nodePaths = flattenSchemaPaths(outputSchema as SchemaLike, node.name)
     paths.push(...nodePaths)
   }
+
   return paths
 }
 
@@ -106,16 +107,21 @@ export function resolveStreamSchema(
 
     if (vv?.schema != null && typeof vv.schema === 'object') {
       const paths = flattenSchemaPaths(vv.schema as SchemaLike, '')
+
       if (paths.length > 0) {
         return paths
       }
     }
+
     const graph = ast.workflows.find((g) => g.name === s.workflowName)
+
     if (!graph) {
       return null
     }
+
     return computeStreamSchemaFromGraph(graph)
   }
+
   return null
 }
 
@@ -134,9 +140,7 @@ interface StreamNodeOutputRowSchema {
  * Extract expected row shape from a stream node's outputSchema when it describes an array of rows.
  * Uses outputSchema.items when outputSchema.type === 'array'. Returns null otherwise.
  */
-export function getStreamNodeOutputRowSchema(
-  node: NodeDecl,
-): StreamNodeOutputRowSchema | null {
+export function getStreamNodeOutputRowSchema(node: NodeDecl): StreamNodeOutputRowSchema | null {
   const outputSchema = node.outputSchema
 
   if (!outputSchema || typeof outputSchema !== 'object') {
@@ -148,6 +152,7 @@ export function getStreamNodeOutputRowSchema(
   }
 
   const items = outputSchema.items
+
   if (!items || typeof items !== 'object') {
     return null
   }
@@ -161,6 +166,7 @@ export function getStreamNodeOutputRowSchema(
 
   const propertyNames = Object.keys(itemProps)
   const required = itemsObj.required
+
   const requiredNames = Array.isArray(required)
     ? (required as string[]).filter((r) => typeof r === 'string')
     : []
@@ -174,14 +180,11 @@ export function getStreamNodeOutputRowSchema(
 export function collectSqlBlocks(ast: SwirlsFile): SqlBlockInfo[] {
   const blocks: SqlBlockInfo[] = []
   const pgBlocks = ast.postgres ?? []
+
   for (const graph of ast.workflows) {
     for (const node of graph.nodes) {
       for (const [key, value] of Object.entries(node.configFields)) {
-        if (
-          key === 'query' &&
-          value?.kind === 'sql_block' &&
-          value.innerRange
-        ) {
+        if (key === 'query' && value?.kind === 'sql_block' && value.innerRange) {
           blocks.push({
             code: value.code,
             innerRange: value.innerRange,
@@ -193,12 +196,10 @@ export function collectSqlBlocks(ast: SwirlsFile): SqlBlockInfo[] {
             postgresBlocks: [],
           })
         }
+
         if (
           node.type === 'postgres' &&
-          (key === 'select' ||
-            key === 'insert' ||
-            key === 'update' ||
-            key === 'delete') &&
+          (key === 'select' || key === 'insert' || key === 'update' || key === 'delete') &&
           value?.kind === 'sql_block' &&
           value.innerRange
         ) {
@@ -216,6 +217,7 @@ export function collectSqlBlocks(ast: SwirlsFile): SqlBlockInfo[] {
       }
     }
   }
+
   return blocks
 }
 
@@ -229,25 +231,27 @@ export function findSqlBlockAtPosition(
       return block
     }
   }
+
   return null
 }
 
 /**
  * If `offset` falls inside `{{key}}` in SQL `code`, return `key`.
  */
-export function findBracePlaceholderKeyAtCodeOffset(
-  code: string,
-  offset: number,
-): string | null {
+export function findBracePlaceholderKeyAtCodeOffset(code: string, offset: number): string | null {
   BRACE_PLACEHOLDER_RE.lastIndex = 0
   let m: RegExpExecArray | null = BRACE_PLACEHOLDER_RE.exec(code)
+
   while (m !== null) {
     const start = m.index
     const end = start + (m[0]?.length ?? 0)
+
     if (offset >= start && offset < end) {
       return m[1] ?? null
     }
+
     m = BRACE_PLACEHOLDER_RE.exec(code)
   }
+
   return null
 }

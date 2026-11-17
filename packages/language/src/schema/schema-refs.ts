@@ -2,12 +2,7 @@
  * Named top-level `schema` blocks: resolution map and validation helpers.
  */
 
-import type {
-  Diagnostic,
-  JsonSchemaLiteral,
-  SourceRange,
-  SwirlsFile,
-} from '../ast'
+import type { Diagnostic, JsonSchemaLiteral, SourceRange, SwirlsFile } from '../ast'
 import { resolveNamedSchemasFromDecls } from './named-schema-resolve'
 
 function diag(
@@ -41,6 +36,7 @@ export function inlineNamedSchemaRefs(
     if (!ref) {
       return undefined
     }
+
     return localMap.get(ref) ?? extraSchemas?.get(ref)
   }
 
@@ -48,11 +44,8 @@ export function inlineNamedSchemaRefs(
     if (!f.schemaRef) {
       return f
     }
-    const {
-      schemaRef: _schemaRef,
-      schemaRefRange: _schemaRefRange,
-      ...rest
-    } = f
+
+    const { schemaRef: _schemaRef, schemaRefRange: _schemaRefRange, ...rest } = f
     const resolved = lit(f.schemaRef)
     return resolved !== undefined ? { ...rest, schema: resolved } : rest
   })
@@ -61,11 +54,8 @@ export function inlineNamedSchemaRefs(
     if (!w.schemaRef) {
       return w
     }
-    const {
-      schemaRef: _schemaRef,
-      schemaRefRange: _schemaRefRange,
-      ...rest
-    } = w
+
+    const { schemaRef: _schemaRef, schemaRefRange: _schemaRefRange, ...rest } = w
     const resolved = lit(w.schemaRef)
     return resolved !== undefined ? { ...rest, schema: resolved } : rest
   })
@@ -76,11 +66,8 @@ export function inlineNamedSchemaRefs(
       if (!sv.schemaRef) {
         return sv
       }
-      const {
-        schemaRef: _schemaRef,
-        schemaRefRange: _schemaRefRange,
-        ...rest
-      } = sv
+
+      const { schemaRef: _schemaRef, schemaRefRange: _schemaRefRange, ...rest } = sv
       const resolved = lit(sv.schemaRef)
       return resolved !== undefined ? { ...rest, schema: resolved } : rest
     }),
@@ -90,11 +77,8 @@ export function inlineNamedSchemaRefs(
     if (!v.schemaRef) {
       return v
     }
-    const {
-      schemaRef: _schemaRef,
-      schemaRefRange: _schemaRefRange,
-      ...rest
-    } = v
+
+    const { schemaRef: _schemaRef, schemaRefRange: _schemaRefRange, ...rest } = v
     const resolved = lit(v.schemaRef)
     return resolved !== undefined ? { ...rest, schema: resolved } : rest
   })
@@ -102,6 +86,7 @@ export function inlineNamedSchemaRefs(
   const actions = (ast.actions ?? []).map((a) => {
     const inputResolved = a.inputRef ? lit(a.inputRef) : undefined
     const outputResolved = a.outputRef ? lit(a.outputRef) : undefined
+
     const {
       inputRef: _inputRef,
       inputRefRange: _inputRefRange,
@@ -109,6 +94,7 @@ export function inlineNamedSchemaRefs(
       outputRefRange: _outputRefRange,
       ...rest
     } = a
+
     return {
       ...rest,
       ...(inputResolved !== undefined ? { input: inputResolved } : {}),
@@ -128,33 +114,27 @@ export function inlineNamedSchemaRefs(
       } = n
 
       const inputResolved = n.inputSchemaRef ? lit(n.inputSchemaRef) : undefined
-      const outputResolved = n.outputSchemaRef
-        ? lit(n.outputSchemaRef)
-        : undefined
+      const outputResolved = n.outputSchemaRef ? lit(n.outputSchemaRef) : undefined
 
       const reviewConfig =
-        n.reviewConfig &&
-        typeof n.reviewConfig === 'object' &&
-        !Array.isArray(n.reviewConfig)
+        n.reviewConfig && typeof n.reviewConfig === 'object' && !Array.isArray(n.reviewConfig)
           ? (() => {
               const raw = n.reviewConfig as Record<string, unknown>
               const { schemaRef, ...reviewRest } = raw
+
               if (typeof schemaRef !== 'string') {
                 return n.reviewConfig
               }
+
               const resolved = lit(schemaRef)
-              return resolved !== undefined
-                ? { ...reviewRest, schema: resolved }
-                : reviewRest
+              return resolved !== undefined ? { ...reviewRest, schema: resolved } : reviewRest
             })()
           : n.reviewConfig
 
       return {
         ...rest,
         ...(inputResolved !== undefined ? { inputSchema: inputResolved } : {}),
-        ...(outputResolved !== undefined
-          ? { outputSchema: outputResolved }
-          : {}),
+        ...(outputResolved !== undefined ? { outputSchema: outputResolved } : {}),
         ...(reviewConfig !== undefined ? { reviewConfig } : {}),
       }
     }),
@@ -210,10 +190,9 @@ export function validateSchemaFieldRefs(
   const out: Diagnostic[] = []
   const localNames = new Set((ast.schemas ?? []).map((s) => s.name))
   const extra = options?.workspaceSchemaNames
+
   const names =
-    extra !== undefined && extra.size > 0
-      ? new Set([...localNames, ...extra])
-      : localNames
+    extra !== undefined && extra.size > 0 ? new Set([...localNames, ...extra]) : localNames
 
   const check = (
     ref: string | undefined,
@@ -224,10 +203,9 @@ export function validateSchemaFieldRefs(
     if (!ref) {
       return
     }
+
     if (!names.has(ref)) {
-      out.push(
-        diag(`${ctx} references undefined schema "${ref}"`, range ?? fallback),
-      )
+      out.push(diag(`${ctx} references undefined schema "${ref}"`, range ?? fallback))
     }
   }
 
@@ -240,6 +218,7 @@ export function validateSchemaFieldRefs(
         ),
       )
     }
+
     check(f.schemaRef, f.schemaRefRange, f.range, `Form "${f.name}"`)
   }
 
@@ -252,6 +231,7 @@ export function validateSchemaFieldRefs(
         ),
       )
     }
+
     check(w.schemaRef, w.schemaRefRange, w.range, `Webhook "${w.name}"`)
   }
 
@@ -265,12 +245,8 @@ export function validateSchemaFieldRefs(
           ),
         )
       }
-      check(
-        sv.schemaRef,
-        sv.schemaRefRange,
-        sv.range,
-        `Stream "${s.name}" version "${sv.key}"`,
-      )
+
+      check(sv.schemaRef, sv.schemaRefRange, sv.range, `Stream "${s.name}" version "${sv.key}"`)
     }
   }
 
@@ -283,27 +259,25 @@ export function validateSchemaFieldRefs(
         ),
       )
     }
+
     check(v.schemaRef, v.schemaRefRange, v.range, `View "${v.name}"`)
   }
 
   for (const a of ast.actions ?? []) {
     const ctx = `Action "${a.name}"`
+
     if (a.input !== undefined && a.inputRef) {
       out.push(
-        diag(
-          `${ctx} cannot combine inline input and input: <name>`,
-          a.inputRefRange ?? a.range,
-        ),
+        diag(`${ctx} cannot combine inline input and input: <name>`, a.inputRefRange ?? a.range),
       )
     }
+
     if (a.output !== undefined && a.outputRef) {
       out.push(
-        diag(
-          `${ctx} cannot combine inline output and output: <name>`,
-          a.outputRefRange ?? a.range,
-        ),
+        diag(`${ctx} cannot combine inline output and output: <name>`, a.outputRefRange ?? a.range),
       )
     }
+
     check(a.inputRef, a.inputRefRange, a.range, `${ctx} input`)
     check(a.outputRef, a.outputRefRange, a.range, `${ctx} output`)
   }
@@ -311,6 +285,7 @@ export function validateSchemaFieldRefs(
   for (const g of ast.workflows) {
     for (const n of g.nodes) {
       const ctx = `Workflow "${g.name}" node "${n.name}"`
+
       if (n.inputSchema !== undefined && n.inputSchemaRef) {
         out.push(
           diag(
@@ -319,6 +294,7 @@ export function validateSchemaFieldRefs(
           ),
         )
       }
+
       if (n.outputSchema !== undefined && n.outputSchemaRef) {
         out.push(
           diag(
@@ -327,31 +303,20 @@ export function validateSchemaFieldRefs(
           ),
         )
       }
-      check(
-        n.inputSchemaRef,
-        n.inputSchemaRefRange,
-        n.range,
-        `${ctx} inputSchema`,
-      )
-      check(
-        n.outputSchemaRef,
-        n.outputSchemaRefRange,
-        n.range,
-        `${ctx} output schema`,
-      )
+
+      check(n.inputSchemaRef, n.inputSchemaRefRange, n.range, `${ctx} inputSchema`)
+      check(n.outputSchemaRef, n.outputSchemaRefRange, n.range, `${ctx} output schema`)
 
       const rc = n.reviewConfig
+
       if (rc) {
         const sr = rc.schemaRef
+
         if (typeof sr === 'string' && sr !== '') {
           if (rc.schema !== undefined && rc.schema !== null) {
-            out.push(
-              diag(
-                `${ctx} review cannot combine inline schema and schema: <name>`,
-                n.range,
-              ),
-            )
+            out.push(diag(`${ctx} review cannot combine inline schema and schema: <name>`, n.range))
           }
+
           check(sr, undefined, n.range, `${ctx} review`)
         }
       }

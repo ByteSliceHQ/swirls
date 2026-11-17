@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "singleQuote": true,
+  "sortImports": {
+    "internalPattern": ["~/", "@/", "#", "@swirls/"]
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/.turbo/**",
+    "bun.lock",
+    "patches/**",
+    "cookbook/**",
+    "skills/**",
+    "editors/vscode/server/**",
+    "editors/vscode/syntaxes/**",
+    "editors/tree-sitter-swirls/src/**",
+    "editors/tree-sitter-swirls/bindings/**",
+    "editors/tree-sitter-swirls/test/**",
+    "editors/tree-sitter-swirls/package-lock.json",
+    "**/__fixtures__/**",
+    "packages/language/examples/**",
+    ".claude/**",
+    ".cursor/**"
+  ]
+}

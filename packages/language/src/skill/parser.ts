@@ -19,11 +19,13 @@ export function parseSkillBlock(
   docComment: string | undefined,
 ): SkillDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'skill') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected skill block name', nameTok)
     d.skipToNextBlock()
@@ -41,6 +43,7 @@ export function parseSkillBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -51,6 +54,7 @@ export function parseSkillBlock(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -62,6 +66,7 @@ export function parseSkillBlock(
 
     if (key === 'name') {
       const valTok = d.peek()
+
       if (valTok?.kind === 'string') {
         d.advance()
         skillName = valTok.value as string
@@ -69,6 +74,7 @@ export function parseSkillBlock(
       } else {
         d.error('Expected quoted skill name after name:', valTok)
       }
+
       continue
     }
 

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+
 import { appAudiencePolicySchema } from './app-audience'
 import { appAvatarSchema } from './app-avatar'
 import { appBrandTokensSchema } from './app-brand-tokens'
@@ -16,7 +17,7 @@ import {
   workflowNodeConfigSchema,
 } from './schemas'
 
-const uuidLike = z.string().uuid()
+const uuidLike = z.uuid()
 
 export const deploymentDefinitionNamedSchemaSchema = z.object({
   id: uuidLike,
@@ -194,14 +195,7 @@ export const CHANNEL_RESPONSE_POLICY_LIMITS = {
  * Where a channel can be bound. Part of the definition, so the language reads
  * its platform list from here instead of keeping a copy.
  */
-export const channelPlatformSchema = z.enum([
-  'slack',
-  'linear',
-  'discord',
-  'web',
-  'mcp',
-  'swirls',
-])
+export const channelPlatformSchema = z.enum(['slack', 'linear', 'discord', 'web', 'mcp', 'swirls'])
 
 export type ChannelPlatform = z.infer<typeof channelPlatformSchema>
 
@@ -254,6 +248,7 @@ export const deploymentDefinitionChannelBlockSchema = z
           message: 'MCP channel requires an agent or workflows',
         })
       }
+
       if (!channel.connectorRef) {
         ctx.addIssue({
           code: 'custom',
@@ -264,6 +259,7 @@ export const deploymentDefinitionChannelBlockSchema = z
       if (!channel.agent) {
         ctx.addIssue({ code: 'custom', message: 'Channel requires an agent' })
       }
+
       if (channel.workflows !== undefined) {
         ctx.addIssue({
           code: 'custom',
@@ -271,11 +267,11 @@ export const deploymentDefinitionChannelBlockSchema = z
         })
       }
     }
+
     if (
       channel.workflows?.some(
         (name, index, names) =>
-          ['send_message', 'get_execution'].includes(name) ||
-          names.indexOf(name) !== index,
+          ['send_message', 'get_execution'].includes(name) || names.indexOf(name) !== index,
       )
     ) {
       ctx.addIssue({
@@ -298,20 +294,17 @@ export const deploymentDefinitionConnectionBlockSchema = z
      * `authRef`. When present, credentials come from the vault auth profile
      * instead of Fabric-brokered OAuth.
      */
-    baseUrl: z.string().url().optional(),
+    baseUrl: z.url().optional(),
     /** Self-managed mode: name of a deployment `auth` block. */
     authRef: z.string().min(1).optional(),
     /** Optional private connectivity realm for the self-managed origin. */
     networkRef: z.string().min(1).optional(),
   })
   .superRefine((block, ctx) => {
-    const message = connectionModePairError(
-      block.name,
-      block.baseUrl,
-      block.authRef,
-    )
+    const message = connectionModePairError(block.name, block.baseUrl, block.authRef)
+
     if (message) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message })
+      ctx.addIssue({ code: 'custom', message })
     }
   })
 
@@ -487,9 +480,7 @@ export const deploymentDefinitionDatabaseBlockSchema = z.object({
   /** sha256 hex of the schema text. */
   schemaChecksum: z.string(),
   /** Declared named connections for direct application access. */
-  connections: z
-    .array(deploymentDefinitionDatabaseConnectionSchema)
-    .default([]),
+  connections: z.array(deploymentDefinitionDatabaseConnectionSchema).default([]),
 })
 
 /**
@@ -555,12 +546,7 @@ export const deploymentDefinitionComputerBlockSchema = z.object({
 export const deploymentDefinitionOperationBlockSchema = z.object({
   id: uuidLike,
   /** Travels inside the signed dispatch, so it follows the wire id rule. */
-  name: z
-    .string()
-    .regex(
-      /^[A-Za-z0-9._-]{1,128}$/,
-      'must be 1-128 characters of A-Za-z0-9._-',
-    ),
+  name: z.string().regex(/^[A-Za-z0-9._-]{1,128}$/, 'must be 1-128 characters of A-Za-z0-9._-'),
   label: z.string(),
   description: z.string().optional(),
   interpreter: z.enum(['powershell', 'sh']),
@@ -661,12 +647,10 @@ export const deploymentDefinitionAppPageSchema = z
   })
   .refine(
     (page) =>
-      [page.openui, page.channel, page.threads, page.reviews].filter(
-        (body) => body !== undefined,
-      ).length === 1,
+      [page.openui, page.channel, page.threads, page.reviews].filter((body) => body !== undefined)
+        .length === 1,
     {
-      message:
-        'App page must declare exactly one of openui, channel, threads, or reviews',
+      message: 'App page must declare exactly one of openui, channel, threads, or reviews',
     },
   )
 
@@ -682,10 +666,7 @@ export const deploymentDefinitionAppNavSectionSchema = z.object({
 
 export const deploymentDefinitionAppShellRegionSchema = z.object({
   name: z.enum(['topbar', 'leftbar', 'rightbar']),
-  props: z.record(
-    z.string(),
-    z.union([z.string(), z.boolean(), z.array(z.string())]),
-  ),
+  props: z.record(z.string(), z.union([z.string(), z.boolean(), z.array(z.string())])),
 })
 
 export const deploymentDefinitionAppLandingDiscoverSchema = z.object({
@@ -806,6 +787,7 @@ const policyGrantBase = z.object({
   effect: z.enum(['allow', 'deny']),
   role: z.string(),
 })
+
 export const deploymentDefinitionPolicyGrantSchema = z.union([
   policyGrantBase.extend({
     agent: z.string(),
@@ -843,13 +825,11 @@ const deploymentDefinitionTestBlockSchema = z
     id: uuidLike,
     name: z.string(),
   })
-  .passthrough()
+  .loose()
 
-export const deploymentDefinitionMockBlockSchema =
-  deploymentDefinitionTestBlockSchema
+export const deploymentDefinitionMockBlockSchema = deploymentDefinitionTestBlockSchema
 
-export const deploymentDefinitionPlaybookBlockSchema =
-  deploymentDefinitionTestBlockSchema
+export const deploymentDefinitionPlaybookBlockSchema = deploymentDefinitionTestBlockSchema
 
 export const deploymentDefinitionSchema = z
   .object({
@@ -866,30 +846,20 @@ export const deploymentDefinitionSchema = z
     /** Swirls-managed Postgres databases (`database name { schema: @prisma … }`). */
     databaseBlocks: z.array(deploymentDefinitionDatabaseBlockSchema).optional(),
     /** Declared data migrations for managed databases (`migration name { … }`). */
-    databaseMigrations: z
-      .array(deploymentDefinitionDatabaseMigrationSchema)
-      .optional(),
+    databaseMigrations: z.array(deploymentDefinitionDatabaseMigrationSchema).optional(),
     diskBlocks: z.array(deploymentDefinitionDiskBlockSchema).optional(),
     computerBlocks: z.array(deploymentDefinitionComputerBlockSchema).optional(),
     /** Scripts that run on enrolled devices (`operation name { … }`). */
-    operationBlocks: z
-      .array(deploymentDefinitionOperationBlockSchema)
-      .optional(),
+    operationBlocks: z.array(deploymentDefinitionOperationBlockSchema).optional(),
     skillBlocks: z.array(deploymentDefinitionSkillBlockSchema).optional(),
-    decisionBlocks: z
-      .array(decisionDefinitionSchema.extend({ id: z.string().uuid() }))
-      .optional(),
+    decisionBlocks: z.array(decisionDefinitionSchema.extend({ id: z.uuid() })).optional(),
     agentBlocks: z.array(deploymentDefinitionAgentBlockSchema).optional(),
     channelBlocks: z.array(deploymentDefinitionChannelBlockSchema).optional(),
     queryBlocks: z.array(deploymentDefinitionQueryBlockSchema).optional(),
-    connectionBlocks: z
-      .array(deploymentDefinitionConnectionBlockSchema)
-      .optional(),
+    connectionBlocks: z.array(deploymentDefinitionConnectionBlockSchema).optional(),
     mcpBlocks: z.array(deploymentDefinitionMcpBlockSchema).optional(),
     networkBlocks: z.array(deploymentDefinitionNetworkBlockSchema).optional(),
-    connectorBlocks: z
-      .array(deploymentDefinitionConnectorBlockSchema)
-      .optional(),
+    connectorBlocks: z.array(deploymentDefinitionConnectorBlockSchema).optional(),
     actionBlocks: z.array(deploymentDefinitionActionBlockSchema).optional(),
     streams: z.array(deploymentDefinitionStreamSchema).optional(),
     /** Spreadsheet-like stream compositions (`view name { … }`). */
@@ -947,6 +917,7 @@ export const deploymentDefinitionSchema = z
       (val.policies?.length ?? 0) +
       (val.mockBlocks?.length ?? 0) +
       (val.playbookBlocks?.length ?? 0)
+
     if (primitiveCount === 0) {
       ctx.addIssue({
         code: 'custom',
@@ -956,8 +927,10 @@ export const deploymentDefinitionSchema = z
     }
 
     const decisionNames = new Set<string>()
+
     for (const [index, decision] of (val.decisionBlocks ?? []).entries()) {
       const block = val.secretBlocks?.find((b) => b.name === decision.secrets)
+
       if (decisionNames.has(decision.name)) {
         ctx.addIssue({
           code: 'custom',
@@ -965,18 +938,20 @@ export const deploymentDefinitionSchema = z
           message: 'Decision names must be unique',
         })
       }
+
       decisionNames.add(decision.name)
+
       if (!block || !block.vars.includes('TYPESAFE_API_KEY')) {
         ctx.addIssue({
           code: 'custom',
           path: ['decisionBlocks', index, 'secrets'],
-          message:
-            'Decision requires an explicit secret block declaring TYPESAFE_API_KEY',
+          message: 'Decision requires an explicit secret block declaring TYPESAFE_API_KEY',
         })
       }
     }
 
     const operationNames = new Set<string>()
+
     for (const [index, operation] of (val.operationBlocks ?? []).entries()) {
       if (operationNames.has(operation.name)) {
         ctx.addIssue({
@@ -985,16 +960,20 @@ export const deploymentDefinitionSchema = z
           message: 'Operation names must be unique',
         })
       }
+
       operationNames.add(operation.name)
     }
 
     for (const [wi, w] of workflows.entries()) {
       for (const [ni, node] of w.nodes.entries()) {
         const config = node.config
+
         if (config.type !== 'device') {
           continue
         }
+
         const path = ['workflows', wi, 'nodes', ni]
+
         if (!operationNames.has(config.operation)) {
           ctx.addIssue({
             code: 'custom',
@@ -1002,6 +981,7 @@ export const deploymentDefinitionSchema = z
             message: `Device node references undefined operation "${config.operation}"`,
           })
         }
+
         if ((config.device === undefined) === (config.devices === undefined)) {
           ctx.addIssue({
             code: 'custom',
@@ -1010,14 +990,14 @@ export const deploymentDefinitionSchema = z
               'Device node needs exactly one of "device" (one device id) or "devices" (a selector)',
           })
         }
+
         // A review replaces a node's work with the approval form, so a
         // device node with one would never dispatch anything.
         if (node.reviewConfig?.enabled) {
           ctx.addIssue({
             code: 'custom',
             path: [...path, 'reviewConfig'],
-            message:
-              'Put the review on a separate node upstream of the device node',
+            message: 'Put the review on a separate node upstream of the device node',
           })
         }
       }
@@ -1025,19 +1005,17 @@ export const deploymentDefinitionSchema = z
 
     for (const [wi, w] of workflows.entries()) {
       const nodeIds = new Set(w.nodes.map((n) => n.id))
+
       for (const [ni, node] of w.nodes.entries()) {
         if (node.type !== 'decision') {
           continue
         }
+
         const config = node.config
-        const definition =
-          config.type === 'decision' ? config.definition : undefined
-        const block = val.secretBlocks?.find(
-          (b) => b.name === definition?.secrets,
-        )
-        const declared = val.decisionBlocks?.find(
-          (d) => d.name === definition?.name,
-        )
+        const definition = config.type === 'decision' ? config.definition : undefined
+        const block = val.secretBlocks?.find((b) => b.name === definition?.secrets)
+        const declared = val.decisionBlocks?.find((d) => d.name === definition?.name)
+
         if (
           !definition ||
           config.type !== 'decision' ||
@@ -1045,9 +1023,7 @@ export const deploymentDefinitionSchema = z
           !declared ||
           JSON.stringify(
             decisionDefinitionSchema.parse(
-              Object.fromEntries(
-                Object.entries(declared).filter(([key]) => key !== 'id'),
-              ),
+              Object.fromEntries(Object.entries(declared).filter(([key]) => key !== 'id')),
             ),
           ) !== JSON.stringify(definition) ||
           !block ||
@@ -1060,12 +1036,12 @@ export const deploymentDefinitionSchema = z
               'Decision requires its deployed declaration and an explicit secret block declaring TYPESAFE_API_KEY',
           })
         }
+
         if (node.reviewConfig?.enabled) {
           ctx.addIssue({
             code: 'custom',
             path: ['workflows', wi, 'nodes', ni, 'reviewConfig'],
-            message:
-              'Use a separate downstream review gate after decision inference',
+            message: 'Use a separate downstream review gate after decision inference',
           })
         }
       }
@@ -1078,6 +1054,7 @@ export const deploymentDefinitionSchema = z
             path: ['workflows', wi, 'edges', ei, 'sourceNodeId'],
           })
         }
+
         if (!nodeIds.has(e.targetNodeId)) {
           ctx.addIssue({
             code: 'custom',
@@ -1090,18 +1067,12 @@ export const deploymentDefinitionSchema = z
   })
 
 export type DeploymentDefinition = z.infer<typeof deploymentDefinitionSchema>
-export type DeploymentDefinitionView = z.infer<
-  typeof deploymentDefinitionViewSchema
->
+export type DeploymentDefinitionView = z.infer<typeof deploymentDefinitionViewSchema>
 export type DeploymentDefinitionViewComputedColumn = z.infer<
   typeof deploymentDefinitionViewComputedColumnSchema
 >
-export type DeploymentDefinitionApp = z.infer<
-  typeof deploymentDefinitionAppSchema
->
-export type DeploymentDefinitionAppPage = z.infer<
-  typeof deploymentDefinitionAppPageSchema
->
+export type DeploymentDefinitionApp = z.infer<typeof deploymentDefinitionAppSchema>
+export type DeploymentDefinitionAppPage = z.infer<typeof deploymentDefinitionAppPageSchema>
 export type DeploymentDefinitionDatabaseBlock = z.infer<
   typeof deploymentDefinitionDatabaseBlockSchema
 >
@@ -1111,42 +1082,30 @@ export type DeploymentDefinitionDatabaseConnection = z.infer<
 export type DeploymentDefinitionDatabaseMigration = z.infer<
   typeof deploymentDefinitionDatabaseMigrationSchema
 >
-export type DeploymentDefinitionRole = z.infer<
-  typeof deploymentDefinitionRoleSchema
->
+export type DeploymentDefinitionRole = z.infer<typeof deploymentDefinitionRoleSchema>
 export type DeploymentDefinitionClaimCondition = z.infer<
   typeof deploymentDefinitionClaimConditionSchema
 >
-export type DeploymentDefinitionPolicy = z.infer<
-  typeof deploymentDefinitionPolicySchema
->
-export type DeploymentDefinitionPolicyGrant = z.infer<
-  typeof deploymentDefinitionPolicyGrantSchema
->
+export type DeploymentDefinitionPolicy = z.infer<typeof deploymentDefinitionPolicySchema>
+export type DeploymentDefinitionPolicyGrant = z.infer<typeof deploymentDefinitionPolicyGrantSchema>
 export type DeploymentDefinitionComputerBlock = z.infer<
   typeof deploymentDefinitionComputerBlockSchema
 >
 export type DeploymentDefinitionOperationBlock = z.infer<
   typeof deploymentDefinitionOperationBlockSchema
 >
-export type DeploymentDefinitionAgentBlock = z.infer<
-  typeof deploymentDefinitionAgentBlockSchema
->
+export type DeploymentDefinitionAgentBlock = z.infer<typeof deploymentDefinitionAgentBlockSchema>
 export type DeploymentDefinitionAgentSuggestion = z.infer<
   typeof deploymentDefinitionAgentSuggestionSchema
 >
-export type DeploymentDefinitionWorkflow = z.infer<
-  typeof deploymentDefinitionWorkflowSchema
->
+export type DeploymentDefinitionWorkflow = z.infer<typeof deploymentDefinitionWorkflowSchema>
 export type DeploymentDefinitionPostgresBlock = z.infer<
   typeof deploymentDefinitionPostgresBlockSchema
 >
 export type DeploymentDefinitionNetworkBlock = z.infer<
   typeof deploymentDefinitionNetworkBlockSchema
 >
-export type DeploymentDefinitionQueryBlock = z.infer<
-  typeof deploymentDefinitionQueryBlockSchema
->
+export type DeploymentDefinitionQueryBlock = z.infer<typeof deploymentDefinitionQueryBlockSchema>
 
 export function parseDeploymentDefinition(data: unknown) {
   return deploymentDefinitionSchema.safeParse(data)

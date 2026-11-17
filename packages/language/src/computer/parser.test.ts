@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { serialize } from '../serializer'
 import { validate } from '../validator'
@@ -40,16 +41,17 @@ computer pr_bot {
   resources: { cpus: 2, memoryMiB: 1024 }
 }
 `)
+
     expect(errors).toEqual([])
     const computer = ast.computer[0]
     expect(computer?.label).toBe('PR bot')
     expect(computer?.description).toBe('Reviews pull requests')
-    expect(
-      computer?.software?.map((pin) => [pin.packageName, pin.pin]),
-    ).toEqual([
+
+    expect(computer?.software?.map((pin) => [pin.packageName, pin.pin])).toEqual([
       ['gh', '2.63.2'],
       ['git', '2.47.0'],
     ])
+
     expect(computer?.disks).toEqual(['kb'])
     expect(computer?.resources?.cpus).toBe(2)
     expect(computer?.resources?.memoryMiB).toBe(1024)
@@ -63,6 +65,7 @@ computer pr_bot {
   resources: { cpus: 2, memoryMiB: 1024 }
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const again = parse(serialize(ast))
@@ -79,23 +82,19 @@ computer pr_bot {
   software: { gh: 2.63.2, ls: latest }
 }
 `)
+
     const messages = errors.map((error) => error.message)
+
     expect(
-      messages.some((message) =>
-        message.includes('Unknown computer property "dockerfile"'),
-      ),
+      messages.some((message) => message.includes('Unknown computer property "dockerfile"')),
     ).toBe(true)
+
     expect(
-      messages.some((message) =>
-        message.includes('Unknown computer property "ephemeral"'),
-      ),
+      messages.some((message) => message.includes('Unknown computer property "ephemeral"')),
     ).toBe(true)
-    expect(
-      messages.some((message) => message.includes('software pin for "gh"')),
-    ).toBe(true)
-    expect(
-      messages.some((message) => message.includes('software pin for "ls"')),
-    ).toBe(true)
+
+    expect(messages.some((message) => message.includes('software pin for "gh"'))).toBe(true)
+    expect(messages.some((message) => message.includes('software pin for "ls"'))).toBe(true)
   })
 })
 
@@ -112,13 +111,16 @@ ${workflow(`
   }
 `)}
 `)
+
     expect(errors).toEqual([])
     const node = ast.workflows[0]?.nodes.find((n) => n.name === 'run')
     expect(node?.type).toBe('shell')
+
     expect(node?.configFields.computer).toMatchObject({
       kind: 'string',
       value: 'pr_bot',
     })
+
     expect(node?.configFields.command).toMatchObject({ kind: 'string' })
   })
 
@@ -138,6 +140,7 @@ ${workflow(`
   }
 `)}
 `)
+
     expect(errors).toEqual([])
     const node = ast.workflows[0]?.nodes.find((n) => n.name === 'run')
     expect(node?.configFields.command?.kind).toBe('ts_block')
@@ -152,9 +155,7 @@ describe('computer and shell validation', () => {
     return validate(ast, {
       includeUnboundComputerWarnings: warnings,
     })
-      .filter((diagnostic) =>
-        warnings ? true : diagnostic.severity !== 'warning',
-      )
+      .filter((diagnostic) => (warnings ? true : diagnostic.severity !== 'warning'))
       .map((diagnostic) => diagnostic.message)
   }
 
@@ -167,12 +168,9 @@ ${workflow(`
   }
 `)}
 `)
-    expect(
-      found.some((message) => message.includes('requires "computer"')),
-    ).toBe(true)
-    expect(
-      found.some((message) => message.includes('requires "command"')),
-    ).toBe(true)
+
+    expect(found.some((message) => message.includes('requires "computer"'))).toBe(true)
+    expect(found.some((message) => message.includes('requires "command"'))).toBe(true)
   })
 
   test('errors when two secrets blocks on one shell node list the same var', () => {
@@ -189,6 +187,7 @@ ${workflow(`
   }
 `)}
 `)
+
     expect(found).toContain(
       'secret var "GH_TOKEN" is listed by both "github" and "gh_alt"; a shell guest gets one value per name',
     )
@@ -208,9 +207,8 @@ ${workflow(`
   }
 `)}
 `)
-    expect(
-      found.filter((message) => message.includes('listed by both')),
-    ).toEqual([])
+
+    expect(found.filter((message) => message.includes('listed by both'))).toEqual([])
   })
 
   test('errors when shell names an unknown computer', () => {
@@ -223,11 +221,10 @@ ${workflow(`
   }
 `)}
 `)
-    expect(
-      found.some((message) =>
-        message.includes('undefined computer block "missing"'),
-      ),
-    ).toBe(true)
+
+    expect(found.some((message) => message.includes('undefined computer block "missing"'))).toBe(
+      true,
+    )
   })
 
   test('errors on unknown disks, duplicates, empty pins, and resource bounds', () => {
@@ -246,32 +243,22 @@ ${workflow(`
   }
 `)}
 `)
+
+    expect(found.some((message) => message.includes('non-empty quoted string'))).toBe(true)
+    expect(found.some((message) => message.includes('duplicate disk "kb"'))).toBe(true)
+    expect(found.some((message) => message.includes('undefined disk block "missing"'))).toBe(true)
+
+    expect(found.some((message) => message.includes('resources.cpus must be at least 1'))).toBe(
+      true,
+    )
+
     expect(
-      found.some((message) => message.includes('non-empty quoted string')),
+      found.some((message) => message.includes('resources.memoryMiB must be at least 128')),
     ).toBe(true)
-    expect(
-      found.some((message) => message.includes('duplicate disk "kb"')),
-    ).toBe(true)
-    expect(
-      found.some((message) =>
-        message.includes('undefined disk block "missing"'),
-      ),
-    ).toBe(true)
-    expect(
-      found.some((message) =>
-        message.includes('resources.cpus must be at least 1'),
-      ),
-    ).toBe(true)
-    expect(
-      found.some((message) =>
-        message.includes('resources.memoryMiB must be at least 128'),
-      ),
-    ).toBe(true)
-    expect(
-      found.some((message) =>
-        message.includes('resources.diskGiB must be at least 1'),
-      ),
-    ).toBe(true)
+
+    expect(found.some((message) => message.includes('resources.diskGiB must be at least 1'))).toBe(
+      true,
+    )
   })
 
   test('rejects software names and pins the catalog cannot accept', () => {
@@ -280,15 +267,13 @@ computer pr_bot {
   software: { gh: "x\\"\\n[hook]", git: "#1", jq: "=1.7", _bad: "1.0" }
 }
 `)
+
     expect(
-      found.filter((message) =>
-        message.includes('must be a version or semver range'),
-      ),
+      found.filter((message) => message.includes('must be a version or semver range')),
     ).toHaveLength(3)
+
     expect(
-      found.some((message) =>
-        message.includes('software package name "_bad" may only contain'),
-      ),
+      found.some((message) => message.includes('software package name "_bad" may only contain')),
     ).toBe(true)
   })
 
@@ -298,6 +283,7 @@ computer pr_bot {
   software: { gh: "2.63.2", git: "^1.2", jq: ">=2,<3", ripgrep: "1.2.*", nodejs: "~20 || 22.x", python3: ">=3.8 <4" }
 }
 `)
+
     expect(found).toEqual([])
   })
 
@@ -314,12 +300,9 @@ ${workflow(`
   }
 `)}
 `)
-    expect(
-      found.some((message) => message.includes('does not accept "format"')),
-    ).toBe(true)
-    expect(found.some((message) => message.includes('remove "schema"'))).toBe(
-      true,
-    )
+
+    expect(found.some((message) => message.includes('does not accept "format"'))).toBe(true)
+    expect(found.some((message) => message.includes('remove "schema"'))).toBe(true)
   })
 
   test('unbound computer warns only when the LSP asks', () => {
@@ -327,16 +310,14 @@ ${workflow(`
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const doctor = validate(ast)
-    expect(
-      doctor.some((diagnostic) => diagnostic.message.includes('not bound')),
-    ).toBe(false)
+    expect(doctor.some((diagnostic) => diagnostic.message.includes('not bound'))).toBe(false)
     const lsp = validate(ast, { includeUnboundComputerWarnings: true })
+
     expect(
       lsp.some(
         (diagnostic) =>
           diagnostic.severity === 'warning' &&
-          diagnostic.message ===
-            'Computer "pr_bot" is not bound by any shell node or agent',
+          diagnostic.message === 'Computer "pr_bot" is not bound by any shell node or agent',
       ),
     ).toBe(true)
   })
@@ -352,14 +333,11 @@ ${workflow(`
   }
 `)}
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast, { includeUnboundComputerWarnings: true })
-    expect(
-      diags.filter((diagnostic) => diagnostic.severity !== 'warning'),
-    ).toEqual([])
-    expect(
-      diags.some((diagnostic) => diagnostic.message.includes('not bound')),
-    ).toBe(false)
+    expect(diags.filter((diagnostic) => diagnostic.severity !== 'warning')).toEqual([])
+    expect(diags.some((diagnostic) => diagnostic.message.includes('not bound'))).toBe(false)
   })
 
   test('a computer bound by an agent is silent', () => {
@@ -373,16 +351,16 @@ agent worker {
   computer: pr_bot
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast, { includeUnboundComputerWarnings: true })
-    expect(
-      diags.some((diagnostic) => diagnostic.message.includes('not bound')),
-    ).toBe(false)
+    expect(diags.some((diagnostic) => diagnostic.message.includes('not bound'))).toBe(false)
   })
 
   test('a computer bound by an agent in another file is silent', () => {
     const { ast, errors } = parse('computer pr_bot {}\n')
     expect(errors).toEqual([])
+
     const diags = validateComputerBlocks(ast, {
       includeUnboundComputerWarnings: true,
       workspace: {
@@ -402,8 +380,7 @@ agent worker {
         ]),
       } as unknown as WorkspaceResourceIndex,
     })
-    expect(
-      diags.some((diagnostic) => diagnostic.message.includes('not bound')),
-    ).toBe(false)
+
+    expect(diags.some((diagnostic) => diagnostic.message.includes('not bound'))).toBe(false)
   })
 })

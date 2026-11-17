@@ -7,8 +7,10 @@
  * file with fifty blocks costs one block per keystroke, not fifty.
  */
 import { createHash } from 'node:crypto'
+
 import ts from 'typescript'
 import { type Diagnostic, DiagnosticSeverity } from 'vscode-languageserver'
+
 import { createLanguageServiceFromMap, virtualUriForBlock } from './host'
 import { getExpectedReturnType } from './return-types'
 import { type TsBlockInfo, virtualToOriginal } from './virtual-docs'
@@ -39,18 +41,13 @@ export function collectVirtualDiagnostics(
   virtualUri: string,
 ): VirtualTsDiagnostic[] {
   const out: VirtualTsDiagnostic[] = []
-  const all = [
-    ...ls.getSyntacticDiagnostics(virtualUri),
-    ...ls.getSemanticDiagnostics(virtualUri),
-  ]
+  const all = [...ls.getSyntacticDiagnostics(virtualUri), ...ls.getSemanticDiagnostics(virtualUri)]
+
   for (const d of all) {
-    if (
-      d.file?.fileName !== virtualUri ||
-      d.start === undefined ||
-      d.length === undefined
-    ) {
+    if (d.file?.fileName !== virtualUri || d.start === undefined || d.length === undefined) {
       continue
     }
+
     out.push({
       start: d.file.getLineAndCharacterOfPosition(d.start),
       end: d.file.getLineAndCharacterOfPosition(d.start + d.length),
@@ -58,6 +55,7 @@ export function collectVirtualDiagnostics(
       category: d.category,
     })
   }
+
   return out
 }
 
@@ -66,13 +64,13 @@ export function collectVirtualDiagnostics(
  * answered from the cache; the rest are checked together in one short-lived
  * language service.
  */
-export function getVirtualDiagnostics(
-  contents: readonly string[],
-): VirtualTsDiagnostic[][] {
+export function getVirtualDiagnostics(contents: readonly string[]): VirtualTsDiagnostic[][] {
   const keys = contents.map(contentKey)
   const missing = new Map<string, string>()
+
   keys.forEach((key, i) => {
     const hit = cache.get(key)
+
     if (hit !== undefined) {
       blockDiagnosticsStats.hits++
       // Refresh recency: a Map iterates in insertion order.
@@ -88,12 +86,15 @@ export function getVirtualDiagnostics(
     const contentMap = new Map<string, string>()
     const uriByKey = new Map<string, string>()
     let n = 0
+
     for (const [key, content] of missing) {
       const uri = virtualUriForBlock(`check-${n++}`)
       uriByKey.set(key, uri)
       contentMap.set(uri, content)
     }
+
     const ls = createLanguageServiceFromMap(contentMap)
+
     try {
       for (const [key, uri] of uriByKey) {
         cache.set(key, collectVirtualDiagnostics(ls, uri))
@@ -101,11 +102,14 @@ export function getVirtualDiagnostics(
     } finally {
       ls.dispose()
     }
+
     while (cache.size > MAX_CACHED_BLOCKS) {
       const oldest = cache.keys().next()
+
       if (oldest.done) {
         break
       }
+
       cache.delete(oldest.value)
     }
   }
@@ -134,10 +138,12 @@ export function toDocumentDiagnostics(
   const expectedReturn = getExpectedReturnType(block)
   return virtual.map((d) => {
     let message = d.message
+
     if (expectedReturn !== undefined && message.includes('__ExpectedReturn')) {
       message = message.replace(/__ExpectedReturn/g, expectedReturn)
       message = `${message} Expected return type for this block: \`${expectedReturn}\`.`
     }
+
     return {
       message,
       range: {

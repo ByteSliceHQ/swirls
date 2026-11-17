@@ -54,22 +54,22 @@ stream <name> {
 
 ### 2.2. Fields (normative)
 
-| Field | Required | Meaning |
-|-------|----------|---------|
-| `enabled` | no | Only **boolean** values are read from the source; other values are ignored and leave **`enabled`** unset (treated like “on”). If **`enabled`** is **`false`**, the block MUST NOT run for a graph completion (§3). If **`true`** or unset, evaluation continues per §3. |
-| `label` | no | Human-readable label; see §5 for defaulting. |
-| `description` | no | Free-form documentation only. |
-| `graph` | yes | Name of a **`graph`** block whose completions drive this stream. The value MAY be a bare identifier (e.g. `graph: process_leads`) or a quoted string (e.g. `graph: "process_leads"`). |
-| `version` | yes | **`version_id`** naming the active writer payload. Persisted writes use **`versions[<version>]`.** MUST appear as a key in **`versions:`**. |
-| `versions` | yes | Map of **`version_id`** → `{ schema, condition?, prepare }`. Each key MUST be unique. Each entry MUST supply **`prepare`** (non-empty **`@ts`**) and **`schema`** (inline **`@json`** or **`schema: <ref>`**) per §6. |
+| Field         | Required | Meaning                                                                                                                                                                                                                                                                 |
+| ------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`     | no       | Only **boolean** values are read from the source; other values are ignored and leave **`enabled`** unset (treated like “on”). If **`enabled`** is **`false`**, the block MUST NOT run for a graph completion (§3). If **`true`** or unset, evaluation continues per §3. |
+| `label`       | no       | Human-readable label; see §5 for defaulting.                                                                                                                                                                                                                            |
+| `description` | no       | Free-form documentation only.                                                                                                                                                                                                                                           |
+| `graph`       | yes      | Name of a **`graph`** block whose completions drive this stream. The value MAY be a bare identifier (e.g. `graph: process_leads`) or a quoted string (e.g. `graph: "process_leads"`).                                                                                   |
+| `version`     | yes      | **`version_id`** naming the active writer payload. Persisted writes use **`versions[<version>]`.** MUST appear as a key in **`versions:`**.                                                                                                                             |
+| `versions`    | yes      | Map of **`version_id`** → `{ schema, condition?, prepare }`. Each key MUST be unique. Each entry MUST supply **`prepare`** (non-empty **`@ts`**) and **`schema`** (inline **`@json`** or **`schema: <ref>`**) per §6.                                                   |
 
 Per-version (**inside `versions:`**):
 
-| Field | Required | Meaning |
-|-------|----------|---------|
-| `schema` | yes | **`schema: @json { … }`** or **`schema: <name>`**. Defines JSON shape for that version’s row. |
-| `condition` | no | **`@ts`** returning **boolean**. If syntactically present, non-empty **`@ts`** required (§6). If falsy at runtime, **`prepare`** MUST NOT run for that completion. |
-| `prepare` | yes | **`@ts`** returning a plain object validated against this version’s **`schema`**. Non-empty **`@ts`** body or file ref (§6). |
+| Field       | Required | Meaning                                                                                                                                                            |
+| ----------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `schema`    | yes      | **`schema: @json { … }`** or **`schema: <name>`**. Defines JSON shape for that version’s row.                                                                      |
+| `condition` | no       | **`@ts`** returning **boolean**. If syntactically present, non-empty **`@ts`** required (§6). If falsy at runtime, **`prepare`** MUST NOT run for that completion. |
+| `prepare`   | yes      | **`@ts`** returning a plain object validated against this version’s **`schema`**. Non-empty **`@ts`** body or file ref (§6).                                       |
 
 ### 2.3. Parse disambiguation
 
@@ -203,20 +203,19 @@ Workspace-level rules are enforced by tools that build a **merged workspace inde
 - **`filter`** MUST be **`@ts { }`** with non-empty body or a **`@ts`** file reference; other config kinds are invalid.
 - Rejected keys (§4.3) MUST be diagnosed.
 
-
 ---
 
 ## 7. Abstract syntax (`StreamDecl`)
 
 The parser produces **`StreamDecl`** values with at least:
 
-| Field | Notes |
-|-------|--------|
-| `name`, `label`, `range` | Always set for a parsed block (`label` may be defaulted per §5). |
-| `description?`, `docComment?`, `enabled?` | Optional. |
-| `graphName` | String (possibly empty on parse); a valid file MUST satisfy §6.1. `graphNameRange?` is used by tooling. |
-| `version`, `versionRange?` | Active writer **`version_id`**. MUST match some **`versions[]`/`versions:`** entry. |
-| `versions` | Array of **`StreamVersionDecl`** (each has **`key`** = `vN`, optional `schema*` fields, **`condition?`, `prepare?`). |
+| Field                                     | Notes                                                                                                                |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `name`, `label`, `range`                  | Always set for a parsed block (`label` may be defaulted per §5).                                                     |
+| `description?`, `docComment?`, `enabled?` | Optional.                                                                                                            |
+| `graphName`                               | String (possibly empty on parse); a valid file MUST satisfy §6.1. `graphNameRange?` is used by tooling.              |
+| `version`, `versionRange?`                | Active writer **`version_id`**. MUST match some **`versions[]`/`versions:`** entry.                                  |
+| `versions`                                | Array of **`StreamVersionDecl`** (each has **`key`** = `vN`, optional `schema*` fields, **`condition?`, `prepare?`). |
 
 Implementations MAY attach extra fields not produced by the core parser (e.g. stable ids) when lowering to other artifacts; such fields are **not** part of the surface syntax.
 
@@ -224,25 +223,25 @@ Implementations MAY attach extra fields not produced by the core parser (e.g. st
 
 ## 8. Design rationale (informative)
 
-| Topic | Rationale |
-|-------|-----------|
-| **`prepare` required** | Forces an explicit mapping from graph output to stored shape. |
-| **`condition` optional** | Allows unconditional persistence. |
-| **`schema` required** | Fixes the record shape for validation and typing. |
-| **`label` default** | Avoids boilerplate while keeping a display string. |
+| Topic                         | Rationale                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------- |
+| **`prepare` required**        | Forces an explicit mapping from graph output to stored shape.                      |
+| **`condition` optional**      | Allows unconditional persistence.                                                  |
+| **`schema` required**         | Fixes the record shape for validation and typing.                                  |
+| **`label` default**           | Avoids boilerplate while keeping a display string.                                 |
 | **Explicit reader `version`** | Lets migrations add new **`versions:`** keys without implicitly changing consumers |
 
 ---
 
 ## 9. Known limitations (informative)
 
-| Topic | Notes |
-|-------|-------|
-| **Switch narrowing** | Types treat `context.output` leaves as independent optionals; no discriminated union for switch branches. |
-| **Sort / pagination** | Not expressible on **`type: stream`** nodes in the current grammar. |
-| **Graph existence** | Some pipelines MAY not re-check that **`graph`** names a graph in the same deploy artifact; behavior is product-specific. |
-| **Partial workspace** | Validating a single file without a workspace index can produce “missing stream / graph” diagnostics that disappear once the full merged workspace is supplied. |
-| **Filter return type** | The reference **`type: stream`** executor coerces a non-object filter result to **`{}`** instead of failing the node. |
+| Topic                  | Notes                                                                                                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Switch narrowing**   | Types treat `context.output` leaves as independent optionals; no discriminated union for switch branches.                                                      |
+| **Sort / pagination**  | Not expressible on **`type: stream`** nodes in the current grammar.                                                                                            |
+| **Graph existence**    | Some pipelines MAY not re-check that **`graph`** names a graph in the same deploy artifact; behavior is product-specific.                                      |
+| **Partial workspace**  | Validating a single file without a workspace index can produce “missing stream / graph” diagnostics that disappear once the full merged workspace is supplied. |
+| **Filter return type** | The reference **`type: stream`** executor coerces a non-object filter result to **`{}`** instead of failing the node.                                          |
 
 ---
 
@@ -250,14 +249,14 @@ Implementations MAY attach extra fields not produced by the core parser (e.g. st
 
 The normative rules in this spec are anchored to tests under [`packages/language/`](../../). Any change to the rules above MUST be reflected in (or break) the listed tests; any change to these tests MUST be reflected in the spec.
 
-| Spec section | Test source |
-|--------------|-------------|
-| §2.1 surface syntax, §2.2 fields, §5 `label` default, §7 `StreamDecl` | [`stream/parser.test.ts`](./parser.test.ts) |
-| §6.1 `stream` block validation (duplicate names, undefined `graph`, missing `prepare` / `schema`, empty `condition`) | [`stream/validator.test.ts`](./validator.test.ts) |
-| §4.2 / §6.3 `type: stream` required keys; §4.3 rejected keys; stream-name resolution | [`../validator.test.ts`](../validator.test.ts) — `stream node (read side)` describe block |
-| §6.2 cross-file resolution of stream / graph names via workspace index | [`../validator.test.ts`](../validator.test.ts) — `workspace-scoped stream node validation` describe block |
-| §6.2 cross-file duplicate detection in the merged workspace index | [`../workspace/workspace-resources.test.ts`](../workspace/workspace-resources.test.ts) |
-| End-to-end valid example exercising stream block + stream node | [`../__fixtures__/valid-stream.swirls`](../__fixtures__/valid-stream.swirls) |
+| Spec section                                                                                                         | Test source                                                                                               |
+| -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| §2.1 surface syntax, §2.2 fields, §5 `label` default, §7 `StreamDecl`                                                | [`stream/parser.test.ts`](./parser.test.ts)                                                               |
+| §6.1 `stream` block validation (duplicate names, undefined `graph`, missing `prepare` / `schema`, empty `condition`) | [`stream/validator.test.ts`](./validator.test.ts)                                                         |
+| §4.2 / §6.3 `type: stream` required keys; §4.3 rejected keys; stream-name resolution                                 | [`../validator.test.ts`](../validator.test.ts) — `stream node (read side)` describe block                 |
+| §6.2 cross-file resolution of stream / graph names via workspace index                                               | [`../validator.test.ts`](../validator.test.ts) — `workspace-scoped stream node validation` describe block |
+| §6.2 cross-file duplicate detection in the merged workspace index                                                    | [`../workspace/workspace-resources.test.ts`](../workspace/workspace-resources.test.ts)                    |
+| End-to-end valid example exercising stream block + stream node                                                       | [`../__fixtures__/valid-stream.swirls`](../__fixtures__/valid-stream.swirls)                              |
 
 Static typing of `condition` / `prepare` and `type: stream` node output (§3, §4.6) is exercised in the LSP layer ([`packages/lsp/src/ts-service/`](../../../lsp/src/ts-service/)). That layer is informative for this spec — the language package itself does not encode TypeScript generation.
 

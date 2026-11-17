@@ -3,12 +3,7 @@
  * Shared by single-file validation and workspace-wide schema indexing.
  */
 
-import type {
-  Diagnostic,
-  JsonSchemaLiteral,
-  SchemaDecl,
-  SourceRange,
-} from '../ast'
+import type { Diagnostic, JsonSchemaLiteral, SchemaDecl, SourceRange } from '../ast'
 
 function diag(
   message: string,
@@ -28,23 +23,24 @@ export interface NamedSchemaResolution {
  * Validates `schema { }` declarations and builds a map of resolved literals.
  * Reports duplicates, missing refs, cycles, and empty declarations.
  */
-export function resolveNamedSchemasFromDecls(
-  decls: SchemaDecl[],
-): NamedSchemaResolution {
+export function resolveNamedSchemasFromDecls(decls: SchemaDecl[]): NamedSchemaResolution {
   const diagnostics: Diagnostic[] = []
   const byName = new Map<string, SchemaDecl>(decls.map((d) => [d.name, d]))
   const resolved = new Map<string, JsonSchemaLiteral>()
   const visiting = new Set<string>()
 
   const seenSchemaNames = new Set<string>()
+
   for (const d of decls) {
     if (seenSchemaNames.has(d.name)) {
       diagnostics.push(diag(`Duplicate schema name "${d.name}"`, d.range))
     } else {
       seenSchemaNames.add(d.name)
     }
+
     const hasInline = d.schema !== undefined
     const hasRef = d.schemaRef !== undefined && d.schemaRef !== ''
+
     if (!hasInline && !hasRef) {
       diagnostics.push(
         diag(
@@ -53,6 +49,7 @@ export function resolveNamedSchemasFromDecls(
         ),
       )
     }
+
     if (hasInline && hasRef) {
       diagnostics.push(
         diag(
@@ -67,6 +64,7 @@ export function resolveNamedSchemasFromDecls(
     if (resolved.has(decl.name)) {
       return resolved.get(decl.name)
     }
+
     if (visiting.has(decl.name)) {
       diagnostics.push(
         diag(
@@ -74,14 +72,17 @@ export function resolveNamedSchemasFromDecls(
           decl.schemaRefRange ?? decl.range,
         ),
       )
+
       return undefined
     }
+
     visiting.add(decl.name)
 
     let lit: JsonSchemaLiteral | undefined
 
     if (decl.schemaRef) {
       const target = byName.get(decl.schemaRef)
+
       if (!target) {
         diagnostics.push(
           diag(
@@ -91,6 +92,7 @@ export function resolveNamedSchemasFromDecls(
         )
       } else {
         lit = resolveDecl(target)
+
         if (lit !== undefined) {
           resolved.set(decl.name, lit)
         }

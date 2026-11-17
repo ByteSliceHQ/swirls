@@ -38,21 +38,26 @@ export function createParseCache(options: ParseCacheOptions = {}): ParseCache {
   return {
     parse(source) {
       const cached = entries.get(source)
+
       if (cached !== undefined) {
         stats.hits++
         entries.delete(source)
         entries.set(source, cached)
         return cached
       }
+
       stats.misses++
       const result = parse(source)
       entries.set(source, result)
+
       if (entries.size > maxEntries) {
         const oldest = entries.keys().next()
+
         if (!oldest.done) {
           entries.delete(oldest.value)
         }
       }
+
       return result
     },
     clear() {

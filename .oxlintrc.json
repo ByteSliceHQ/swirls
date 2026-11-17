@@ -1,0 +1,88 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/.turbo/**",
+    "cookbook/**",
+    "skills/**",
+    "editors/vscode/server/**",
+    "editors/tree-sitter-swirls/src/**",
+    "editors/tree-sitter-swirls/bindings/**",
+    ".claude/**",
+    ".cursor/**"
+  ],
+  "jsPlugins": [
+    {
+      "name": "@stylistic",
+      "specifier": "@stylistic/eslint-plugin"
+    }
+  ],
+  "rules": {
+    "curly": "error",
+    "no-underscore-dangle": [
+      "warn",
+      {
+        "allow": ["__schema", "__dirname"]
+      }
+    ],
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "disallowTypeAnnotations": true
+      }
+    ],
+    "@stylistic/padding-line-between-statements": [
+      "error",
+      {
+        "blankLine": "always",
+        "prev": "*",
+        "next": [
+          "multiline-block-like",
+          "multiline-expression",
+          "multiline-const",
+          "multiline-let",
+          "multiline-var"
+        ]
+      },
+      {
+        "blankLine": "always",
+        "prev": [
+          "multiline-block-like",
+          "multiline-expression",
+          "multiline-const",
+          "multiline-let",
+          "multiline-var"
+        ],
+        "next": "*"
+      }
+    ],
+    "import/no-unassigned-import": [
+      "warn",
+      {
+        "allow": ["**/stdio-guard"]
+      }
+    ],
+    "unicorn/no-array-sort": "off"
+  },
+  "overrides": [
+    {
+      "files": ["editors/tree-sitter-swirls/grammar.js"],
+      "rules": {
+        "no-underscore-dangle": "off",
+        "no-unused-vars": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

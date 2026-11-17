@@ -6,7 +6,9 @@ const structuredText = z.union([
   z.record(z.string(), z.json()),
   z.array(z.json()),
 ])
+
 const identifier = z.string().regex(/^[a-zA-Z0-9_]+$/)
+
 const questionSchema = z.discriminatedUnion('type', [
   z
     .object({
@@ -41,6 +43,7 @@ const questionSchema = z.discriminatedUnion('type', [
     })
     .strict(),
 ])
+
 export const decisionQuestionsSchema = z
   .record(identifier, questionSchema)
   .refine((v) => Object.keys(v).length > 0, 'At least one question is required')
@@ -66,11 +69,7 @@ export const decisionNodeConfigSchema = z
     // Validated by the shared workflow failure-policy intersection.
     failurePolicy: z.unknown().optional(),
     decision: identifier,
-    state: z.union([
-      z.string(),
-      z.record(z.string(), z.json()),
-      z.array(z.json()),
-    ]),
+    state: z.union([z.string(), z.record(z.string(), z.json()), z.array(z.json())]),
     model: z.string().optional(),
     /** Immutable declaration copied into the deployed node. */
     definition: decisionDefinitionSchema.optional(),
@@ -80,6 +79,7 @@ export type DecisionNodeConfig = z.infer<typeof decisionNodeConfigSchema>
 
 const probability = z.number().min(0).max(1)
 const distribution = z.record(z.string(), probability)
+
 const answerSchema = z.discriminatedUnion('type', [
   z
     .object({
@@ -100,6 +100,7 @@ const answerSchema = z.discriminatedUnion('type', [
     .strict(),
   z.object({ type: z.literal('noul'), noul: probability }).strict(),
 ])
+
 export const decisionResponseSchema = z.object({
   model: z.string().trim().min(1),
   answers: z.record(z.string(), answerSchema),
@@ -114,19 +115,18 @@ export type DecisionResponse = z.infer<typeof decisionResponseSchema>
 
 const sameKeys = (a: object, b: object) => {
   const keys = Object.keys(a)
-  return (
-    keys.length === Object.keys(b).length &&
-    keys.every((k) => Object.hasOwn(b, k))
-  )
+  return keys.length === Object.keys(b).length && keys.every((k) => Object.hasOwn(b, k))
 }
 
 function sameJson(a: unknown, b: unknown): boolean {
   if (a === b) {
     return true
   }
+
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((item, i) => sameJson(item, b[i]))
   }
+
   if (
     a &&
     b &&
@@ -142,6 +142,7 @@ function sameJson(a: unknown, b: unknown): boolean {
       )
     )
   }
+
   return false
 }
 
@@ -151,84 +152,90 @@ export function validateDecisionResponse(
   questions: DecisionQuestions,
 ): DecisionResponse {
   const parsed = decisionResponseSchema.safeParse(value)
+
   if (!parsed.success) {
     throw new Error('Malformed TypeSafe response envelope')
   }
+
   const result = parsed.data
+
   if (!sameKeys(result.answers, questions)) {
     throw new Error('TypeSafe answer IDs do not match the questions')
   }
+
   for (const [id, question] of Object.entries(questions)) {
     const answer = result.answers[id]!
+
     if (answer.type !== question.type) {
       throw new Error(`TypeSafe answer type mismatch for ${id}`)
     }
+
     if (answer.type === 'noul' || question.type === 'noul') {
       continue
     }
+
     const domain =
       question.type === 'choice'
         ? question.criteria
         : Object.fromEntries(question.criteria.map((v, i) => [String(i), v]))
+
     const probabilities = answer.probabilities
+
     if (
       !sameKeys(probabilities, domain) ||
-      Math.abs(Object.values(probabilities).reduce((a, b) => a + b, 0) - 1) >
-        1e-6
+      Math.abs(Object.values(probabilities).reduce((a, b) => a + b, 0) - 1) > 1e-6
     ) {
       throw new Error(`Invalid TypeSafe distribution for ${id}`)
     }
+
     if (
       answer.type === 'choice' &&
       (!Object.hasOwn(domain, answer.choice) ||
-        probabilities[answer.choice]! <
-          Math.max(...Object.values(probabilities)) - 1e-6)
+        probabilities[answer.choice]! < Math.max(...Object.values(probabilities)) - 1e-6)
     ) {
       throw new Error(`Invalid TypeSafe choice for ${id}`)
     }
+
     if (answer.type === 'score') {
-      const expected = Object.entries(probabilities).reduce(
-        (sum, [k, p]) => sum + Number(k) * p,
-        0,
-      )
-      if (
-        !sameJson(answer.legend, domain) ||
-        Math.abs(answer.score - expected) > 1e-6
-      ) {
+      const expected = Object.entries(probabilities).reduce((sum, [k, p]) => sum + Number(k) * p, 0)
+
+      if (!sameJson(answer.legend, domain) || Math.abs(answer.score - expected) > 1e-6) {
         throw new Error(`Invalid TypeSafe score for ${id}`)
       }
     }
   }
+
   return result
 }
+
+const objectSchema = (properties: Record<string, unknown>) => ({
+  type: 'object',
+  properties,
+  required: Object.keys(properties),
+  additionalProperties: false,
+})
 
 /** Shared by deployment snapshots and editor context typing. */
 export function decisionOutputSchema(
   definition: Pick<DecisionDefinition, 'name' | 'questions'>,
 ): Record<string, unknown> {
-  const object = (properties: Record<string, unknown>) => ({
-    type: 'object',
-    properties,
-    required: Object.keys(properties),
-    additionalProperties: false,
-  })
   const number = { type: 'number' }
+
   const answers = Object.fromEntries(
     Object.entries(definition.questions).map(([id, q]) => {
       const type = { const: q.type, type: 'string' }
+
       if (q.type === 'noul') {
-        return [id, object({ type, noul: number })]
+        return [id, objectSchema({ type, noul: number })]
       }
+
       const keys =
-        q.type === 'choice'
-          ? Object.keys(q.criteria)
-          : q.criteria.map((_, i) => String(i))
-      const probabilities = object(
-        Object.fromEntries(keys.map((k) => [k, number])),
-      )
+        q.type === 'choice' ? Object.keys(q.criteria) : q.criteria.map((_, i) => String(i))
+
+      const probabilities = objectSchema(Object.fromEntries(keys.map((k) => [k, number])))
       return [
         id,
-        object(
+        objectSchema(
           q.type === 'choice'
             ? {
                 type,
@@ -239,7 +246,7 @@ export function decisionOutputSchema(
             : {
                 type,
                 score: number,
-                legend: object(Object.fromEntries(keys.map((k) => [k, {}]))),
+                legend: objectSchema(Object.fromEntries(keys.map((k) => [k, {}]))),
                 probabilities,
                 confidence: number,
               },
@@ -247,11 +254,12 @@ export function decisionOutputSchema(
       ]
     }),
   )
-  return object({
+
+  return objectSchema({
     decision: { type: 'string', const: definition.name },
     provider: { type: 'string', const: 'typesafe' },
     model: { type: 'string' },
-    answers: object(answers),
-    usage: object({ input_tokens: number, output_tokens: number }),
+    answers: objectSchema(answers),
+    usage: objectSchema({ input_tokens: number, output_tokens: number }),
   })
 }

@@ -5,6 +5,7 @@
  */
 
 import type { SourceRange, SwirlsFile } from '@swirls/language'
+
 import { positionInRange } from '../ts-service/virtual-docs'
 
 export interface PrismaBlock {
@@ -21,6 +22,7 @@ export interface PrismaBlock {
  */
 export function collectPrismaBlocks(ast: SwirlsFile): PrismaBlock[] {
   const blocks: PrismaBlock[] = []
+
   for (const db of ast.databases ?? []) {
     if (db.schemaBlock) {
       blocks.push({
@@ -30,6 +32,7 @@ export function collectPrismaBlocks(ast: SwirlsFile): PrismaBlock[] {
       })
     }
   }
+
   return blocks
 }
 
@@ -46,5 +49,6 @@ export function findPrismaBlockAtPosition(
       return block
     }
   }
+
   return null
 }

@@ -12,10 +12,7 @@ export interface SwirlsWorkspaceDirent {
  * Callers pass a plain object (e.g. `node:fs` or deploy `DeployBundleFs` + `existsSync` shim).
  */
 export interface SwirlsWorkspaceFileSystem {
-  readdirSync(
-    path: string,
-    options: { withFileTypes: true },
-  ): SwirlsWorkspaceDirent[]
+  readdirSync(path: string, options: { withFileTypes: true }): SwirlsWorkspaceDirent[]
   readFileSync(path: string, encoding: 'utf-8'): string
   existsSync(path: string): boolean
 }

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import {
   APP_BRAND_TOKEN_KEYS,
   brandTokensToCssVars,
@@ -76,14 +77,13 @@ describe('brandTokensToCssVars', () => {
       brand: '#B33A2B',
       radius: '8px',
     })
+
     expect(vars['--background']).toBe('#f7f5f1')
     expect(vars['--primary']).toBe('#B33A2B')
     expect(vars['--brand']).toBe('#B33A2B')
     expect(vars['--sidebar-primary']).toBe('#B33A2B')
     expect(vars['--ring']).toBe('color-mix(in srgb, #B33A2B 42%, transparent)')
-    expect(vars['--sidebar-ring']).toBe(
-      'color-mix(in srgb, #B33A2B 42%, transparent)',
-    )
+    expect(vars['--sidebar-ring']).toBe('color-mix(in srgb, #B33A2B 42%, transparent)')
     expect(vars['--radius']).toBe('8px')
     expect(vars['--foreground']).toBeUndefined()
     expect(vars['--sidebar']).toBeUndefined()
@@ -120,12 +120,11 @@ describe('brandTokensToCssVars', () => {
 
   test('covers every author key', () => {
     const all = Object.fromEntries(
-      APP_BRAND_TOKEN_KEYS.map((key) => [
-        key,
-        key === 'radius' ? '8px' : '#111111',
-      ]),
+      APP_BRAND_TOKEN_KEYS.map((key) => [key, key === 'radius' ? '8px' : '#111111']),
     )
+
     const vars = brandTokensToCssVars(all)
+
     expect(Object.keys(vars).sort()).toEqual(
       [
         '--background',

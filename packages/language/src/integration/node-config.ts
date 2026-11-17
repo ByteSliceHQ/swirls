@@ -8,6 +8,7 @@ export function configStringValue(
     const value = String(cv.value).trim()
     return value !== '' ? value : undefined
   }
+
   return undefined
 }
 
@@ -16,11 +17,13 @@ function mergeNamedDecls<T extends { name: string }>(
   workspaceMap: Map<string, T> | undefined,
 ): T[] {
   const byName = new Map((local ?? []).map((d) => [d.name, d]))
+
   for (const [name, decl] of workspaceMap ?? []) {
     if (!byName.has(name)) {
       byName.set(name, decl)
     }
   }
+
   return [...byName.values()]
 }
 
@@ -45,13 +48,17 @@ export function connectionProviderForNode(
   connections: ConnectionDecl[],
 ): { name: string; provider: string; range: NodeDecl['range'] } | undefined {
   const connName = configStringValue(node.configFields.connection)
+
   if (!connName) {
     return undefined
   }
+
   const decl = connections.find((c) => c.name === connName)
+
   if (!decl) {
     return undefined
   }
+
   return {
     name: connName,
     provider: decl.provider,

@@ -23,8 +23,7 @@ export const SWIRLS_HARNESSES: HarnessCatalog = {
     },
     {
       name: 'codex',
-      description:
-        'OpenAI Codex CLI, run as `codex exec` with its inner sandbox off',
+      description: 'OpenAI Codex CLI, run as `codex exec` with its inner sandbox off',
       package: 'codex',
     },
     {

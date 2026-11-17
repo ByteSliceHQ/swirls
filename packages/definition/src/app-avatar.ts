@@ -6,14 +6,7 @@
 
 import { z } from 'zod'
 
-export const APP_AVATAR_VARIANTS = [
-  'beam',
-  'marble',
-  'bauhaus',
-  'pixel',
-  'sunset',
-  'ring',
-] as const
+export const APP_AVATAR_VARIANTS = ['beam', 'marble', 'bauhaus', 'pixel', 'sunset', 'ring'] as const
 
 export type AppAvatarVariant = (typeof APP_AVATAR_VARIANTS)[number]
 

@@ -1,16 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+
 import type { NodeDecl } from '@swirls/language'
 import { parse } from '@swirls/language'
+
 import { getAiNodeOptionsDiagnostics } from './ai-validation'
 
 const EXAMPLES_DIR = path.join(import.meta.dir, '../../language/examples')
 
-function hasMessage(
-  diags: ReturnType<typeof getAiNodeOptionsDiagnostics>,
-  sub: string,
-): boolean {
+function hasMessage(diags: ReturnType<typeof getAiNodeOptionsDiagnostics>, sub: string): boolean {
   return diags.some((d) => d.message.includes(sub))
 }
 
@@ -29,6 +28,7 @@ describe('getAiNodeOptionsDiagnostics', () => {
       start: { line: 1, column: 1, offset: 0 },
       end: { line: 1, column: 10, offset: 9 },
     }
+
     const node: NodeDecl = {
       name: 'ai',
       type: 'ai',
@@ -46,6 +46,7 @@ describe('getAiNodeOptionsDiagnostics', () => {
       },
       range: r,
     }
+
     const diags = getAiNodeOptionsDiagnostics([node])
     expect(hasMessage(diags, 'Unknown property')).toBe(true)
     expect(hasMessage(diags, 'unknownKey')).toBe(true)
@@ -56,6 +57,7 @@ describe('getAiNodeOptionsDiagnostics', () => {
       start: { line: 1, column: 1, offset: 0 },
       end: { line: 1, column: 10, offset: 9 },
     }
+
     const node: NodeDecl = {
       name: 'ai',
       type: 'ai',
@@ -66,6 +68,7 @@ describe('getAiNodeOptionsDiagnostics', () => {
       },
       range: r,
     }
+
     const diags = getAiNodeOptionsDiagnostics([node])
     expect(hasMessage(diags, 'requires "prompt"')).toBe(true)
   })
@@ -75,6 +78,7 @@ describe('getAiNodeOptionsDiagnostics', () => {
       start: { line: 1, column: 1, offset: 0 },
       end: { line: 1, column: 10, offset: 9 },
     }
+
     const node: NodeDecl = {
       name: 'ai',
       type: 'ai',
@@ -99,6 +103,7 @@ describe('getAiNodeOptionsDiagnostics', () => {
       },
       range: r,
     }
+
     const diags = getAiNodeOptionsDiagnostics([node])
     expect(hasMessage(diags, 'Unknown option')).toBe(false)
   })
@@ -108,6 +113,7 @@ describe('getAiNodeOptionsDiagnostics', () => {
       start: { line: 1, column: 1, offset: 0 },
       end: { line: 1, column: 10, offset: 9 },
     }
+
     const node: NodeDecl = {
       name: 'ai',
       type: 'ai',
@@ -131,6 +137,7 @@ describe('getAiNodeOptionsDiagnostics', () => {
       },
       range: r,
     }
+
     const diags = getAiNodeOptionsDiagnostics([node])
     expect(hasMessage(diags, 'Unknown option')).toBe(true)
     expect(hasMessage(diags, 'temperature')).toBe(true)

@@ -16,15 +16,14 @@ function rangeFromTokens(start: Token, end: Token): SourceRange {
 
 function parseTableDecl(d: ResourceParserDelegate): PostgresTableDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'table') {
     return null
   }
 
   const nameTok = d.advance()
-  if (
-    !nameTok ||
-    (nameTok.kind !== 'identifier' && nameTok.kind !== 'keyword')
-  ) {
+
+  if (!nameTok || (nameTok.kind !== 'identifier' && nameTok.kind !== 'keyword')) {
     d.error('Expected table name', nameTok)
     d.skipToNextBlock()
     return null
@@ -41,6 +40,7 @@ function parseTableDecl(d: ResourceParserDelegate): PostgresTableDecl | null {
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -51,6 +51,7 @@ function parseTableDecl(d: ResourceParserDelegate): PostgresTableDecl | null {
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -62,13 +63,12 @@ function parseTableDecl(d: ResourceParserDelegate): PostgresTableDecl | null {
 
     if (key === 'schema') {
       const next = d.peek()
+
       if (next?.kind === 'fenced_block' && next.fencedLang === 'json') {
         const tok = d.advance()!
+
         try {
-          schema = JSON.parse(tok.fencedContent ?? '{}') as Record<
-            string,
-            unknown
-          >
+          schema = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
         } catch {
           d.error('Invalid JSON in table schema block', tok)
         }
@@ -82,6 +82,7 @@ function parseTableDecl(d: ResourceParserDelegate): PostgresTableDecl | null {
             },
           }
         }
+
         continue
       }
     }
@@ -104,11 +105,13 @@ export function parsePostgresBlock(
   docComment: string | undefined,
 ): PostgresDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'postgres') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected postgres block name', nameTok)
     d.skipToNextBlock()
@@ -133,6 +136,7 @@ export function parsePostgresBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -144,13 +148,16 @@ export function parsePostgresBlock(
 
     if (t.kind === 'keyword' && t.value === 'table') {
       const tableDecl = parseTableDecl(d)
+
       if (tableDecl) {
         tables.push(tableDecl)
       }
+
       continue
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -162,35 +169,34 @@ export function parsePostgresBlock(
 
     if (key === 'label') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         label = v
       }
+
       continue
     }
 
     if (key === 'secrets') {
       const refTok = d.advance()
-      if (
-        refTok &&
-        (refTok.kind === 'identifier' || refTok.kind === 'keyword')
-      ) {
+
+      if (refTok && (refTok.kind === 'identifier' || refTok.kind === 'keyword')) {
         secretsRef = refTok.value as string
         secretsRefRange = { ...refTok.range }
       }
+
       continue
     }
 
     if (key === 'connection') {
       const valTok = d.peek()
+
       if (valTok?.kind === 'string') {
         d.advance()
         connection = valTok.value as string
         connectionIsLiteral = true
         connectionRange = valTok.range
-      } else if (
-        valTok &&
-        (valTok.kind === 'identifier' || valTok.kind === 'keyword')
-      ) {
+      } else if (valTok && (valTok.kind === 'identifier' || valTok.kind === 'keyword')) {
         d.advance()
         connection = valTok.value as string
         connectionIsLiteral = false
@@ -198,15 +204,14 @@ export function parsePostgresBlock(
       } else {
         d.error('Expected connection value (identifier or string)', valTok)
       }
+
       continue
     }
 
     if (key === 'network') {
       const valueToken = d.peek()
-      if (
-        valueToken &&
-        (valueToken.kind === 'identifier' || valueToken.kind === 'keyword')
-      ) {
+
+      if (valueToken && (valueToken.kind === 'identifier' || valueToken.kind === 'keyword')) {
         d.advance()
         networkRef = valueToken.value as string
         networkRefRange = valueToken.range
@@ -214,6 +219,7 @@ export function parsePostgresBlock(
         d.error('Postgres network must be a network block name', valueToken)
         d.parseValue()
       }
+
       continue
     }
 

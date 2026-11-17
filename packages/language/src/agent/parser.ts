@@ -23,10 +23,7 @@ function rangeFromTokens(start: Token, end: Token): SourceRange {
 }
 
 /** Parse a `sandbox: { … }` literal (resource and lifecycle overrides). */
-function parseSandboxDecl(
-  d: ResourceParserDelegate,
-  valueStart: Token,
-): AgentSandboxDecl | null {
+function parseSandboxDecl(d: ResourceParserDelegate, valueStart: Token): AgentSandboxDecl | null {
   if (!d.expect('lbrace')) {
     d.error('sandbox: expected { after sandbox:', d.peek())
     return null
@@ -47,11 +44,10 @@ function parseSandboxDecl(
   let ephemeral: boolean | undefined
   let ephemeralRange: SourceRange | undefined
 
-  const parseSandboxNumber = (
-    assign: (val: number, range: SourceRange | undefined) => void,
-  ) => {
+  const parseSandboxNumber = (assign: (val: number, range: SourceRange | undefined) => void) => {
     const vt = d.peek()
     const val = d.parseValue()
+
     if (typeof val === 'number') {
       assign(val, vt?.range as SourceRange | undefined)
     }
@@ -59,6 +55,7 @@ function parseSandboxDecl(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -74,6 +71,7 @@ function parseSandboxDecl(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -88,6 +86,7 @@ function parseSandboxDecl(
         cpus = val
         cpusRange = range
       })
+
       continue
     }
 
@@ -96,6 +95,7 @@ function parseSandboxDecl(
         memoryMiB = val
         memoryMiBRange = range
       })
+
       continue
     }
 
@@ -104,6 +104,7 @@ function parseSandboxDecl(
         diskGiB = val
         diskGiBRange = range
       })
+
       continue
     }
 
@@ -112,6 +113,7 @@ function parseSandboxDecl(
         autoStopMinutes = val
         autoStopMinutesRange = range
       })
+
       continue
     }
 
@@ -120,6 +122,7 @@ function parseSandboxDecl(
         autoArchiveMinutes = val
         autoArchiveMinutesRange = range
       })
+
       continue
     }
 
@@ -128,16 +131,19 @@ function parseSandboxDecl(
         autoDeleteMinutes = val
         autoDeleteMinutesRange = range
       })
+
       continue
     }
 
     if (key === 'ephemeral') {
       const vt = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'boolean') {
         ephemeral = val
         ephemeralRange = vt?.range as SourceRange | undefined
       }
+
       continue
     }
 
@@ -166,10 +172,7 @@ function parseSandboxDecl(
 }
 
 /** Parse a `wallet: { … }` literal (Zero tool-spend budget). */
-function parseWalletDecl(
-  d: ResourceParserDelegate,
-  valueStart: Token,
-): AgentWalletDecl | null {
+function parseWalletDecl(d: ResourceParserDelegate, valueStart: Token): AgentWalletDecl | null {
   if (!d.expect('lbrace')) {
     d.error('wallet: expected { after wallet:', d.peek())
     return null
@@ -184,6 +187,7 @@ function parseWalletDecl(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -199,6 +203,7 @@ function parseWalletDecl(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -211,6 +216,7 @@ function parseWalletDecl(
     if (key === 'budget' || key === 'maxPerCall') {
       const vt = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'number') {
         if (key === 'budget') {
           budget = val
@@ -220,11 +226,13 @@ function parseWalletDecl(
           maxPerCallRange = vt?.range as SourceRange | undefined
         }
       }
+
       continue
     }
 
     if (key === 'cadence') {
       const tok = d.peek()
+
       if (tok && (tok.kind === 'identifier' || tok.kind === 'keyword')) {
         d.advance()
         cadence = tok.value as string
@@ -234,6 +242,7 @@ function parseWalletDecl(
         cadence = tok.value as string
         cadenceRange = tok.range as SourceRange
       }
+
       continue
     }
 
@@ -269,17 +278,16 @@ const CONTEXT_KEYS = [
  * swallowed: these knobs govern what the model is allowed to see, so a typo
  * that silently reverts an agent to the managed default is worth a diagnostic.
  */
-function parseContextDecl(
-  d: ResourceParserDelegate,
-  valueStart: Token,
-): AgentContextDecl | null {
+function parseContextDecl(d: ResourceParserDelegate, valueStart: Token): AgentContextDecl | null {
   if (!d.expect('lbrace')) {
     d.error('context: expected { after context', d.peek())
+
     // Swallow whatever stands in for the block so the rest of the agent block
     // still parses, instead of cascading into a stray-token error at top level.
     if (d.peek()?.kind !== 'rbrace') {
       d.parseValue()
     }
+
     return null
   }
 
@@ -300,15 +308,18 @@ function parseContextDecl(
   ) => {
     const vt = d.peek()
     const val = d.parseValue()
+
     if (typeof val === 'number') {
       assign(val, vt?.range)
       return
     }
+
     d.error(`context.${key} must be a number`, vt)
   }
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -324,6 +335,7 @@ function parseContextDecl(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -338,6 +350,7 @@ function parseContextDecl(
         budget = val
         budgetRange = range
       })
+
       continue
     }
 
@@ -346,6 +359,7 @@ function parseContextDecl(
         compactAt = val
         compactAtRange = range
       })
+
       continue
     }
 
@@ -354,6 +368,7 @@ function parseContextDecl(
         keepRecentTurns = val
         keepRecentTurnsRange = range
       })
+
       continue
     }
 
@@ -362,23 +377,21 @@ function parseContextDecl(
         pruneToolResultsAfter = val
         pruneToolResultsAfterRange = range
       })
+
       continue
     }
 
     if (key === 'cache_retention') {
       const tok = d.peek()
-      if (
-        tok &&
-        (tok.kind === 'identifier' ||
-          tok.kind === 'keyword' ||
-          tok.kind === 'string')
-      ) {
+
+      if (tok && (tok.kind === 'identifier' || tok.kind === 'keyword' || tok.kind === 'string')) {
         d.advance()
         cacheRetention = String(tok.value)
         cacheRetentionRange = tok.range
       } else {
         d.error('context.cache_retention must be none, short, or long', tok)
       }
+
       continue
     }
 
@@ -386,6 +399,7 @@ function parseContextDecl(
       `Unexpected key "${key}" in context block — only ${CONTEXT_KEYS.slice(0, -1).join(', ')}, and ${CONTEXT_KEYS.at(-1)} are allowed`,
       t,
     )
+
     d.parseValue()
   }
 
@@ -415,11 +429,10 @@ function parseComputerRef(
   keyTok: Token | null,
 ): { name: string; range: SourceRange } {
   const valueTok = d.peek()
+
   if (
     valueTok &&
-    (valueTok.kind === 'identifier' ||
-      valueTok.kind === 'keyword' ||
-      valueTok.kind === 'string')
+    (valueTok.kind === 'identifier' || valueTok.kind === 'keyword' || valueTok.kind === 'string')
   ) {
     d.advance()
     return {
@@ -427,12 +440,15 @@ function parseComputerRef(
       range: { ...valueTok.range },
     }
   }
+
   if (valueTok && valueTok.kind !== 'rbrace') {
     const range = { ...valueTok.range }
     d.parseValue()
     return { name: '', range }
   }
+
   const range = keyTok?.range ?? valueTok?.range
+
   if (!range) {
     return {
       name: '',
@@ -442,6 +458,7 @@ function parseComputerRef(
       },
     }
   }
+
   return { name: '', range: { ...range } }
 }
 
@@ -452,6 +469,7 @@ function parseIdentifierList(d: ResourceParserDelegate): {
   range: SourceRange
 } | null {
   const open = d.expect('lbracket')
+
   if (!open) {
     d.error('Expected [', d.peek())
     return null
@@ -462,6 +480,7 @@ function parseIdentifierList(d: ResourceParserDelegate): {
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbracket') {
       break
     }
@@ -485,6 +504,7 @@ function parseIdentifierList(d: ResourceParserDelegate): {
   }
 
   const close = d.expect('rbracket')
+
   if (!close) {
     d.error('Expected ] after tools list', d.peek())
     d.skipToNextBlock()
@@ -522,6 +542,7 @@ function parseAgentProfileBody(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -534,6 +555,7 @@ function parseAgentProfileBody(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -545,61 +567,75 @@ function parseAgentProfileBody(
 
     if (key === 'description') {
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         description = val
         descriptionRange = d.peek()?.range ?? rangeStart.range
       }
+
       continue
     }
 
     if (key === 'system') {
       const vt = d.peek()
       const cv = vt ? d.parseConfigValue(vt) : undefined
+
       if (cv?.kind === 'ts_block') {
         systemCode = cv.code
         systemCodeRange = cv.innerRange
       } else {
         d.error('Expected @ts block for role system:', vt)
       }
+
       continue
     }
 
     if (key === 'tools') {
       const parsedList = parseIdentifierList(d)
+
       if (parsedList) {
         tools = parsedList.names
         toolsRanges = parsedList.ranges
       }
+
       continue
     }
 
     if (key === 'skills') {
       const parsedList = parseIdentifierList(d)
+
       if (parsedList) {
         skills = parsedList.names
         skillsRanges = parsedList.ranges
       }
+
       continue
     }
 
     if (key === 'mcp') {
       const parsedList = parseIdentifierList(d)
+
       if (parsedList) {
         mcp = parsedList.names
         mcpRanges = parsedList.ranges
       }
+
       continue
     }
 
     if (key === 'sandbox') {
       const vs = d.peek()
+
       if (!vs) {
         break
       }
+
       const decl = parseSandboxDecl(d, vs)
+
       if (decl) {
         sandbox = decl
       }
+
       continue
     }
 
@@ -641,28 +677,26 @@ function parseSuggestionsDecl(
   valueStart: Token,
 ): AgentSuggestionDecl[] | undefined {
   const raw = d.parseValue()
+
   if (!Array.isArray(raw)) {
-    d.error(
-      'suggestions: expected an array of { label, message } objects',
-      valueStart,
-    )
+    d.error('suggestions: expected an array of { label, message } objects', valueStart)
     return undefined
   }
 
   const suggestions: AgentSuggestionDecl[] = []
+
   for (const [index, item] of raw.entries()) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      d.error(
-        `suggestions[${index}]: expected an object with label and message`,
-        valueStart,
-      )
+      d.error(`suggestions[${index}]: expected an object with label and message`, valueStart)
       continue
     }
 
     const record = item as Record<string, unknown>
+
     if (typeof record.label !== 'string') {
       d.error(`suggestions[${index}]: label must be a string`, valueStart)
     }
+
     if (typeof record.message !== 'string') {
       d.error(`suggestions[${index}]: message must be a string`, valueStart)
     }
@@ -682,11 +716,13 @@ export function parseAgentBlock(
   docComment: string | undefined,
 ): AgentDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'agent') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected agent block name', nameTok)
     d.skipToNextBlock()
@@ -736,6 +772,7 @@ export function parseAgentBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -748,28 +785,28 @@ export function parseAgentBlock(
     if (t.kind === 'keyword' && t.value === 'profile') {
       d.advance()
       const profileNameTok = d.advance()
+
       if (
         !profileNameTok ||
-        (profileNameTok.kind !== 'identifier' &&
-          profileNameTok.kind !== 'keyword')
+        (profileNameTok.kind !== 'identifier' && profileNameTok.kind !== 'keyword')
       ) {
         d.error('Expected profile name', profileNameTok)
         d.skipToNextBlock()
         return null
       }
-      const profileBody = parseAgentProfileBody(
-        d,
-        profileNameTok.value as string,
-        profileNameTok,
-      )
+
+      const profileBody = parseAgentProfileBody(d, profileNameTok.value as string, profileNameTok)
+
       if (profileBody) {
         profiles.push(profileBody)
       }
+
       continue
     }
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -782,14 +819,19 @@ export function parseAgentBlock(
       if (d.peek()?.kind === 'colon') {
         d.advance()
       }
+
       const vs = d.peek()
+
       if (!vs) {
         break
       }
+
       const decl = parseContextDecl(d, vs)
+
       if (decl) {
         context = decl
       }
+
       continue
     }
 
@@ -800,22 +842,27 @@ export function parseAgentBlock(
 
     if (key === 'label') {
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         label = val
       }
+
       continue
     }
 
     if (key === 'description') {
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         description = val
       }
+
       continue
     }
 
     if (key === 'provider') {
       const tok = d.peek()
+
       if (tok && (tok.kind === 'identifier' || tok.kind === 'keyword')) {
         d.advance()
         provider = tok.value as string
@@ -825,49 +872,50 @@ export function parseAgentBlock(
         provider = tok.value as string
         providerRange = tok.range as SourceRange
       }
+
       continue
     }
 
     if (key === 'model') {
       const valTok = d.peek()
+
       if (valTok?.kind === 'string') {
         d.advance()
         model = valTok.value as string
         modelRange = valTok.range as SourceRange
-      } else if (
-        valTok &&
-        (valTok.kind === 'identifier' || valTok.kind === 'keyword')
-      ) {
+      } else if (valTok && (valTok.kind === 'identifier' || valTok.kind === 'keyword')) {
         d.advance()
         model = valTok.value as string
         modelRange = valTok.range as SourceRange
       } else {
         d.error('Expected model (string)', valTok)
       }
+
       continue
     }
 
     if (key === 'secrets') {
       const refTok = d.advance()
-      if (
-        refTok &&
-        (refTok.kind === 'identifier' || refTok.kind === 'keyword')
-      ) {
+
+      if (refTok && (refTok.kind === 'identifier' || refTok.kind === 'keyword')) {
         secretsRef = refTok.value as string
         secretsRefRange = { ...refTok.range }
       }
+
       continue
     }
 
     if (key === 'system') {
       const vt = d.peek()
       const cv = vt ? d.parseConfigValue(vt) : undefined
+
       if (cv?.kind === 'ts_block') {
         systemCode = cv.code
         systemCodeRange = cv.innerRange
       } else {
         d.error('Expected @ts block for system:', vt)
       }
+
       continue
     }
 
@@ -878,76 +926,92 @@ export function parseAgentBlock(
       // thing in the editor.
       const vt = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'number') {
         temperature = val
         temperatureRange = vt?.range ?? modelRange
       }
+
       continue
     }
 
     if (key === 'maxTokens') {
       const vt = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'number') {
         maxTokens = val
         maxTokensRange = vt?.range ?? modelRange
       }
+
       continue
     }
 
     if (key === 'maxSteps') {
       const vt = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'number') {
         maxSteps = val
         maxStepsRange = vt?.range ?? modelRange
       }
+
       continue
     }
 
     if (key === 'tools') {
       const parsedList = parseIdentifierList(d)
+
       if (parsedList) {
         tools = parsedList.names
         toolsRanges = parsedList.ranges
       }
+
       continue
     }
 
     if (key === 'skills') {
       const parsedList = parseIdentifierList(d)
+
       if (parsedList) {
         skills = parsedList.names
         skillsRanges = parsedList.ranges
       }
+
       continue
     }
 
     if (key === 'mcp') {
       const parsedList = parseIdentifierList(d)
+
       if (parsedList) {
         mcp = parsedList.names
         mcpRanges = parsedList.ranges
       }
+
       continue
     }
 
     if (key === 'team') {
       const parsedList = parseIdentifierList(d)
+
       if (parsedList) {
         team = parsedList.names
         teamRanges = parsedList.ranges
       }
+
       continue
     }
 
     if (key === 'disks') {
       const parsedList = parseIdentifierList(d)
+
       if (parsedList) {
         disks = parsedList.names
         disksRanges = parsedList.ranges
         disksRange = parsedList.range
       }
+
       continue
     }
 
@@ -960,37 +1024,49 @@ export function parseAgentBlock(
 
     if (key === 'sandbox') {
       const vs = d.peek()
+
       if (!vs) {
         break
       }
+
       const decl = parseSandboxDecl(d, vs)
+
       if (decl) {
         sandbox = decl
       }
+
       continue
     }
 
     if (key === 'wallet') {
       const vs = d.peek()
+
       if (!vs) {
         break
       }
+
       const decl = parseWalletDecl(d, vs)
+
       if (decl) {
         wallet = decl
       }
+
       continue
     }
 
     if (key === 'suggestions') {
       const vs = d.peek()
+
       if (!vs) {
         break
       }
+
       const parsedSuggestions = parseSuggestionsDecl(d, vs)
+
       if (parsedSuggestions) {
         suggestions = parsedSuggestions
       }
+
       continue
     }
 

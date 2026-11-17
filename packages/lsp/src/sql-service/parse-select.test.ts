@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'bun:test'
+
 import { getSelectResultColumns } from './parse-select'
 
 describe('getSelectResultColumns', () => {
   test('simple SELECT returns column names', () => {
     const result = getSelectResultColumns('SELECT a, b FROM {{table}}')
     expect(result.kind).toBe('columns')
+
     if (result.kind === 'columns') {
       expect(result.columns).toEqual(['a', 'b'])
     }
@@ -18,6 +20,7 @@ describe('getSelectResultColumns', () => {
   test('aliased column returns alias name', () => {
     const result = getSelectResultColumns('SELECT foo AS bar FROM {{table}}')
     expect(result.kind).toBe('columns')
+
     if (result.kind === 'columns') {
       expect(result.columns).toEqual(['bar'])
     }
@@ -26,6 +29,7 @@ describe('getSelectResultColumns', () => {
   test('empty SQL returns error', () => {
     const result = getSelectResultColumns('')
     expect(result.kind).toBe('error')
+
     if (result.kind === 'error') {
       expect(result.message).toContain('Empty')
     }
@@ -37,10 +41,9 @@ describe('getSelectResultColumns', () => {
   })
 
   test('non-SELECT returns error', () => {
-    const result = getSelectResultColumns(
-      'INSERT INTO {{table}} (x) VALUES (1)',
-    )
+    const result = getSelectResultColumns('INSERT INTO {{table}} (x) VALUES (1)')
     expect(result.kind).toBe('error')
+
     if (result.kind === 'error') {
       expect(result.message).toContain('Only SELECT')
     }
@@ -49,6 +52,7 @@ describe('getSelectResultColumns', () => {
   test('invalid SQL returns error with message', () => {
     const result = getSelectResultColumns('SELECT FROM broken')
     expect(result.kind).toBe('error')
+
     if (result.kind === 'error') {
       expect(result.message.length).toBeGreaterThan(0)
     }

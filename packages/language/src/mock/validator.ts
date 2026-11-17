@@ -15,10 +15,7 @@ import { resolvedOutputSchemaLiteralForNode } from '../format-output-compat'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import { nameLookup } from '../workspace/workspace-resources'
 import type { MockDecl } from './ast'
-import {
-  checkJsonSchemaPayload,
-  formatSchemaFailures,
-} from './json-schema-check'
+import { checkJsonSchemaPayload, formatSchemaFailures } from './json-schema-check'
 
 export type ValidateMockBlocksOptions = {
   workspace?: WorkspaceResourceIndex
@@ -44,13 +41,9 @@ function parseJsonCode(
     return JSON.parse(code)
   } catch (err) {
     diagnostics.push(
-      diag(
-        `Invalid JSON in ${label}: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        range,
-      ),
+      diag(`Invalid JSON in ${label}: ${err instanceof Error ? err.message : String(err)}`, range),
     )
+
     return null
   }
 }
@@ -62,6 +55,7 @@ function walkNodes(
 ): void {
   for (const node of nodes) {
     out.push({ workflowName, node })
+
     if (node.subgraph?.nodes?.length) {
       walkNodes(node.subgraph.nodes, workflowName, out)
     }
@@ -72,9 +66,11 @@ function collectWorkflowNodes(
   workflows: Iterable<WorkflowDecl>,
 ): Array<{ workflowName: string; node: NodeDecl }> {
   const out: Array<{ workflowName: string; node: NodeDecl }> = []
+
   for (const workflow of workflows) {
     walkNodes(workflow.nodes ?? [], workflow.name, out)
   }
+
   return out
 }
 
@@ -83,29 +79,33 @@ function resolveReviewSchema(
   schemaLiterals: Map<string, JsonSchemaLiteral>,
 ): JsonSchemaLiteral | undefined {
   const rc = node.reviewConfig
+
   if (!rc || typeof rc !== 'object' || Array.isArray(rc)) {
     return undefined
   }
+
   const record = rc as Record<string, unknown>
-  if (
-    record.schema &&
-    typeof record.schema === 'object' &&
-    !Array.isArray(record.schema)
-  ) {
+
+  if (record.schema && typeof record.schema === 'object' && !Array.isArray(record.schema)) {
     return record.schema as JsonSchemaLiteral
   }
+
   const ref = record.schemaRef
+
   if (typeof ref === 'string' && ref !== '') {
     return schemaLiterals.get(ref)
   }
+
   return undefined
 }
 
 function reviewEnabled(node: NodeDecl): boolean {
   const rc = node.reviewConfig
+
   if (!rc || typeof rc !== 'object' || Array.isArray(rc)) {
     return false
   }
+
   return (rc as Record<string, unknown>).enabled !== false
 }
 
@@ -116,9 +116,11 @@ function resolveActionOutputSchema(
   if (action.output != null) {
     return action.output
   }
+
   if (action.outputRef) {
     return schemaLiterals.get(action.outputRef)
   }
+
   if (action.outputBlock?.code) {
     try {
       return JSON.parse(action.outputBlock.code) as JsonSchemaLiteral
@@ -126,6 +128,7 @@ function resolveActionOutputSchema(
       return undefined
     }
   }
+
   return undefined
 }
 
@@ -136,9 +139,11 @@ function resolveMockFormDataPayload(mock: MockDecl): unknown {
       ...mock.review.formDataLiteral,
     }
   }
+
   if (mock.review?.formData?.code) {
     try {
       const parsed = JSON.parse(mock.review.formData.code) as unknown
+
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return {
           approved: mock.review.auto !== 'reject',
@@ -149,6 +154,7 @@ function resolveMockFormDataPayload(mock: MockDecl): unknown {
       // Invalid JSON reported separately.
     }
   }
+
   return { approved: mock.review?.auto !== 'reject' }
 }
 
@@ -160,6 +166,7 @@ function reportSchemaFailures(
   range: SourceRange,
 ): void {
   const failures = checkJsonSchemaPayload(schema, value)
+
   if (failures) {
     diagnostics.push(diag(formatSchemaFailures(label, failures), range))
   }
@@ -170,6 +177,7 @@ export function validateMockBlocks(
   options?: ValidateMockBlocksOptions,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = []
+
   if ((ast.mocks ?? []).length === 0) {
     return diagnostics
   }
@@ -178,18 +186,15 @@ export function validateMockBlocks(
   const schemaLiterals = options?.schemaLiterals ?? new Map()
   const seen = new Map<string, MockDecl>()
 
-  const localActions = new Map(
-    (ast.actions ?? []).map((a) => [a.name, a] as const),
-  )
-  const actionLookup = nameLookup(
-    new Set(localActions.keys()),
-    workspace?.actions,
-  )
+  const localActions = new Map((ast.actions ?? []).map((a) => [a.name, a] as const))
+  const actionLookup = nameLookup(new Set(localActions.keys()), workspace?.actions)
 
   const workflowByName = new Map<string, WorkflowDecl>()
+
   for (const w of ast.workflows ?? []) {
     workflowByName.set(w.name, w)
   }
+
   if (workspace?.workflowBlocks) {
     for (const [name, w] of workspace.workflowBlocks) {
       if (!workflowByName.has(name)) {
@@ -197,14 +202,13 @@ export function validateMockBlocks(
       }
     }
   }
-  const workflowNameLookup = nameLookup(
-    new Set(workflowByName.keys()),
-    workspace?.workflows,
-  )
+
+  const workflowNameLookup = nameLookup(new Set(workflowByName.keys()), workspace?.workflows)
   const allNodes = collectWorkflowNodes(workflowByName.values())
 
   for (const mock of ast.mocks ?? []) {
     const prev = seen.get(mock.name)
+
     if (prev) {
       diagnostics.push(diag(`Duplicate mock block "${mock.name}"`, mock.range))
     } else {
@@ -212,6 +216,7 @@ export function validateMockBlocks(
     }
 
     const isDefaults = mock.name === 'defaults'
+
     if (isDefaults) {
       if (mock.action || mock.node || mock.output || mock.review) {
         diagnostics.push(
@@ -224,18 +229,15 @@ export function validateMockBlocks(
     }
 
     if (mock.mode === 'selective' && (!mock.only || mock.only.length === 0)) {
-      diagnostics.push(
-        diag('mock mode: selective requires only: […]', mock.range),
-      )
+      diagnostics.push(diag('mock mode: selective requires only: […]', mock.range))
     }
 
     if (mock.action && mock.node) {
-      diagnostics.push(
-        diag('mock cannot set both action: and node:', mock.range),
-      )
+      diagnostics.push(diag('mock cannot set both action: and node:', mock.range))
     }
 
     let outputPayload: unknown | undefined
+
     if (mock.output) {
       const parsed = parseJsonCode(
         mock.output.code,
@@ -243,6 +245,7 @@ export function validateMockBlocks(
         diagnostics,
         'mock output',
       )
+
       if (parsed !== null) {
         outputPayload = parsed
       }
@@ -269,11 +272,11 @@ export function validateMockBlocks(
           ),
         )
       } else {
-        const action =
-          localActions.get(mock.action) ??
-          workspace?.actionBlocks.get(mock.action)
+        const action = localActions.get(mock.action) ?? workspace?.actionBlocks.get(mock.action)
+
         if (action && outputPayload !== undefined) {
           const outputSchema = resolveActionOutputSchema(action, schemaLiterals)
+
           if (outputSchema) {
             reportSchemaFailures(
               diagnostics,
@@ -307,6 +310,7 @@ export function validateMockBlocks(
         const matches = allNodes.filter(
           (n) => n.workflowName === mock.workflow && n.node.name === mock.node,
         )
+
         if (matches.length === 0) {
           diagnostics.push(
             diag(
@@ -316,6 +320,7 @@ export function validateMockBlocks(
           )
         } else {
           const target = matches[0]!
+
           if (mock.review) {
             if (!reviewEnabled(target.node)) {
               diagnostics.push(
@@ -326,6 +331,7 @@ export function validateMockBlocks(
               )
             } else {
               const schema = resolveReviewSchema(target.node, schemaLiterals)
+
               if (schema) {
                 reportSchemaFailures(
                   diagnostics,
@@ -339,10 +345,8 @@ export function validateMockBlocks(
           }
 
           if (outputPayload !== undefined && !mock.action) {
-            const outputSchema = resolvedOutputSchemaLiteralForNode(
-              target.node,
-              schemaLiterals,
-            )
+            const outputSchema = resolvedOutputSchemaLiteralForNode(target.node, schemaLiterals)
+
             if (outputSchema) {
               reportSchemaFailures(
                 diagnostics,

@@ -8,17 +8,9 @@
  * envelope around the schema (names, uniqueness, presence, ordering).
  */
 
-import {
-  databaseOperationSchema,
-  resourceNameSchema,
-} from '@swirls/definition/schemas'
-import type {
-  ConfigValue,
-  Diagnostic,
-  NodeDecl,
-  SourceRange,
-  SwirlsFile,
-} from '../ast'
+import { databaseOperationSchema, resourceNameSchema } from '@swirls/definition/schemas'
+
+import type { ConfigValue, Diagnostic, NodeDecl, SourceRange, SwirlsFile } from '../ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import { nameLookup } from '../workspace/workspace-resources'
 import type { DatabaseConnectionDecl, MigrationDecl } from './ast'
@@ -29,6 +21,7 @@ function isReservedDatabaseConnectionName(name: string): boolean {
   if (RESERVED_DATABASE_CONNECTION_NAMES.has(name)) {
     return true
   }
+
   return name.startsWith('pg_')
 }
 
@@ -37,13 +30,7 @@ function validateDatabaseConnection(
   connectionNames: Set<string>,
 ): Diagnostic[] {
   const out: Diagnostic[] = []
-  out.push(
-    ...validateResourceName(
-      connection.name,
-      connection.range,
-      'Database connection',
-    ),
-  )
+  out.push(...validateResourceName(connection.name, connection.range, 'Database connection'))
 
   if (isReservedDatabaseConnectionName(connection.name)) {
     out.push(
@@ -55,13 +42,9 @@ function validateDatabaseConnection(
   }
 
   if (connectionNames.has(connection.name)) {
-    out.push(
-      diag(
-        `Duplicate database connection name "${connection.name}"`,
-        connection.range,
-      ),
-    )
+    out.push(diag(`Duplicate database connection name "${connection.name}"`, connection.range))
   }
+
   connectionNames.add(connection.name)
 
   return out
@@ -78,15 +61,13 @@ function diag(
   return { message, range, severity }
 }
 
-function validateResourceName(
-  name: string,
-  range: SourceRange,
-  kind: string,
-): Diagnostic[] {
+function validateResourceName(name: string, range: SourceRange, kind: string): Diagnostic[] {
   const result = resourceNameSchema.safeParse(name)
+
   if (result.success) {
     return []
   }
+
   const msg = result.error.issues[0]?.message ?? 'Invalid name'
   return [diag(`${kind} name: ${msg}`, range)]
 }
@@ -95,12 +76,15 @@ function tsBlockHasBody(cv: ConfigValue | undefined): boolean {
   if (!cv) {
     return false
   }
+
   if (cv.kind === 'ts_block') {
     return Boolean(cv.code?.trim())
   }
+
   if (cv.kind === 'ts_file_ref') {
     return Boolean(cv.path?.trim())
   }
+
   return false
 }
 
@@ -118,19 +102,16 @@ export function validateDatabaseBlocks(
     if (names.has(r.name)) {
       out.push(diag(`Duplicate database block name "${r.name}"`, r.range))
     }
+
     names.add(r.name)
 
     // Presence only. Prisma owns model/enum/relation correctness at deploy time.
     if (r.schemaSource.trim().length === 0) {
-      out.push(
-        diag(
-          'Database block requires a non-empty schema: @prisma { } block',
-          r.range,
-        ),
-      )
+      out.push(diag('Database block requires a non-empty schema: @prisma { } block', r.range))
     }
 
     const connectionNames = new Set<string>()
+
     for (const connection of r.connections ?? []) {
       out.push(...validateDatabaseConnection(connection, connectionNames))
     }
@@ -147,12 +128,7 @@ function validateMigrationBlock(
   const out: Diagnostic[] = []
 
   if (m.database === '') {
-    out.push(
-      diag(
-        `Migration "${m.name}" requires "database" (a database block name)`,
-        m.range,
-      ),
-    )
+    out.push(diag(`Migration "${m.name}" requires "database" (a database block name)`, m.range))
   } else if (!databaseNames.has(m.database)) {
     out.push(
       diag(
@@ -163,15 +139,11 @@ function validateMigrationBlock(
   }
 
   if (!Number.isInteger(m.order) || m.order < 0) {
-    out.push(
-      diag(
-        `Migration "${m.name}" requires "order" as a non-negative integer`,
-        m.range,
-      ),
-    )
+    out.push(diag(`Migration "${m.name}" requires "order" as a non-negative integer`, m.range))
   } else if (m.database !== '') {
     const byOrder = orderByDatabase.get(m.database) ?? new Map()
     const existing = byOrder.get(m.order)
+
     if (existing) {
       out.push(
         diag(
@@ -182,6 +154,7 @@ function validateMigrationBlock(
     } else {
       byOrder.set(m.order, m)
     }
+
     orderByDatabase.set(m.database, byOrder)
   }
 
@@ -203,6 +176,7 @@ export function validateMigrationBlocks(
 ): Diagnostic[] {
   const out: Diagnostic[] = []
   const migrations = ast.migrations ?? []
+
   const databaseNames = nameLookup(
     new Set((ast.databases ?? []).map((d) => d.name)),
     options?.workspace?.databases,
@@ -217,6 +191,7 @@ export function validateMigrationBlocks(
     if (names.has(m.name)) {
       out.push(diag(`Duplicate migration block name "${m.name}"`, m.range))
     }
+
     names.add(m.name)
 
     out.push(...validateMigrationBlock(m, databaseNames, orderByDatabase))
@@ -232,14 +207,12 @@ export function validateMigrationBlocks(
  * body, and `condition:` (optional) must be a @ts block. Prisma-body
  * correctness stays with the deploy path, like `migration` bodies.
  */
-function validateDatabaseNode(
-  node: NodeDecl,
-  databaseNames: Set<string>,
-): Diagnostic[] {
+function validateDatabaseNode(node: NodeDecl, databaseNames: Set<string>): Diagnostic[] {
   const out: Diagnostic[] = []
   const cf = node.configFields
 
   const databaseCv = cf.database
+
   if (!databaseCv || databaseCv.kind !== 'string') {
     out.push(diag('Database node requires a "database" field', node.range))
   } else if (!databaseNames.has(databaseCv.value)) {
@@ -252,6 +225,7 @@ function validateDatabaseNode(
   }
 
   const operationCv = cf.operation
+
   if (!operationCv || operationCv.kind !== 'string') {
     out.push(diag('Database node requires an "operation" field', node.range))
   } else if (!databaseOperationSchema.safeParse(operationCv.value).success) {
@@ -264,21 +238,19 @@ function validateDatabaseNode(
   }
 
   const runCv = cf.run
+
   if (!runCv) {
     out.push(diag('Database node requires a "run" (@ts block)', node.range))
   } else if (runCv.kind !== 'ts_block' && runCv.kind !== 'ts_file_ref') {
     out.push(diag('Database node "run" must be a @ts block', runCv.range))
   } else if (runCv.kind === 'ts_block' && !runCv.code.trim()) {
-    out.push(
-      diag('Database node "run" must be a non-empty @ts block', runCv.range),
-    )
+    out.push(diag('Database node "run" must be a non-empty @ts block', runCv.range))
   }
 
   const conditionCv = cf.condition
+
   if (conditionCv && conditionCv.kind !== 'ts_block') {
-    out.push(
-      diag('Database node "condition" must be a @ts block', conditionCv.range),
-    )
+    out.push(diag('Database node "condition" must be a @ts block', conditionCv.range))
   }
 
   return out
@@ -289,6 +261,7 @@ export function validateDatabaseNodes(
   options?: { workspace?: WorkspaceResourceIndex },
 ): Diagnostic[] {
   const out: Diagnostic[] = []
+
   const databaseNames = nameLookup(
     new Set((ast.databases ?? []).map((d) => d.name)),
     options?.workspace?.databases,
@@ -299,6 +272,7 @@ export function validateDatabaseNodes(
       if (node.type !== 'database') {
         continue
       }
+
       out.push(...validateDatabaseNode(node, databaseNames))
     }
   }

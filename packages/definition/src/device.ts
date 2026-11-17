@@ -63,9 +63,11 @@ export function deviceMatchesSelector(
   if (device.status !== 'active') {
     return false
   }
+
   if (selector.os !== undefined && device.os !== selector.os) {
     return false
   }
+
   return (selector.tags ?? []).every((tag) => device.tags.includes(tag))
 }
 
@@ -80,14 +82,17 @@ export function parseDeviceTagsInput(
     .split(/[\s,]+/)
     .map((entry) => entry.trim().toLowerCase())
     .filter((entry) => entry !== '')
+
   for (const entry of entries) {
     if (!deviceTagSchema.safeParse(entry).success) {
       return { ok: false, invalid: entry }
     }
   }
+
   if (new Set(entries).size > DEVICE_TAGS_MAX) {
     return { ok: false, invalid: `more than ${DEVICE_TAGS_MAX} tags` }
   }
+
   return { ok: true, tags: [...new Set(entries)].sort() }
 }
 
@@ -104,17 +109,18 @@ export const DEVICE_INSTALL_DEFAULT_API_URL = 'https://swirls.ai/api'
  * argument, because arguments are visible to every user on the machine. The
  * API address is only named when it is not the one the scripts default to.
  */
-export function deviceInstallCommands(input: {
-  token: string
-  apiUrl: string
-  webUrl: string
-}): { windows: string[]; unix: string[] } {
+export function deviceInstallCommands(input: { token: string; apiUrl: string; webUrl: string }): {
+  windows: string[]
+  unix: string[]
+} {
   const site = input.webUrl.replace(/\/+$/, '')
   const api = input.apiUrl.replace(/\/+$/, '')
   const namesApi = api !== DEVICE_INSTALL_DEFAULT_API_URL
+
   const preserved = namesApi
     ? 'SWIRLSOPS_ENROLLMENT_TOKEN,SWIRLSOPS_API_URL'
     : 'SWIRLSOPS_ENROLLMENT_TOKEN'
+
   return {
     windows: [
       `$env:SWIRLSOPS_ENROLLMENT_TOKEN = "${input.token}"`,

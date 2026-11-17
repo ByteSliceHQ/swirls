@@ -4,6 +4,7 @@
  */
 
 import { resourceNameSchema } from '@swirls/definition/schemas'
+
 import type { ConfigValue, Diagnostic, SourceRange, SwirlsFile } from '../ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import { nameLookup } from '../workspace/workspace-resources'
@@ -17,15 +18,13 @@ function diag(
   return { message, range, severity }
 }
 
-function validateResourceName(
-  name: string,
-  range: SourceRange,
-  kind: string,
-): Diagnostic[] {
+function validateResourceName(name: string, range: SourceRange, kind: string): Diagnostic[] {
   const result = resourceNameSchema.safeParse(name)
+
   if (result.success) {
     return []
   }
+
   const msg = result.error.issues[0]?.message ?? 'Invalid name'
   return [diag(`${kind} name: ${msg}`, range)]
 }
@@ -34,12 +33,15 @@ function tsPredicateHasBody(cv: ConfigValue | undefined): boolean {
   if (!cv) {
     return false
   }
+
   if (cv.kind === 'ts_block') {
     return Boolean(cv.code?.trim())
   }
+
   if (cv.kind === 'ts_file_ref') {
     return Boolean(cv.path?.trim())
   }
+
   return false
 }
 
@@ -51,20 +53,11 @@ function validateComputedColumn(
   const out: Diagnostic[] = []
   const id = `"${col.name}"`
 
-  out.push(
-    ...validateResourceName(
-      col.name,
-      col.range,
-      `View "${view.name}" computed column`,
-    ),
-  )
+  out.push(...validateResourceName(col.name, col.range, `View "${view.name}" computed column`))
 
   if (col.workflowName === '') {
     out.push(
-      diag(
-        `View "${view.name}" computed column ${id} requires "graph" (workflow name)`,
-        col.range,
-      ),
+      diag(`View "${view.name}" computed column ${id} requires "graph" (workflow name)`, col.range),
     )
   } else if (!workflowNames.has(col.workflowName)) {
     out.push(
@@ -109,10 +102,12 @@ export function validateViewBlocks(
 ): Diagnostic[] {
   const out: Diagnostic[] = []
   const viewBlocks = ast.views ?? []
+
   const streamNames = nameLookup(
     new Set((ast.streams ?? []).map((s) => s.name)),
     options?.workspace?.streams,
   )
+
   const workflowNames = nameLookup(
     new Set(ast.workflows.map((g) => g.name)),
     options?.workspace?.workflows,
@@ -128,32 +123,21 @@ export function validateViewBlocks(
 
     if (view.streams.length === 0) {
       out.push(
-        diag(
-          `View "${view.name}" requires "streams" (non-empty list of stream names)`,
-          view.range,
-        ),
+        diag(`View "${view.name}" requires "streams" (non-empty list of stream names)`, view.range),
       )
     }
 
     const seenStreams = new Set<string>()
+
     for (const ref of view.streams) {
       if (seenStreams.has(ref.name)) {
-        out.push(
-          diag(
-            `View "${view.name}" lists stream "${ref.name}" more than once`,
-            ref.range,
-          ),
-        )
+        out.push(diag(`View "${view.name}" lists stream "${ref.name}" more than once`, ref.range))
       }
+
       seenStreams.add(ref.name)
 
       if (!streamNames.has(ref.name)) {
-        out.push(
-          diag(
-            `View references stream "${ref.name}" which is not defined`,
-            ref.range,
-          ),
-        )
+        out.push(diag(`View references stream "${ref.name}" which is not defined`, ref.range))
       }
     }
 
@@ -183,15 +167,14 @@ export function validateViewBlocks(
     }
 
     const seenCols = new Set<string>()
+
     for (const col of view.computed) {
       if (seenCols.has(col.name)) {
         out.push(
-          diag(
-            `View "${view.name}" declares duplicate computed column "${col.name}"`,
-            col.range,
-          ),
+          diag(`View "${view.name}" declares duplicate computed column "${col.name}"`, col.range),
         )
       }
+
       seenCols.add(col.name)
       out.push(...validateComputedColumn(view, col, workflowNames))
     }
@@ -213,13 +196,16 @@ export function validateViewBlocks(
 export function validateViewExecutionCycles(ast: SwirlsFile): Diagnostic[] {
   const out: Diagnostic[] = []
   const views = ast.views ?? []
+
   if (views.length === 0) {
     return out
   }
 
   const streamsByWorkflow = new Map<string, string[]>()
+
   for (const s of ast.streams ?? []) {
     const list = streamsByWorkflow.get(s.workflowName)
+
     if (list) {
       list.push(s.name)
     } else {
@@ -230,10 +216,13 @@ export function validateViewExecutionCycles(ast: SwirlsFile): Diagnostic[] {
   // Edge v1 -> v2: a computed column of v1 runs a graph that writes a stream
   // composed by v2.
   const edges = new Map<string, Set<string>>()
+
   for (const v1 of views) {
     const targets = new Set<string>()
+
     for (const col of v1.computed) {
       const written = streamsByWorkflow.get(col.workflowName) ?? []
+
       for (const streamName of written) {
         for (const v2 of views) {
           if (v2.streams.some((ref) => ref.name === streamName)) {
@@ -242,6 +231,7 @@ export function validateViewExecutionCycles(ast: SwirlsFile): Diagnostic[] {
         }
       }
     }
+
     edges.set(v1.name, targets)
   }
 
@@ -253,16 +243,21 @@ export function validateViewExecutionCycles(ast: SwirlsFile): Diagnostic[] {
     if (done.has(name)) {
       return
     }
+
     if (visiting.has(name)) {
       for (const member of path.slice(path.indexOf(name))) {
         inCycle.add(member)
       }
+
       return
     }
+
     visiting.add(name)
+
     for (const next of edges.get(name) ?? []) {
       visit(next, [...path, next])
     }
+
     visiting.delete(name)
     done.add(name)
   }

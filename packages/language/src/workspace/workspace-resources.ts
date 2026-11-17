@@ -1,26 +1,25 @@
 import { join } from 'pathe'
+
 import type { ActionDecl } from '../action/ast'
 import type { AgentDecl } from '../agent/ast'
+import type { JsonSchemaLiteral } from '../ast'
 import type { SchemaDecl, SourceRange, WorkflowDecl } from '../ast'
 import type { ChannelDecl } from '../channel/ast'
 import type { ComputerDecl } from '../computer/ast'
 import type { ConnectionDecl } from '../connection/ast'
 import type { ConnectorDecl } from '../connector/ast'
 import type { DatabaseDecl } from '../database/ast'
+import type { DecisionDecl } from '../decision'
 import type { DiskDecl } from '../disk/ast'
 import type { McpDecl } from '../mcp/ast'
 import type { OperationDecl } from '../operation/ast'
-import type { ParseCache } from '../parse-cache'
 import { type ParseResult, parse as parseSource } from '../parser'
 import type { PostgresDecl } from '../postgres/ast'
 import type { QueryDecl } from '../query/ast'
 import { resolveNamedSchemasFromDecls } from '../schema'
 import type { SkillDecl } from '../skill/ast'
 import { collectSwirlsFiles } from './collect'
-import {
-  nodeWorkspaceFileSystem,
-  type SwirlsWorkspaceFileSystem,
-} from './sandbox'
+import { nodeWorkspaceFileSystem, type SwirlsWorkspaceFileSystem } from './sandbox'
 
 /** One declaration site for a top-level resource in the workspace. */
 export type DeclSite = {
@@ -30,9 +29,6 @@ export type DeclSite = {
   /** Full declaration span when indexed from a parsed AST range. */
   range?: SourceRange
 }
-
-/** @deprecated Use {@link DeclSite} */
-export type StreamBlockDeclSite = DeclSite
 
 export type ResourceDeclMap = Map<string, DeclSite[]>
 
@@ -45,7 +41,7 @@ export type WorkspaceSecretEntry = {
 
 export type WorkspaceResourceIndex = {
   decisions?: ResourceDeclMap
-  decisionBlocks?: Map<string, import('../decision').DecisionDecl>
+  decisionBlocks?: Map<string, DecisionDecl>
   forms: ResourceDeclMap
   webhooks: ResourceDeclMap
   schedules: ResourceDeclMap
@@ -91,7 +87,7 @@ export type WorkspaceResourceIndex = {
   schemas: ResourceDeclMap
   secrets: Map<string, WorkspaceSecretEntry>
   /** Resolved JSON Schema literals for all named schemas in the workspace (follows schemaRef chains). */
-  schemaLiterals: Map<string, import('../ast').JsonSchemaLiteral>
+  schemaLiterals: Map<string, JsonSchemaLiteral>
   /** Workflow bodies for cross-file validation (last declaration wins if duplicates; doctor reports dupes). */
   workflowBlocks: Map<string, WorkflowDecl>
   /** Postgres block bodies for cross-file node validation. */
@@ -124,6 +120,7 @@ export type WorkspaceResourceIndex = {
 
 function pushSite(map: ResourceDeclMap, name: string, site: DeclSite) {
   const arr = map.get(name)
+
   if (arr) {
     arr.push(site)
   } else {
@@ -139,13 +136,16 @@ function mergeSecretVars(
   type?: 'managed',
 ) {
   const e = secrets.get(name)
+
   if (!e) {
     secrets.set(name, { vars: [...vars], sites: [site], type })
     return
   }
+
   e.sites.push(site)
   const set = new Set([...e.vars, ...vars])
   e.vars = [...set]
+
   if (type === 'managed') {
     e.type = 'managed'
   }
@@ -159,37 +159,38 @@ function siteFromRange(relativePath: string, range: SourceRange): DeclSite {
   }
 }
 
+const emptyDeclMap = (): ResourceDeclMap => new Map()
+
 export function emptyWorkspaceResourceIndex(): WorkspaceResourceIndex {
-  const empty = (): ResourceDeclMap => new Map()
   return {
-    forms: empty(),
-    webhooks: empty(),
-    schedules: empty(),
-    workflows: empty(),
-    streams: empty(),
-    views: empty(),
-    auths: empty(),
-    connections: empty(),
-    actions: empty(),
-    postgres: empty(),
-    databases: empty(),
-    migrations: empty(),
-    disk: empty(),
-    computer: empty(),
-    operation: empty(),
-    skill: empty(),
-    agent: empty(),
-    decisions: empty(),
+    forms: emptyDeclMap(),
+    webhooks: emptyDeclMap(),
+    schedules: emptyDeclMap(),
+    workflows: emptyDeclMap(),
+    streams: emptyDeclMap(),
+    views: emptyDeclMap(),
+    auths: emptyDeclMap(),
+    connections: emptyDeclMap(),
+    actions: emptyDeclMap(),
+    postgres: emptyDeclMap(),
+    databases: emptyDeclMap(),
+    migrations: emptyDeclMap(),
+    disk: emptyDeclMap(),
+    computer: emptyDeclMap(),
+    operation: emptyDeclMap(),
+    skill: emptyDeclMap(),
+    agent: emptyDeclMap(),
+    decisions: emptyDeclMap(),
     decisionBlocks: new Map(),
-    mcp: empty(),
-    networks: empty(),
-    channels: empty(),
-    queries: empty(),
-    connector: empty(),
-    apps: empty(),
-    mocks: empty(),
-    playbooks: empty(),
-    schemas: empty(),
+    mcp: emptyDeclMap(),
+    networks: emptyDeclMap(),
+    channels: emptyDeclMap(),
+    queries: emptyDeclMap(),
+    connector: emptyDeclMap(),
+    apps: emptyDeclMap(),
+    mocks: emptyDeclMap(),
+    playbooks: emptyDeclMap(),
+    schemas: emptyDeclMap(),
     secrets: new Map(),
     schemaLiterals: new Map(),
     workflowBlocks: new Map(),
@@ -213,28 +214,28 @@ export function emptyWorkspaceResourceIndex(): WorkspaceResourceIndex {
  * Legacy compatibility: synthetic workspace index containing only stream names
  * (no declaration sites). Prefer {@link buildWorkspaceResourceIndex}.
  */
-export function workspaceIndexFromStreamNames(
-  names: Set<string>,
-): WorkspaceResourceIndex {
+export function workspaceIndexFromStreamNames(names: Set<string>): WorkspaceResourceIndex {
   const idx = emptyWorkspaceResourceIndex()
+
   for (const n of names) {
     idx.streams.set(n, [])
   }
+
   return idx
 }
 
 /** Union local names with workspace declaration keys (for multi-file validation). */
-export function nameLookup(
-  local: Set<string>,
-  ws?: ResourceDeclMap | Set<string>,
-): Set<string> {
+export function nameLookup(local: Set<string>, ws?: ResourceDeclMap | Set<string>): Set<string> {
   if (!ws) {
     return local
   }
+
   const keyList = ws instanceof Set ? [...ws] : [...ws.keys()]
+
   if (keyList.length === 0) {
     return local
   }
+
   return new Set([...local, ...keyList])
 }
 
@@ -305,26 +306,29 @@ const RESOURCE_MAP_KINDS: Array<{
 ]
 
 /** Names declared more than once across the workspace (same policy as deploy merge). */
-export function workspaceDuplicates(
-  idx: WorkspaceResourceIndex,
-): WorkspaceDuplicate[] {
+export function workspaceDuplicates(idx: WorkspaceResourceIndex): WorkspaceDuplicate[] {
   const out: WorkspaceDuplicate[] = []
+
   for (const { key, label } of RESOURCE_MAP_KINDS) {
     const m = idx[key]
+
     if (!m) {
       continue
     }
+
     for (const [name, sites] of m) {
       if (sites.length > 1) {
         out.push({ kind: label, name, sites })
       }
     }
   }
+
   for (const [name, entry] of idx.secrets) {
     if (entry.sites.length > 1) {
       out.push({ kind: 'secret', name, sites: entry.sites })
     }
   }
+
   return out
 }
 
@@ -333,7 +337,7 @@ export function workspaceDuplicates(
  * and resolved schema literals (for cross-file `schemaRef`).
  *
  * A long-lived caller that rebuilds the index as files change (the language
- * server) passes `parse` from a {@link ParseCache}, so a rebuild re-parses only
+ * server) passes `parse` from a `createParseCache`, so a rebuild re-parses only
  * the files whose text changed. One-shot callers leave it out.
  */
 export function buildWorkspaceResourceIndex(args: {
@@ -350,12 +354,15 @@ export function buildWorkspaceResourceIndex(args: {
   for (const relativePath of paths) {
     const fullPath = join(args.cwd, relativePath)
     let content: string
+
     try {
       content = fileSystem.readFileSync(fullPath, 'utf-8')
     } catch {
       continue
     }
+
     const { ast, errors } = parse(content)
+
     if (errors.length > 0 || !ast) {
       continue
     }
@@ -363,113 +370,128 @@ export function buildWorkspaceResourceIndex(args: {
     for (const f of ast.forms ?? []) {
       pushSite(idx.forms, f.name, siteFromRange(relativePath, f.range))
     }
+
     for (const w of ast.webhooks ?? []) {
       pushSite(idx.webhooks, w.name, siteFromRange(relativePath, w.range))
     }
+
     for (const s of ast.schedules ?? []) {
       pushSite(idx.schedules, s.name, siteFromRange(relativePath, s.range))
     }
+
     for (const w of ast.workflows ?? []) {
       pushSite(idx.workflows, w.name, siteFromRange(relativePath, w.range))
       idx.workflowBlocks.set(w.name, w)
     }
+
     for (const s of ast.streams ?? []) {
       pushSite(idx.streams, s.name, siteFromRange(relativePath, s.range))
     }
+
     for (const v of ast.views ?? []) {
       pushSite(idx.views, v.name, siteFromRange(relativePath, v.range))
     }
+
     for (const a of ast.auths ?? []) {
       pushSite(idx.auths, a.name, siteFromRange(relativePath, a.range))
     }
+
     for (const c of ast.connections ?? []) {
       pushSite(idx.connections, c.name, siteFromRange(relativePath, c.range))
       idx.connectionBlocks.set(c.name, c)
     }
+
     for (const a of ast.actions ?? []) {
       pushSite(idx.actions, a.name, siteFromRange(relativePath, a.range))
       idx.actionBlocks.set(a.name, a)
     }
+
     for (const p of ast.postgres ?? []) {
       pushSite(idx.postgres, p.name, siteFromRange(relativePath, p.range))
       idx.postgresBlocks.set(p.name, p)
     }
+
     for (const db of ast.databases ?? []) {
       pushSite(idx.databases, db.name, siteFromRange(relativePath, db.range))
       idx.databaseBlocks.set(db.name, db)
     }
+
     for (const m of ast.migrations ?? []) {
       pushSite(idx.migrations, m.name, siteFromRange(relativePath, m.range))
     }
+
     for (const a of ast.disk ?? []) {
       pushSite(idx.disk, a.name, siteFromRange(relativePath, a.range))
       idx.diskBlocks.set(a.name, a)
     }
+
     for (const computer of ast.computer ?? []) {
-      pushSite(
-        idx.computer,
-        computer.name,
-        siteFromRange(relativePath, computer.range),
-      )
+      pushSite(idx.computer, computer.name, siteFromRange(relativePath, computer.range))
       idx.computerBlocks.set(computer.name, computer)
     }
+
     for (const operation of ast.operations ?? []) {
-      pushSite(
-        idx.operation,
-        operation.name,
-        siteFromRange(relativePath, operation.range),
-      )
+      pushSite(idx.operation, operation.name, siteFromRange(relativePath, operation.range))
       idx.operationBlocks.set(operation.name, operation)
     }
+
     for (const s of ast.skill ?? []) {
       pushSite(idx.skill, s.name, siteFromRange(relativePath, s.range))
       idx.skillBlocks.set(s.name, s)
     }
+
     for (const d of ast.decisions ?? []) {
       pushSite(idx.decisions!, d.name, siteFromRange(relativePath, d.range))
       idx.decisionBlocks!.set(d.name, d)
     }
+
     for (const a of ast.agent ?? []) {
       pushSite(idx.agent, a.name, siteFromRange(relativePath, a.range))
       idx.agentBlocks.set(a.name, a)
     }
+
     for (const m of ast.mcp ?? []) {
       pushSite(idx.mcp, m.name, siteFromRange(relativePath, m.range))
       idx.mcpBlocks.set(m.name, m)
     }
+
     for (const network of ast.networks ?? []) {
       if (idx.networks) {
-        pushSite(
-          idx.networks,
-          network.name,
-          siteFromRange(relativePath, network.range),
-        )
+        pushSite(idx.networks, network.name, siteFromRange(relativePath, network.range))
       }
     }
+
     for (const ch of ast.channels ?? []) {
       pushSite(idx.channels, ch.name, siteFromRange(relativePath, ch.range))
       idx.channelBlocks.set(ch.name, ch)
     }
+
     for (const q of ast.queries ?? []) {
       pushSite(idx.queries, q.name, siteFromRange(relativePath, q.range))
       idx.queryBlocks.set(q.name, q)
     }
+
     for (const c of ast.connector ?? []) {
       pushSite(idx.connector, c.name, siteFromRange(relativePath, c.range))
       idx.connectorBlocks.set(c.name, c)
     }
+
     for (const a of ast.apps ?? []) {
       pushSite(idx.apps, a.name, siteFromRange(relativePath, a.range))
     }
+
     for (const m of ast.mocks ?? []) {
       pushSite(idx.mocks, m.name, siteFromRange(relativePath, m.range))
     }
+
     for (const p of ast.playbooks ?? []) {
       pushSite(idx.playbooks, p.name, siteFromRange(relativePath, p.range))
     }
+
     for (const sch of ast.schemas ?? []) {
       pushSite(idx.schemas, sch.name, siteFromRange(relativePath, sch.range))
     }
+
     for (const sec of ast.secrets ?? []) {
       mergeSecretVars(
         idx.secrets,
@@ -479,38 +501,11 @@ export function buildWorkspaceResourceIndex(args: {
         sec.type,
       )
     }
+
     allSchemas.push(...(ast.schemas ?? []))
   }
 
   idx.schemaLiterals = resolveNamedSchemasFromDecls(allSchemas).map
 
   return idx
-}
-
-/**
- * @deprecated Use {@link buildWorkspaceResourceIndex} and `.streams`.
- */
-export function buildWorkspaceStreamBlockIndex(args: {
-  cwd: string
-  fileSystem?: SwirlsWorkspaceFileSystem
-}): {
-  names: Set<string>
-  duplicateNames: Array<{ name: string; sites: DeclSite[] }>
-} {
-  const idx = buildWorkspaceResourceIndex(args)
-  const duplicateNames: Array<{ name: string; sites: DeclSite[] }> = []
-  for (const [name, sites] of idx.streams) {
-    if (sites.length > 1) {
-      duplicateNames.push({ name, sites })
-    }
-  }
-  return { names: new Set(idx.streams.keys()), duplicateNames }
-}
-
-/** @deprecated Use {@link buildWorkspaceResourceIndex} and `.streams`. */
-export function collectWorkspaceStreamBlockNames(args: {
-  cwd: string
-  fileSystem?: SwirlsWorkspaceFileSystem
-}): Set<string> {
-  return new Set(buildWorkspaceResourceIndex(args).streams.keys())
 }

@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "description": "Lexer, parser, AST, validator and serializer for the .swirls language.",
   "license": "MIT",
-  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ByteSliceHQ/swirls.git",
     "directory": "packages/language"
   },
+  "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./inline-ts-file-refs": "./src/inline-ts-file-refs.ts",

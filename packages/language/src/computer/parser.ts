@@ -25,16 +25,16 @@ function rangeFromTokens(start: Token, end: Token): SourceRange {
  */
 function parseSoftwarePackageName(d: ResourceParserDelegate): string | null {
   const t = d.peek()
+
   if (t?.kind === 'string' && typeof t.value === 'string') {
     d.advance()
     return t.value
   }
+
   return d.parsePropertyKey()
 }
 
-function parseSoftwarePins(
-  d: ResourceParserDelegate,
-): ComputerSoftwarePin[] | null {
+function parseSoftwarePins(d: ResourceParserDelegate): ComputerSoftwarePin[] | null {
   if (!d.expect('lbrace')) {
     d.error('software: expected {', d.peek())
     return null
@@ -44,9 +44,11 @@ function parseSoftwarePins(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment' || t.kind === 'comma') {
       d.advance()
       continue
@@ -54,29 +56,32 @@ function parseSoftwarePins(
 
     const keyTok = t
     const key = parseSoftwarePackageName(d)
+
     if (!key) {
       break
     }
+
     if (!d.expect('colon')) {
       d.error('Expected : after software package name', d.peek())
       break
     }
 
     const valTok = d.peek()
+
     if (valTok?.kind === 'string') {
       d.advance()
+
       pins.push({
         packageName: key,
         pin: valTok.value as string,
         range: valTok.range,
       })
+
       continue
     }
 
-    d.error(
-      `software pin for "${key}" must be a non-empty quoted string`,
-      valTok ?? keyTok,
-    )
+    d.error(`software pin for "${key}" must be a non-empty quoted string`, valTok ?? keyTok)
+
     if (valTok) {
       d.parseValue()
     }
@@ -104,18 +109,22 @@ function parseResources(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment' || t.kind === 'comma') {
       d.advance()
       continue
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
+
     if (!d.expect('colon')) {
       d.error('Expected : after resources key', d.peek())
       break
@@ -123,15 +132,19 @@ function parseResources(
 
     const valTok = d.peek()
     const val = d.parseValue()
+
     if (key !== 'cpus' && key !== 'memoryMiB' && key !== 'diskGiB') {
       d.error(`Unknown computer resources property "${key}"`, t)
       continue
     }
+
     if (typeof val !== 'number') {
       d.error(`resources.${key} must be a number`, valTok)
       continue
     }
+
     const range = valTok?.range
+
     if (key === 'cpus') {
       cpus = val
       cpusRange = range
@@ -170,18 +183,23 @@ function parseDiskList(d: ResourceParserDelegate): {
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbracket') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
     }
+
     if (t.kind === 'identifier' || t.kind === 'keyword') {
       const tok = d.advance()
+
       if (!tok) {
         break
       }
+
       names.push(tok.value as string)
       ranges.push(tok.range)
     } else {
@@ -189,6 +207,7 @@ function parseDiskList(d: ResourceParserDelegate): {
       d.skipToNextBlock()
       return null
     }
+
     d.expect('comma')
   }
 
@@ -221,6 +240,7 @@ function bareName(token: Token | null): string | null {
   ) {
     return token.value
   }
+
   return null
 }
 
@@ -231,13 +251,16 @@ function bareName(token: Token | null): string | null {
  */
 function skipHarnessValue(d: ResourceParserDelegate): void {
   const t = d.peek()
+
   if (!t || t.kind === 'rbrace' || t.kind === 'comma') {
     return
   }
+
   if (bareName(t) !== null) {
     d.advance()
     return
   }
+
   d.parseValue()
 }
 
@@ -248,15 +271,9 @@ function skipHarnessValue(d: ResourceParserDelegate): void {
  * against the host's harness catalog. Returns null when the block is
  * incomplete; each problem is reported as an error.
  */
-function parseHarness(
-  d: ResourceParserDelegate,
-  harnessKey: Token,
-): ComputerHarnessDecl | null {
+function parseHarness(d: ResourceParserDelegate, harnessKey: Token): ComputerHarnessDecl | null {
   if (!d.expect('lbrace')) {
-    d.error(
-      'harness: expected { type: coding, provider: <name> }',
-      d.peek() ?? harnessKey,
-    )
+    d.error('harness: expected { type: coding, provider: <name> }', d.peek() ?? harnessKey)
     skipHarnessValue(d)
     return null
   }
@@ -270,20 +287,24 @@ function parseHarness(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment' || t.kind === 'comma') {
       d.advance()
       continue
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       d.error('Expected harness property name', t)
       valid = false
       break
     }
+
     if (!d.expect('colon')) {
       d.error(`Expected : after harness property "${key}"`, d.peek())
       valid = false
@@ -295,18 +316,17 @@ function parseHarness(
     skipHarnessValue(d)
 
     if (!isHarnessKey(key)) {
-      d.error(
-        `Unknown harness property "${key}"; expected ${formatAllowed(HARNESS_KEYS)}`,
-        t,
-      )
+      d.error(`Unknown harness property "${key}"; expected ${formatAllowed(HARNESS_KEYS)}`, t)
       valid = false
       continue
     }
+
     if (seen.has(key)) {
       d.error(`Duplicate harness property "${key}"`, t)
       valid = false
       continue
     }
+
     seen.add(key)
 
     if (value === null) {
@@ -325,6 +345,7 @@ function parseHarness(
   }
 
   const endTok = d.expect('rbrace')
+
   if (!endTok) {
     d.error('Expected } after harness block', d.peek())
     return null
@@ -334,6 +355,7 @@ function parseHarness(
     d.error('harness requires "type"', harnessKey)
     valid = false
   }
+
   if (!seen.has('provider')) {
     d.error('harness requires "provider"', harnessKey)
     valid = false
@@ -363,11 +385,13 @@ export function parseComputerBlock(
   docComment: string | undefined,
 ): ComputerDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'computer') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected computer block name', nameTok)
     d.skipToNextBlock()
@@ -391,18 +415,22 @@ export function parseComputerBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
+
     if (!d.expect('colon')) {
       d.error('Expected :', d.peek())
       break
@@ -410,6 +438,7 @@ export function parseComputerBlock(
 
     if (key === 'label' || key === 'description') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         if (key === 'label') {
           label = v
@@ -417,55 +446,67 @@ export function parseComputerBlock(
           description = v
         }
       }
+
       continue
     }
 
     if (key === 'software') {
       const vs = d.peek()
+
       if (!vs) {
         break
       }
+
       const pins = parseSoftwarePins(d)
+
       if (pins) {
         software = pins
       }
+
       continue
     }
 
     if (key === 'disks') {
       const parsed = parseDiskList(d)
+
       if (parsed) {
         disks = parsed.names
         disksRanges = parsed.ranges
       }
+
       continue
     }
 
     if (key === 'resources') {
       const vs = d.peek()
+
       if (!vs) {
         break
       }
+
       const decl = parseResources(d, vs)
+
       if (decl) {
         resources = decl
       }
+
       continue
     }
 
     if (key === 'harness') {
       const decl = parseHarness(d, t)
+
       if (harnessSeen) {
-        d.error(
-          `Computer "${String(nameTok.value)}" declares more than one harness block`,
-          t,
-        )
+        d.error(`Computer "${String(nameTok.value)}" declares more than one harness block`, t)
         continue
       }
+
       harnessSeen = true
+
       if (decl) {
         harness = decl
       }
+
       continue
     }
 

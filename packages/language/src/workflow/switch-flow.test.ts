@@ -1,12 +1,9 @@
 import { describe, expect, test } from 'bun:test'
+
 import type { EdgeDecl, NodeDecl, SourceRange, WorkflowDecl } from '../ast'
 import { parse } from '../parser'
 import { validate } from '../validator'
-import {
-  getBranchNodes,
-  getExclusiveSwitchBranches,
-  validateSwitchFlow,
-} from './switch-flow'
+import { getBranchNodes, getExclusiveSwitchBranches, validateSwitchFlow } from './switch-flow'
 
 const r: SourceRange = {
   start: { line: 0, column: 0, offset: 0 },
@@ -15,6 +12,7 @@ const r: SourceRange = {
 
 function node(name: string, type: string, cases?: string[]): NodeDecl {
   const configFields: NodeDecl['configFields'] = {}
+
   if (cases) {
     configFields.cases = {
       kind: 'array',
@@ -22,6 +20,7 @@ function node(name: string, type: string, cases?: string[]): NodeDecl {
       range: r,
     }
   }
+
   return { name, type, label: '', configFields, range: r }
 }
 
@@ -50,6 +49,7 @@ describe('getBranchNodes', () => {
       ],
       [edge('sw', 'a1', 'a'), edge('a1', 'a2'), edge('sw', 'b1', 'b')],
     )
+
     expect(getBranchNodes(g, 'sw', 'a')).toEqual(new Set(['a1', 'a2']))
     expect(getBranchNodes(g, 'sw', 'b')).toEqual(new Set(['b1']))
   })
@@ -61,9 +61,8 @@ describe('getExclusiveSwitchBranches', () => {
       [node('sw', 'switch', ['a', 'b']), node('only_a', 'code')],
       [edge('sw', 'only_a', 'a')],
     )
-    expect(getExclusiveSwitchBranches('only_a', g)).toEqual(
-      new Map([['sw', 'a']]),
-    )
+
+    expect(getExclusiveSwitchBranches('only_a', g)).toEqual(new Map([['sw', 'a']]))
   })
 })
 
@@ -73,11 +72,10 @@ describe('validateSwitchFlow', () => {
       [node('sw', 'switch', ['a', 'b']), node('sink', 'code')],
       [edge('sw', 'sink', 'a'), edge('sw', 'sink', 'b')],
     )
+
     const diags = validateSwitchFlow(g)
     expect(diags.some((d) => d.severity !== 'warning')).toBe(true)
-    expect(diags.some((d) => d.message.includes('mutually exclusive'))).toBe(
-      true,
-    )
+    expect(diags.some((d) => d.message.includes('mutually exclusive'))).toBe(true)
   })
 
   test('Rule B: rejects cross-branch join (GTM pattern)', () => {
@@ -93,12 +91,12 @@ describe('validateSwitchFlow', () => {
         edge('promote', 'finalize'),
       ],
     )
+
     const diags = validateSwitchFlow(g)
+
     expect(
       diags.some(
-        (d) =>
-          d.severity === 'error' &&
-          d.message.includes('joins switch "route" branches'),
+        (d) => d.severity === 'error' && d.message.includes('joins switch "route" branches'),
       ),
     ).toBe(true)
   })
@@ -111,19 +109,13 @@ describe('validateSwitchFlow', () => {
         node('b', 'code'),
         node('join', 'code'),
       ],
-      [
-        edge('sw', 'a', 'a'),
-        edge('sw', 'b', 'b'),
-        edge('a', 'join'),
-        edge('b', 'join'),
-      ],
+      [edge('sw', 'a', 'a'), edge('sw', 'b', 'b'), edge('a', 'join'), edge('b', 'join')],
     )
+
     const diags = validateSwitchFlow(g)
+
     expect(
-      diags.some(
-        (d) =>
-          d.severity === 'error' && d.message.includes('joins switch "sw"'),
-      ),
+      diags.some((d) => d.severity === 'error' && d.message.includes('joins switch "sw"')),
     ).toBe(true)
   })
 
@@ -135,32 +127,24 @@ describe('validateSwitchFlow', () => {
         node('a', 'code'),
         node('join', 'code'),
       ],
-      [
-        edge('pre', 'sw'),
-        edge('pre', 'join'),
-        edge('sw', 'a', 'a'),
-        edge('a', 'join'),
-      ],
+      [edge('pre', 'sw'), edge('pre', 'join'), edge('sw', 'a', 'a'), edge('a', 'join')],
     )
+
     const diags = validateSwitchFlow(g)
+
     expect(
       diags.some(
-        (d) =>
-          d.severity === 'error' &&
-          d.message.includes('joins must-run node(s) with switch'),
+        (d) => d.severity === 'error' && d.message.includes('joins must-run node(s) with switch'),
       ),
     ).toBe(true)
   })
 
   test('allows leaf switch branches (no rejoin)', () => {
     const g = workflow(
-      [
-        node('sw', 'switch', ['a', 'b']),
-        node('a', 'code'),
-        node('b', 'code'),
-      ],
+      [node('sw', 'switch', ['a', 'b']), node('a', 'code'), node('b', 'code')],
       [edge('sw', 'a', 'a'), edge('sw', 'b', 'b')],
     )
+
     const errors = validateSwitchFlow(g).filter((d) => d.severity === 'error')
     expect(errors).toEqual([])
   })
@@ -179,19 +163,15 @@ describe('validateSwitchFlow', () => {
         edge('promote', 'finalize_reviewed'),
       ],
     )
+
     const errors = validateSwitchFlow(g).filter((d) => d.severity === 'error')
     expect(errors).toEqual([])
   })
 
   test('Rule C: switch outgoing edge must be labeled', () => {
-    const g = workflow(
-      [node('sw', 'switch', ['a']), node('t', 'code')],
-      [edge('sw', 't')],
-    )
+    const g = workflow([node('sw', 'switch', ['a']), node('t', 'code')], [edge('sw', 't')])
     const diags = validateSwitchFlow(g)
-    expect(diags.some((d) => d.message.includes('must have a label'))).toBe(
-      true,
-    )
+    expect(diags.some((d) => d.message.includes('must have a label'))).toBe(true)
   })
 
   test('Rule C: warns on missing case coverage', () => {
@@ -199,31 +179,22 @@ describe('validateSwitchFlow', () => {
       [node('sw', 'switch', ['a', 'b']), node('a', 'code')],
       [edge('sw', 'a', 'a')],
     )
+
     const diags = validateSwitchFlow(g)
+
     expect(
       diags.some(
-        (d) =>
-          d.severity === 'warning' &&
-          d.message.includes('no outgoing edge for case "b"'),
+        (d) => d.severity === 'warning' && d.message.includes('no outgoing edge for case "b"'),
       ),
     ).toBe(true)
   })
 
   test('allows non-switch diamond merge', () => {
     const g = workflow(
-      [
-        node('root', 'code'),
-        node('b', 'code'),
-        node('c', 'code'),
-        node('end', 'code'),
-      ],
-      [
-        edge('root', 'b'),
-        edge('root', 'c'),
-        edge('b', 'end'),
-        edge('c', 'end'),
-      ],
+      [node('root', 'code'), node('b', 'code'), node('c', 'code'), node('end', 'code')],
+      [edge('root', 'b'), edge('root', 'c'), edge('b', 'end'), edge('c', 'end')],
     )
+
     const errors = validateSwitchFlow(g).filter((d) => d.severity === 'error')
     expect(errors).toEqual([])
   })
@@ -261,13 +232,13 @@ workflow bad_switch_join {
   }
 }
 `
+
     const { ast } = parse(source)
     const diags = validate(ast)
+
     expect(
       diags.some(
-        (d) =>
-          d.severity === 'error' &&
-          d.message.includes('joins switch "route" branches'),
+        (d) => d.severity === 'error' && d.message.includes('joins switch "route" branches'),
       ),
     ).toBe(true)
   })

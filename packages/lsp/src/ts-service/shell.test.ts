@@ -1,5 +1,7 @@
 import { expect, test } from 'bun:test'
+
 import { parse } from '@swirls/language'
+
 import { createLanguageServiceFromMap, virtualUriForBlock } from './host'
 import { buildVirtualTsContent, collectTsBlocks } from './virtual-docs'
 
@@ -24,26 +26,20 @@ workflow g {
   flow { root -> run }
 }
 `)
+
   expect(parsed.errors).toEqual([])
-  const blocks = collectTsBlocks(parsed.ast).filter(
-    (block) => block.nodeName === 'run',
-  )
+  const blocks = collectTsBlocks(parsed.ast).filter((block) => block.nodeName === 'run')
   expect(blocks).toHaveLength(1)
+
   const content = new Map(
-    blocks.map((block, i) => [
-      virtualUriForBlock(String(i)),
-      buildVirtualTsContent(block),
-    ]),
+    blocks.map((block, i) => [virtualUriForBlock(String(i)), buildVirtualTsContent(block)]),
   )
+
   const service = createLanguageServiceFromMap(content)
   return blocks.flatMap((_block, i) =>
     service
       .getSemanticDiagnostics(virtualUriForBlock(String(i)))
-      .map((d) =>
-        typeof d.messageText === 'string'
-          ? d.messageText
-          : d.messageText.messageText,
-      ),
+      .map((d) => (typeof d.messageText === 'string' ? d.messageText : d.messageText.messageText)),
   )
 }
 
@@ -56,7 +52,7 @@ test('shell command @ts reads upstream outputs', () => {
 })
 
 test('shell command @ts has no context.secrets', () => {
-  expect(
-    diagnostics('return "echo " + context.secrets.github.GH_TOKEN'),
-  ).toEqual([expect.stringContaining("Property 'secrets' does not exist")])
+  expect(diagnostics('return "echo " + context.secrets.github.GH_TOKEN')).toEqual([
+    expect.stringContaining("Property 'secrets' does not exist"),
+  ])
 })

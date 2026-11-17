@@ -1,14 +1,12 @@
 import { join } from 'pathe'
+
 import type { SwirlsFile } from '../ast'
 import type { LanguageHost } from '../host'
 import { inlineTsFileRefs } from '../inline-ts-file-refs'
 import { parse } from '../parser'
 import { validateTsFileRefs } from '../validate-ts-file-refs'
 import { validate } from '../validator'
-import {
-  nodeWorkspaceFileSystem,
-  type SwirlsWorkspaceFileSystem,
-} from './sandbox'
+import { nodeWorkspaceFileSystem, type SwirlsWorkspaceFileSystem } from './sandbox'
 import type { WorkspaceResourceIndex } from './workspace-resources'
 
 /**
@@ -31,6 +29,7 @@ export function parseSwirlsFile(args: {
   const fullPath = join(cwd, relativePath)
 
   let content: string
+
   try {
     content = fileSystem.readFileSync(fullPath, 'utf-8')
   } catch {
@@ -50,14 +49,15 @@ export function parseSwirlsFile(args: {
     workspace: args.workspace,
     host: args.host,
   })
+
   const blocking = diagnostics.filter((d) => d.severity === 'error')
+
   if (blocking.length > 0) {
     const first = blocking[0]
+
     if (first) {
       const pos = first.range?.start
-      throw new Error(
-        `${relativePath}:${pos?.line ?? 0}: Validation error: ${first.message}`,
-      )
+      throw new Error(`${relativePath}:${pos?.line ?? 0}: Validation error: ${first.message}`)
     }
   }
 
@@ -65,9 +65,12 @@ export function parseSwirlsFile(args: {
     swirlsFilePath: fullPath,
     existsSync: fileSystem.existsSync,
   })
+
   const refBlocking = refDiags.filter((d) => d.severity === 'error')
+
   if (refBlocking.length > 0) {
     const first = refBlocking[0]
+
     if (first) {
       const pos = first.range?.start
       throw new Error(`${relativePath}:${pos?.line ?? 0}: ${first.message}`)
@@ -81,7 +84,7 @@ export function parseSwirlsFile(args: {
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    throw new Error(`${relativePath}: Failed to load @ts file: ${msg}`)
+    throw new Error(`${relativePath}: Failed to load @ts file: ${msg}`, { cause: e })
   }
 
   return result.ast

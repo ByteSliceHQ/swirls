@@ -7,4 +7,4 @@
  * real package (and the 4 MB of `effect`, `c12`, `jiti`, `giget` and
  * `chokidar` it pulls in) would be dead weight in the bundle.
  */
-export {}
+export default {}

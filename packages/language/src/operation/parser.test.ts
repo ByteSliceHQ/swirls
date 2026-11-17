@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { inlineTsFileRefs } from '../inline-ts-file-refs'
 import { parse } from '../parser'
 import { serialize } from '../serializer'
@@ -46,15 +47,18 @@ function onlyOperation(source: string) {
   const { ast, errors } = parse(source)
   expect(errors).toEqual([])
   const [operation] = ast.operations
+
   if (!operation) {
     throw new Error('expected one operation')
   }
+
   return operation
 }
 
 describe('operation blocks', () => {
   test('should parse the fields of an operation', () => {
     const operation = onlyOperation(OPERATION)
+
     expect({
       name: operation.name,
       label: operation.label,
@@ -74,6 +78,7 @@ describe('operation blocks', () => {
 
   test('should read a script whose braces are structure', () => {
     const operation = onlyOperation(OPERATION)
+
     expect(operation.command?.script).toBe(
       [
         '$since = (Get-Date).AddHours(-4)',
@@ -93,6 +98,7 @@ operation braces {
   }
 }
 `)
+
     expect(operation.command?.script).toBe('echo "}" \'}\'\necho done\n')
   })
 
@@ -105,6 +111,7 @@ operation commented {
   }
 }
 `)
+
     expect(operation.command?.script).toBe('# closes nothing: }\necho done\n')
   })
 
@@ -116,9 +123,8 @@ operation count_args {
   }
 }
 `)
-    expect(operation.command?.script).toBe(
-      'if [ $# -gt 0 ]; then echo "{"; fi\n',
-    )
+
+    expect(operation.command?.script).toBe('if [ $# -gt 0 ]; then echo "{"; fi\n')
   })
 
   test('should not end a PowerShell script inside a block comment', () => {
@@ -130,9 +136,8 @@ operation documented {
   }
 }
 `)
-    expect(operation.command?.script).toBe(
-      '<# } not the end #>\nWrite-Output "ok"\n',
-    )
+
+    expect(operation.command?.script).toBe('<# } not the end #>\nWrite-Output "ok"\n')
   })
 
   test('should not end a PowerShell script inside a here-string', () => {
@@ -147,9 +152,8 @@ operation documented {
       '}',
       '',
     ].join('\n')
-    expect(onlyOperation(source).command?.script).toContain(
-      'Write-Output $text',
-    )
+
+    expect(onlyOperation(source).command?.script).toContain('Write-Output $text')
   })
 
   test('should read a script file reference', () => {
@@ -158,6 +162,7 @@ operation from_file {
   command: @ps "scripts/collect.ps1"
 }
 `)
+
     expect(operation.command).toMatchObject({
       lang: 'ps',
       path: 'scripts/collect.ps1',
@@ -170,11 +175,12 @@ operation from_file {
   command: @sh "scripts/collect.sh"
 }
 `)
+
     inlineTsFileRefs(ast, {
       swirlsFilePath: '/project/ops.swirls',
-      readFileSync: (path) =>
-        path === '/project/scripts/collect.sh' ? 'uptime\r\n' : '',
+      readFileSync: (path) => (path === '/project/scripts/collect.sh' ? 'uptime\r\n' : ''),
     })
+
     expect(ast.operations[0]?.command?.script).toBe('uptime\r\n')
   })
 
@@ -184,6 +190,7 @@ operation wrong {
   command: "Get-Process"
 }
 `)
+
     expect(errors[0]?.message).toContain('must be an @ps { } or @sh { } block')
   })
 
@@ -194,12 +201,14 @@ operation wrong {
   command: @sh { uptime }
 }
 `)
+
     expect(errors[0]?.message).toBe('Unknown operation property "elevate"')
   })
 
   test('should round-trip through the serializer', () => {
     const first = parse(OPERATION).ast.operations[0]
     const second = parse(serialize(parse(OPERATION).ast)).ast.operations[0]
+
     expect({
       script: second?.command?.script,
       platform: second?.platform,
@@ -222,6 +231,7 @@ operation wrong {
   }
 `),
     )
+
     const node = ast.workflows[0]?.nodes.find((n) => n.name === 'run')
     expect(node?.configFields.code).toBeUndefined()
   })
@@ -265,50 +275,40 @@ describe('operation validation', () => {
   })
 
   test('should refuse a platform it does not know', () => {
-    const source =
-      'operation o {\n  platform: beos\n  command: @sh { uptime }\n}\n'
-    expect(messages(source)).toEqual([
-      'Operation "platform" must be windows, linux or macos',
-    ])
+    const source = 'operation o {\n  platform: beos\n  command: @sh { uptime }\n}\n'
+    expect(messages(source)).toEqual(['Operation "platform" must be windows, linux or macos'])
   })
 
   test('should refuse an sh script on windows', () => {
-    const source =
-      'operation o {\n  platform: windows\n  command: @sh { uptime }\n}\n'
+    const source = 'operation o {\n  platform: windows\n  command: @sh { uptime }\n}\n'
+
     expect(messages(source)).toEqual([
       'An @sh command cannot run on windows. Use @ps, or another platform.',
     ])
   })
 
   test('should refuse a timeout longer than the daemon allows', () => {
-    const source =
-      'operation o {\n  timeout: 7200\n  command: @sh { uptime }\n}\n'
+    const source = 'operation o {\n  timeout: 7200\n  command: @sh { uptime }\n}\n'
+
     expect(messages(source)).toEqual([
       'Operation "timeout" must be a whole number of seconds from 1 to 3600',
     ])
   })
 
   test('should refuse a runAs it does not know', () => {
-    const source =
-      'operation o {\n  runAs: root\n  command: @sh { uptime }\n}\n'
-    expect(messages(source)).toEqual([
-      'Operation "runAs" must be system or signed_in_user',
-    ])
+    const source = 'operation o {\n  runAs: root\n  command: @sh { uptime }\n}\n'
+    expect(messages(source)).toEqual(['Operation "runAs" must be system or signed_in_user'])
   })
 
   test('should warn that devices refuse signed_in_user for now', () => {
-    const { ast } = parse(
-      'operation o {\n  runAs: signed_in_user\n  command: @sh { uptime }\n}\n',
-    )
-    expect(validate(ast).map((diagnostic) => diagnostic.severity)).toEqual([
-      'warning',
-    ])
+    const { ast } = parse('operation o {\n  runAs: signed_in_user\n  command: @sh { uptime }\n}\n')
+    expect(validate(ast).map((diagnostic) => diagnostic.severity)).toEqual(['warning'])
   })
 
   test('should refuse a script file with the wrong extension', () => {
-    expect(
-      messages('operation o {\n  command: @ps "scripts/collect.sh"\n}\n'),
-    ).toEqual(['@ps must reference a .ps1 file'])
+    expect(messages('operation o {\n  command: @ps "scripts/collect.sh"\n}\n')).toEqual([
+      '@ps must reference a .ps1 file',
+    ])
   })
 
   test('should refuse two operations with one name', () => {
@@ -316,6 +316,7 @@ describe('operation validation', () => {
 operation twice { command: @sh { uptime } }
 operation twice { command: @sh { uptime } }
 `
+
     expect(messages(source)).toContain('Duplicate operation "twice"')
   })
 })
@@ -332,6 +333,7 @@ describe('device nodes', () => {
     input: @ts { return { verbose: true } }
   }
 `)}`
+
     expect(messages(source)).toEqual([])
   })
 
@@ -344,6 +346,7 @@ describe('device nodes', () => {
     waitSeconds: 600
   }
 `)}`
+
     expect(messages(source)).toEqual([])
   })
 
@@ -355,9 +358,8 @@ describe('device nodes', () => {
     device: "0199f6a0-0000-7000-8000-000000000001"
   }
 `)
-    expect(messages(source)).toEqual([
-      'Device node references undefined operation "missing"',
-    ])
+
+    expect(messages(source)).toEqual(['Device node references undefined operation "missing"'])
   })
 
   test('should find an operation declared in another file', () => {
@@ -368,10 +370,13 @@ describe('device nodes', () => {
     device: "0199f6a0-0000-7000-8000-000000000001"
   }
 `)
+
     const workspace = emptyWorkspaceResourceIndex()
+
     for (const operation of parse(uptime).ast.operations) {
       workspace.operationBlocks.set(operation.name, operation)
     }
+
     const { ast } = parse(node)
     expect(validate(ast, { workspace })).toEqual([])
   })
@@ -383,6 +388,7 @@ describe('device nodes', () => {
     operation: uptime
   }
 `)}`
+
     expect(messages(source)).toEqual([
       'Device node requires "device" (one device id) or "devices" (a selector)',
     ])
@@ -397,6 +403,7 @@ describe('device nodes', () => {
     devices: { os: linux }
   }
 `)}`
+
     expect(messages(source)).toEqual([
       'Device node takes "device" (one device id) or "devices" (a selector), not both',
     ])
@@ -410,6 +417,7 @@ describe('device nodes', () => {
     devices: { tags: [] }
   }
 `)}`
+
     expect(messages(source)).toEqual([
       'A selector needs at least one tag or an os. There is no selector for every device.',
     ])
@@ -423,6 +431,7 @@ describe('device nodes', () => {
     devices: { tags: ["Front Office"] }
   }
 `)}`
+
     expect(messages(source)).toEqual([
       'A tag is lowercase and uses letters, numbers, dots, dashes, underscores and colons',
     ])
@@ -440,6 +449,7 @@ ${workflow(`
     devices: { os: macos }
   }
 `)}`
+
     expect(messages(source)).toEqual([
       'Operation "spooler" runs on windows, so this selector matches no device it can run on',
     ])
@@ -454,6 +464,7 @@ ${workflow(`
     review: { enabled: true }
   }
 `)}`
+
     expect(messages(source)).toContain(
       'A device node cannot carry a review. Put the review on a separate node upstream of it.',
     )
@@ -468,6 +479,7 @@ ${workflow(`
     waitSeconds: 86400
   }
 `)}`
+
     expect(messages(source)).toEqual([
       'Device node "waitSeconds" must be a whole number from 30 to 3600',
     ])
@@ -482,6 +494,7 @@ ${workflow(`
     schema: @json { { "type": "object" } }
   }
 `)}`
+
     expect(messages(source).length).toBeGreaterThan(0)
   })
 
@@ -518,6 +531,7 @@ agent helpdesk {
   tools: [check_device]
 }
 `
+
     expect(messages(source)).toEqual([])
   })
 })

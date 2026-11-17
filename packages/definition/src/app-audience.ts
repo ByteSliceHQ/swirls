@@ -7,12 +7,7 @@
 
 import { z } from 'zod'
 
-export const APP_AUDIENCE_ADMISSION = [
-  'invite',
-  'domain',
-  'invite_or_domain',
-  'public',
-] as const
+export const APP_AUDIENCE_ADMISSION = ['invite', 'domain', 'invite_or_domain', 'public'] as const
 
 export const APP_AUDIENCE_AUTH = ['email_otp', 'oidc'] as const
 
@@ -30,12 +25,10 @@ export const APP_AUDIENCE_ACTIVITY_RANGE = ['24h', '7d', '30d'] as const
 export type AppAudienceAdmission = (typeof APP_AUDIENCE_ADMISSION)[number]
 export type AppAudienceAuth = (typeof APP_AUDIENCE_AUTH)[number]
 export type AppInvitationStatus = (typeof APP_INVITATION_STATUS)[number]
-export type AppInvitationEffectiveStatus =
-  (typeof APP_INVITATION_EFFECTIVE_STATUS)[number]
+export type AppInvitationEffectiveStatus = (typeof APP_INVITATION_EFFECTIVE_STATUS)[number]
 export type AppUserStatus = (typeof APP_USER_STATUS)[number]
 export type AppUserAuthSource = (typeof APP_USER_AUTH_SOURCE)[number]
-export type AppAudienceActivityRange =
-  (typeof APP_AUDIENCE_ACTIVITY_RANGE)[number]
+export type AppAudienceActivityRange = (typeof APP_AUDIENCE_ACTIVITY_RANGE)[number]
 
 export function effectiveInvitationStatus(input: {
   status: string
@@ -45,14 +38,14 @@ export function effectiveInvitationStatus(input: {
   if (input.status === 'accepted' || input.status === 'revoked') {
     return input.status
   }
-  const expiresAt =
-    input.expiresAt instanceof Date
-      ? input.expiresAt
-      : new Date(input.expiresAt)
+
+  const expiresAt = input.expiresAt instanceof Date ? input.expiresAt : new Date(input.expiresAt)
   const now = input.now ?? new Date()
+
   if (input.status === 'pending' && expiresAt.getTime() <= now.getTime()) {
     return 'expired'
   }
+
   return 'pending'
 }
 
@@ -78,39 +71,42 @@ export const appAudiencePolicySchema = z
   .superRefine((value, ctx) => {
     if (value.admission !== 'public' && !value.auth) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'auth is required unless admission is public',
         path: ['auth'],
       })
     }
+
     if (value.auth === 'oidc' && !value.idp) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'idp is required when auth is oidc',
         path: ['idp'],
       })
     }
+
     if (value.auth === 'email_otp' && value.idp) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'idp must not be set when auth is email_otp',
         path: ['idp'],
       })
     }
+
     if (
-      (value.admission === 'domain' ||
-        value.admission === 'invite_or_domain') &&
+      (value.admission === 'domain' || value.admission === 'invite_or_domain') &&
       (!value.allowDomains || value.allowDomains.length === 0)
     ) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'allow_domains is required for domain admission modes',
         path: ['allowDomains'],
       })
     }
+
     if (value.admission === 'public' && value.auth === 'oidc') {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'public admission cannot use oidc auth',
         path: ['auth'],
       })
@@ -122,9 +118,11 @@ export type AppAudiencePolicy = z.infer<typeof appAudiencePolicySchema>
 /** Extract the registrable domain from an email address. */
 export function emailDomain(email: string): string | null {
   const at = email.lastIndexOf('@')
+
   if (at <= 0 || at === email.length - 1) {
     return null
   }
+
   return email
     .slice(at + 1)
     .trim()
@@ -137,17 +135,23 @@ export function emailMatchesAudienceDomains(
   policy: Pick<AppAudiencePolicy, 'allowDomains' | 'denyDomains'>,
 ): boolean {
   const domain = emailDomain(email)
+
   if (!domain) {
     return false
   }
+
   const deny = policy.denyDomains ?? []
+
   if (deny.some((pattern) => domainMatchesPattern(domain, pattern))) {
     return false
   }
+
   const allow = policy.allowDomains ?? []
+
   if (allow.length === 0) {
     return false
   }
+
   return allow.some((pattern) => domainMatchesPattern(domain, pattern))
 }
 
@@ -182,8 +186,7 @@ export function evaluateEmailAdmission(input: {
   }
 
   const domainOk =
-    (policy.admission === 'domain' ||
-      policy.admission === 'invite_or_domain') &&
+    (policy.admission === 'domain' || policy.admission === 'invite_or_domain') &&
     emailMatchesAudienceDomains(email, policy)
 
   if (domainOk) {
@@ -193,9 +196,11 @@ export function evaluateEmailAdmission(input: {
   if (policy.admission === 'invite') {
     return { allowed: false, reason: 'invitation_required' }
   }
+
   if (policy.admission === 'domain') {
     return { allowed: false, reason: 'domain_not_allowed' }
   }
+
   return { allowed: false, reason: 'invitation_or_domain_required' }
 }
 
@@ -203,12 +208,12 @@ export function evaluateEmailAdmission(input: {
 export function domainMatchesPattern(domain: string, pattern: string): boolean {
   const normalizedDomain = domain.trim().toLowerCase()
   const normalizedPattern = pattern.trim().toLowerCase()
+
   if (normalizedPattern.startsWith('*.')) {
     const suffix = normalizedPattern.slice(2)
-    return (
-      normalizedDomain === suffix || normalizedDomain.endsWith(`.${suffix}`)
-    )
+    return normalizedDomain === suffix || normalizedDomain.endsWith(`.${suffix}`)
   }
+
   return normalizedDomain === normalizedPattern
 }
 
@@ -222,9 +227,7 @@ export const appAudiencePublicAuthSchema = z.object({
 
 export type AppAudiencePublicAuth = z.infer<typeof appAudiencePublicAuthSchema>
 
-export function toPublicAudienceAuth(
-  policy: AppAudiencePolicy,
-): AppAudiencePublicAuth {
+export function toPublicAudienceAuth(policy: AppAudiencePolicy): AppAudiencePublicAuth {
   return {
     admission: policy.admission,
     auth: policy.auth ?? 'email_otp',
@@ -241,12 +244,11 @@ export const AUDIENCE_ERROR_DETAIL_QUERY = 'audience_error_detail'
 export const AUDIENCE_LOGIN_HINT_QUERY = 'email'
 
 /** Keep only a plausible email for OIDC `login_hint`. */
-export function normalizeAudienceLoginHint(
-  value: string | null | undefined,
-): string | null {
+export function normalizeAudienceLoginHint(value: string | null | undefined): string | null {
   if (!value) {
     return null
   }
+
   const email = value.trim().toLowerCase()
   return emailDomain(email) ? email : null
 }
@@ -255,17 +257,16 @@ export function normalizeAudienceLoginHint(
 export function audienceInviteUrl(hostedUrl: string, email: string): string {
   const hint = normalizeAudienceLoginHint(email)
   const url = new URL(hostedUrl)
+
   if (hint) {
     url.searchParams.set(AUDIENCE_LOGIN_HINT_QUERY, hint)
   }
+
   return url.toString()
 }
 
 /** User-facing copy for hosted audience access failures. */
-export function formatAudienceAccessError(
-  reason: string,
-  detail?: string | null,
-): string {
+export function formatAudienceAccessError(reason: string, detail?: string | null): string {
   switch (reason) {
     case 'invitation_required':
       return 'You need an invitation to sign in. Contact the app owner to request access.'
@@ -284,9 +285,7 @@ export function formatAudienceAccessError(
     case 'invalid_callback':
       return 'Sign-in could not be completed. Please try again.'
     case 'oidc_provider_error':
-      return detail?.trim()
-        ? detail.trim()
-        : 'Your identity provider rejected the sign-in request.'
+      return detail?.trim() ? detail.trim() : 'Your identity provider rejected the sign-in request.'
     case 'rate_limited':
       return 'Too many attempts. Wait a moment and try again.'
     case 'session_restore_failed':
@@ -325,10 +324,9 @@ function runtimeEnvironmentValue(name: string): string | undefined {
 }
 
 /** Hosted-app DNS suffix: slug is served at `{slug}.{base}`. */
-export function resolveSurfaceHostedBase(
-  options: ResolveSurfaceHostedBaseOptions = {},
-): string {
+export function resolveSurfaceHostedBase(options: ResolveSurfaceHostedBaseOptions = {}): string {
   const explicit = options.envBase?.trim()
+
   if (explicit) {
     return explicit
   }
@@ -348,30 +346,32 @@ export function hostedAppOrigin(slug: string, baseHost?: string): string {
     resolveSurfaceHostedBase({
       envBase: runtimeEnvironmentValue('SURFACE_HOSTED_BASE'),
     })
+
   return `https://${slug}.${base}`
 }
 
 /** Extract hosted slug from a request host like `{slug}.swirls.cloud`. */
-export function parseHostedSlugFromHost(
-  host: string,
-  baseHost?: string,
-): string | null {
+export function parseHostedSlugFromHost(host: string, baseHost?: string): string | null {
   const base =
     baseHost ??
     resolveSurfaceHostedBase({
       envBase: runtimeEnvironmentValue('SURFACE_HOSTED_BASE'),
     })
+
   const normalized = host.split(':')[0]?.trim().toLowerCase()
+
   if (!normalized) {
     return null
   }
 
   const suffix = `.${base}`
+
   if (normalized === base || !normalized.endsWith(suffix)) {
     return null
   }
 
   const slug = normalized.slice(0, -suffix.length)
+
   if (!slug || slug.includes('.')) {
     return null
   }
@@ -396,6 +396,7 @@ export function audienceHostedRedirectUrl(input: {
   }
 
   let hostedHost: string
+
   try {
     hostedHost = new URL(input.hostedUrl).host.toLowerCase()
   } catch {
@@ -403,6 +404,7 @@ export function audienceHostedRedirectUrl(input: {
   }
 
   const currentHost = input.requestHost.split(':')[0]?.trim().toLowerCase()
+
   if (!currentHost || currentHost === hostedHost) {
     return null
   }
@@ -413,17 +415,17 @@ export function audienceHostedRedirectUrl(input: {
   return target.toString()
 }
 
+const normalizeSlugPart = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+
 /** Derive a stable hosted slug from org and app names. */
 export function deriveHostedSlug(orgSlug: string, appName: string): string {
-  const normalize = (value: string) =>
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 40)
-
-  const orgPart = normalize(orgSlug) || 'org'
-  const appPart = normalize(appName) || 'app'
+  const orgPart = normalizeSlugPart(orgSlug) || 'org'
+  const appPart = normalizeSlugPart(appName) || 'app'
   return `${orgPart}-${appPart}`.slice(0, 63)
 }

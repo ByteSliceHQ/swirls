@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { validate } from '../validator'
 import { emptyWorkspaceResourceIndex } from '../workspace/workspace-resources'
@@ -17,11 +18,8 @@ mock stub {
   output: @json { { "ok": true } }
 }
 `)
-    expect(
-      diags.some((d) =>
-        d.message.includes('unknown action "missing_action"'),
-      ),
-    ).toBe(true)
+
+    expect(diags.some((d) => d.message.includes('unknown action "missing_action"'))).toBe(true)
   })
 
   test('requires workflow when node is set', () => {
@@ -33,11 +31,8 @@ mock gate {
   }
 }
 `)
-    expect(
-      diags.some((d) =>
-        d.message.includes('requires workflow: <name>'),
-      ),
-    ).toBe(true)
+
+    expect(diags.some((d) => d.message.includes('requires workflow: <name>'))).toBe(true)
   })
 
   test('errors when node is missing from pinned workflow', () => {
@@ -55,11 +50,8 @@ mock gate {
   }
 }
 `)
-    expect(
-      diags.some((d) =>
-        d.message.includes('not found in workflow "demo"'),
-      ),
-    ).toBe(true)
+
+    expect(diags.some((d) => d.message.includes('not found in workflow "demo"'))).toBe(true)
   })
 
   test('errors when review formData fails node review schema', () => {
@@ -99,12 +91,9 @@ mock review_ok {
   }
 }
 `)
+
     expect(
-      diags.some(
-        (d) =>
-          d.message.includes('review formData') &&
-          d.message.includes('notes'),
-      ),
+      diags.some((d) => d.message.includes('review formData') && d.message.includes('notes')),
     ).toBe(true)
   })
 
@@ -145,12 +134,9 @@ mock review_ok {
   }
 }
 `)
+
     expect(
-      diags.filter(
-        (d) =>
-          d.severity === 'error' &&
-          d.message.includes('mock "review_ok"'),
-      ),
+      diags.filter((d) => d.severity === 'error' && d.message.includes('mock "review_ok"')),
     ).toEqual([])
   })
 
@@ -215,11 +201,8 @@ mock beta_review {
   }
 }
 `)
-    expect(
-      diags.filter(
-        (d) => d.severity === 'error' && d.message.includes('mock "'),
-      ),
-    ).toEqual([])
+
+    expect(diags.filter((d) => d.severity === 'error' && d.message.includes('mock "'))).toEqual([])
   })
 
   test('errors when action output fails output schema', () => {
@@ -247,11 +230,10 @@ mock create_thing {
   }
 }
 `)
+
     expect(
       diags.some(
-        (d) =>
-          d.message.includes('mock "create_thing" output') &&
-          d.message.includes('schema'),
+        (d) => d.message.includes('mock "create_thing" output') && d.message.includes('schema'),
       ),
     ).toBe(true)
   })
@@ -265,11 +247,10 @@ mock review_approve {
   }
 }
 `)
+
     expect(
       diags.some(
-        (d) =>
-          d.severity === 'warning' &&
-          d.message.includes('not bound to a workflow/node'),
+        (d) => d.severity === 'warning' && d.message.includes('not bound to a workflow/node'),
       ),
     ).toBe(true)
   })
@@ -287,6 +268,7 @@ mock gate {
   }
 }
 `
+
     const other = `
 workflow other {
   label: "Other"
@@ -311,6 +293,7 @@ workflow other {
   }
 }
 `
+
     const localParsed = parse(local)
     const otherParsed = parse(other)
     expect(localParsed.errors).toEqual([])
@@ -318,18 +301,13 @@ workflow other {
 
     const workspace = emptyWorkspaceResourceIndex()
     const wf = otherParsed.ast.workflows[0]!
-    workspace.workflows.set('other', [
-      { relativePath: 'other.swirls', line: 1 },
-    ])
+    workspace.workflows.set('other', [{ relativePath: 'other.swirls', line: 1 }])
     workspace.workflowBlocks.set('other', wf)
 
     const diags = validate(localParsed.ast, { workspace })
+
     expect(
-      diags.some(
-        (d) =>
-          d.message.includes('review formData') &&
-          d.message.includes('score'),
-      ),
+      diags.some((d) => d.message.includes('review formData') && d.message.includes('score')),
     ).toBe(true)
   })
 })

@@ -2,8 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+
 import { parse } from '@swirls/language'
 import { buildWorkspaceResourceIndex } from '@swirls/language/workspace'
+
 import { buildVirtualTsContent, collectTsBlocks } from './virtual-docs'
 
 const SUBGRAPH_WORKFLOW_PATH = path.join(
@@ -11,10 +13,7 @@ const SUBGRAPH_WORKFLOW_PATH = path.join(
   '../../../language/examples/subgraph-workflow.swirls',
 )
 
-const STREAM_EXAMPLE_PATH = path.join(
-  import.meta.dir,
-  '../../../language/examples/stream.swirls',
-)
+const STREAM_EXAMPLE_PATH = path.join(import.meta.dir, '../../../language/examples/stream.swirls')
 
 const LOOP_INLINE_SUBGRAPH_FIXTURE = path.join(
   import.meta.dir,
@@ -37,15 +36,11 @@ describe('TS block return type constraints', () => {
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const inputBlock = blocks.find(
-      (b) => b.configKey === 'input' && b.nodeName === 'run_helper',
-    )
+    const inputBlock = blocks.find((b) => b.configKey === 'input' && b.nodeName === 'run_helper')
     expect(inputBlock).toBeDefined()
     const virtual = buildVirtualTsContent(inputBlock!)
     expect(virtual).toContain('type __ExpectedReturn = ')
-    expect(virtual).toContain(
-      'async function __expr(): Promise<__ExpectedReturn> {',
-    )
+    expect(virtual).toContain('async function __expr(): Promise<__ExpectedReturn> {')
     // helper_graph root node inputSchema is { value: number }
     expect(virtual).toContain('value: number')
   })
@@ -54,13 +49,12 @@ describe('TS block return type constraints', () => {
     const content = fs.readFileSync(SUBGRAPH_WORKFLOW_PATH, 'utf8')
     const result = parse(content)
     const blocks = collectTsBlocks(result.ast)
+
     // root node in main_graph has outputSchema { value: number }
     const rootCodeBlock = blocks.find(
-      (b) =>
-        b.configKey === 'code' &&
-        b.nodeName === 'root' &&
-        b.workflowName === 'main_graph',
+      (b) => b.configKey === 'code' && b.nodeName === 'root' && b.workflowName === 'main_graph',
     )
+
     expect(rootCodeBlock).toBeDefined()
     const virtual = buildVirtualTsContent(rootCodeBlock!)
     expect(virtual).toContain('type __ExpectedReturn = ')
@@ -85,12 +79,11 @@ graph g {
   }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const codeBlock = blocks.find(
-      (b) => b.configKey === 'code' && b.nodeName === 'root',
-    )
+    const codeBlock = blocks.find((b) => b.configKey === 'code' && b.nodeName === 'root')
     expect(codeBlock).toBeDefined()
     const virtual = buildVirtualTsContent(codeBlock!)
     expect(virtual).toContain('k?: number')
@@ -110,18 +103,15 @@ graph g {
   flow { n -> n }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const promptBlock = blocks.find(
-      (b) => b.configKey === 'prompt' && b.nodeName === 'n',
-    )
+    const promptBlock = blocks.find((b) => b.configKey === 'prompt' && b.nodeName === 'n')
     expect(promptBlock).toBeDefined()
     const virtual = buildVirtualTsContent(promptBlock!)
     expect(virtual).toContain('type __ExpectedReturn = string')
-    expect(virtual).toContain(
-      'async function __expr(): Promise<__ExpectedReturn> {',
-    )
+    expect(virtual).toContain('async function __expr(): Promise<__ExpectedReturn> {')
   })
 
   test('switch router block gets union of case labels', () => {
@@ -138,19 +128,16 @@ graph g {
   flow { classify -> classify }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const routerBlock = blocks.find(
-      (b) => b.configKey === 'router' && b.nodeName === 'classify',
-    )
+    const routerBlock = blocks.find((b) => b.configKey === 'router' && b.nodeName === 'classify')
     expect(routerBlock).toBeDefined()
     const virtual = buildVirtualTsContent(routerBlock!)
     expect(virtual).toContain('type __ExpectedReturn = ')
     expect(virtual).toContain('"urgent" | "normal" | "low"')
-    expect(virtual).toContain(
-      'async function __expr(): Promise<__ExpectedReturn> {',
-    )
+    expect(virtual).toContain('async function __expr(): Promise<__ExpectedReturn> {')
   })
 
   test('postgres insert params: placeholder type inferred by column position', () => {
@@ -171,20 +158,17 @@ graph g {
   flow { root -> root }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const paramsBlock = blocks.find(
-      (b) => b.configKey === 'params' && b.nodeName === 'root',
-    )
+    const paramsBlock = blocks.find((b) => b.configKey === 'params' && b.nodeName === 'root')
     expect(paramsBlock).toBeDefined()
     const virtual = buildVirtualTsContent(paramsBlock!)
     expect(virtual).toContain('type __ExpectedReturn = ')
     expect(virtual).toContain('funky: string')
     expect(virtual).toContain('[key: string]: unknown')
-    expect(virtual).toContain(
-      'async function __expr(): Promise<__ExpectedReturn> {',
-    )
+    expect(virtual).toContain('async function __expr(): Promise<__ExpectedReturn> {')
   })
 
   test('postgres insert params: VALUES without parens still maps positionally', () => {
@@ -205,12 +189,11 @@ graph g {
   flow { root -> root }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const paramsBlock = blocks.find(
-      (b) => b.configKey === 'params' && b.nodeName === 'root',
-    )
+    const paramsBlock = blocks.find((b) => b.configKey === 'params' && b.nodeName === 'root')
     expect(paramsBlock).toBeDefined()
     const virtual = buildVirtualTsContent(paramsBlock!)
     expect(virtual).toContain('type __ExpectedReturn = ')
@@ -236,12 +219,11 @@ graph g {
   flow { root -> root }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const paramsBlock = blocks.find(
-      (b) => b.configKey === 'params' && b.nodeName === 'root',
-    )
+    const paramsBlock = blocks.find((b) => b.configKey === 'params' && b.nodeName === 'root')
     expect(paramsBlock).toBeDefined()
     const virtual = buildVirtualTsContent(paramsBlock!)
     expect(virtual).toContain('type __ExpectedReturn = ')
@@ -267,12 +249,11 @@ graph g {
   flow { root -> root }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const paramsBlock = blocks.find(
-      (b) => b.configKey === 'params' && b.nodeName === 'root',
-    )
+    const paramsBlock = blocks.find((b) => b.configKey === 'params' && b.nodeName === 'root')
     expect(paramsBlock).toBeDefined()
     const virtual = buildVirtualTsContent(paramsBlock!)
     expect(virtual).toContain('type __ExpectedReturn = ')
@@ -299,12 +280,11 @@ graph g {
   flow { root -> root }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const paramsBlock = blocks.find(
-      (b) => b.configKey === 'params' && b.nodeName === 'root',
-    )
+    const paramsBlock = blocks.find((b) => b.configKey === 'params' && b.nodeName === 'root')
     expect(paramsBlock).toBeDefined()
     const virtual = buildVirtualTsContent(paramsBlock!)
     expect(virtual).toContain('type __ExpectedReturn = ')
@@ -330,17 +310,14 @@ graph g {
   flow { root -> root }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const paramsBlock = blocks.find(
-      (b) => b.configKey === 'params' && b.nodeName === 'root',
-    )
+    const paramsBlock = blocks.find((b) => b.configKey === 'params' && b.nodeName === 'root')
     expect(paramsBlock).toBeDefined()
     const virtual = buildVirtualTsContent(paramsBlock!)
-    expect(virtual).toMatch(
-      /type __ExpectedReturn = \{[^}]*\[key: string\]: unknown/,
-    )
+    expect(virtual).toMatch(/type __ExpectedReturn = \{[^}]*\[key: string\]: unknown/)
   })
 
   test('postgres insert params: no placeholders means no return type constraint', () => {
@@ -361,12 +338,11 @@ graph g {
   flow { root -> root }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const paramsBlock = blocks.find(
-      (b) => b.configKey === 'params' && b.nodeName === 'root',
-    )
+    const paramsBlock = blocks.find((b) => b.configKey === 'params' && b.nodeName === 'root')
     expect(paramsBlock).toBeDefined()
     const virtual = buildVirtualTsContent(paramsBlock!)
     expect(virtual).not.toContain('type __ExpectedReturn')
@@ -388,18 +364,15 @@ graph g {
   flow { p -> p }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const block = blocks.find(
-      (b) => b.configKey === 'objective' && b.nodeName === 'p',
-    )
+    const block = blocks.find((b) => b.configKey === 'objective' && b.nodeName === 'p')
     expect(block).toBeDefined()
     const virtual = buildVirtualTsContent(block!)
     expect(virtual).toContain('type __ExpectedReturn = string')
-    expect(virtual).toContain(
-      'async function __expr(): Promise<__ExpectedReturn> {',
-    )
+    expect(virtual).toContain('async function __expr(): Promise<__ExpectedReturn> {')
   })
 
   test('parallel searchQueries block expects string[]', () => {
@@ -415,18 +388,15 @@ graph g {
   flow { p -> p }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const block = blocks.find(
-      (b) => b.configKey === 'searchQueries' && b.nodeName === 'p',
-    )
+    const block = blocks.find((b) => b.configKey === 'searchQueries' && b.nodeName === 'p')
     expect(block).toBeDefined()
     const virtual = buildVirtualTsContent(block!)
     expect(virtual).toContain('type __ExpectedReturn = string[]')
-    expect(virtual).toContain(
-      'async function __expr(): Promise<__ExpectedReturn> {',
-    )
+    expect(virtual).toContain('async function __expr(): Promise<__ExpectedReturn> {')
   })
 
   test('parallel urls block expects string[]', () => {
@@ -443,18 +413,15 @@ graph g {
   flow { p -> p }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const block = blocks.find(
-      (b) => b.configKey === 'urls' && b.nodeName === 'p',
-    )
+    const block = blocks.find((b) => b.configKey === 'urls' && b.nodeName === 'p')
     expect(block).toBeDefined()
     const virtual = buildVirtualTsContent(block!)
     expect(virtual).toContain('type __ExpectedReturn = string[]')
-    expect(virtual).toContain(
-      'async function __expr(): Promise<__ExpectedReturn> {',
-    )
+    expect(virtual).toContain('async function __expr(): Promise<__ExpectedReturn> {')
   })
 
   test('parallel node without schema infers search output type for downstream context', () => {
@@ -483,12 +450,11 @@ graph g {
   }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const nextCode = blocks.find(
-      (b) => b.configKey === 'code' && b.nodeName === 'next',
-    )
+    const nextCode = blocks.find((b) => b.configKey === 'code' && b.nodeName === 'next')
     expect(nextCode).toBeDefined()
     const virtual = buildVirtualTsContent(nextCode!)
     expect(virtual).toContain('search_id: string')
@@ -519,12 +485,11 @@ graph g {
   }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const nextCode = blocks.find(
-      (b) => b.configKey === 'code' && b.nodeName === 'next',
-    )
+    const nextCode = blocks.find((b) => b.configKey === 'code' && b.nodeName === 'next')
     expect(nextCode).toBeDefined()
     const virtual = buildVirtualTsContent(nextCode!)
     expect(virtual).toContain('markdown?: string')
@@ -555,12 +520,11 @@ graph g {
   }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const nextCode = blocks.find(
-      (b) => b.configKey === 'code' && b.nodeName === 'next',
-    )
+    const nextCode = blocks.find((b) => b.configKey === 'code' && b.nodeName === 'next')
     expect(nextCode).toBeDefined()
     const virtual = buildVirtualTsContent(nextCode!)
     expect(virtual).toContain('results: Array<{')
@@ -593,12 +557,11 @@ graph g {
   }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const nextCode = blocks.find(
-      (b) => b.configKey === 'code' && b.nodeName === 'next',
-    )
+    const nextCode = blocks.find((b) => b.configKey === 'code' && b.nodeName === 'next')
     expect(nextCode).toBeDefined()
     const virtual = buildVirtualTsContent(nextCode!)
     expect(virtual).toContain('stdout: string')
@@ -645,12 +608,11 @@ graph g {
   }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const nextCode = blocks.find(
-      (b) => b.configKey === 'code' && b.nodeName === 'next',
-    )
+    const nextCode = blocks.find((b) => b.configKey === 'code' && b.nodeName === 'next')
     expect(nextCode).toBeDefined()
     const virtual = buildVirtualTsContent(nextCode!)
     expect(virtual).toContain("kind: 'swirls.file'")
@@ -702,12 +664,11 @@ graph g {
   }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const promptBlock = blocks.find(
-      (b) => b.configKey === 'prompt' && b.nodeName === 'classify',
-    )
+    const promptBlock = blocks.find((b) => b.configKey === 'prompt' && b.nodeName === 'classify')
     expect(promptBlock).toBeDefined()
     const virtual = buildVirtualTsContent(promptBlock!)
     expect(virtual).toContain("kind: 'swirls.file'")
@@ -741,12 +702,11 @@ graph g {
   }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const nextCode = blocks.find(
-      (b) => b.configKey === 'code' && b.nodeName === 'next',
-    )
+    const nextCode = blocks.find((b) => b.configKey === 'code' && b.nodeName === 'next')
     expect(nextCode).toBeDefined()
     const virtual = buildVirtualTsContent(nextCode!)
     expect(virtual).toContain('sent: true')
@@ -771,12 +731,11 @@ graph g {
   flow { root -> root }
 }
 `
+
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const paramsBlock = blocks.find(
-      (b) => b.configKey === 'params' && b.nodeName === 'root',
-    )
+    const paramsBlock = blocks.find((b) => b.configKey === 'params' && b.nodeName === 'root')
     expect(paramsBlock).toBeDefined()
     const virtual = buildVirtualTsContent(paramsBlock!)
     expect(virtual).toContain('type __ExpectedReturn = ')
@@ -789,11 +748,11 @@ graph g {
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
+
     const cond = blocks.find(
-      (b) =>
-        b.streamDecl?.name === 'store_topic_tokens' &&
-        b.configKey === 'condition',
+      (b) => b.streamDecl?.name === 'store_topic_tokens' && b.configKey === 'condition',
     )
+
     expect(cond).toBeDefined()
     const virtual = buildVirtualTsContent(cond!)
     expect(virtual).toContain('type __ExpectedReturn = boolean')
@@ -804,11 +763,11 @@ graph g {
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
+
     const prep = blocks.find(
-      (b) =>
-        b.streamDecl?.name === 'store_topic_tokens' &&
-        b.configKey === 'prepare',
+      (b) => b.streamDecl?.name === 'store_topic_tokens' && b.configKey === 'prepare',
     )
+
     expect(prep).toBeDefined()
     const virtual = buildVirtualTsContent(prep!)
     expect(virtual).toContain('type __ExpectedReturn = ')
@@ -821,9 +780,7 @@ graph g {
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const items = blocks.find(
-      (b) => b.configKey === 'items' && b.nodeName === 'each_item',
-    )
+    const items = blocks.find((b) => b.configKey === 'items' && b.nodeName === 'each_item')
     expect(items).toBeDefined()
     const virtual = buildVirtualTsContent(items!)
     expect(virtual).toContain('type __ExpectedReturn = ')
@@ -836,16 +793,17 @@ graph g {
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
+
     const innerCode = blocks.find(
-      (b) =>
-        b.workflowName.includes('subgraph') &&
-        b.nodeName === 'root' &&
-        b.configKey === 'code',
+      (b) => b.workflowName.includes('subgraph') && b.nodeName === 'root' && b.configKey === 'code',
     )
+
     expect(innerCode).toBeDefined()
+
     if (!innerCode) {
       throw new Error('Expected map subgraph code block')
     }
+
     const virtual = buildVirtualTsContent(innerCode)
     expect(virtual).toContain('iteration: { index: number; item:')
     expect(virtual).toContain('x: number')
@@ -872,22 +830,25 @@ graph g {
   }
   flow { root -> each_item }
 }`)
+
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
+
     const innerCode = blocks.find(
       (block) =>
         block.workflowName.includes('subgraph') &&
         block.nodeName === 'root' &&
         block.configKey === 'code',
     )
+
     expect(innerCode).toBeDefined()
+
     if (!innerCode) {
       throw new Error('Expected fanout subgraph code block')
     }
+
     const virtual = buildVirtualTsContent(innerCode)
-    expect(virtual).toContain(
-      'iteration: { index: number; item: { x?: number }; total: number }',
-    )
+    expect(virtual).toContain('iteration: { index: number; item: { x?: number }; total: number }')
   })
 
   test('while condition and update on parent graph include context.iteration', () => {
@@ -895,14 +856,11 @@ graph g {
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const cond = blocks.find(
-      (b) => b.nodeName === 'refine_digest' && b.configKey === 'condition',
-    )
-    const upd = blocks.find(
-      (b) => b.nodeName === 'refine_digest' && b.configKey === 'update',
-    )
+    const cond = blocks.find((b) => b.nodeName === 'refine_digest' && b.configKey === 'condition')
+    const upd = blocks.find((b) => b.nodeName === 'refine_digest' && b.configKey === 'update')
     expect(cond?.loopHost?.type).toBe('while')
     expect(upd?.loopHost?.type).toBe('while')
+
     for (const b of [cond, upd]) {
       expect(b).toBeDefined()
       const virtual = buildVirtualTsContent(b!)
@@ -916,9 +874,7 @@ graph g {
     const result = parse(content)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const paramsBlock = blocks.find(
-      (b) => b.nodeName === 'post_slack' && b.configKey === 'params',
-    )
+    const paramsBlock = blocks.find((b) => b.nodeName === 'post_slack' && b.configKey === 'params')
     expect(paramsBlock).toBeDefined()
     const virtual = buildVirtualTsContent(paramsBlock!)
     expect(virtual).toContain('type __ExpectedReturn = {')
@@ -970,12 +926,11 @@ workflow notify {
   }
 }
 `
+
     const result = parse(source)
     expect(result.errors).toHaveLength(0)
     const blocks = collectTsBlocks(result.ast)
-    const afterBlock = blocks.find(
-      (b) => b.nodeName === 'after' && b.configKey === 'code',
-    )
+    const afterBlock = blocks.find((b) => b.nodeName === 'after' && b.configKey === 'code')
     expect(afterBlock).toBeDefined()
     const virtual = buildVirtualTsContent(afterBlock!)
     expect(virtual).toContain('post_slack: { output: { ok: boolean')
@@ -983,6 +938,7 @@ workflow notify {
 
   test('integration action typing resolves cross-file connection via workspace', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-lsp-int-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'connections.swirls'),
@@ -990,6 +946,7 @@ workflow notify {
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'actions.swirls'),
         `action slack_post_message {
@@ -1010,6 +967,7 @@ workflow notify {
 `,
         'utf-8',
       )
+
       const workflowSource = `
 workflow notify {
   label: "Notify"
@@ -1023,6 +981,7 @@ workflow notify {
   flow { root -> post_slack }
 }
 `
+
       fs.writeFileSync(path.join(dir, 'notify.swirls'), workflowSource, 'utf-8')
 
       const { ast, errors } = parse(workflowSource)
@@ -1031,14 +990,17 @@ workflow notify {
       const localBlock = collectTsBlocks(ast).find(
         (b) => b.nodeName === 'post_slack' && b.configKey === 'params',
       )
+
       expect(localBlock).toBeDefined()
       const localVirtual = buildVirtualTsContent(localBlock!)
       expect(localVirtual).not.toContain('channel: string')
 
       const workspace = buildWorkspaceResourceIndex({ cwd: dir })
+
       const wsBlock = collectTsBlocks(ast, { workspace }).find(
         (b) => b.nodeName === 'post_slack' && b.configKey === 'params',
       )
+
       expect(wsBlock).toBeDefined()
       const wsVirtual = buildVirtualTsContent(wsBlock!)
       expect(wsVirtual).toContain('channel: string')
@@ -1050,18 +1012,18 @@ workflow notify {
 
   test('graphql integration params block emits alias declarations before __ExpectedReturn', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-lsp-gql-params-'))
-    const schemaPath = path.join(
-      import.meta.dir,
-      '../graphql-action/__fixtures__/users.graphql',
-    )
+    const schemaPath = path.join(import.meta.dir, '../graphql-action/__fixtures__/users.graphql')
+
     try {
       fs.mkdirSync(path.join(dir, 'swirls/integrations/test'), {
         recursive: true,
       })
+
       fs.writeFileSync(
         path.join(dir, 'swirls/integrations/test/schema.graphql'),
         fs.readFileSync(schemaPath, 'utf-8'),
       )
+
       fs.writeFileSync(
         path.join(dir, 'swirls/integrations/test/list_issues.swirls'),
         `action test_list_issues {
@@ -1072,11 +1034,13 @@ workflow notify {
 }
 `,
       )
+
       fs.writeFileSync(
         path.join(dir, 'connections.swirls'),
         `connection test_conn { provider: test }
 `,
       )
+
       const workflowSource = `
 workflow list_issues {
   label: "List issues"
@@ -1093,17 +1057,21 @@ workflow list_issues {
   flow { root -> fetch_issues }
 }
 `
+
       fs.writeFileSync(path.join(dir, 'list_issues.swirls'), workflowSource)
 
       const { ast, errors } = parse(workflowSource)
       expect(errors).toHaveLength(0)
 
       const workspace = buildWorkspaceResourceIndex({ cwd: dir })
+
       const readWorkspaceFile = (relativePath: string) => {
         const fullPath = path.join(dir, relativePath)
+
         if (!fs.existsSync(fullPath)) {
           return undefined
         }
+
         return fs.readFileSync(fullPath, 'utf-8')
       }
 
@@ -1111,6 +1079,7 @@ workflow list_issues {
         workspace,
         readWorkspaceFile,
       }).find((b) => b.nodeName === 'fetch_issues' && b.configKey === 'params')
+
       expect(paramsBlock).toBeDefined()
 
       const virtual = buildVirtualTsContent(paramsBlock!)
@@ -1119,9 +1088,7 @@ workflow list_issues {
       expect(virtual).not.toContain('type __ExpectedReturn = type ')
       expect(virtual).toContain('"filter"?: IssueFilter')
       expect(virtual).toContain('"first"?: number')
-      expect(virtual).toContain(
-        'async function __expr(): Promise<__ExpectedReturn> {',
-      )
+      expect(virtual).toContain('async function __expr(): Promise<__ExpectedReturn> {')
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }
@@ -1129,18 +1096,18 @@ workflow list_issues {
 
   test('graphql integration infers downstream output type from document selection', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-lsp-gql-output-'))
-    const schemaPath = path.join(
-      import.meta.dir,
-      '../graphql-action/__fixtures__/users.graphql',
-    )
+    const schemaPath = path.join(import.meta.dir, '../graphql-action/__fixtures__/users.graphql')
+
     try {
       fs.mkdirSync(path.join(dir, 'swirls/integrations/test'), {
         recursive: true,
       })
+
       fs.writeFileSync(
         path.join(dir, 'swirls/integrations/test/schema.graphql'),
         fs.readFileSync(schemaPath, 'utf-8'),
       )
+
       fs.writeFileSync(
         path.join(dir, 'swirls/integrations/test/list_issues.swirls'),
         `action test_list_issues {
@@ -1151,11 +1118,13 @@ workflow list_issues {
 }
 `,
       )
+
       fs.writeFileSync(
         path.join(dir, 'connections.swirls'),
         `connection test_conn { provider: test }
 `,
       )
+
       const workflowSource = `
 workflow list_issues {
   label: "List issues"
@@ -1176,17 +1145,21 @@ workflow list_issues {
   }
 }
 `
+
       fs.writeFileSync(path.join(dir, 'list_issues.swirls'), workflowSource)
 
       const { ast, errors } = parse(workflowSource)
       expect(errors).toHaveLength(0)
 
       const workspace = buildWorkspaceResourceIndex({ cwd: dir })
+
       const readWorkspaceFile = (relativePath: string) => {
         const fullPath = path.join(dir, relativePath)
+
         if (!fs.existsSync(fullPath)) {
           return undefined
         }
+
         return fs.readFileSync(fullPath, 'utf-8')
       }
 
@@ -1194,6 +1167,7 @@ workflow list_issues {
         workspace,
         readWorkspaceFile,
       }).find((b) => b.nodeName === 'after' && b.configKey === 'code')
+
       expect(afterBlock).toBeDefined()
 
       const virtual = buildVirtualTsContent(afterBlock!)

@@ -2,17 +2,17 @@
   "name": "tree-sitter-swirls",
   "version": "0.1.0",
   "description": "Tree-sitter grammar for the Swirls DSL (.swirls files)",
+  "keywords": [
+    "parser",
+    "swirls",
+    "tree-sitter"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/ByteSliceHQ/swirls.git",
     "directory": "editors/tree-sitter-swirls"
   },
-  "keywords": [
-    "tree-sitter",
-    "parser",
-    "swirls"
-  ],
   "files": [
     "grammar.js",
     "tree-sitter.json",

@@ -7,40 +7,31 @@ import {
   getInferredVendorKeyForNode,
   MANAGEABLE_VENDOR_KEY_SET,
 } from '@swirls/definition/secrets/vendor-keys'
-import type {
-  ConfigValue,
-  Diagnostic,
-  NodeDecl,
-  SecretsDecl,
-  SourceRange,
-} from '../ast'
+
+import type { ConfigValue, Diagnostic, NodeDecl, SecretsDecl, SourceRange } from '../ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 
 /** Matches project secret key rules (see docs/reference/secrets.md). */
 export const SECRET_KEY_PATTERN = /^[a-zA-Z0-9_]+$/
 
-type DiagFn = (
-  message: string,
-  range: SourceRange,
-  severity?: 'error' | 'warning',
-) => Diagnostic
+type DiagFn = (message: string, range: SourceRange, severity?: 'error' | 'warning') => Diagnostic
 
 /**
  * Validate that every var in a `type: managed` secret block is a known
  * manageable platform key.
  */
-export function validateManagedSecretBlock(
-  block: SecretsDecl,
-  diag: DiagFn,
-): Diagnostic[] {
+export function validateManagedSecretBlock(block: SecretsDecl, diag: DiagFn): Diagnostic[] {
   if (block.type !== 'managed') {
     return []
   }
+
   const out: Diagnostic[] = []
+
   for (const v of block.vars) {
     if (!SECRET_KEY_PATTERN.test(v)) {
       continue
     }
+
     if (!MANAGEABLE_VENDOR_KEY_SET.has(v)) {
       out.push(
         diag(
@@ -50,6 +41,7 @@ export function validateManagedSecretBlock(
       )
     }
   }
+
   return out
 }
 
@@ -62,6 +54,7 @@ export function collectDeclaredVendorVars(
   workspace?: WorkspaceResourceIndex | null,
 ): Map<string, string> {
   const declaredVendorVars = new Map<string, string>()
+
   for (const s of secretsBlocks) {
     for (const v of s.vars) {
       if (MANAGEABLE_VENDOR_KEY_SET.has(v) && !declaredVendorVars.has(v)) {
@@ -69,6 +62,7 @@ export function collectDeclaredVendorVars(
       }
     }
   }
+
   if (workspace?.secrets) {
     for (const [blockName, entry] of workspace.secrets) {
       for (const v of entry.vars) {
@@ -78,6 +72,7 @@ export function collectDeclaredVendorVars(
       }
     }
   }
+
   return declaredVendorVars
 }
 
@@ -90,6 +85,7 @@ export function configFieldsForVendorInference(
       if (cv.kind === 'string') {
         return [k, cv.value]
       }
+
       return [k, undefined]
     }),
   )
@@ -107,9 +103,11 @@ export function validateInferredVendorKeyDeclaration(
     type: node.type,
     config: configFieldsForVendorInference(node.configFields),
   })
+
   if (!inferredVendorKey || declaredVendorVars.has(inferredVendorKey)) {
     return []
   }
+
   return [
     diag(
       `Node "${node.name}" (${node.type}) requires vendor key "${inferredVendorKey}" but no secret block declares it. Add a secret block with vars: [${inferredVendorKey}] (use type: managed for Enterprise platform keys).`,

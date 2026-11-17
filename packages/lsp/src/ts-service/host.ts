@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import { createRequire } from 'node:module'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
 import ts from 'typescript'
 
 /** Resolve `typescript/lib/*.d.ts` from the installed `typescript` package, or from `typescript-lib/` next to server.js (VSIX / packaged extension). */
@@ -13,12 +14,14 @@ function resolveBundledTypescriptLibDirectory(): string | undefined {
   try {
     const serverDir = path.dirname(fileURLToPath(import.meta.url))
     const bundled = path.join(serverDir, 'typescript-lib')
+
     if (fs.existsSync(path.join(bundled, 'lib.es2022.d.ts'))) {
       return bundled
     }
   } catch {
     // ignore
   }
+
   return undefined
 }
 
@@ -34,21 +37,21 @@ function resolveTypescriptLibDirectory(): string | undefined {
 /** TS may pass absolute paths or bare names like `lib.dom.d.ts` depending on getCurrentDirectory. */
 function resolveLibRequestPath(libDir: string, requestedPath: string): string {
   const n = path.normalize(requestedPath)
+
   if (path.isAbsolute(n)) {
     return n
   }
+
   return path.normalize(path.join(libDir, path.basename(requestedPath)))
 }
 
-function isLibPath(
-  libDir: string,
-  defaultLibPath: string,
-  requestedPath: string,
-): boolean {
+function isLibPath(libDir: string, defaultLibPath: string, requestedPath: string): boolean {
   const resolved = resolveLibRequestPath(libDir, requestedPath)
+
   if (resolved === path.normalize(defaultLibPath)) {
     return true
   }
+
   const normLibDir = path.normalize(libDir) + path.sep
   return resolved.startsWith(normLibDir) && resolved.endsWith('.d.ts')
 }
@@ -99,9 +102,11 @@ function resolveVirtualLib(compilerOptions: ts.CompilerOptions): {
 
   if (!defaultLibContent) {
     const altDir = resolveTypescriptLibDirectory()
+
     if (altDir) {
       const candidate = path.join(altDir, libFileName)
       const alt = loadLibFile(candidate)
+
       if (alt) {
         defaultLibPath = candidate
         libDir = altDir
@@ -113,33 +118,36 @@ function resolveVirtualLib(compilerOptions: ts.CompilerOptions): {
   return { defaultLibPath, libDir, defaultLibContent }
 }
 
-function createTypeScriptHost(
-  fileName: string,
-  content: string,
-): ts.LanguageServiceHost {
+function createTypeScriptHost(fileName: string, content: string): ts.LanguageServiceHost {
   const compilerOptions = virtualTsCompilerOptions
-  const { defaultLibPath, libDir, defaultLibContent } =
-    resolveVirtualLib(compilerOptions)
+  const { defaultLibPath, libDir, defaultLibContent } = resolveVirtualLib(compilerOptions)
 
   const version = scriptVersion(content)
   const libCache = new Map<string, string>()
 
   function getLibContent(name: string): string | undefined {
     const fullPath = resolveLibRequestPath(libDir, name)
+
     if (fullPath === path.normalize(defaultLibPath)) {
       return defaultLibContent ?? undefined
     }
+
     if (!isLibPath(libDir, defaultLibPath, name)) {
       return undefined
     }
+
     const cached = libCache.get(fullPath)
+
     if (cached !== undefined) {
       return cached
     }
+
     const fileContent = loadLibFile(fullPath)
+
     if (fileContent !== undefined) {
       libCache.set(fullPath, fileContent)
     }
+
     return fileContent
   }
 
@@ -151,10 +159,13 @@ function createTypeScriptHost(
       if (name === fileName) {
         return ts.ScriptSnapshot.fromString(content)
       }
+
       const libContent = getLibContent(name)
+
       if (libContent !== undefined) {
         return ts.ScriptSnapshot.fromString(libContent)
       }
+
       return undefined
     },
     /** Required so /// <reference lib="dom" /> resolves under libDir, not extension/server/lib.dom.d.ts */
@@ -164,16 +175,20 @@ function createTypeScriptHost(
       if (name === fileName) {
         return content
       }
+
       return getLibContent(name)
     },
     fileExists: (name: string): boolean => {
       if (name === fileName) {
         return true
       }
+
       const fullPath = resolveLibRequestPath(libDir, name)
+
       if (fullPath === path.normalize(defaultLibPath)) {
         return defaultLibContent !== undefined
       }
+
       if (isLibPath(libDir, defaultLibPath, name)) {
         try {
           return fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()
@@ -181,6 +196,7 @@ function createTypeScriptHost(
           return false
         }
       }
+
       return false
     },
   }
@@ -194,10 +210,7 @@ function createTypeScriptHost(
  */
 const documentRegistry = ts.createDocumentRegistry()
 
-export function createLanguageService(
-  fileName: string,
-  content: string,
-): ts.LanguageService {
+export function createLanguageService(fileName: string, content: string): ts.LanguageService {
   const host = createTypeScriptHost(fileName, content)
   return ts.createLanguageService(host, documentRegistry)
 }
@@ -206,30 +219,34 @@ export function createLanguageService(
  * Create a LanguageServiceHost that serves multiple virtual TS files (e.g. one per @ts { } block).
  * contentMap is held by reference; mutate it when the document changes so the same LS sees new content.
  */
-function createMultiFileTypeScriptHost(
-  contentMap: Map<string, string>,
-): ts.LanguageServiceHost {
+function createMultiFileTypeScriptHost(contentMap: Map<string, string>): ts.LanguageServiceHost {
   const compilerOptions = virtualTsCompilerOptions
-  const { defaultLibPath, libDir, defaultLibContent } =
-    resolveVirtualLib(compilerOptions)
+  const { defaultLibPath, libDir, defaultLibContent } = resolveVirtualLib(compilerOptions)
   const libCache = new Map<string, string>()
 
   function getLibContent(name: string): string | undefined {
     const fullPath = resolveLibRequestPath(libDir, name)
+
     if (fullPath === path.normalize(defaultLibPath)) {
       return defaultLibContent ?? undefined
     }
+
     if (!isLibPath(libDir, defaultLibPath, name)) {
       return undefined
     }
+
     const cached = libCache.get(fullPath)
+
     if (cached !== undefined) {
       return cached
     }
+
     const fileContent = loadLibFile(fullPath)
+
     if (fileContent !== undefined) {
       libCache.set(fullPath, fileContent)
     }
+
     return fileContent
   }
 
@@ -238,39 +255,50 @@ function createMultiFileTypeScriptHost(
     getScriptFileNames: (): string[] => Array.from(contentMap.keys()),
     getScriptVersion: (fileName: string): string => {
       const content = contentMap.get(fileName)
+
       if (content !== undefined) {
         return scriptVersion(content)
       }
+
       return ''
     },
     getScriptSnapshot: (name: string): ts.IScriptSnapshot | undefined => {
       const content = contentMap.get(name)
+
       if (content !== undefined) {
         return ts.ScriptSnapshot.fromString(content)
       }
+
       const libContent = getLibContent(name)
+
       if (libContent !== undefined) {
         return ts.ScriptSnapshot.fromString(libContent)
       }
+
       return undefined
     },
     getCurrentDirectory: () => libDir,
     getDefaultLibFileName: () => defaultLibPath,
     readFile: (name: string): string | undefined => {
       const content = contentMap.get(name)
+
       if (content !== undefined) {
         return content
       }
+
       return getLibContent(name)
     },
     fileExists: (name: string): boolean => {
       if (contentMap.has(name)) {
         return true
       }
+
       const fullPath = resolveLibRequestPath(libDir, name)
+
       if (fullPath === path.normalize(defaultLibPath)) {
         return defaultLibContent !== undefined
       }
+
       if (isLibPath(libDir, defaultLibPath, name)) {
         try {
           return fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()
@@ -278,6 +306,7 @@ function createMultiFileTypeScriptHost(
           return false
         }
       }
+
       return false
     },
   }
@@ -287,9 +316,7 @@ function createMultiFileTypeScriptHost(
  * Create a single LanguageService for all virtual files in contentMap.
  * Use this for one Program per document; pass the same map reference and update it on document change.
  */
-export function createLanguageServiceFromMap(
-  contentMap: Map<string, string>,
-): ts.LanguageService {
+export function createLanguageServiceFromMap(contentMap: Map<string, string>): ts.LanguageService {
   const host = createMultiFileTypeScriptHost(contentMap)
   return ts.createLanguageService(host, documentRegistry)
 }

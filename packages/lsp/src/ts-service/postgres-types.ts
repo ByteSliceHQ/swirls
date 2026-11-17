@@ -1,13 +1,10 @@
-import type {
-  NodeDecl,
-  PostgresDecl,
-  PostgresTableDecl,
-} from '@swirls/language'
+import type { NodeDecl, PostgresDecl, PostgresTableDecl } from '@swirls/language'
 import {
   BRACE_PLACEHOLDER_RE,
   extractTablesFromSql,
   parseInsertExplicitColumns,
 } from '@swirls/language/postgres/sql-utils'
+
 import { jsonSchemaToTsType } from './schema-to-ts'
 import {
   DISK_COPY_FILE_OUTPUT_TS,
@@ -30,15 +27,19 @@ const SELECT_COLUMNS_RE = /\bSELECT\s+([\s\S]*?)\bFROM\b/i
  */
 function extractTableName(sql: string): string | undefined {
   const tables = extractTablesFromSql(sql)
+
   if (tables.length === 0) {
     return undefined
   }
+
   if (/^\s*UPDATE\b/i.test(sql)) {
     return tables[0]
   }
+
   if (tables.length >= 2) {
     return tables[1]
   }
+
   return tables[0]
 }
 
@@ -47,13 +48,17 @@ function extractTableName(sql: string): string | undefined {
  */
 function extractSelectColumns(sql: string): string[] | undefined {
   const m = SELECT_COLUMNS_RE.exec(sql)
+
   if (!m) {
     return undefined
   }
+
   const clause = m[1].trim()
+
   if (clause === '*') {
     return undefined
   }
+
   return clause
     .split(',')
     .map((c) =>
@@ -73,12 +78,14 @@ function projectSchemaToColumns(
   columns: string[],
 ): Record<string, unknown> {
   const props = schema.properties as Record<string, unknown> | undefined
+
   if (!props) {
     return schema
   }
 
   const required = (schema.required as string[] | undefined) ?? []
   const projected: Record<string, unknown> = {}
+
   for (const col of columns) {
     if (col in props) {
       projected[col] = props[col]
@@ -104,15 +111,16 @@ function findPostgresTableDeclAndSqlForNode(
     string,
     { kind: string; value?: unknown; code?: string } | undefined
   >
+
   const blockName =
-    fields.postgres?.kind === 'string'
-      ? (fields.postgres.value as string)
-      : undefined
+    fields.postgres?.kind === 'string' ? (fields.postgres.value as string) : undefined
+
   if (!blockName) {
     return undefined
   }
 
   const block = postgresBlocks.find((b) => b.name === blockName)
+
   if (!block) {
     return undefined
   }
@@ -122,16 +130,19 @@ function findPostgresTableDeclAndSqlForNode(
     (fields.insert?.kind === 'sql_block' ? fields.insert.code : undefined) ??
     (fields.update?.kind === 'sql_block' ? fields.update.code : undefined) ??
     (fields.delete?.kind === 'sql_block' ? fields.delete.code : undefined)
+
   if (!sql) {
     return undefined
   }
 
   const tableName = extractTableName(sql)
+
   if (!tableName) {
     return undefined
   }
 
   const table = block.tables.find((t) => t.name === tableName)
+
   if (!table?.schema) {
     return undefined
   }
@@ -148,20 +159,20 @@ function resolveTableSchema(
   postgresBlocks: PostgresDecl[],
 ): Record<string, unknown> | undefined {
   const resolved = findPostgresTableDeclAndSqlForNode(node, postgresBlocks)
+
   if (!resolved) {
     return undefined
   }
+
   const { table, sql } = resolved
 
   const columns = extractSelectColumns(sql)
+
   if (!columns) {
     return table.schema as Record<string, unknown>
   }
 
-  return projectSchemaToColumns(
-    table.schema as Record<string, unknown>,
-    columns,
-  )
+  return projectSchemaToColumns(table.schema as Record<string, unknown>, columns)
 }
 
 /**
@@ -173,9 +184,11 @@ function resolveFullTableRowSchema(
   postgresBlocks: PostgresDecl[],
 ): Record<string, unknown> | undefined {
   const resolved = findPostgresTableDeclAndSqlForNode(node, postgresBlocks)
+
   if (!resolved) {
     return undefined
   }
+
   return resolved.table.schema as Record<string, unknown>
 }
 
@@ -184,31 +197,41 @@ function resolveFullTableRowSchema(
  */
 function extractFirstValuesRowInner(sql: string): string | undefined {
   const vm = /\bVALUES\b/i.exec(sql)
+
   if (!vm) {
     return undefined
   }
+
   let i = vm.index + vm[0].length
+
   while (i < sql.length && /\s/.test(sql[i]!)) {
     i++
   }
+
   if (sql[i] !== '(') {
     return undefined
   }
+
   let depth = 1
   const start = i + 1
   i++
+
   while (i < sql.length && depth > 0) {
     const ch = sql[i]!
+
     if (ch === '(') {
       depth++
     } else if (ch === ')') {
       depth--
     }
+
     i++
   }
+
   if (depth !== 0) {
     return undefined
   }
+
   return sql.slice(start, i - 1)
 }
 
@@ -216,10 +239,12 @@ function extractPlaceholdersInOrderInSubstring(s: string): string[] {
   const keys: string[] = []
   BRACE_PLACEHOLDER_RE.lastIndex = 0
   let m: RegExpExecArray | null = BRACE_PLACEHOLDER_RE.exec(s)
+
   while (m !== null) {
     keys.push(m[1]!)
     m = BRACE_PLACEHOLDER_RE.exec(s)
   }
+
   return keys
 }
 
@@ -232,21 +257,27 @@ function buildInsertPlaceholderToColumnName(
   columns: string[] | null,
 ): Map<string, string> {
   const map = new Map<string, string>()
+
   if (!columns || columns.length === 0) {
     return map
   }
+
   const inner = extractFirstValuesRowInner(sql)
+
   const placeholders =
     inner !== undefined
       ? extractPlaceholdersInOrderInSubstring(inner)
       : extractPlaceholdersAfterValues(sql)
+
   for (let i = 0; i < placeholders.length && i < columns.length; i++) {
     const ph = placeholders[i]!
     const col = columns[i]!
+
     if (!map.has(ph)) {
       map.set(ph, col)
     }
   }
+
   return map
 }
 
@@ -255,12 +286,12 @@ function buildInsertPlaceholderToColumnName(
  */
 function extractPlaceholdersAfterValues(sql: string): string[] {
   const vm = /\bVALUES\b/i.exec(sql)
+
   if (!vm) {
     return []
   }
-  return extractPlaceholdersInOrderInSubstring(
-    sql.slice(vm.index + vm[0].length),
-  )
+
+  return extractPlaceholdersInOrderInSubstring(sql.slice(vm.index + vm[0].length))
 }
 
 function allPlaceholderKeysFirstAppearance(sql: string): string[] {
@@ -268,14 +299,18 @@ function allPlaceholderKeysFirstAppearance(sql: string): string[] {
   const seen = new Set<string>()
   BRACE_PLACEHOLDER_RE.lastIndex = 0
   let m: RegExpExecArray | null = BRACE_PLACEHOLDER_RE.exec(sql)
+
   while (m !== null) {
     const k = m[1]!
+
     if (!seen.has(k)) {
       seen.add(k)
       out.push(k)
     }
+
     m = BRACE_PLACEHOLDER_RE.exec(sql)
   }
+
   return out
 }
 
@@ -286,18 +321,19 @@ function findSelectComparisonColumnForPlaceholder(
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(placeholderKey)) {
     return undefined
   }
-  const left = new RegExp(
-    `\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*\\{\\{${placeholderKey}\\}\\}`,
-    'i',
-  )
+
+  const left = new RegExp(`\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*\\{\\{${placeholderKey}\\}\\}`, 'i')
   const ml = left.exec(sql)
+
   if (ml) {
     return ml[1]
   }
+
   const right = new RegExp(
     `\\{\\{${placeholderKey}\\}\\}\\s*=\\s*\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b`,
     'i',
   )
+
   const mr = right.exec(sql)
   return mr?.[1]
 }
@@ -309,10 +345,13 @@ function tsFromSchemaProp(
   if (!col || !(col in props)) {
     return undefined
   }
+
   const sub = props[col]
+
   if (!sub || typeof sub !== 'object' || Array.isArray(sub)) {
     return 'unknown'
   }
+
   return jsonSchemaToTsType(sub as Record<string, unknown>)
 }
 
@@ -320,20 +359,17 @@ function tsFromSchemaProp(
  * Infer a TypeScript output type for a node based on its type and config
  * when no explicit outputSchema is provided.
  */
-function parallelOperation(
-  node: NodeDecl,
-): 'search' | 'extract' | 'findall' | undefined {
+function parallelOperation(node: NodeDecl): 'search' | 'extract' | 'findall' | undefined {
   const cv = node.configFields.operation
+
   if (!cv || cv.kind !== 'string') {
     return undefined
   }
-  if (
-    cv.value === 'search' ||
-    cv.value === 'extract' ||
-    cv.value === 'findall'
-  ) {
+
+  if (cv.value === 'search' || cv.value === 'extract' || cv.value === 'findall') {
     return cv.value
   }
+
   return undefined
 }
 
@@ -347,15 +383,19 @@ export function inferOutputTypeForNode(
 
   if (node.type === 'parallel') {
     const op = parallelOperation(node)
+
     if (op === 'search') {
       return PARALLEL_SEARCH_OUTPUT_TS
     }
+
     if (op === 'extract') {
       return PARALLEL_EXTRACT_OUTPUT_TS
     }
+
     if (op === 'findall') {
       return PARALLEL_FINDALL_OUTPUT_TS
     }
+
     return undefined
   }
 
@@ -373,17 +413,16 @@ export function inferOutputTypeForNode(
 
   if (node.type === 'disk') {
     const op = node.configFields.operation
+
     if (op?.kind === 'string' && op.value === 'copy_file') {
       return DISK_COPY_FILE_OUTPUT_TS
     }
+
     return DISK_EXEC_OUTPUT_TS
   }
 
   if (node.type === 'postgres') {
-    const fields = node.configFields as Record<
-      string,
-      { kind: string; code?: string } | undefined
-    >
+    const fields = node.configFields as Record<string, { kind: string; code?: string } | undefined>
 
     const tableSchema = resolveTableSchema(node, postgresBlocks)
 
@@ -391,8 +430,10 @@ export function inferOutputTypeForNode(
       if (tableSchema) {
         return `(${jsonSchemaToTsType(tableSchema)})[]`
       }
+
       return 'Record<string, unknown>[]'
     }
+
     if (fields.insert || fields.update || fields.delete) {
       return '{ executed: boolean } | { skipped: boolean }'
     }
@@ -425,33 +466,37 @@ export function postgresParamsReturnTypeString(
   }
 
   const fullSchema = resolveFullTableRowSchema(node, postgresBlocks)
+
   if (!fullSchema) {
     return undefined
   }
+
   const props = fullSchema.properties as Record<string, unknown> | undefined
+
   if (!props) {
     return undefined
   }
 
-  const fields = node.configFields as Record<
-    string,
-    { kind: string; code?: string } | undefined
-  >
+  const fields = node.configFields as Record<string, { kind: string; code?: string } | undefined>
 
   if (fields.insert?.kind === 'sql_block') {
     const sql = fields.insert.code!
     const keys = allPlaceholderKeysFirstAppearance(sql)
+
     if (keys.length === 0) {
       return undefined
     }
+
     const cols = parseInsertExplicitColumns(sql)
     const phToCol = buildInsertPlaceholderToColumnName(sql, cols)
     const parts: string[] = []
+
     for (const k of keys) {
       const col = phToCol.get(k)
       const t = tsFromSchemaProp(props, col) ?? 'unknown'
       parts.push(`${k}: ${t}`)
     }
+
     return paramsObjectType(parts)
   }
 
@@ -462,15 +507,19 @@ export function postgresParamsReturnTypeString(
 
   if (comparisonSql) {
     const keys = allPlaceholderKeysFirstAppearance(comparisonSql)
+
     if (keys.length === 0) {
       return undefined
     }
+
     const parts: string[] = []
+
     for (const k of keys) {
       const col = findSelectComparisonColumnForPlaceholder(comparisonSql, k)
       const t = tsFromSchemaProp(props, col) ?? 'unknown'
       parts.push(`${k}: ${t}`)
     }
+
     return paramsObjectType(parts)
   }
 
@@ -488,18 +537,18 @@ export function getPostgresPlaceholderTsTypeString(
   placeholderKey: string,
 ): string | undefined {
   const row = resolveFullTableRowSchema(node, postgresBlocks)
+
   if (!row) {
     return undefined
   }
+
   const props = row.properties as Record<string, unknown> | undefined
+
   if (!props) {
     return undefined
   }
 
-  const fields = node.configFields as Record<
-    string,
-    { kind: string; code?: string } | undefined
-  >
+  const fields = node.configFields as Record<string, { kind: string; code?: string } | undefined>
 
   if (fields.insert?.kind === 'sql_block' && fields.insert.code) {
     const sql = fields.insert.code
@@ -515,10 +564,7 @@ export function getPostgresPlaceholderTsTypeString(
     (fields.delete?.kind === 'sql_block' ? fields.delete.code : undefined)
 
   if (comparisonSql) {
-    const col = findSelectComparisonColumnForPlaceholder(
-      comparisonSql,
-      placeholderKey,
-    )
+    const col = findSelectComparisonColumnForPlaceholder(comparisonSql, placeholderKey)
     return tsFromSchemaProp(props, col) ?? 'unknown'
   }
 

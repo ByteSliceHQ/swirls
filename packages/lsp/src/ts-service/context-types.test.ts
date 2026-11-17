@@ -1,18 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type {
-  NodeDecl,
-  SourceRange,
-  StreamDecl,
-  SwirlsFile,
-  WorkflowDecl,
-} from '@swirls/language'
+
+import type { NodeDecl, SourceRange, StreamDecl, SwirlsFile, WorkflowDecl } from '@swirls/language'
 import { parse } from '@swirls/language'
-import {
-  generateContextTypePreamble,
-  generateStreamBlockContextPreamble,
-} from './context-types'
+
+import { generateContextTypePreamble, generateStreamBlockContextPreamble } from './context-types'
 
 const LOOP_INLINE_SUBGRAPH_FIXTURE = path.join(
   import.meta.dir,
@@ -103,13 +96,7 @@ function streamGraphWithPullRef(streamName: string): {
 describe('generateContextTypePreamble', () => {
   test('types type:stream node output from referenced stream schema as SchemaType[]', () => {
     const { graph, streams } = streamGraphWithPullRef('scores')
-    const preamble = generateContextTypePreamble(
-      graph,
-      'format',
-      [graph],
-      [],
-      streams,
-    )
+    const preamble = generateContextTypePreamble(graph, 'format', [graph], [], streams)
 
     expect(preamble).toContain('type PullOutput =')
     expect(preamble).toContain('email')
@@ -119,6 +106,7 @@ describe('generateContextTypePreamble', () => {
 
   test('stream block without schema yields unknown[] for stream node output', () => {
     const { graph } = streamGraphWithPullRef('scores')
+
     const streamsNoSchema: StreamDecl[] = [
       {
         name: 'scores',
@@ -130,13 +118,7 @@ describe('generateContextTypePreamble', () => {
       },
     ]
 
-    const preamble = generateContextTypePreamble(
-      graph,
-      'format',
-      [graph],
-      [],
-      streamsNoSchema,
-    )
+    const preamble = generateContextTypePreamble(graph, 'format', [graph], [], streamsNoSchema)
 
     expect(preamble).toContain('pull: { output: unknown[] }')
     expect(preamble).not.toContain('PullOutput')
@@ -144,13 +126,7 @@ describe('generateContextTypePreamble', () => {
 
   test('missing stream block for reference yields unknown[]', () => {
     const { graph } = streamGraphWithPullRef('wrong_name')
-    const preamble = generateContextTypePreamble(
-      graph,
-      'format',
-      [graph],
-      [],
-      [],
-    )
+    const preamble = generateContextTypePreamble(graph, 'format', [graph], [], [])
 
     expect(preamble).toContain('pull: { output: unknown[] }')
   })
@@ -159,9 +135,11 @@ describe('generateContextTypePreamble', () => {
     const content = fs.readFileSync(LOOP_INLINE_SUBGRAPH_FIXTURE, 'utf8')
     const { ast } = parse(content)
     const graph = ast.workflows[0]
+
     if (!graph) {
       throw new Error('expected graph')
     }
+
     const after: NodeDecl = {
       name: 'after',
       type: 'code',
@@ -169,21 +147,14 @@ describe('generateContextTypePreamble', () => {
       configFields: {},
       range,
     }
+
     const extended: WorkflowDecl = {
       ...graph,
       nodes: [...graph.nodes, after],
-      edges: [
-        ...(graph.edges ?? []),
-        { source: 'each_item', target: 'after', range },
-      ],
+      edges: [...(graph.edges ?? []), { source: 'each_item', target: 'after', range }],
     }
-    const preamble = generateContextTypePreamble(
-      extended,
-      'after',
-      ast.workflows,
-      [],
-      [],
-    )
+
+    const preamble = generateContextTypePreamble(extended, 'after', ast.workflows, [], [])
     expect(preamble).toContain('Each_itemOutput =')
     expect(preamble).toContain('[]')
     expect(preamble).toContain('each_item: { output: Each_itemOutput }')
@@ -218,12 +189,15 @@ graph g {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const graph = ast.workflows[0]
+
     if (!graph) {
       throw new Error('expected graph')
     }
+
     const preamble = generateContextTypePreamble(
       graph,
       'tail',
@@ -234,6 +208,7 @@ graph g {
       undefined,
       ast as SwirlsFile,
     )
+
     expect(preamble).toContain('type RootInput =')
     expect(preamble).toContain('name')
     expect(preamble).toContain('email')
@@ -275,12 +250,15 @@ graph g {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const graph = ast.workflows[0]
+
     if (!graph) {
       throw new Error('expected graph')
     }
+
     const preamble = generateContextTypePreamble(
       graph,
       'tail',
@@ -291,6 +269,7 @@ graph g {
       undefined,
       ast as SwirlsFile,
     )
+
     expect(preamble).toContain('type ScoredOutput =')
     expect(preamble).toContain('score')
     expect(preamble).toContain('scored: { output: ScoredOutput }')
@@ -320,12 +299,15 @@ graph g {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const graph = ast.workflows[0]
+
     if (!graph) {
       throw new Error('expected graph')
     }
+
     const preamble = generateContextTypePreamble(
       graph,
       'root',
@@ -336,6 +318,7 @@ graph g {
       undefined,
       ast as SwirlsFile,
     )
+
     expect(preamble).toContain('type RootReview =')
     expect(preamble).toContain('approved')
     expect(preamble).toContain('reviews: {\n    root: RootReview')
@@ -345,12 +328,7 @@ graph g {
 describe('generateStreamBlockContextPreamble', () => {
   test('types context.output as partial record keyed by leaf node names', () => {
     const { graph, streams } = streamGraphWithPullRef('scores')
-    const preamble = generateStreamBlockContextPreamble(
-      graph,
-      [graph],
-      [],
-      streams,
-    )
+    const preamble = generateStreamBlockContextPreamble(graph, [graph], [], streams)
     expect(preamble).toContain('format: unknown')
     expect(preamble).toContain('output: { format: unknown }')
     expect(preamble).toContain('root:')
@@ -389,9 +367,7 @@ describe('generateStreamBlockContextPreamble', () => {
     expect(preamble).toContain('type RootOutput =')
     expect(preamble).toContain('topic')
     expect(preamble).toContain('tokens')
-    expect(preamble).toContain(
-      'output: { root: { topic: string; tokens: number } }',
-    )
+    expect(preamble).toContain('output: { root: { topic: string; tokens: number } }')
   })
 
   test('switch graph with two leaf code nodes types both leaves as optional on context.output', () => {
@@ -408,6 +384,7 @@ describe('generateStreamBlockContextPreamble', () => {
       },
       range,
     }
+
     const routeNode: NodeDecl = {
       name: 'route',
       type: 'switch',
@@ -415,6 +392,7 @@ describe('generateStreamBlockContextPreamble', () => {
       configFields: {},
       range,
     }
+
     const leafA: NodeDecl = {
       name: 'leaf_a',
       type: 'code',
@@ -427,6 +405,7 @@ describe('generateStreamBlockContextPreamble', () => {
       },
       range,
     }
+
     const leafB: NodeDecl = {
       name: 'leaf_b',
       type: 'code',
@@ -439,6 +418,7 @@ describe('generateStreamBlockContextPreamble', () => {
       },
       range,
     }
+
     const graph: WorkflowDecl = {
       name: 'switch_g',
       label: 'Switch',
@@ -455,9 +435,7 @@ describe('generateStreamBlockContextPreamble', () => {
 
     expect(preamble).toContain('type Leaf_aOutput =')
     expect(preamble).toContain('type Leaf_bOutput =')
-    expect(preamble).toContain(
-      'output: { leaf_a?: { x: number }; leaf_b?: { y: string } }',
-    )
+    expect(preamble).toContain('output: { leaf_a?: { x: number }; leaf_b?: { y: string } }')
     expect(preamble).toContain('leaf_a?: { output: Leaf_aOutput }')
     expect(preamble).toContain('leaf_b?: { output: Leaf_bOutput }')
     expect(preamble).toContain('route: { output: unknown }')

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import type { Diagnostic } from '../ast'
 import { parse } from '../parser'
 import { validate } from '../validator'
@@ -33,6 +34,7 @@ stream a {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
@@ -49,6 +51,7 @@ stream s {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
@@ -66,6 +69,7 @@ stream s {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
@@ -87,6 +91,7 @@ stream s {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
@@ -104,12 +109,11 @@ stream s {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)
-    const schemaDiag = diags.find((d) =>
-      d.message.toLowerCase().includes('no schema'),
-    )
+    const schemaDiag = diags.find((d) => d.message.toLowerCase().includes('no schema'))
     expect(schemaDiag).toBeDefined()
     expect(schemaDiag?.severity).toBe('error')
   })
@@ -126,6 +130,7 @@ stream bad {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.some((e) => e.message.includes('top-level'))).toBe(true)
     /** Parser still produces a declaration; validator should catch missing coherence if any */
@@ -143,6 +148,7 @@ stream s {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     const diags = validate(ast)

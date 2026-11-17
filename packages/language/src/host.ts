@@ -78,10 +78,7 @@ export type OpenUiValidationResult =
 /** Parses and checks the body of an `@openui { … }` block. */
 export interface OpenUiSupport {
   extractBindings(source: string): OpenUiBindings
-  validate(
-    source: string,
-    options: { readonly expose: OpenUiExpose },
-  ): OpenUiValidationResult
+  validate(source: string, options: { readonly expose: OpenUiExpose }): OpenUiValidationResult
 }
 
 /** Shape every provider key must have, whatever the runtime's catalog holds. */

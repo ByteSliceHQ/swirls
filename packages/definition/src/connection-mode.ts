@@ -9,16 +9,12 @@ export type ConnectionSelfManagedFields = {
 }
 
 /** True when the connection uses vault-backed credentials instead of Fabric OAuth. */
-export function isSelfManagedConnectionBlock(
-  block: ConnectionSelfManagedFields,
-): boolean {
+export function isSelfManagedConnectionBlock(block: ConnectionSelfManagedFields): boolean {
   return Boolean(block.baseUrl && block.authRef)
 }
 
 /** True when only one of baseUrl or authRef is set (invalid partial state). */
-export function hasPartialSelfManagedFields(
-  block: ConnectionSelfManagedFields,
-): boolean {
+export function hasPartialSelfManagedFields(block: ConnectionSelfManagedFields): boolean {
   return Boolean(block.baseUrl) !== Boolean(block.authRef)
 }
 
@@ -31,5 +27,6 @@ export function connectionModePairError(
   if (hasPartialSelfManagedFields({ baseUrl, authRef })) {
     return `Connection "${connectionName}" self-managed mode requires both base_url and auth (or neither for managed OAuth).`
   }
+
   return undefined
 }

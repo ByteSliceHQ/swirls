@@ -11,22 +11,25 @@ function diag(
 
 function getSwitchCases(node: NodeDecl): string[] {
   const cv = node.configFields.cases
+
   if (!cv || cv.kind !== 'array') {
     return []
   }
-  return cv.value
-    .filter((v) => v.kind === 'string')
-    .map((v) => v.value)
+
+  return cv.value.filter((v) => v.kind === 'string').map((v) => v.value)
 }
 
 function buildAdjacency(workflow: WorkflowDecl): Map<string, string[]> {
   const adj = new Map<string, string[]>()
+
   for (const n of workflow.nodes) {
     adj.set(n.name, [])
   }
+
   for (const e of workflow.edges) {
     adj.get(e.source)?.push(e.target)
   }
+
   return adj
 }
 
@@ -49,7 +52,9 @@ export function getBranchNodes(
     if (reachable.has(name)) {
       return
     }
+
     reachable.add(name)
+
     for (const t of adj.get(name) ?? []) {
       dfs(t)
     }
@@ -58,6 +63,7 @@ export function getBranchNodes(
   for (const start of firstHop) {
     dfs(start)
   }
+
   return reachable
 }
 
@@ -74,24 +80,25 @@ export function getExclusiveSwitchBranches(
   for (const sw of switchNodes) {
     const cases = getSwitchCases(sw)
     const matching: string[] = []
+
     for (const c of cases) {
       if (getBranchNodes(workflow, sw.name, c).has(nodeName)) {
         matching.push(c)
       }
     }
+
     if (matching.length === 1) {
       result.set(sw.name, matching[0]!)
     }
   }
+
   return result
 }
 
-function getEdgeSwitchRequirements(
-  edge: EdgeDecl,
-  workflow: WorkflowDecl,
-): Map<string, string> {
+function getEdgeSwitchRequirements(edge: EdgeDecl, workflow: WorkflowDecl): Map<string, string> {
   const req = new Map<string, string>()
   const sourceNode = workflow.nodes.find((n) => n.name === edge.source)
+
   if (!sourceNode) {
     return req
   }
@@ -100,15 +107,14 @@ function getEdgeSwitchRequirements(
     if (edge.label) {
       req.set(sourceNode.name, edge.label)
     }
+
     return req
   }
 
-  for (const [sw, label] of getExclusiveSwitchBranches(
-    edge.source,
-    workflow,
-  )) {
+  for (const [sw, label] of getExclusiveSwitchBranches(edge.source, workflow)) {
     req.set(sw, label)
   }
+
   return req
 }
 
@@ -161,6 +167,7 @@ export function validateSwitchFlow(workflow: WorkflowDecl): Diagnostic[] {
   }
 
   const incomingByTarget = new Map<string, EdgeDecl[]>()
+
   for (const e of workflow.edges) {
     const list = incomingByTarget.get(e.target) ?? []
     list.push(e)
@@ -176,14 +183,17 @@ export function validateSwitchFlow(workflow: WorkflowDecl): Diagnostic[] {
     const targetRange = targetNode?.range ?? workflow.range
 
     const directSwitchLabels = new Map<string, Set<string>>()
+
     for (const e of incoming) {
       const src = nodeByName.get(e.source)
+
       if (src?.type === 'switch' && e.label) {
         const labels = directSwitchLabels.get(src.name) ?? new Set()
         labels.add(e.label)
         directSwitchLabels.set(src.name, labels)
       }
     }
+
     for (const [swName, labels] of directSwitchLabels) {
       if (labels.size > 1) {
         out.push(
@@ -196,6 +206,7 @@ export function validateSwitchFlow(workflow: WorkflowDecl): Diagnostic[] {
     }
 
     const labelsBySwitch = new Map<string, Set<string>>()
+
     for (const e of incoming) {
       for (const [sw, label] of getEdgeSwitchRequirements(e, workflow)) {
         const set = labelsBySwitch.get(sw) ?? new Set()
@@ -220,11 +231,14 @@ export function validateSwitchFlow(workflow: WorkflowDecl): Diagnostic[] {
         if (nodeByName.get(e.source)?.type === 'switch') {
           return false
         }
+
         return mustRun.has(e.source)
       })
+
       const hasBranchExclusive = incoming.some((e) =>
         getExclusiveSwitchBranches(e.source, workflow).has(swName),
       )
+
       if (hasMustRunIncoming && hasBranchExclusive) {
         out.push(
           diag(

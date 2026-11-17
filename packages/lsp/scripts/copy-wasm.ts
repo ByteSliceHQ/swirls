@@ -15,19 +15,12 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 
 const requireFromHere = createRequire(import.meta.url)
-const languageServerPkg = requireFromHere.resolve(
-  '@prisma/language-server/package.json',
-)
+const languageServerPkg = requireFromHere.resolve('@prisma/language-server/package.json')
 const requireFromLanguageServer = createRequire(languageServerPkg)
-const wasmPkg = requireFromLanguageServer.resolve(
-  '@prisma/prisma-schema-wasm/package.json',
-)
+const wasmPkg = requireFromLanguageServer.resolve('@prisma/prisma-schema-wasm/package.json')
 const wasmSource = join(dirname(wasmPkg), 'src', 'prisma_schema_build_bg.wasm')
 
-const distDir = join(
-  dirname(dirname(new URL(import.meta.url).pathname)),
-  'dist',
-)
+const distDir = join(dirname(dirname(new URL(import.meta.url).pathname)), 'dist')
 const wasmDest = join(distDir, 'prisma_schema_build_bg.wasm')
 
 mkdirSync(distDir, { recursive: true })

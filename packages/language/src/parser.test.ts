@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+
 import { parse } from './parser'
 
 const EXAMPLES_DIR = path.join(import.meta.dir, '../examples')
@@ -47,6 +48,7 @@ workflow parent {
     root -> explore
   }
 }`
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.workflows[1]?.executionTokenTtl).toBe('3h')
@@ -135,6 +137,7 @@ stream my_stream {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const graph = ast.workflows[0]
@@ -147,11 +150,11 @@ stream my_stream {
       expect(errors.length).toBe(0)
       const aiNodes = ast.workflows[0]!.nodes.filter((n) => n.type === 'ai')
       expect(aiNodes.length).toBeGreaterThan(0)
+
       const imageNode = aiNodes.find(
-        (n) =>
-          n.configFields.kind?.kind === 'string' &&
-          n.configFields.kind?.value === 'image',
+        (n) => n.configFields.kind?.kind === 'string' && n.configFields.kind?.value === 'image',
       )
+
       expect(imageNode).toBeDefined()
       expect(imageNode?.configFields.options).toBeDefined()
     })
@@ -164,6 +167,7 @@ stream my_stream {
       const root = ast.workflows[0]!.nodes[0]!
       expect(root.name).toBe('root')
       expect(root.configFields.code?.kind).toBe('ts_file_ref')
+
       if (root.configFields.code?.kind === 'ts_file_ref') {
         expect(root.configFields.code.path).toBe('./normalize-email.ts.swirls')
       }
@@ -199,6 +203,7 @@ form my_form {
     { "type": "object", "properties": { "x": { "type": "string" } } }
   }}
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.forms.length).toBe(1)
@@ -224,6 +229,7 @@ form public_form {
   schema: @json { {} }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.forms[0]?.visibility).toBe('public')
@@ -238,6 +244,7 @@ form internal_form {
   schema: @json { {} }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.forms[0]?.visibility).toBe('internal')
@@ -251,6 +258,7 @@ form legacy {
   schema: @json { {} }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.forms[0]?.visibility).toBe('internal')
@@ -265,6 +273,7 @@ form bad {
   schema: @json { {} }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBeGreaterThan(0)
       const visErr = errors.find((e) => e.message.includes('visibility'))
@@ -283,13 +292,12 @@ form bad {
   schema: @json { {} }
 }
 `
+
       const { errors } = parse(source)
       expect(errors.length).toBeGreaterThan(0)
+
       expect(
-        errors.some(
-          (e) =>
-            e.message.includes('public') || e.message.includes('visibility'),
-        ),
+        errors.some((e) => e.message.includes('public') || e.message.includes('visibility')),
       ).toBe(true)
     })
 
@@ -301,6 +309,7 @@ form bad {
   schema: @json { {} }
 }
 `
+
       const { errors } = parse(source)
       expect(errors.length).toBeGreaterThan(0)
       expect(errors.some((e) => e.message.includes('visibility'))).toBe(true)
@@ -317,6 +326,7 @@ form gated {
   schema: @json { {} }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const ref = ast.forms[0]?.authRef
@@ -333,6 +343,7 @@ form open {
   schema: @json { {} }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.forms[0]?.authRef).toBeUndefined()
@@ -346,10 +357,9 @@ form bad {
   schema: @json { {} }
 }
 `
+
       const { ast, errors } = parse(source)
-      expect(errors.some((e) => e.message.includes('auth block name'))).toBe(
-        true,
-      )
+      expect(errors.some((e) => e.message.includes('auth block name'))).toBe(true)
       expect(ast.forms[0]?.authRef).toBeUndefined()
     })
 
@@ -364,6 +374,7 @@ form bad {
   schema: @json { {} }
 }
 `
+
       const { errors } = parse(source)
       expect(errors.length).toBeGreaterThan(0)
     })
@@ -379,6 +390,7 @@ schedule daily {
   enabled: true
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.schedules.length).toBe(1)
@@ -415,6 +427,7 @@ workflow g {
     }  }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const rootNode = ast.workflows[0]?.nodes.find((n) => n.name === 'root')
@@ -444,12 +457,14 @@ workflow g {
   flow { root -> n }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const n = ast.workflows[0]?.nodes.find((node) => node.name === 'n')
       expect(n).toBeDefined()
       expect(n?.outputSchema).toBeDefined()
-      expect((n?.outputSchema as Record<string, unknown>).properties).toEqual({
+
+      expect(n?.outputSchema?.properties).toEqual({
         y: { type: 'number' },
       })
     })
@@ -473,6 +488,7 @@ workflow g {
   flow { root -> bad }
 }
 `
+
       const { errors } = parse(source)
       expect(errors.length).toBeGreaterThan(0)
       expect(errors.some((e) => e.message.includes('inputSchema'))).toBe(true)
@@ -497,13 +513,12 @@ workflow g {
   flow { root -> bad }
 }
 `
+
       const { errors } = parse(source)
       expect(errors.length).toBeGreaterThan(0)
+
       expect(
-        errors.some(
-          (e) =>
-            e.message.includes('schema') && e.message.includes('outputSchema'),
-        ),
+        errors.some((e) => e.message.includes('schema') && e.message.includes('outputSchema')),
       ).toBe(true)
     })
   })
@@ -531,6 +546,7 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.workflows.length).toBe(1)
@@ -556,15 +572,14 @@ workflow g {
     }  }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const n = ast.workflows[0]!.nodes[0]!
       expect(n.type).toBe('code')
       const codeConfig = n.configFields.code
       expect(codeConfig?.kind).toBe('ts_block')
-      expect(
-        typeof (codeConfig?.kind === 'ts_block' ? codeConfig.code : undefined),
-      ).toBe('string')
+      expect(typeof (codeConfig?.kind === 'ts_block' ? codeConfig.code : undefined)).toBe('string')
     })
 
     test('node with ts_file_ref', () => {
@@ -577,11 +592,13 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const n = ast.workflows[0]!.nodes[0]!
       const codeConfig = n.configFields.code
       expect(codeConfig?.kind).toBe('ts_file_ref')
+
       if (codeConfig?.kind === 'ts_file_ref') {
         expect(codeConfig.path).toBe('./x.ts.swirls')
       }
@@ -622,13 +639,16 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const g = ast.workflows[0]!
       const root = g.nodes.find((x) => x.isRoot)
+
       expect(root?.secretsMap).toEqual({
         svc: ['MY_KEY', 'OPENROUTER_API_KEY'],
       })
+
       const n = g.nodes.find((x) => x.name === 'n')
       expect(n?.secretsMap).toEqual({ pay: ['STRIPE_SECRET'] })
     })
@@ -662,6 +682,7 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const edges = ast.workflows[0]!.edges
@@ -677,17 +698,10 @@ workflow g {
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.secrets.length).toBe(4)
-      expect(ast.secrets.map((s) => s.name)).toEqual([
-        'gh',
-        'api_k',
-        'basic_s',
-        'tok',
-      ])
+      expect(ast.secrets.map((s) => s.name)).toEqual(['gh', 'api_k', 'basic_s', 'tok'])
       const ghSecret = ast.secrets.find((s) => s.name === 'gh')
       expect(ghSecret?.label).toBe('GitHub OAuth client')
-      expect(ghSecret?.description).toBe(
-        'Client credentials for the example integration',
-      )
+      expect(ghSecret?.description).toBe('Client credentials for the example integration')
       expect(ast.auths.length).toBe(4)
       const oauth = ast.auths.find((a) => a.name === 'oauth_ex')
       expect(oauth?.label).toBe('Example OAuth')
@@ -703,14 +717,12 @@ secret llm_keys {
   vars: [OPENROUTER_API_KEY, RESEND_API_KEY]
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.secrets).toHaveLength(1)
       expect(ast.secrets[0]?.type).toBe('managed')
-      expect(ast.secrets[0]?.vars).toEqual([
-        'OPENROUTER_API_KEY',
-        'RESEND_API_KEY',
-      ])
+      expect(ast.secrets[0]?.vars).toEqual(['OPENROUTER_API_KEY', 'RESEND_API_KEY'])
     })
 
     test('errors on unknown secret type', () => {
@@ -720,10 +732,9 @@ secret llm_keys {
   vars: [OPENROUTER_API_KEY]
 }
 `
+
       const { errors } = parse(source)
-      expect(
-        errors.some((e) => e.message.includes('Unknown secret type')),
-      ).toBe(true)
+      expect(errors.some((e) => e.message.includes('Unknown secret type'))).toBe(true)
     })
 
     test('node secrets map and http auth ref', () => {
@@ -755,13 +766,14 @@ workflow g {
   flow { root -> h }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const root = ast.workflows[0]?.nodes.find((n) => n.isRoot)
       expect(root?.secretsMap).toEqual({ sblock: ['K1'] })
       const h = ast.workflows[0]?.nodes.find((n) => n.name === 'h')
       expect(h?.configFields.auth?.kind).toBe('string')
-      expect((h?.configFields.auth as { value: string }).value).toBe('a1')
+      expect(h?.configFields.auth).toMatchObject({ value: 'a1' })
     })
   })
 
@@ -801,6 +813,7 @@ trigger t1 { form:f -> g enabled: true }
 trigger t2 { webhook:w -> g }
 trigger t3 { schedule:s -> g }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.triggers.length).toBe(3)
@@ -822,6 +835,7 @@ form x {
     {}
   }}
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.forms[0]?.docComment?.trim()).toBe('Doc for form')
@@ -838,6 +852,7 @@ form f {
     {}
   }}
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.version).toBe(1)
@@ -849,10 +864,12 @@ form f {
       const source = loadSource(FIXTURES_DIR, 'invalid-syntax.swirls')
       const { ast, errors } = parse(source)
       expect(errors.length).toBeGreaterThan(0)
+
       errors.forEach((e) => {
         expect(e.message).toBeDefined()
         expect(e.range.start.line).toBeGreaterThanOrEqual(1)
       })
+
       expect(ast.forms.length).toBeGreaterThanOrEqual(0)
     })
   })
@@ -872,11 +889,13 @@ app client_portal {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       // New grammar requires `key: value`; colon-free body yields parse errors
       // and does not produce a well-formed AppDecl with pages.
       expect(errors.length).toBeGreaterThan(0)
       const app = ast.apps[0]
+
       if (app) {
         expect(app.pages.length).toBe(0)
       }
@@ -898,6 +917,7 @@ channel support {
   agent: triage
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors).toEqual([])
       expect(ast.apps.map((a) => a.name)).toEqual(['support_center'])
@@ -942,6 +962,7 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.schemas.length).toBe(1)
@@ -976,6 +997,7 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const root = ast.workflows[0]?.nodes.find((n) => n.isRoot)
@@ -997,20 +1019,22 @@ workflow g {
         const source = loadSource(EXAMPLES_DIR, file)
         const { ast, errors } = parse(source)
         expect(errors.length).toBe(0)
+
         for (const g of ast.workflows) {
           const nodeNames = new Set(g.nodes.map((n) => n.name))
+
           for (const e of g.edges) {
             expect(nodeNames.has(e.source)).toBe(true)
             expect(nodeNames.has(e.target)).toBe(true)
           }
+
           if (g.edges.length > 0) {
             expect(g.flowRange).toBeDefined()
           }
         }
+
         for (const t of ast.triggers) {
-          const graphExists = ast.workflows.some(
-            (gr) => gr.name === t.workflowName,
-          )
+          const graphExists = ast.workflows.some((gr) => gr.name === t.workflowName)
           expect(graphExists).toBe(true)
         }
       })
@@ -1030,15 +1054,18 @@ webhook stripe_hook {
   header: "Stripe-Security"
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.webhooks.length).toBe(1)
       const w = ast.webhooks[0]!
+
       expect(w.secretRef).toEqual({
         blockName: 'my_secret',
         varName: 'STRIPE',
         range: expect.any(Object),
       })
+
       expect(w.header?.value).toBe('Stripe-Security')
     })
 
@@ -1048,6 +1075,7 @@ webhook anon {
   label: "Anon"
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       expect(ast.webhooks[0]?.secretRef).toBeUndefined()
@@ -1066,14 +1094,17 @@ describe('top-level keyword list', () => {
           : kind === 'action'
             ? 'action a { provider: acme }'
             : 'query q { }'
+
       const { ast } = parse(`form broken { label: }\n${next}\nform after { label: "After" }\n`)
       expect(ast.forms.map((f) => f.name)).toContain('after')
+
       const parsed =
         kind === 'skill'
           ? [ast.skill].flat().filter(Boolean).length
           : kind === 'action'
             ? (ast.actions ?? []).length
             : (ast.queries ?? []).length
+
       expect(parsed).toBe(1)
     },
   )

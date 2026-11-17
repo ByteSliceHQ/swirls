@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { validateChannelBlocks } from './validator'
 
@@ -31,6 +32,7 @@ channel research_slack {
   mode: mention
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
     expect(errors).toEqual([])
@@ -58,6 +60,7 @@ channel support_slack_two {
   mode: mention
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
     expect(errors.length).toBeGreaterThan(0)
@@ -84,6 +87,7 @@ channel web_sales {
   agent: concierge
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
     expect(errors).toEqual([])
@@ -109,6 +113,7 @@ channel web_concierge {
   agent: concierge
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
     expect(errors.length).toBeGreaterThan(0)
@@ -129,6 +134,7 @@ channel web_concierge {
   agent: concierge
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
     expect(errors).toEqual([])
@@ -154,6 +160,7 @@ channel finance {
   connector: client_portal
 }
 `
+
     const { ast } = parse(source)
     expect(validateChannelBlocks(ast)).toEqual([])
   })
@@ -165,12 +172,12 @@ channel finance {
   agent: finance_guy
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('with platform "mcp" must declare a connector'),
-      ),
+      errors.some((e) => e.message.includes('with platform "mcp" must declare a connector')),
     ).toBe(true)
   })
 
@@ -188,14 +195,11 @@ channel finance {
   mode: dm
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
-    expect(
-      errors.some((e) => e.message.includes('must not declare a connection')),
-    ).toBe(true)
-    expect(
-      errors.some((e) => e.message.includes('must not declare a mode')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('must not declare a connection'))).toBe(true)
+    expect(errors.some((e) => e.message.includes('must not declare a mode'))).toBe(true)
   })
 
   test('(b) forbids connector on non-mcp channels', () => {
@@ -206,12 +210,12 @@ channel finance {
   connector: client_portal
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('"connector:" is only valid for platform "mcp"'),
-      ),
+      errors.some((e) => e.message.includes('"connector:" is only valid for platform "mcp"')),
     ).toBe(true)
   })
 
@@ -230,6 +234,7 @@ channel support {
   agent: triage
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.channels[0]?.platform).toBe('swirls')
@@ -246,6 +251,7 @@ channel support {
   mode: all
 }
 `
+
     const { ast } = parse(source)
     expect(ast.channels[0]?.mode).toBe('all')
     expect(validateChannelBlocks(ast)).toEqual([])
@@ -259,12 +265,12 @@ channel support {
   mode: dm
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('with platform "swirls" does not support mode "dm"'),
-      ),
+      errors.some((e) => e.message.includes('with platform "swirls" does not support mode "dm"')),
     ).toBe(true)
   })
 
@@ -274,16 +280,15 @@ channel support {
   platform: swirls
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('with platform "swirls" must declare an agent'),
-      ),
+      errors.some((e) => e.message.includes('with platform "swirls" must declare an agent')),
     ).toBe(true)
-    expect(
-      errors.some((e) => e.message.includes('references unknown agent')),
-    ).toBe(false)
+
+    expect(errors.some((e) => e.message.includes('references unknown agent'))).toBe(false)
   })
 
   test('allows several portal rooms fronted by the same agent', () => {
@@ -298,6 +303,7 @@ channel escalations {
   agent: triage
 }
 `
+
     const { ast } = parse(source)
     expect(validateChannelBlocks(ast)).toEqual([])
   })
@@ -314,6 +320,7 @@ channel support {
   agent: triage
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
     expect(errors.length).toBeGreaterThan(0)
@@ -328,6 +335,7 @@ channel support {
   mode: ambient
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.channels[0]?.mode).toBe('ambient')
@@ -343,13 +351,13 @@ channel support {
   mode: ambient
 }
 `
+
       const { ast } = parse(source)
       const errors = validateChannelBlocks(ast)
+
       expect(
         errors.some((e) =>
-          e.message.includes(
-            `with platform "${platform}" does not support mode "ambient" yet`,
-          ),
+          e.message.includes(`with platform "${platform}" does not support mode "ambient" yet`),
         ),
       ).toBe(true)
     }
@@ -364,13 +372,14 @@ channel finance {
   mode: ambient
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('with platform "mcp" must not declare a mode'),
-      ),
+      errors.some((e) => e.message.includes('with platform "mcp" must not declare a mode')),
     ).toBe(true)
+
     expect(errors.some((e) => e.message.includes('mode "ambient"'))).toBe(false)
   })
 
@@ -385,6 +394,7 @@ channel support {
   max_unprompted_per_hour: 6
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(validateChannelBlocks(ast)).toEqual([])
@@ -401,6 +411,7 @@ channel support {
   max_unprompted_per_hour: 6
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(validateChannelBlocks(ast)).toEqual([])
@@ -417,14 +428,12 @@ channel finance {
   max_unprompted_per_hour: 6
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const messages = validateChannelBlocks(ast).map((e) => e.message)
-    for (const key of [
-      'engagement_timeout',
-      'cooldown',
-      'max_unprompted_per_hour',
-    ]) {
+
+    for (const key of ['engagement_timeout', 'cooldown', 'max_unprompted_per_hour']) {
       expect(
         messages.some(
           (m) =>
@@ -443,38 +452,33 @@ channel support {
 ${body}
 }
 `)
+
     expect(errors).toEqual([])
     return ast
   }
 
   test('accepts engagement_timeout at the one-day ceiling and rejects a step past it', () => {
+    expect(validateChannelBlocks(portalChannelWith('  engagement_timeout: "24h"'))).toEqual([])
+
     expect(
-      validateChannelBlocks(portalChannelWith('  engagement_timeout: "24h"')),
-    ).toEqual([])
-    expect(
-      validateChannelBlocks(
-        portalChannelWith('  engagement_timeout: "1441m"'),
-      ).some((e) => e.message.includes('engagement_timeout must be at most')),
+      validateChannelBlocks(portalChannelWith('  engagement_timeout: "1441m"')).some((e) =>
+        e.message.includes('engagement_timeout must be at most'),
+      ),
     ).toBe(true)
   })
 
   test('rejects a zero engagement_timeout', () => {
     expect(
-      validateChannelBlocks(
-        portalChannelWith('  engagement_timeout: "0s"'),
-      ).some((e) =>
+      validateChannelBlocks(portalChannelWith('  engagement_timeout: "0s"')).some((e) =>
         e.message.includes('engagement_timeout must be longer than zero'),
       ),
     ).toBe(true)
   })
 
   test('accepts a zero cooldown and rejects one past the ceiling', () => {
-    expect(
-      validateChannelBlocks(portalChannelWith('  cooldown: "0s"')),
-    ).toEqual([])
-    expect(
-      validateChannelBlocks(portalChannelWith('  cooldown: "24h"')),
-    ).toEqual([])
+    expect(validateChannelBlocks(portalChannelWith('  cooldown: "0s"'))).toEqual([])
+    expect(validateChannelBlocks(portalChannelWith('  cooldown: "24h"'))).toEqual([])
+
     expect(
       validateChannelBlocks(portalChannelWith('  cooldown: "25h"')).some((e) =>
         e.message.includes('cooldown must be at most'),
@@ -485,15 +489,9 @@ ${body}
   test('rejects a duration literal that does not match the grammar', () => {
     // The parser already refuses unquoted and non-string values, so the
     // remaining path into this check is a quoted literal with a bad unit.
-    for (const literal of [
-      '30 minutes',
-      '30',
-      'thirty',
-      '30d',
-      '1.5h',
-      '-5m',
-    ]) {
+    for (const literal of ['30 minutes', '30', 'thirty', '30d', '1.5h', '-5m']) {
       const ast = portalChannelWith(`  cooldown: "${literal}"`)
+
       expect(
         validateChannelBlocks(ast).some((e) =>
           e.message.includes('cooldown must be a quoted duration'),
@@ -503,17 +501,12 @@ ${body}
   })
 
   test('accepts max_unprompted_per_hour of zero and rejects negatives or fractions', () => {
-    expect(
-      validateChannelBlocks(portalChannelWith('  max_unprompted_per_hour: 0')),
-    ).toEqual([])
+    expect(validateChannelBlocks(portalChannelWith('  max_unprompted_per_hour: 0'))).toEqual([])
+
     for (const value of ['-1', '2.5']) {
       expect(
-        validateChannelBlocks(
-          portalChannelWith(`  max_unprompted_per_hour: ${value}`),
-        ).some((e) =>
-          e.message.includes(
-            'max_unprompted_per_hour must be a whole number of 0 or more',
-          ),
+        validateChannelBlocks(portalChannelWith(`  max_unprompted_per_hour: ${value}`)).some((e) =>
+          e.message.includes('max_unprompted_per_hour must be a whole number of 0 or more'),
         ),
       ).toBe(true)
     }
@@ -527,12 +520,12 @@ channel finance {
   connector: missing_connector
 }
 `
+
     const { ast } = parse(source)
     const errors = validateChannelBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('references unknown connector "missing_connector"'),
-      ),
+      errors.some((e) => e.message.includes('references unknown connector "missing_connector"')),
     ).toBe(true)
   })
 })

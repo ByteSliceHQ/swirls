@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+
 import type { Diagnostic } from '../ast'
 import { parse } from '../parser'
 import { validate } from '../validator'
@@ -41,6 +42,7 @@ postgres db {
   table t2 { schema: @json { { "type": "object", "properties": { "a": { "type": "string" } } } } }
 }
 `)
+
     expect(hasDiag(diags, 'Duplicate postgres block name "db"')).toBe(true)
   })
 
@@ -52,9 +54,8 @@ postgres db {
   table t { schema: @json { { "type": "object", "properties": { "a": { "type": "string" } } } } }
 }
 `)
-    expect(
-      hasDiag(diags, 'references undefined secret block "nonexistent"'),
-    ).toBe(true)
+
+    expect(hasDiag(diags, 'references undefined secret block "nonexistent"')).toBe(true)
   })
 
   test('connection references nonexistent var in secret block', () => {
@@ -69,9 +70,8 @@ postgres db {
   table t { schema: @json { { "type": "object", "properties": { "a": { "type": "string" } } } } }
 }
 `)
-    expect(
-      hasDiag(diags, 'must reference a var from secret block "creds"'),
-    ).toBe(true)
+
+    expect(hasDiag(diags, 'must reference a var from secret block "creds"')).toBe(true)
   })
 
   test('literal connection string produces warning', () => {
@@ -81,6 +81,7 @@ postgres db {
   table t { schema: @json { { "type": "object", "properties": { "a": { "type": "string" } } } } }
 }
 `)
+
     const warning = diags.find((d) => d.message.includes('plaintext string'))
     expect(warning).toBeDefined()
     expect(warning?.severity).toBe('warning')
@@ -92,6 +93,7 @@ postgres db {
   connection: PG_URL
 }
 `)
+
     expect(hasDiag(diags, 'must declare at least one table')).toBe(true)
   })
 
@@ -103,9 +105,8 @@ postgres db {
   table t { schema: @json { { "type": "object", "properties": { "b": { "type": "string" } } } } }
 }
 `)
-    expect(hasDiag(diags, 'Duplicate table name "t" in postgres block')).toBe(
-      true,
-    )
+
+    expect(hasDiag(diags, 'Duplicate table name "t" in postgres block')).toBe(true)
   })
 
   test('table without schema produces error', () => {
@@ -115,6 +116,7 @@ postgres db {
   table t { schema: @json { {} } }
 }
 `)
+
     expect(hasDiag(diags, 'requires a schema')).toBe(true)
   })
 })
@@ -135,6 +137,7 @@ workflow g {
   }
 }
 `)
+
     expect(hasDiag(diags, 'requires a "postgres" field')).toBe(true)
   })
 
@@ -150,9 +153,8 @@ workflow g {
   }
 }
 `)
-    expect(
-      hasDiag(diags, 'references undefined postgres block "nonexistent"'),
-    ).toBe(true)
+
+    expect(hasDiag(diags, 'references undefined postgres block "nonexistent"')).toBe(true)
   })
 
   test('both select and insert', () => {
@@ -172,6 +174,7 @@ workflow g {
   }
 }
 `)
+
     expect(
       hasDiag(
         diags,
@@ -195,11 +198,9 @@ workflow g {
   }
 }
 `)
+
     expect(
-      hasDiag(
-        diags,
-        'requires exactly one of "select", "insert", "update", or "delete"',
-      ),
+      hasDiag(diags, 'requires exactly one of "select", "insert", "update", or "delete"'),
     ).toBe(true)
   })
 
@@ -218,6 +219,7 @@ workflow g {
   }
 }
 `)
+
     expect(hasDiag(diags, 'must be a SELECT statement')).toBe(true)
   })
 
@@ -236,6 +238,7 @@ workflow g {
   }
 }
 `)
+
     expect(hasDiag(diags, 'requires a "params"')).toBe(true)
   })
 
@@ -255,11 +258,9 @@ workflow g {
   }
 }
 `)
+
     expect(
-      hasDiag(
-        diags,
-        'condition is only valid on postgres write nodes (insert, update, delete)',
-      ),
+      hasDiag(diags, 'condition is only valid on postgres write nodes (insert, update, delete)'),
     ).toBe(true)
   })
 
@@ -278,6 +279,7 @@ workflow g {
   }
 }
 `)
+
     expect(hasDiag(diags, 'not declared in postgres block "db"')).toBe(true)
   })
 
@@ -297,11 +299,9 @@ workflow g {
   }
 }
 `)
+
     expect(
-      hasDiag(
-        diags,
-        'Placeholder "{{typo}}" is not declared on table "t" in postgres block "db"',
-      ),
+      hasDiag(diags, 'Placeholder "{{typo}}" is not declared on table "t" in postgres block "db"'),
     ).toBe(false)
   })
 
@@ -321,11 +321,9 @@ workflow g {
   }
 }
 `)
+
     expect(
-      hasDiag(
-        diags,
-        'Params key "extra" is not declared on table "t" in postgres block "db"',
-      ),
+      hasDiag(diags, 'Params key "extra" is not declared on table "t" in postgres block "db"'),
     ).toBe(false)
   })
 
@@ -345,11 +343,9 @@ workflow g {
   }
 }
 `)
+
     expect(
-      hasDiag(
-        diags,
-        'Column "wrong_col" is not declared on table "t" in postgres block "db"',
-      ),
+      hasDiag(diags, 'Column "wrong_col" is not declared on table "t" in postgres block "db"'),
     ).toBe(true)
   })
 
@@ -369,11 +365,9 @@ workflow g {
   }
 }
 `)
+
     expect(
-      hasDiag(
-        diags,
-        'Postgres INSERT VALUES clause must wrap row values in parentheses',
-      ),
+      hasDiag(diags, 'Postgres INSERT VALUES clause must wrap row values in parentheses'),
     ).toBe(true)
   })
 
@@ -393,11 +387,9 @@ workflow g {
   }
 }
 `)
+
     expect(
-      hasDiag(
-        diags,
-        'Postgres INSERT VALUES clause must wrap row values in parentheses',
-      ),
+      hasDiag(diags, 'Postgres INSERT VALUES clause must wrap row values in parentheses'),
     ).toBe(false)
   })
 
@@ -418,6 +410,7 @@ workflow g {
   }
 }
 `)
+
     expect(diags.filter((d) => d.severity === 'error')).toEqual([])
     expect(diags.filter((d) => d.severity === 'warning')).toEqual([])
   })
@@ -438,6 +431,7 @@ workflow g {
   }
 }
 `)
+
     expect(diags).toEqual([])
   })
 
@@ -456,9 +450,8 @@ workflow g {
   }
 }
 `)
-    expect(hasDiag(diags, 'Postgres update must be an UPDATE statement')).toBe(
-      true,
-    )
+
+    expect(hasDiag(diags, 'Postgres update must be an UPDATE statement')).toBe(true)
   })
 
   test('delete with non-DELETE SQL', () => {
@@ -476,9 +469,8 @@ workflow g {
   }
 }
 `)
-    expect(hasDiag(diags, 'Postgres delete must be a DELETE statement')).toBe(
-      true,
-    )
+
+    expect(hasDiag(diags, 'Postgres delete must be a DELETE statement')).toBe(true)
   })
 
   test('update without WHERE warns about whole-table write', () => {
@@ -497,9 +489,8 @@ workflow g {
   }
 }
 `)
-    const warning = diags.find((d) =>
-      d.message.includes('Postgres UPDATE has no WHERE clause'),
-    )
+
+    const warning = diags.find((d) => d.message.includes('Postgres UPDATE has no WHERE clause'))
     expect(warning?.severity).toBe('warning')
   })
 
@@ -518,9 +509,8 @@ workflow g {
   }
 }
 `)
-    const warning = diags.find((d) =>
-      d.message.includes('Postgres DELETE has no WHERE clause'),
-    )
+
+    const warning = diags.find((d) => d.message.includes('Postgres DELETE has no WHERE clause'))
     expect(warning?.severity).toBe('warning')
   })
 
@@ -539,6 +529,7 @@ workflow g {
   }
 }
 `)
+
     expect(
       hasDiag(
         diags,
@@ -562,6 +553,7 @@ workflow g {
   }
 }
 `)
+
     expect(
       hasDiag(
         diags,
@@ -585,6 +577,7 @@ workflow g {
   }
 }
 `)
+
     expect(diags).toEqual([])
   })
 
@@ -604,11 +597,9 @@ workflow g {
   }
 }
 `)
+
     expect(
-      hasDiag(
-        diags,
-        'Column "wrong_col" is not declared on table "t" in postgres block "db"',
-      ),
+      hasDiag(diags, 'Column "wrong_col" is not declared on table "t" in postgres block "db"'),
     ).toBe(true)
   })
 
@@ -627,6 +618,7 @@ workflow g {
   }
 }
 `)
+
     expect(hasDiag(diags, 'not declared in postgres block "db"')).toBe(true)
   })
 
@@ -646,11 +638,9 @@ workflow g {
   }
 }
 `)
+
     expect(
-      hasDiag(
-        diags,
-        'SQL placeholder "{{missing}}" has no matching key in params return object',
-      ),
+      hasDiag(diags, 'SQL placeholder "{{missing}}" has no matching key in params return object'),
     ).toBe(true)
   })
 
@@ -670,6 +660,7 @@ workflow g {
   }
 }
 `)
+
     expect(diags).toEqual([])
   })
 })

@@ -94,9 +94,7 @@ export function getSelectResultColumns(sql: string): SelectColumnsResult {
     const names: string[] = []
 
     for (const col of columns) {
-      const name = getColumnNameFromExpr(
-        col as Parameters<typeof getColumnNameFromExpr>[0],
-      )
+      const name = getColumnNameFromExpr(col as Parameters<typeof getColumnNameFromExpr>[0])
 
       if (name === '*') {
         return { kind: 'star' }

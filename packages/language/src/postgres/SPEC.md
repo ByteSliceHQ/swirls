@@ -69,12 +69,12 @@ postgres my_db {
 
 ### Fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `label` | no | Human-readable label. |
-| `secrets` | no | References a top-level `secret` block; validates `connection` bare identifiers against that block’s `vars`. |
-| `connection` | yes | Postgres connection string: bare identifier (secret ref) or quoted literal (local dev; validator warning). |
-| `table <name> { }` | yes (≥1) | Declares a table available for validation; at least one table per block. |
+| Field              | Required | Description                                                                                                 |
+| ------------------ | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `label`            | no       | Human-readable label.                                                                                       |
+| `secrets`          | no       | References a top-level `secret` block; validates `connection` bare identifiers against that block’s `vars`. |
+| `connection`       | yes      | Postgres connection string: bare identifier (secret ref) or quoted literal (local dev; validator warning).  |
+| `table <name> { }` | yes (≥1) | Declares a table available for validation; at least one table per block.                                    |
 
 ### Connection and secrets
 
@@ -150,13 +150,13 @@ node load_leads {
 
 These fields apply to nodes that use **`select:`** for reads. For writes, see §3.
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `label` | no | Human-readable label for the node. |
-| `postgres` | yes | Name of a top-level `postgres` block. |
-| `select` | yes | `@sql` block: must be a `SELECT` statement. |
-| `params` | optional | `@ts` block returning a **plain object** whose keys match `{{key}}` placeholders in the SQL (required when the SQL contains placeholders). |
-| `schema` / `outputSchema` | recommended | JSON Schema for query result rows (e.g. array of objects). |
+| Field                     | Required    | Description                                                                                                                                |
+| ------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `label`                   | no          | Human-readable label for the node.                                                                                                         |
+| `postgres`                | yes         | Name of a top-level `postgres` block.                                                                                                      |
+| `select`                  | yes         | `@sql` block: must be a `SELECT` statement.                                                                                                |
+| `params`                  | optional    | `@ts` block returning a **plain object** whose keys match `{{key}}` placeholders in the SQL (required when the SQL contains placeholders). |
+| `schema` / `outputSchema` | recommended | JSON Schema for query result rows (e.g. array of objects).                                                                                 |
 
 ---
 
@@ -216,14 +216,14 @@ node upsert_lead {
 
 These fields apply to nodes that use **`insert:`** for writes. For reads, see §2.
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `label` | no | Human-readable label for the node. |
-| `postgres` | yes | Name of a top-level `postgres` block. |
-| `insert` | yes | `@sql` block: must be an `INSERT` (or upsert) statement. |
-| `params` | **required** | `@ts` block returning a **plain object** whose keys match `{{key}}` placeholders in the SQL. |
-| `condition` | no | `@ts` block returning boolean; if false, the insert is skipped. |
-| `schema` / `outputSchema` | n/a | Not used for typical insert nodes (no row output by default). |
+| Field                     | Required     | Description                                                                                  |
+| ------------------------- | ------------ | -------------------------------------------------------------------------------------------- |
+| `label`                   | no           | Human-readable label for the node.                                                           |
+| `postgres`                | yes          | Name of a top-level `postgres` block.                                                        |
+| `insert`                  | yes          | `@sql` block: must be an `INSERT` (or upsert) statement.                                     |
+| `params`                  | **required** | `@ts` block returning a **plain object** whose keys match `{{key}}` placeholders in the SQL. |
+| `condition`               | no           | `@ts` block returning boolean; if false, the insert is skipped.                              |
+| `schema` / `outputSchema` | n/a          | Not used for typical insert nodes (no row output by default).                                |
 
 Include the node in `flow { ... }` like any other node.
 
@@ -261,14 +261,14 @@ node refresh_score {
 
 ### Fields (write / `update:`)
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `label` | no | Human-readable label for the node. |
-| `postgres` | yes | Name of a top-level `postgres` block. |
-| `update` | yes | `@sql` block: must be an `UPDATE` statement. |
-| `params` | required when the SQL has `{{...}}` placeholders | `@ts` block returning a **plain object** whose keys match `{{key}}` placeholders in the SQL. |
-| `condition` | no | `@ts` block returning boolean; if false, the update is skipped. |
-| `schema` / `outputSchema` | n/a | Not used (no row output by default). |
+| Field                     | Required                                         | Description                                                                                  |
+| ------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `label`                   | no                                               | Human-readable label for the node.                                                           |
+| `postgres`                | yes                                              | Name of a top-level `postgres` block.                                                        |
+| `update`                  | yes                                              | `@sql` block: must be an `UPDATE` statement.                                                 |
+| `params`                  | required when the SQL has `{{...}}` placeholders | `@ts` block returning a **plain object** whose keys match `{{key}}` placeholders in the SQL. |
+| `condition`               | no                                               | `@ts` block returning boolean; if false, the update is skipped.                              |
+| `schema` / `outputSchema` | n/a                                              | Not used (no row output by default).                                                         |
 
 An `UPDATE` without a `WHERE` clause modifies every row in the table; the validator
 emits a **warning**. Explicit `SET col = ...` column names are validated against the
@@ -304,14 +304,14 @@ node purge_stale_leads {
 
 ### Fields (write / `delete:`)
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `label` | no | Human-readable label for the node. |
-| `postgres` | yes | Name of a top-level `postgres` block. |
-| `delete` | yes | `@sql` block: must be a `DELETE` statement. |
-| `params` | required when the SQL has `{{...}}` placeholders | `@ts` block returning a **plain object** whose keys match `{{key}}` placeholders in the SQL. |
-| `condition` | no | `@ts` block returning boolean; if false, the delete is skipped. |
-| `schema` / `outputSchema` | n/a | Not used (no row output by default). |
+| Field                     | Required                                         | Description                                                                                  |
+| ------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `label`                   | no                                               | Human-readable label for the node.                                                           |
+| `postgres`                | yes                                              | Name of a top-level `postgres` block.                                                        |
+| `delete`                  | yes                                              | `@sql` block: must be a `DELETE` statement.                                                  |
+| `params`                  | required when the SQL has `{{...}}` placeholders | `@ts` block returning a **plain object** whose keys match `{{key}}` placeholders in the SQL. |
+| `condition`               | no                                               | `@ts` block returning boolean; if false, the delete is skipped.                              |
+| `schema` / `outputSchema` | n/a                                              | Not used (no row output by default).                                                         |
 
 A `DELETE` without a `WHERE` clause removes every row in the table; the validator
 emits a **warning**.
@@ -348,20 +348,19 @@ Table names are taken from the SQL (`FROM`, `INSERT INTO`, …) and matched agai
 
 ## 7. Field matrix (quick reference)
 
-| Field | `select:` node | `insert:` node | `update:` node | `delete:` node |
-|-------|----------------|----------------|----------------|----------------|
-| `label:` | optional | optional | optional | optional |
-| `postgres:` | required | required | required | required |
-| `select:` | required | — | — | — |
-| `insert:` | — | required | — | — |
-| `update:` | — | — | required | — |
-| `delete:` | — | — | — | required |
-| `params:` | optional (required if SQL has `{{...}}`) | required | required if SQL has `{{...}}` | required if SQL has `{{...}}` |
-| `schema:` / `outputSchema` | recommended | n/a | n/a | n/a |
-| `condition:` | — | optional | optional | optional |
+| Field                      | `select:` node                           | `insert:` node | `update:` node                | `delete:` node                |
+| -------------------------- | ---------------------------------------- | -------------- | ----------------------------- | ----------------------------- |
+| `label:`                   | optional                                 | optional       | optional                      | optional                      |
+| `postgres:`                | required                                 | required       | required                      | required                      |
+| `select:`                  | required                                 | —              | —                             | —                             |
+| `insert:`                  | —                                        | required       | —                             | —                             |
+| `update:`                  | —                                        | —              | required                      | —                             |
+| `delete:`                  | —                                        | —              | —                             | required                      |
+| `params:`                  | optional (required if SQL has `{{...}}`) | required       | required if SQL has `{{...}}` | required if SQL has `{{...}}` |
+| `schema:` / `outputSchema` | recommended                              | n/a            | n/a                           | n/a                           |
+| `condition:`               | —                                        | optional       | optional                      | optional                      |
 
 ---
-
 
 ## 8. AST (conceptual)
 
@@ -392,10 +391,10 @@ Implementation lives under `packages/language/src/postgres/` (`ast.ts`, `parser.
 
 ## 11. Design decisions
 
-| Decision | Choice |
-|----------|--------|
-| Top-level keyword | `postgres` — domain-specific, no conditional `type` field. |
-| Reads vs writes | `select:` for reads; `insert:` / `update:` / `delete:` for writes — one SQL entry point per node. |
-| Parameters | `params:` returns a **named object**; `{{key}}` → `$N` at runtime. |
-| Graph writes | Regular nodes in `flow`, not separate persist finalizers. |
-| `table:` on nodes | Omitted — derived from SQL for validation and LSP. |
+| Decision          | Choice                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------- |
+| Top-level keyword | `postgres` — domain-specific, no conditional `type` field.                                        |
+| Reads vs writes   | `select:` for reads; `insert:` / `update:` / `delete:` for writes — one SQL entry point per node. |
+| Parameters        | `params:` returns a **named object**; `{{key}}` → `$N` at runtime.                                |
+| Graph writes      | Regular nodes in `flow`, not separate persist finalizers.                                         |
+| `table:` on nodes | Omitted — derived from SQL for validation and LSP.                                                |

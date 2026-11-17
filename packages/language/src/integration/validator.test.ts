@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+
 import { validateMockBlocks } from '../mock/validator'
 import { parse } from '../parser'
 import { validate } from '../validator'
@@ -60,6 +61,7 @@ workflow notify {
   flow { root -> post_slack }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const diags = validate(ast)
@@ -82,11 +84,10 @@ workflow notify {
   flow { root -> post_slack }
 }
 `
+
     const { ast } = parse(source)
     const diags = validate(ast)
-    expect(
-      diags.some((d) => d.message.includes('"params" must be a @ts block')),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('"params" must be a @ts block'))).toBe(true)
   })
 
   test('errors when action and path are both set', () => {
@@ -105,13 +106,10 @@ workflow notify {
   flow { root -> post_slack }
 }
 `
+
     const { ast } = parse(source)
     const diags = validate(ast)
-    expect(
-      diags.some((d) =>
-        d.message.includes('either "action" or "path", not both'),
-      ),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('either "action" or "path", not both'))).toBe(true)
   })
 
   test('errors for unknown action block', () => {
@@ -128,13 +126,10 @@ workflow notify {
   flow { root -> post_slack }
 }
 `
+
     const { ast } = parse(source)
     const diags = validate(ast)
-    expect(
-      diags.some((d) =>
-        d.message.includes('references undefined action block'),
-      ),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('references undefined action block'))).toBe(true)
   })
 
   test('warns on raw path without action', () => {
@@ -151,13 +146,13 @@ workflow notify {
   flow { root -> post_slack }
 }
 `
+
     const { ast } = parse(source)
     const diags = validate(ast)
+
     expect(
       diags.some(
-        (d) =>
-          d.severity === 'warning' &&
-          d.message.includes('raw "path" without "action"'),
+        (d) => d.severity === 'warning' && d.message.includes('raw "path" without "action"'),
       ),
     ).toBe(true)
   })
@@ -179,17 +174,17 @@ workflow notify {
   flow { root -> post_slack }
 }
 `
+
     const { ast } = parse(source)
     const diags = validate(ast)
-    expect(diags.some((d) => d.message.includes('must not set "method"'))).toBe(
-      true,
-    )
+    expect(diags.some((d) => d.message.includes('must not set "method"'))).toBe(true)
   })
 })
 
 describe('validateIntegrationNodes cross-file', () => {
   test('resolves connection and action from workspace index', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-int-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'connections.swirls'),
@@ -199,7 +194,9 @@ describe('validateIntegrationNodes cross-file', () => {
 `,
         'utf-8',
       )
+
       fs.writeFileSync(path.join(dir, 'actions.swirls'), ACTION_BLOCK, 'utf-8')
+
       fs.writeFileSync(
         path.join(dir, 'notify.swirls'),
         `workflow notify {
@@ -218,18 +215,14 @@ describe('validateIntegrationNodes cross-file', () => {
       )
 
       const workspace = buildWorkspaceResourceIndex({ cwd: dir })
-      const notifySource = fs.readFileSync(
-        path.join(dir, 'notify.swirls'),
-        'utf-8',
-      )
+      const notifySource = fs.readFileSync(path.join(dir, 'notify.swirls'), 'utf-8')
       const { ast, errors } = parse(notifySource)
       expect(errors).toEqual([])
 
       const diagsLocal = validate(ast)
+
       expect(
-        diagsLocal.some((d) =>
-          d.message.includes('requires a valid "connection" block'),
-        ),
+        diagsLocal.some((d) => d.message.includes('requires a valid "connection" block')),
       ).toBe(true)
 
       const diagsWs = validate(ast, { workspace })
@@ -253,32 +246,28 @@ workflow notify {
   flow { root -> post_slack }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
 
     const known = parse(ACTION_BLOCK).ast.actions[0]
     expect(known).toBeDefined()
     const workspace = emptyWorkspaceResourceIndex()
+
     if (known) {
-      workspace.actions.set(known.name, [
-        { relativePath: 'actions.swirls', line: 1 },
-      ])
+      workspace.actions.set(known.name, [{ relativePath: 'actions.swirls', line: 1 }])
       workspace.actionBlocks.set(known.name, known)
     }
 
     const diags = validateIntegrationNodes(ast, { workspace })
+
     expect(
-      diags.some((d) =>
-        d.message.includes(
-          'references undefined action block "unknown_action"',
-        ),
-      ),
+      diags.some((d) => d.message.includes('references undefined action block "unknown_action"')),
     ).toBe(true)
+
     expect(
       validate(ast, { workspace }).some((d) =>
-        d.message.includes(
-          'references undefined action block "unknown_action"',
-        ),
+        d.message.includes('references undefined action block "unknown_action"'),
       ),
     ).toBe(true)
   })
@@ -292,24 +281,23 @@ workflow hello {
   root { type: code code: @ts { return {} } }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.mocks).toEqual([])
+
     expect(
-      ast.workflows.some((workflow) =>
-        workflow.nodes.some((node) => node.type === 'integration'),
-      ),
+      ast.workflows.some((workflow) => workflow.nodes.some((node) => node.type === 'integration')),
     ).toBe(false)
 
     const known = parse(ACTION_BLOCK).ast.actions[0]
     expect(known).toBeDefined()
     const workspace = emptyWorkspaceResourceIndex()
+
     if (known) {
       for (let i = 0; i < 5_000; i++) {
         const name = `generated_action_${i}`
-        workspace.actions.set(name, [
-          { relativePath: 'actions.swirls', line: 1 },
-        ])
+        workspace.actions.set(name, [{ relativePath: 'actions.swirls', line: 1 }])
         workspace.actionBlocks.set(name, { ...known, name })
       }
     }

@@ -27,16 +27,20 @@ export function validateActionBlocks(
 
   const duplicateNames = new Set<string>()
   const nameCounts = new Map<string, number>()
+
   for (const a of actions) {
     nameCounts.set(a.name, (nameCounts.get(a.name) ?? 0) + 1)
   }
+
   for (const [name, count] of nameCounts) {
     if (count > 1) {
       duplicateNames.add(name)
     }
   }
+
   for (const name of duplicateNames) {
     const first = actions.find((a) => a.name === name)
+
     if (first) {
       out.push(diag(`Duplicate action block name "${name}"`, first.range))
     }
@@ -80,12 +84,10 @@ export function validateActionBlocks(
     if (a.graphqlDocument !== undefined && a.graphqlDocument !== '') {
       if (a.method.toUpperCase() !== 'POST') {
         out.push(
-          diag(
-            `Action "${a.name}" with document requires method POST`,
-            a.methodRange ?? a.range,
-          ),
+          diag(`Action "${a.name}" with document requires method POST`, a.methodRange ?? a.range),
         )
       }
+
       if (
         a.input !== undefined ||
         a.inputRef !== undefined ||

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { serialize } from '../serializer'
 import { validate } from '../validator'
@@ -95,6 +96,7 @@ describe('view block parsing', () => {
     expect(v.schema).toMatchObject({ type: 'object' })
     expect(v.schemaBlock?.code).toContain('"topic"')
     expect(v.columns?.kind).toBe('ts_block')
+
     if (v.columns?.kind === 'ts_block') {
       expect(v.columns.code).toContain('context.streams.store_topic_tokens')
     }
@@ -115,6 +117,7 @@ view bare {
   columns: @ts { return {} }
 }
 `)
+
     expect(errors.length).toBe(0)
     expect(ast.views[0]?.label).toBe('bare')
   })
@@ -133,6 +136,7 @@ view v {
   }
 }
 `)
+
     expect(errors.length).toBe(0)
     expect(ast.views[0]?.computed.length).toBe(1)
   })
@@ -145,6 +149,7 @@ view v {
   columns: @ts { return {} }
 }
 `)
+
     expect(errors.length).toBe(0)
     expect(ast.views[0]?.schemaRef).toBe('shared_shape')
   })
@@ -164,9 +169,8 @@ view v {
   }
 }
 `)
-    expect(
-      errors.some((e) => e.message.includes('Unexpected key "bogus"')),
-    ).toBe(true)
+
+    expect(errors.some((e) => e.message.includes('Unexpected key "bogus"'))).toBe(true)
   })
 
   test('round-trips through serialize -> parse', () => {
@@ -202,14 +206,11 @@ view v {
   label: "V"
 }
 `)
+
     const diags = validate(ast)
-    expect(diags.some((d) => d.message.includes('requires "streams"'))).toBe(
-      true,
-    )
+    expect(diags.some((d) => d.message.includes('requires "streams"'))).toBe(true)
     expect(diags.some((d) => d.message.includes('has no schema'))).toBe(true)
-    expect(diags.some((d) => d.message.includes('requires "columns"'))).toBe(
-      true,
-    )
+    expect(diags.some((d) => d.message.includes('requires "columns"'))).toBe(true)
   })
 
   test('undefined stream reference is reported', () => {
@@ -220,12 +221,12 @@ view v {
   columns: @ts { return {} }
 }
 `)
+
     const diags = validate(ast)
+
     expect(
       diags.some((d) =>
-        d.message.includes(
-          'View references stream "missing_stream" which is not defined',
-        ),
+        d.message.includes('View references stream "missing_stream" which is not defined'),
       ),
     ).toBe(true)
   })
@@ -251,11 +252,11 @@ view v {
   }
 }
 `)
+
     const diags = validate(ast)
+
     expect(
-      diags.some((d) =>
-        d.message.includes('references workflow "nope" which is not defined'),
-      ),
+      diags.some((d) => d.message.includes('references workflow "nope" which is not defined')),
     ).toBe(true)
   })
 
@@ -280,12 +281,9 @@ view v {
   }
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) =>
-        d.message.includes('input requires a non-empty @ts block'),
-      ),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('input requires a non-empty @ts block'))).toBe(true)
   })
 
   test('duplicate computed column names are reported', () => {
@@ -307,12 +305,12 @@ view v {
   }
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) =>
-        d.message.includes('declares duplicate computed column "c"'),
-      ),
-    ).toBe(true)
+
+    expect(diags.some((d) => d.message.includes('declares duplicate computed column "c"'))).toBe(
+      true,
+    )
   })
 
   test('duplicate view names are reported', () => {
@@ -335,10 +333,9 @@ view v {
   columns: @ts { return {} }
 }
 `)
+
     const diags = validate(ast)
-    expect(diags.some((d) => d.message.includes('Duplicate view name'))).toBe(
-      true,
-    )
+    expect(diags.some((d) => d.message.includes('Duplicate view name'))).toBe(true)
   })
 
   test('computed column running the stream-writing graph of its own view is rejected', () => {
@@ -359,12 +356,9 @@ view v {
   }
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) =>
-        d.message.includes('creates an infinite execution loop'),
-      ),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('creates an infinite execution loop'))).toBe(true)
   })
 
   test('mutual view cycle across two views is rejected', () => {
@@ -400,10 +394,9 @@ view vb {
   }
 }
 `)
+
     const diags = validate(ast)
-    const loops = diags.filter((d) =>
-      d.message.includes('creates an infinite execution loop'),
-    )
+    const loops = diags.filter((d) => d.message.includes('creates an infinite execution loop'))
     expect(loops.length).toBe(2)
   })
 
@@ -426,11 +419,8 @@ view v {
   }
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) =>
-        d.message.includes('creates an infinite execution loop'),
-      ),
-    ).toBe(false)
+    expect(diags.some((d) => d.message.includes('creates an infinite execution loop'))).toBe(false)
   })
 })

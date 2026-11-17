@@ -1,16 +1,12 @@
-import type { SwirlsFile, WorkflowDecl } from '@swirls/language'
-import {
-  harnessProviderDetail,
-  harnessProviders,
-  harnessTypes,
-} from './language-host'
-import {
-} from '@swirls/language'
-import { parse } from './parse-cache'
-import type { WorkspaceResourceIndex } from '@swirls/language/workspace'
 import type { CompletionItem, Position } from 'vscode-languageserver'
 import { CompletionItemKind } from 'vscode-languageserver'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
+
+import type { SwirlsFile, WorkflowDecl } from '@swirls/language'
+import type { WorkspaceResourceIndex } from '@swirls/language/workspace'
+
+import { harnessProviderDetail, harnessProviders, harnessTypes } from './language-host'
+import { parse } from './parse-cache'
 
 /**
  * If position is inside a `node X { ... }` or `root { ... }` block within a graph, return that graph and node name.
@@ -27,11 +23,14 @@ export function getNodeContextAtPosition(
   const rootRe = /\broot\s*\{/g
   const nodeRe = /\bnode\s+([a-zA-Z0-9_]+)\s*\{/g
   let m: RegExpExecArray | null = rootRe.exec(text)
+
   while (m !== null) {
     blocks.push({ start: m.index, nodeName: 'root' })
     m = rootRe.exec(text)
   }
+
   m = nodeRe.exec(text)
+
   while (m !== null) {
     blocks.push({ start: m.index, nodeName: m[1] })
     m = nodeRe.exec(text)
@@ -39,6 +38,7 @@ export function getNodeContextAtPosition(
 
   blocks.sort((a, b) => b.start - a.start)
   const block = blocks.find((b) => b.start <= offset)
+
   if (!block) {
     return null
   }
@@ -46,39 +46,52 @@ export function getNodeContextAtPosition(
   const blockStart = block.start + text.slice(block.start).indexOf('{')
   let count = 1
   let pos = blockStart + 1
+
   while (count > 0 && pos < text.length) {
     const ch = text[pos]
+
     if (ch === '{') {
       count++
     } else if (ch === '}') {
       count--
     }
+
     pos++
   }
+
   const blockEnd = pos - 1
+
   if (offset > blockEnd) {
     return null
   }
 
   const textBeforeBlock = text.slice(0, block.start)
+
   const lastWorkflowMatch = Math.max(
     textBeforeBlock.lastIndexOf('workflow '),
     textBeforeBlock.lastIndexOf('graph '),
   )
+
   if (lastWorkflowMatch < 0) {
     return null
   }
+
   const afterWorkflow = text.slice(lastWorkflowMatch)
+
   const workflowNameMatch =
     afterWorkflow.match(/workflow\s+([a-zA-Z0-9_]+)\s*\{/) ??
     afterWorkflow.match(/graph\s+([a-zA-Z0-9_]+)\s*\{/)
+
   if (!workflowNameMatch) {
     return null
   }
+
   const graph = ast.workflows.find((g) => g.name === workflowNameMatch[1])
+
   if (!graph || !graph.nodes.some((n) => n.name === block.nodeName)) {
     return null
   }
+
   return { graph, nodeName: block.nodeName }
 }
 
@@ -156,8 +169,7 @@ const TOP_LEVEL_KEYWORDS: CompletionItem[] = [
   {
     label: 'agent',
     kind: CompletionItemKind.Keyword,
-    detail:
-      'Declare an agent profile (provider, model, secrets, tools, roles) for agent nodes',
+    detail: 'Declare an agent profile (provider, model, secrets, tools, roles) for agent nodes',
   },
   {
     label: 'mcp',
@@ -167,8 +179,7 @@ const TOP_LEVEL_KEYWORDS: CompletionItem[] = [
   {
     label: 'connector',
     kind: CompletionItemKind.Keyword,
-    detail:
-      'Declare an inbound OAuth application slot (label, description) for MCP channels',
+    detail: 'Declare an inbound OAuth application slot (label, description) for MCP channels',
   },
   {
     label: 'network',
@@ -178,8 +189,7 @@ const TOP_LEVEL_KEYWORDS: CompletionItem[] = [
   {
     label: 'stream',
     kind: CompletionItemKind.Keyword,
-    detail:
-      'Define a named stream for graph output (schema, condition, prepare)',
+    detail: 'Define a named stream for graph output (schema, condition, prepare)',
   },
 ]
 
@@ -284,8 +294,7 @@ const NODE_TYPES: CompletionItem[] = [
   {
     label: 'agent',
     kind: CompletionItemKind.Constant,
-    detail:
-      'LLM agent node: bind to top-level agent block, optional tools + roles',
+    detail: 'LLM agent node: bind to top-level agent block, optional tools + roles',
   },
 ]
 
@@ -367,8 +376,7 @@ const PROPERTY_KEYS: CompletionItem[] = [
   {
     label: 'operation',
     kind: CompletionItemKind.Property,
-    detail:
-      'Node operation (e.g. bucket: download | upload; parallel: search | extract)',
+    detail: 'Node operation (e.g. bucket: download | upload; parallel: search | extract)',
   },
   {
     label: 'kind',
@@ -476,8 +484,7 @@ const PROPERTY_KEYS: CompletionItem[] = [
   {
     label: 'review',
     kind: CompletionItemKind.Property,
-    detail:
-      'Human review (true or { enabled, title, description, schema, actions })',
+    detail: 'Human review (true or { enabled, title, description, schema, actions })',
   },
   {
     label: 'objective',
@@ -538,8 +545,7 @@ const PROPERTY_KEYS: CompletionItem[] = [
   {
     label: 'waitSeconds',
     kind: CompletionItemKind.Property,
-    detail:
-      'Seconds to wait for a device to collect its run, 30 to 3600 (default 300)',
+    detail: 'Seconds to wait for a device to collect its run, 30 to 3600 (default 300)',
   },
   {
     label: 'command',
@@ -589,8 +595,7 @@ const PROPERTY_KEYS: CompletionItem[] = [
   {
     label: 'provider',
     kind: CompletionItemKind.Property,
-    detail:
-      'Search: firecrawl | telem; LLM: openai | anthropic | google | openrouter',
+    detail: 'Search: firecrawl | telem; LLM: openai | anthropic | google | openrouter',
   },
   {
     label: 'select',
@@ -733,14 +738,12 @@ const STREAM_PROPERTIES: CompletionItem[] = [
   {
     label: 'version',
     kind: CompletionItemKind.Property,
-    detail:
-      'Active writer version (v1, v2, …) — must match a key in versions { }',
+    detail: 'Active writer version (v1, v2, …) — must match a key in versions { }',
   },
   {
     label: 'versions',
     kind: CompletionItemKind.Keyword,
-    detail:
-      'Per-version schema, condition, and prepare: versions { v1 { … } v2 { … } }',
+    detail: 'Per-version schema, condition, and prepare: versions { v1 { … } v2 { … } }',
   },
   {
     label: 'graph',
@@ -1023,22 +1026,22 @@ const HARNESS_TYPE_VALUES: CompletionItem[] = harnessTypes.map((entry) => ({
   detail: entry.description,
 }))
 
-const HARNESS_PROVIDER_VALUES: CompletionItem[] = harnessProviders.map(
-  (entry) => ({
-    label: entry.name,
-    kind: CompletionItemKind.EnumMember,
-    detail: harnessProviderDetail(entry),
-  }),
-)
+const HARNESS_PROVIDER_VALUES: CompletionItem[] = harnessProviders.map((entry) => ({
+  label: entry.name,
+  kind: CompletionItemKind.EnumMember,
+  detail: harnessProviderDetail(entry),
+}))
 
 /** Value completions for `type:` and `provider:` inside `harness: { }`. */
 function harnessValueCompletions(trimmed: string): CompletionItem[] | null {
   if (/\btype\s*:\s*\w*$/.test(trimmed)) {
     return HARNESS_TYPE_VALUES
   }
+
   if (/\bprovider\s*:\s*\w*$/.test(trimmed)) {
     return HARNESS_PROVIDER_VALUES
   }
+
   return null
 }
 
@@ -1087,23 +1090,29 @@ function cursorInsideProfile(text: string, offset: number): boolean {
   const before = text.slice(0, offset)
   const profileBlock = /\bprofile\s+[a-zA-Z0-9_]+\s*\{/g
   let match = profileBlock.exec(before)
+
   while (match !== null) {
     const openBrace = match.index + match[0].indexOf('{')
     const closingBrace = findBlockEnd(text, openBrace)
     const end = closingBrace < 0 ? text.length : closingBrace
+
     if (offset <= end) {
       return true
     }
+
     match = profileBlock.exec(before)
   }
+
   return false
 }
 
 function agentBodyCompletions(text: string, offset: number): CompletionItem[] {
   const items = [...AGENT_BODY_LINE_KEYWORDS, ...AGENT_BLOCK_PROPERTIES]
+
   if (!cursorInsideProfile(text, offset)) {
     return items
   }
+
   return items.filter((item) => item.label !== 'computer')
 }
 
@@ -1119,8 +1128,7 @@ const AGENT_BODY_LINE_KEYWORDS: CompletionItem[] = [
   {
     label: 'role',
     kind: CompletionItemKind.Keyword,
-    detail:
-      'Nested role block — optional description, tools subset, system @ts snippet',
+    detail: 'Nested role block — optional description, tools subset, system @ts snippet',
   },
 ]
 
@@ -1179,26 +1187,10 @@ const NODE_TYPE_EXTRA_PROPERTY_LABELS: Record<string, string[]> = {
   workflow: ['workflow', 'graph', 'input'],
   map: ['items', 'maxItems', 'subgraph', 'workflow', 'graph'],
   fanout: ['items', 'maxItems', 'concurrency', 'subgraph', 'workflow', 'graph'],
-  while: [
-    'input',
-    'condition',
-    'update',
-    'maxIterations',
-    'subgraph',
-    'workflow',
-    'graph',
-  ],
+  while: ['input', 'condition', 'update', 'maxIterations', 'subgraph', 'workflow', 'graph'],
   stream: ['stream', 'version', 'filter'],
   email: ['from', 'to', 'subject'],
-  postgres: [
-    'postgres',
-    'select',
-    'insert',
-    'update',
-    'delete',
-    'params',
-    'condition',
-  ],
+  postgres: ['postgres', 'select', 'insert', 'update', 'delete', 'params', 'condition'],
   disk: ['disk', 'command', 'operation', 'path', 'file', 'overwrite'],
   shell: ['computer', 'command'],
   device: ['operation', 'device', 'devices', 'input', 'waitSeconds'],
@@ -1211,12 +1203,14 @@ function getNodePropertiesForType(nodeType: string): CompletionItem[] {
   const extra = pickProperties(extraLabels)
   const seen = new Set(COMMON_NODE_PROPERTIES.map((c) => c.label))
   const merged = [...COMMON_NODE_PROPERTIES]
+
   for (const item of extra) {
     if (!seen.has(item.label)) {
       seen.add(item.label)
       merged.push(item)
     }
   }
+
   return merged
 }
 
@@ -1287,41 +1281,46 @@ const BLOCK_PATTERNS: { type: BlockContextType; regex: RegExp }[] = [
 function findBlockEnd(text: string, openBraceOffset: number): number {
   let depth = 0
   let pos = openBraceOffset
+
   while (pos < text.length) {
     const ch = text[pos]
+
     if (ch === '{') {
       depth++
     } else if (ch === '}') {
       depth--
     }
+
     if (depth === 0) {
       return pos
     }
+
     pos++
   }
+
   return -1
 }
 
 /**
  * Returns the innermost block type containing the given offset, or null if outside all blocks.
  */
-export function getBlockContext(
-  text: string,
-  offset: number,
-): BlockContextType {
+export function getBlockContext(text: string, offset: number): BlockContextType {
   const spans: BlockSpan[] = []
   const before = text.slice(0, offset)
 
   for (const { type, regex } of BLOCK_PATTERNS) {
     regex.lastIndex = 0
     let m = regex.exec(before)
+
     while (m !== null) {
       const openBrace = m.index + m[0].indexOf('{')
       const closingBrace = findBlockEnd(text, openBrace)
       const end = closingBrace < 0 ? text.length : closingBrace
+
       if (offset <= end) {
         spans.push({ type, start: openBrace, end })
       }
+
       m = regex.exec(before)
     }
   }
@@ -1329,15 +1328,13 @@ export function getBlockContext(
   if (spans.length === 0) {
     return null
   }
+
   // Innermost = largest start position that still contains offset
   spans.sort((a, b) => b.start - a.start)
   return spans[0].type
 }
 
-function getLineBeforeCursor(
-  document: TextDocument,
-  position: Position,
-): string {
+function getLineBeforeCursor(document: TextDocument, position: Position): string {
   const offset = document.offsetAt(position)
   const text = document.getText()
   const lineStart = text.lastIndexOf('\n', offset - 1) + 1
@@ -1356,9 +1353,9 @@ export function getCompletions(
   const result = parse(text)
   const ast = result.ast
   const blockContext = getBlockContext(text, offset)
+
   if (
-    (blockContext === 'channel' &&
-      /^workflows\s*:\s*\[[^\]]*$/.test(trimmed)) ||
+    (blockContext === 'channel' && /^workflows\s*:\s*\[[^\]]*$/.test(trimmed)) ||
     /^(allow|deny)\s+\w+\s*->\s*workflow\s+\w*$/.test(trimmed)
   ) {
     return [
@@ -1368,6 +1365,7 @@ export function getCompletions(
       ]),
     ].map((label) => ({ label, kind: CompletionItemKind.Reference }))
   }
+
   if (/^decision\s*:\s*\w*$/.test(trimmed)) {
     return [
       ...new Set([
@@ -1380,12 +1378,10 @@ export function getCompletions(
       detail: 'Declared decision',
     }))
   }
+
   if (blockContext === 'decision' && /^secrets\s*:\s*\w*$/.test(trimmed)) {
     return [
-      ...new Set([
-        ...ast.secrets.map((s) => s.name),
-        ...(workspace?.secrets.keys() ?? []),
-      ]),
+      ...new Set([...ast.secrets.map((s) => s.name), ...(workspace?.secrets.keys() ?? [])]),
     ].map((label) => ({
       label,
       kind: CompletionItemKind.Reference,
@@ -1401,17 +1397,19 @@ export function getCompletions(
         return GRAPH_LEVEL_KEYWORDS
       case 'root':
         return ROOT_NODE_PROPERTIES
+
       case 'node': {
         const nodeContext = getNodeContextAtPosition(document, position, ast)
+
         if (!nodeContext) {
           return COMMON_NODE_PROPERTIES
         }
-        const node = nodeContext.graph.nodes.find(
-          (n) => n.name === nodeContext.nodeName,
-        )
+
+        const node = nodeContext.graph.nodes.find((n) => n.name === nodeContext.nodeName)
         const nodeType = node?.type ?? 'code'
         return getNodePropertiesForType(nodeType)
       }
+
       case 'flow':
         return []
       case 'form':
@@ -1487,6 +1485,7 @@ export function getCompletions(
 
   if (blockContext === 'computer_harness') {
     const values = harnessValueCompletions(trimmed)
+
     if (values) {
       return values
     }
@@ -1508,6 +1507,7 @@ export function getCompletions(
     if (blockContext !== null) {
       return []
     }
+
     return TOP_LEVEL_KEYWORDS.filter((k) => k.label !== trimmed.split(/\s/)[0])
   }
 
@@ -1522,10 +1522,7 @@ export function getCompletions(
     return NODE_TYPES
   }
 
-  if (
-    /\btype\s*:\s*$/.test(trimmed) &&
-    (blockContext === 'node' || blockContext === 'root')
-  ) {
+  if (/\btype\s*:\s*$/.test(trimmed) && (blockContext === 'node' || blockContext === 'root')) {
     return NODE_TYPES
   }
 
@@ -1533,15 +1530,13 @@ export function getCompletions(
     return []
   }
 
-  if (
-    trimmed.match(/^\s*(form|webhook|schedule)\s*:\s*$/) &&
-    blockContext === 'trigger'
-  ) {
+  if (trimmed.match(/^\s*(form|webhook|schedule)\s*:\s*$/) && blockContext === 'trigger') {
     const resourceType = trimmed.includes('form')
       ? 'form'
       : trimmed.includes('webhook')
         ? 'webhook'
         : 'schedule'
+
     const names: CompletionItem[] =
       resourceType === 'form'
         ? ast.forms.map((f) => ({
@@ -1560,6 +1555,7 @@ export function getCompletions(
               kind: CompletionItemKind.Reference,
               detail: `Schedule: ${s.label}`,
             }))
+
     return names
   }
 
@@ -1578,17 +1574,22 @@ export function getCompletions(
     if (blockContext !== 'flow') {
       return []
     }
+
     const lastWorkflowMatch = Math.max(
       text.slice(0, offset).lastIndexOf('workflow '),
       text.slice(0, offset).lastIndexOf('graph '),
     )
+
     if (lastWorkflowMatch >= 0) {
       const afterWorkflow = text.slice(lastWorkflowMatch)
+
       const workflowNameMatch =
         afterWorkflow.match(/workflow\s+([a-zA-Z0-9_]+)\s*\{/) ??
         afterWorkflow.match(/graph\s+([a-zA-Z0-9_]+)\s*\{/)
+
       if (workflowNameMatch) {
         const graph = ast.workflows.find((g) => g.name === workflowNameMatch[1])
+
         if (graph) {
           return graph.nodes.map((node) => ({
             label: node.name,
@@ -1598,6 +1599,7 @@ export function getCompletions(
         }
       }
     }
+
     return []
   }
 
@@ -1610,12 +1612,15 @@ export function getCompletions(
       text.slice(0, offset).lastIndexOf('workflow '),
       text.slice(0, offset).lastIndexOf('graph '),
     )
+
     const slice = text.slice(lastWorkflowMatch)
+
     const workflowNameMatch =
-      slice.match(/workflow\s+([a-zA-Z0-9_]+)\s*\{/) ??
-      slice.match(/graph\s+([a-zA-Z0-9_]+)\s*\{/)
+      slice.match(/workflow\s+([a-zA-Z0-9_]+)\s*\{/) ?? slice.match(/graph\s+([a-zA-Z0-9_]+)\s*\{/)
+
     if (workflowNameMatch) {
       const graph = ast.workflows.find((g) => g.name === workflowNameMatch[1])
+
       if (graph) {
         return graph.nodes.map((node) => ({
           label: node.name,
@@ -1627,6 +1632,7 @@ export function getCompletions(
   }
 
   const inBlock = /\{\s*$/.test(text.slice(0, offset)) || blockContext !== null
+
   if (
     inBlock &&
     (trimmed.endsWith(' ') ||
@@ -1637,23 +1643,28 @@ export function getCompletions(
     switch (blockContext) {
       case 'root':
         return ROOT_NODE_PROPERTIES
+
       case 'node': {
         const nodeContext = getNodeContextAtPosition(document, position, ast)
+
         if (nodeContext) {
-          const node = nodeContext.graph.nodes.find(
-            (n) => n.name === nodeContext.nodeName,
-          )
+          const node = nodeContext.graph.nodes.find((n) => n.name === nodeContext.nodeName)
           const isAiNode = node?.type === 'ai'
+
           const completingKindValue =
             /\bkind\s*:\s*$/.test(trimmed) || /\bkind\s*:\s*\S*$/.test(trimmed)
+
           if (isAiNode && completingKindValue) {
             return AI_KIND_VALUES
           }
+
           const nodeType = node?.type ?? 'code'
           return getNodePropertiesForType(nodeType)
         }
+
         return COMMON_NODE_PROPERTIES
       }
+
       case 'graph':
         return GRAPH_LEVEL_KEYWORDS
       case 'flow':
@@ -1713,11 +1724,7 @@ export function getCompletions(
     }
   }
 
-  if (
-    trimmed.length < 3 &&
-    /^(f|w|s|g|t|n|a|p)$/.test(trimmed) &&
-    blockContext === null
-  ) {
+  if (trimmed.length < 3 && /^(f|w|s|g|t|n|a|p)$/.test(trimmed) && blockContext === null) {
     const keywordMap: Record<string, string> = {
       f: 'form',
       w: 'webhook',
@@ -1728,16 +1735,17 @@ export function getCompletions(
       a: 'auth',
       p: 'postgres',
     }
+
     const full = keywordMap[trimmed]
+
     if (full) {
       return TOP_LEVEL_KEYWORDS.filter((keyword) => keyword.label === full)
     }
   }
 
   if (blockContext === null && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed)) {
-    const matches = TOP_LEVEL_KEYWORDS.filter((k) =>
-      k.label.startsWith(trimmed),
-    )
+    const matches = TOP_LEVEL_KEYWORDS.filter((k) => k.label.startsWith(trimmed))
+
     if (matches.length > 0) {
       return matches
     }

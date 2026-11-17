@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 
 describe('skill block parser', () => {
@@ -8,9 +9,11 @@ skill swirls_lang {
   name: "swirls-lang"
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.skill).toHaveLength(1)
+
     expect(ast.skill[0]).toMatchObject({
       name: 'swirls_lang',
       skillName: 'swirls-lang',
@@ -23,11 +26,10 @@ skill bad {
   source: "foo"
 }
 `
+
     const { ast, errors } = parse(src)
     expect(ast.skill).toHaveLength(0)
-    expect(
-      errors.some((e) => e.message.includes('Unknown skill property')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('Unknown skill property'))).toBe(true)
   })
 
   test('requires name field', () => {
@@ -36,10 +38,9 @@ skill empty {
   label: "nope"
 }
 `
+
     const { ast, errors } = parse(src)
     expect(ast.skill).toHaveLength(0)
-    expect(
-      errors.some((e) => e.message.includes('Skill block requires name')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('Skill block requires name'))).toBe(true)
   })
 })

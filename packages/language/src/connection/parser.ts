@@ -18,17 +18,16 @@ function parseBarewordValue(
   d: ResourceParserDelegate,
 ): { value: string; range: SourceRange } | null {
   const tok = d.peek()
+
   if (!tok) {
     return null
   }
-  if (
-    tok.kind === 'identifier' ||
-    tok.kind === 'keyword' ||
-    tok.kind === 'string'
-  ) {
+
+  if (tok.kind === 'identifier' || tok.kind === 'keyword' || tok.kind === 'string') {
     d.advance()
     return { value: tok.value as string, range: tok.range as SourceRange }
   }
+
   return null
 }
 
@@ -70,6 +69,7 @@ export function parseConnectionBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -81,6 +81,7 @@ export function parseConnectionBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -88,6 +89,7 @@ export function parseConnectionBlock(
     if (seenKeys.has(key)) {
       d.error(`Duplicate connection property "${key}"`, keyTok)
     }
+
     seenKeys.add(key)
 
     if (!d.expect('colon')) {
@@ -97,62 +99,74 @@ export function parseConnectionBlock(
 
     if (key === 'label') {
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         label = val
       }
+
       continue
     }
 
     if (key === 'description') {
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         description = val
       }
+
       continue
     }
 
     if (key === 'provider') {
       const parsed = parseBarewordValue(d)
+
       if (parsed) {
         provider = parsed.value
         providerRange = parsed.range
       } else {
         d.error('connection provider must be a name', d.peek())
       }
+
       continue
     }
 
     if (key === 'base_url') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         baseUrl = val
         baseUrlRange = valTok?.range as SourceRange | undefined
       } else {
         d.error('connection base_url must be a quoted string', d.peek())
       }
+
       continue
     }
 
     if (key === 'auth') {
       const parsed = parseBarewordValue(d)
+
       if (parsed) {
         authRef = parsed.value
         authRefRange = parsed.range
       } else {
         d.error('connection auth must be an auth block name', d.peek())
       }
+
       continue
     }
 
     if (key === 'network') {
       const parsed = parseBarewordValue(d)
+
       if (parsed) {
         networkRef = parsed.value
         networkRefRange = parsed.range
       } else {
         d.error('connection network must be a network block name', d.peek())
       }
+
       continue
     }
 
@@ -162,11 +176,13 @@ export function parseConnectionBlock(
   }
 
   const closing = d.expect('rbrace')
+
   if (!closing) {
     // Anchor the error to a real token (`d.peek()` is null at EOF, which the
     // delegate would silently drop). `start` always exists here.
     d.error('Expected } to close connection block', d.peek() ?? start)
   }
+
   const end = closing ?? d.peek()
 
   return {

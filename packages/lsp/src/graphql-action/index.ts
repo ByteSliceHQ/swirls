@@ -1,7 +1,4 @@
-export {
-  GRAPHQL_SCHEMA_JSON_FILENAME,
-  GRAPHQL_SCHEMA_SDL_FILENAME,
-} from './constants'
+export { GRAPHQL_SCHEMA_JSON_FILENAME, GRAPHQL_SCHEMA_SDL_FILENAME } from './constants'
 export {
   type ParsedGraphqlOperation,
   parseGraphqlActionOperation,
@@ -25,7 +22,4 @@ export {
   graphqlActionParamsTypeParts,
   graphqlActionParamsTypeString,
 } from './to-typescript'
-export {
-  validateGraphqlActionOutput,
-  validateGraphqlActionVariables,
-} from './validate'
+export { validateGraphqlActionOutput, validateGraphqlActionVariables } from './validate'

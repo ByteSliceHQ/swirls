@@ -3,6 +3,7 @@
  */
 
 import { resourceNameSchema } from '@swirls/definition/schemas'
+
 import type { AgentDecl, AgentProfileDecl } from '../agent/ast'
 import type { Diagnostic, SourceRange, SwirlsFile } from '../ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
@@ -16,15 +17,13 @@ function diag(
   return { message, range, severity }
 }
 
-function validateResourceName(
-  name: string,
-  range: SourceRange,
-  kind: string,
-): Diagnostic[] {
+function validateResourceName(name: string, range: SourceRange, kind: string): Diagnostic[] {
   const result = resourceNameSchema.safeParse(name)
+
   if (result.success) {
     return []
   }
+
   const msg = result.error.issues[0]?.message ?? 'Invalid name'
   return [diag(`${kind} name: ${msg}`, range)]
 }
@@ -32,12 +31,14 @@ function validateResourceName(
 function validateMcpUrl(url: string, range: SourceRange): Diagnostic[] {
   try {
     const parsed = new URL(url)
+
     if (parsed.protocol !== 'https:') {
       return [diag('MCP block url must be an https URL', range)]
     }
   } catch {
     return [diag('MCP block url must be a valid absolute https URL', range)]
   }
+
   return []
 }
 
@@ -59,9 +60,11 @@ export function validateMcpBlocks(
     if (names.has(m.name)) {
       out.push(diag(`Duplicate mcp block name "${m.name}"`, m.range))
     }
+
     names.add(m.name)
 
     const trimmedUrl = m.url?.trim() ?? ''
+
     if (trimmedUrl.length === 0) {
       out.push(
         diag(
@@ -93,19 +96,19 @@ export function validateMcpBlocks(
   return out
 }
 
-function mcpBlockMap(
-  ast: SwirlsFile,
-  workspace?: WorkspaceResourceIndex,
-): Map<string, McpDecl> {
+function mcpBlockMap(ast: SwirlsFile, workspace?: WorkspaceResourceIndex): Map<string, McpDecl> {
   const m = new Map<string, McpDecl>()
+
   for (const decl of ast.mcp ?? []) {
     m.set(decl.name, decl)
   }
+
   if (workspace?.mcpBlocks) {
     for (const [name, decl] of workspace.mcpBlocks) {
       m.set(name, decl)
     }
   }
+
   return m
 }
 
@@ -125,22 +128,20 @@ export function validateAgentMcpRefs(
     for (let i = 0; i < (mcpNames ?? []).length; i++) {
       const mcpName = mcpNames![i]!
       const listRange = ranges?.[i] ?? at
+
       if (!mcpByName.has(mcpName)) {
-        out.push(
-          diag(
-            `${context} references undefined mcp block "${mcpName}"`,
-            listRange,
-          ),
-        )
+        out.push(diag(`${context} references undefined mcp block "${mcpName}"`, listRange))
       }
     }
   }
 
   function validateProfileMcp(agent: AgentDecl, profile: AgentProfileDecl) {
     const agentMcpSet = new Set(agent.mcp ?? [])
+
     for (let i = 0; i < (profile.mcp ?? []).length; i++) {
       const mcpName = profile.mcp![i]!
       const listRange = profile.mcpRanges?.[i] ?? profile.range
+
       if (!agentMcpSet.has(mcpName)) {
         out.push(
           diag(
@@ -154,6 +155,7 @@ export function validateAgentMcpRefs(
 
   for (const a of ast.agent ?? []) {
     validateMcpList(a.mcp, a.mcpRanges, a.range, `Agent "${a.name}"`)
+
     for (const profile of a.profiles ?? []) {
       validateProfileMcp(a, profile)
     }

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+
 import type { ConfigValue, SwirlsFile } from './ast'
 import { parse } from './parser'
 import { serialize } from './serializer'
@@ -15,14 +16,18 @@ function normalizeConfigValue(cv: ConfigValue): unknown {
     case 'null':
     case 'boolean':
       return { kind: cv.kind, value: cv.value }
+
     case 'object': {
       const keys = Object.keys(cv.value).sort()
       const value: Record<string, unknown> = {}
+
       for (const k of keys) {
         value[k] = normalizeConfigValue(cv.value[k]!)
       }
+
       return { kind: 'object', value }
     }
+
     case 'array':
       return {
         kind: 'array',
@@ -44,22 +49,25 @@ function configFieldsEqual(
 ): boolean {
   const keysA = Object.keys(a).sort()
   const keysB = Object.keys(b).sort()
+
   if (keysA.length !== keysB.length) {
     return false
   }
+
   for (let i = 0; i < keysA.length; i++) {
     if (keysA[i] !== keysB[i]) {
       return false
     }
   }
+
   for (const k of keysA) {
     if (
-      JSON.stringify(normalizeConfigValue(a[k]!)) !==
-      JSON.stringify(normalizeConfigValue(b[k]!))
+      JSON.stringify(normalizeConfigValue(a[k]!)) !== JSON.stringify(normalizeConfigValue(b[k]!))
     ) {
       return false
     }
   }
+
   return true
 }
 
@@ -72,55 +80,67 @@ function structuralEqual(a: SwirlsFile, b: SwirlsFile): boolean {
   if ((a.schemas?.length ?? 0) !== (b.schemas?.length ?? 0)) {
     return false
   }
+
   if (a.forms.length !== b.forms.length) {
     return false
   }
+
   if (a.webhooks.length !== b.webhooks.length) {
     return false
   }
+
   if (a.schedules.length !== b.schedules.length) {
     return false
   }
+
   if (a.workflows.length !== b.workflows.length) {
     return false
   }
+
   if ((a.streams?.length ?? 0) !== (b.streams?.length ?? 0)) {
     return false
   }
+
   if (a.triggers.length !== b.triggers.length) {
     return false
   }
+
   if ((a.secrets?.length ?? 0) !== (b.secrets?.length ?? 0)) {
     return false
   }
+
   if ((a.auths?.length ?? 0) !== (b.auths?.length ?? 0)) {
     return false
   }
+
   for (let i = 0; i < a.forms.length; i++) {
     if (a.forms[i]?.name !== b.forms[i]?.name) {
       return false
     }
   }
+
   for (let i = 0; i < a.workflows.length; i++) {
     const ga = a.workflows[i]!
     const gb = b.workflows[i]!
+
     if (ga.name !== gb.name) {
       return false
     }
+
     if (ga.nodes.length !== gb.nodes.length) {
       return false
     }
+
     if (ga.edges.length !== gb.edges.length) {
       return false
     }
+
     for (let j = 0; j < ga.nodes.length; j++) {
-      if (
-        ga.nodes[j]?.name !== gb.nodes[j]?.name ||
-        ga.nodes[j]?.type !== gb.nodes[j]?.type
-      ) {
+      if (ga.nodes[j]?.name !== gb.nodes[j]?.name || ga.nodes[j]?.type !== gb.nodes[j]?.type) {
         return false
       }
     }
+
     for (let j = 0; j < ga.edges.length; j++) {
       if (
         ga.edges[j]?.source !== gb.edges[j]?.source ||
@@ -130,13 +150,16 @@ function structuralEqual(a: SwirlsFile, b: SwirlsFile): boolean {
       }
     }
   }
+
   const aStreams = a.streams ?? []
   const bStreams = b.streams ?? []
+
   for (let i = 0; i < aStreams.length; i++) {
     if (aStreams[i]?.name !== bStreams[i]?.name) {
       return false
     }
   }
+
   for (let i = 0; i < a.triggers.length; i++) {
     if (
       a.triggers[i]?.name !== b.triggers[i]?.name ||
@@ -145,53 +168,69 @@ function structuralEqual(a: SwirlsFile, b: SwirlsFile): boolean {
       return false
     }
   }
+
   const aSecrets = a.secrets ?? []
   const bSecrets = b.secrets ?? []
+
   for (let i = 0; i < aSecrets.length; i++) {
     const sa = aSecrets[i]!
     const sb = bSecrets[i]!
+
     if (sa.name !== sb.name) {
       return false
     }
+
     if (sa.label !== sb.label) {
       return false
     }
+
     if (sa.description !== sb.description) {
       return false
     }
+
     if (sa.vars.length !== sb.vars.length) {
       return false
     }
+
     for (let j = 0; j < sa.vars.length; j++) {
       if (sa.vars[j] !== sb.vars[j]) {
         return false
       }
     }
   }
+
   const aAuths = a.auths ?? []
   const bAuths = b.auths ?? []
+
   for (let i = 0; i < aAuths.length; i++) {
     const aa = aAuths[i]!
     const ba = bAuths[i]!
+
     if (aa.name !== ba.name) {
       return false
     }
+
     if (aa.label !== ba.label) {
       return false
     }
+
     if (aa.description !== ba.description) {
       return false
     }
+
     if (aa.authType !== ba.authType) {
       return false
     }
+
     if (aa.secretsRef !== ba.secretsRef) {
       return false
     }
+
     if (!configFieldsEqual(aa.configFields, ba.configFields)) {
       return false
     }
   }
+
   return true
 }
 
@@ -207,6 +246,7 @@ workflow concurrent {
     code: @ts { return {} }
   }
 }`)
+
     expect(first.errors).toEqual([])
     const output = serialize(first.ast)
     expect(output).toContain('executionTokenTtl: "150m"')
@@ -231,10 +271,7 @@ workflow concurrent {
 
     test('valid-auth.swirls fixture produces structurally equivalent AST', () => {
       const fixturesDir = path.join(import.meta.dir, '__fixtures__')
-      const source = fs.readFileSync(
-        path.join(fixturesDir, 'valid-auth.swirls'),
-        'utf8',
-      )
+      const source = fs.readFileSync(path.join(fixturesDir, 'valid-auth.swirls'), 'utf8')
       const first = parse(source)
       expect(first.errors.length).toBe(0)
       const serialized = serialize(first.ast)
@@ -245,10 +282,7 @@ workflow concurrent {
 
     test('loop-inline-subgraph.swirls fixture produces structurally equivalent AST', () => {
       const fixturesDir = path.join(import.meta.dir, '__fixtures__')
-      const source = fs.readFileSync(
-        path.join(fixturesDir, 'loop-inline-subgraph.swirls'),
-        'utf8',
-      )
+      const source = fs.readFileSync(path.join(fixturesDir, 'loop-inline-subgraph.swirls'), 'utf8')
       const first = parse(source)
       expect(first.errors.length).toBe(0)
       const serialized = serialize(first.ast)
@@ -293,6 +327,7 @@ agent worker {
   computer: pr_bot
 }
 `
+
       const first = parse(source)
       expect(first.errors).toEqual([])
       const out = serialize(first.ast)
@@ -326,6 +361,7 @@ agent sre_assistant {
 
 secret creds { vars: [ OPENROUTER_API_KEY ] }
 `
+
       const first = parse(source)
       expect(first.errors).toEqual([])
       const out = serialize(first.ast)
@@ -337,9 +373,7 @@ secret creds { vars: [ OPENROUTER_API_KEY ] }
       expect(second.errors).toEqual([])
       expect(second.ast.mcp?.[0]?.name).toBe('axiom_observability')
       expect(second.ast.agent?.[0]?.mcp).toEqual(['axiom_observability'])
-      expect(second.ast.agent?.[0]?.profiles?.[0]?.mcp).toEqual([
-        'axiom_observability',
-      ])
+      expect(second.ast.agent?.[0]?.profiles?.[0]?.mcp).toEqual(['axiom_observability'])
     })
 
     test('omitted agent provider stays omitted and re-parses as openrouter', () => {
@@ -350,6 +384,7 @@ agent operator {
   secrets: ai_creds
 }
 `
+
       const first = parse(source)
       expect(first.errors).toEqual([])
       expect(first.ast.agent?.[0]?.provider).toBe('openrouter')
@@ -376,6 +411,7 @@ agent direct {
   secrets: ai_creds
 }
 `
+
       const first = parse(source)
       expect(first.errors).toEqual([])
       const out = serialize(first.ast)
@@ -383,10 +419,7 @@ agent direct {
       expect(out).toContain('provider: openai')
       const second = parse(out)
       expect(second.errors).toEqual([])
-      expect(second.ast.agent?.map((agent) => agent.provider)).toEqual([
-        'openrouter',
-        'openai',
-      ])
+      expect(second.ast.agent?.map((agent) => agent.provider)).toEqual(['openrouter', 'openai'])
       expect(serialize(second.ast)).toBe(out)
     })
 
@@ -401,6 +434,7 @@ agent direct {
   max_unprompted_per_hour: 6
 }
 `
+
       const first = parse(source)
       expect(first.errors).toEqual([])
       const out = serialize(first.ast)
@@ -427,6 +461,7 @@ agent direct {
   mode: all
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors).toEqual([])
       const out = serialize(ast)
@@ -447,6 +482,7 @@ channel finance {
   connector: client_portal
 }
 `
+
       const first = parse(source)
       expect(first.errors).toEqual([])
       const out = serialize(first.ast)
@@ -486,6 +522,7 @@ workflow g {
   flow { }
 }
 `
+
       const { ast } = parse(source)
       const out = serialize(ast)
       expect(out).toContain('kind:')
@@ -504,6 +541,7 @@ workflow g {
   }
 }
 `
+
       const { ast, errors } = parse(source)
       expect(errors.length).toBe(0)
       const out = serialize(ast)
@@ -517,9 +555,7 @@ workflow g {
       const { ast } = parse(source)
       const out = serialize(ast)
       expect(out).toContain('review:')
-      const nodeWithReview = ast.workflows[0]?.nodes.find(
-        (n) => n.reviewConfig != null,
-      )
+      const nodeWithReview = ast.workflows[0]?.nodes.find((n) => n.reviewConfig != null)
       expect(nodeWithReview).toBeDefined()
     })
   })
@@ -544,6 +580,7 @@ stream out {
   }
 }
 `
+
       const { ast: a1, errors: e1 } = parse(source)
       expect(e1.length).toBe(0)
       const ser = serialize(a1)
@@ -568,6 +605,7 @@ stream out {
         path.join(import.meta.dir, '__fixtures__', 'valid-postgres.swirls'),
         'utf8',
       )
+
       const { ast: ast1, errors: e1 } = parse(source)
       expect(e1).toEqual([])
 
@@ -583,6 +621,7 @@ stream out {
       expect(r2.connection).toBe(r1.connection)
       expect(r2.connectionIsLiteral).toBe(r1.connectionIsLiteral)
       expect(r2.tables.length).toBe(r1.tables.length)
+
       for (let i = 0; i < r1.tables.length; i++) {
         expect(r2.tables[i]?.name).toBe(r1.tables[i]?.name)
       }
@@ -593,6 +632,7 @@ stream out {
         path.join(import.meta.dir, '__fixtures__', 'valid-postgres.swirls'),
         'utf8',
       )
+
       const { ast } = parse(source)
       const out = serialize(ast)
       expect(out).toContain('postgres my_db {')
@@ -610,6 +650,7 @@ postgres db {
   table t { schema: @json { { "type": "object", "properties": { "a": { "type": "string" } } } } }
 }
 `
+
       const { ast } = parse(source)
       const out = serialize(ast)
       expect(out).toContain('connection: "postgres://localhost/mydb"')
@@ -625,6 +666,7 @@ form pub {
   schema: @json { {} }
 }
 `
+
       const first = parse(source)
       expect(first.errors.length).toBe(0)
       expect(first.ast.forms[0]?.visibility).toBe('public')
@@ -645,6 +687,7 @@ form internal_form {
   schema: @json { {} }
 }
 `
+
       const first = parse(source)
       expect(first.errors.length).toBe(0)
       expect(first.ast.forms[0]?.visibility).toBe('internal')
@@ -667,6 +710,7 @@ form legacy {
   schema: @json { {} }
 }
 `
+
       const first = parse(source)
       expect(first.errors.length).toBe(0)
       expect(first.ast.forms[0]?.visibility).toBe('internal')
@@ -690,6 +734,7 @@ form gated {
   schema: @json { {} }
 }
 `
+
       const first = parse(source)
       expect(first.errors.length).toBe(0)
       expect(first.ast.forms[0]?.authRef).toBeDefined()
@@ -711,6 +756,7 @@ form open {
   schema: @json { {} }
 }
 `
+
       const first = parse(source)
       expect(first.errors.length).toBe(0)
 
@@ -737,6 +783,7 @@ webhook stripe_hook {
   header: "Stripe-Security"
 }
 `
+
       const first = parse(source)
       expect(first.errors.length).toBe(0)
       const serialized = serialize(first.ast)

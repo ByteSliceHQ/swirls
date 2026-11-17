@@ -1,11 +1,9 @@
-import type { SwirlsFile } from '@swirls/language'
 import type { CompletionItem } from 'vscode-languageserver'
 import { CompletionItemKind } from 'vscode-languageserver'
-import {
-  collectSqlBlocks,
-  findSqlBlockAtPosition,
-  resolveStreamSchema,
-} from './blocks'
+
+import type { SwirlsFile } from '@swirls/language'
+
+import { collectSqlBlocks, findSqlBlockAtPosition, resolveStreamSchema } from './blocks'
 
 /** Logical table name used in SQL blocks (user writes SELECT * FROM {{table}} or we suggest "stream"). */
 const STREAM_TABLE_PLACEHOLDER = '{{table}}'
@@ -55,9 +53,11 @@ function getStreamNameFromNode(node: {
   configFields: Record<string, { kind?: string; value?: unknown }>
 }): string | null {
   const streamVal = node.configFields.stream
+
   if (streamVal?.kind === 'string' && typeof streamVal.value === 'string') {
     return streamVal.value
   }
+
   return null
 }
 
@@ -65,9 +65,11 @@ function getStreamVersionPinFromNode(node: {
   configFields: Record<string, { kind?: string; value?: unknown }>
 }): string | undefined {
   const v = node.configFields.version
+
   if (v?.kind === 'string' && typeof v.value === 'string' && v.value.trim()) {
     return v.value.trim()
   }
+
   return undefined
 }
 
@@ -81,6 +83,7 @@ export function getSqlCompletions(
 ): CompletionItem[] {
   const blocks = collectSqlBlocks(ast)
   const block = findSqlBlockAtPosition(blocks, line, character)
+
   if (!block) {
     return []
   }
@@ -93,6 +96,7 @@ export function getSqlCompletions(
     detail: 'Stream table (use in FROM clause)',
     insertText: STREAM_TABLE_PLACEHOLDER,
   })
+
   items.push({
     label: STREAM_TABLE_LABEL,
     kind: CompletionItemKind.Variable,
@@ -101,9 +105,11 @@ export function getSqlCompletions(
   })
 
   const streamName = getStreamNameFromNode(block.node)
+
   if (streamName) {
     const versionPin = getStreamVersionPinFromNode(block.node)
     const columns = resolveStreamSchema(ast, streamName, versionPin)
+
     if (columns && columns.length > 0) {
       for (const col of columns) {
         items.push({

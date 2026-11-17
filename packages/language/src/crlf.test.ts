@@ -1,15 +1,17 @@
 import { describe, expect, test } from 'bun:test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+
 import { parse } from './parser'
 
 const FIXTURES_DIR = join(import.meta.dir, '__fixtures__')
 
 /** Byte offsets count the extra \r, so they are the one thing allowed to differ. */
 function comparable(ast: unknown): string {
-  return JSON.stringify(ast, (key, value) =>
-    key === 'offset' ? undefined : value,
-  ).replaceAll('\\r\\n', '\\n')
+  return JSON.stringify(ast, (key, value) => (key === 'offset' ? undefined : value)).replaceAll(
+    '\\r\\n',
+    '\\n',
+  )
 }
 
 describe('CRLF sources', () => {

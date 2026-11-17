@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 
 describe('connector block parser', () => {
@@ -9,9 +10,11 @@ connector client_portal {
   description: "Inbound OAuth application for MSP end clients"
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.connector).toHaveLength(1)
+
     expect(ast.connector[0]).toMatchObject({
       name: 'client_portal',
       label: 'Client connector',
@@ -24,6 +27,7 @@ connector client_portal {
 connector bare {
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.connector).toHaveLength(1)
@@ -37,11 +41,10 @@ connector bad {
   provider: swirls
 }
 `
+
     const { ast, errors } = parse(src)
     expect(ast.connector).toHaveLength(1)
-    expect(
-      errors.some((e) => e.message.includes('Unknown connector property')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('Unknown connector property'))).toBe(true)
   })
 
   test('flags duplicate property within a block', () => {
@@ -51,10 +54,9 @@ connector dupe {
   label: "Two"
 }
 `
+
     const { errors } = parse(src)
-    expect(
-      errors.some((e) => e.message.includes('Duplicate connector property')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('Duplicate connector property'))).toBe(true)
   })
 
   test('captures the doc comment above the block', () => {
@@ -64,6 +66,7 @@ connector client_portal {
   label: "Client connector"
 }
 `
+
     const { ast } = parse(src)
     expect(ast.connector[0]?.docComment).toBe('Client-facing MCP connector')
   })

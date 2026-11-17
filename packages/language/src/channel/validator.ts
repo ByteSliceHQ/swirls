@@ -1,4 +1,5 @@
 import { CHANNEL_RESPONSE_POLICY_LIMITS } from '@swirls/definition/deployment-definition'
+
 import type { Diagnostic, SwirlsFile } from '../ast'
 import { DURATION_SYNTAX_HINT, parseDurationSeconds } from '../duration'
 import { resolveNamedSchemasFromDecls } from '../schema'
@@ -11,25 +12,27 @@ function diag(message: string, range: ChannelDecl['range']): Diagnostic {
 }
 
 /** Every response-policy knob the channel actually declared, with its range. */
-function declaredResponsePolicy(
-  ch: ChannelDecl,
-): { key: string; range: ChannelDecl['range'] }[] {
+function declaredResponsePolicy(ch: ChannelDecl): { key: string; range: ChannelDecl['range'] }[] {
   const declared: { key: string; range: ChannelDecl['range'] }[] = []
+
   if (ch.engagementTimeout !== undefined) {
     declared.push({
       key: 'engagement_timeout',
       range: ch.engagementTimeoutRange ?? ch.range,
     })
   }
+
   if (ch.cooldown !== undefined) {
     declared.push({ key: 'cooldown', range: ch.cooldownRange ?? ch.range })
   }
+
   if (ch.maxUnpromptedPerHour !== undefined) {
     declared.push({
       key: 'max_unprompted_per_hour',
       range: ch.maxUnpromptedPerHourRange ?? ch.range,
     })
   }
+
   return declared
 }
 
@@ -47,6 +50,7 @@ function validateResponsePolicy(ch: ChannelDecl): Diagnostic[] {
 
   if (ch.engagementTimeout !== undefined) {
     const seconds = parseDurationSeconds(ch.engagementTimeout)
+
     if (seconds === null) {
       out.push(
         diag(
@@ -61,9 +65,7 @@ function validateResponsePolicy(ch: ChannelDecl): Diagnostic[] {
           ch.engagementTimeoutRange ?? ch.range,
         ),
       )
-    } else if (
-      seconds > CHANNEL_RESPONSE_POLICY_LIMITS.maxEngagementTimeoutSeconds
-    ) {
+    } else if (seconds > CHANNEL_RESPONSE_POLICY_LIMITS.maxEngagementTimeoutSeconds) {
       out.push(
         diag(
           `${label}: engagement_timeout must be at most "24h"`,
@@ -75,20 +77,13 @@ function validateResponsePolicy(ch: ChannelDecl): Diagnostic[] {
 
   if (ch.cooldown !== undefined) {
     const seconds = parseDurationSeconds(ch.cooldown)
+
     if (seconds === null) {
       out.push(
-        diag(
-          `${label}: cooldown must be ${DURATION_SYNTAX_HINT}`,
-          ch.cooldownRange ?? ch.range,
-        ),
+        diag(`${label}: cooldown must be ${DURATION_SYNTAX_HINT}`, ch.cooldownRange ?? ch.range),
       )
     } else if (seconds > CHANNEL_RESPONSE_POLICY_LIMITS.maxCooldownSeconds) {
-      out.push(
-        diag(
-          `${label}: cooldown must be at most "24h"`,
-          ch.cooldownRange ?? ch.range,
-        ),
-      )
+      out.push(diag(`${label}: cooldown must be at most "24h"`, ch.cooldownRange ?? ch.range))
     }
   }
 
@@ -122,11 +117,9 @@ export function channelResponsePolicyToDeploymentPayload(decl: ChannelDecl): {
   maxUnpromptedPerHour?: number
 } {
   const engagementTimeoutSeconds =
-    decl.engagementTimeout === undefined
-      ? null
-      : parseDurationSeconds(decl.engagementTimeout)
-  const cooldownSeconds =
-    decl.cooldown === undefined ? null : parseDurationSeconds(decl.cooldown)
+    decl.engagementTimeout === undefined ? null : parseDurationSeconds(decl.engagementTimeout)
+
+  const cooldownSeconds = decl.cooldown === undefined ? null : parseDurationSeconds(decl.cooldown)
 
   return {
     ...(engagementTimeoutSeconds !== null ? { engagementTimeoutSeconds } : {}),
@@ -146,18 +139,16 @@ export function validateChannelBlocks(
   const localAgents = new Set((ast.agent ?? []).map((a) => a.name))
   const agentNames = nameLookup(localAgents, workspace?.agent)
 
-  const connectionsByName = new Map(
-    (ast.connections ?? []).map((c) => [c.name, c]),
-  )
+  const connectionsByName = new Map((ast.connections ?? []).map((c) => [c.name, c]))
+
   for (const [name, decl] of workspace?.connectionBlocks ?? []) {
     if (!connectionsByName.has(name)) {
       connectionsByName.set(name, decl)
     }
   }
 
-  const connectorsByName = new Map(
-    (ast.connector ?? []).map((c) => [c.name, c]),
-  )
+  const connectorsByName = new Map((ast.connector ?? []).map((c) => [c.name, c]))
+
   for (const [name, decl] of workspace?.connectorBlocks ?? []) {
     if (!connectorsByName.has(name)) {
       connectorsByName.set(name, decl)
@@ -171,10 +162,7 @@ export function validateChannelBlocks(
   for (const ch of ast.channels ?? []) {
     if (ch.platform !== 'mcp' && !ch.agent) {
       out.push(
-        diag(
-          `Channel "${ch.name}" with platform "${ch.platform}" must declare an agent`,
-          ch.range,
-        ),
+        diag(`Channel "${ch.name}" with platform "${ch.platform}" must declare an agent`, ch.range),
       )
     } else if (ch.agent && !agentNames.has(ch.agent)) {
       out.push(
@@ -190,11 +178,7 @@ export function validateChannelBlocks(
     // until the gate is wired into each ingress. MCP is left to its own
     // "must not declare a mode" diagnostic below rather than told about a mode
     // it has no use for.
-    if (
-      ch.mode === 'ambient' &&
-      !isSurfaceChannelPlatform(ch.platform) &&
-      ch.platform !== 'mcp'
-    ) {
+    if (ch.mode === 'ambient' && !isSurfaceChannelPlatform(ch.platform) && ch.platform !== 'mcp') {
       out.push(
         diag(
           `Channel "${ch.name}" with platform "${ch.platform}" does not support mode "ambient" yet — ambient response gating ships for platform "swirls" first; use "mention" (the default) or "all"`,
@@ -217,55 +201,49 @@ export function validateChannelBlocks(
     if (ch.platform === 'mcp') {
       if (!ch.agent && !ch.workflows?.length) {
         out.push(
-          diag(
-            `Channel "${ch.name}" must declare an agent or non-empty workflows`,
-            ch.range,
-          ),
+          diag(`Channel "${ch.name}" must declare an agent or non-empty workflows`, ch.range),
         )
       }
+
       const seen = new Set<string>()
+
       for (const name of ch.workflows ?? []) {
         const at = ch.workflowsRange ?? ch.range
+
         if (seen.has(name)) {
           out.push(diag(`Channel "${ch.name}" repeats workflow "${name}"`, at))
         }
+
         seen.add(name)
+
         if (['send_message', 'get_execution'].includes(name)) {
-          out.push(
-            diag(
-              `Workflow "${name}" conflicts with a reserved MCP tool name`,
-              at,
-            ),
-          )
+          out.push(diag(`Workflow "${name}" conflicts with a reserved MCP tool name`, at))
         }
+
         const workflow =
-          ast.workflows.find((w) => w.name === name) ??
-          workspace?.workflowBlocks.get(name)
+          ast.workflows.find((w) => w.name === name) ?? workspace?.workflowBlocks.get(name)
+
         if (!workflow) {
-          out.push(
-            diag(
-              `Channel "${ch.name}" references unknown workflow "${name}"`,
-              at,
-            ),
-          )
+          out.push(diag(`Channel "${ch.name}" references unknown workflow "${name}"`, at))
           continue
         }
+
         if (!workflow.description?.trim()) {
           out.push(diag(`MCP workflow "${name}" requires a description`, at))
         }
+
         const root = workflow.nodes.find((n) => n.isRoot)
+
         const schema =
           root?.inputSchema ??
           (root?.inputSchemaRef
             ? (localSchemas.get(root.inputSchemaRef) ??
               workspace?.schemaLiterals.get(root.inputSchemaRef))
             : undefined)
+
         if (!schema || schema.type !== 'object') {
           out.push(
-            diag(
-              `MCP workflow "${name}" requires an object inputSchema on its root node`,
-              at,
-            ),
+            diag(`MCP workflow "${name}" requires an object inputSchema on its root node`, at),
           )
         }
       }
@@ -276,10 +254,7 @@ export function validateChannelBlocks(
       // meaningless for MCP).
       if (ch.connector === undefined) {
         out.push(
-          diag(
-            `Channel "${ch.name}" with platform "mcp" must declare a connector`,
-            ch.range,
-          ),
+          diag(`Channel "${ch.name}" with platform "mcp" must declare a connector`, ch.range),
         )
       } else if (!connectorsByName.has(ch.connector)) {
         // (c) `connector:` must reference a declared connector block.
@@ -302,10 +277,7 @@ export function validateChannelBlocks(
 
       if (ch.modeRange !== undefined) {
         out.push(
-          diag(
-            `Channel "${ch.name}" with platform "mcp" must not declare a mode`,
-            ch.modeRange,
-          ),
+          diag(`Channel "${ch.name}" with platform "mcp" must not declare a mode`, ch.modeRange),
         )
       }
 
@@ -329,6 +301,7 @@ export function validateChannelBlocks(
           ),
         )
       }
+
       // (b) `connector:` is inbound-OAuth only, valid solely on MCP channels.
       if (ch.connector !== undefined) {
         out.push(
@@ -342,6 +315,7 @@ export function validateChannelBlocks(
       // (d) Outbound connection provider-match check for non-MCP platforms.
       if (ch.connection !== undefined) {
         const conn = connectionsByName.get(ch.connection)
+
         if (!conn) {
           out.push(
             diag(
@@ -365,11 +339,7 @@ export function validateChannelBlocks(
       // portal keys its shared session on `channel:<name>`), so several of them
       // may front the same agent. Every other platform routes inbound events by
       // platform, mode, and agent, where a second binding would double-deliver.
-      if (
-        ch.platform === 'mcp' ||
-        ch.platform === 'web' ||
-        isSurfaceChannelPlatform(ch.platform)
-      ) {
+      if (ch.platform === 'mcp' || ch.platform === 'web' || isSurfaceChannelPlatform(ch.platform)) {
         const list = enabledChannelNames.get(ch.name) ?? []
         list.push(ch)
         enabledChannelNames.set(ch.name, list)

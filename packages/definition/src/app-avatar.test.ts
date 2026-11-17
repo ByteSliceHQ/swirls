@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { appAvatarSchema, isAppAvatarShape, isAppAvatarVariant } from './app-avatar'
 
 describe('app-avatar', () => {
@@ -16,10 +17,9 @@ describe('app-avatar', () => {
 
   test('appAvatarSchema accepts sparse avatar config', () => {
     expect(appAvatarSchema.safeParse({ variant: 'marble' }).success).toBe(true)
-    expect(
-      appAvatarSchema.safeParse({ colors: ['#9e3b3b', '#8b7355'] }).success,
-    ).toBe(true)
+    expect(appAvatarSchema.safeParse({ colors: ['#9e3b3b', '#8b7355'] }).success).toBe(true)
     expect(appAvatarSchema.safeParse({ shape: 'circle' }).success).toBe(true)
+
     expect(
       appAvatarSchema.safeParse({
         variant: 'ring',

@@ -21,34 +21,35 @@ function parseNamedExposureList(
   field: string,
 ): NetworkNamedExposureRef[] {
   const token = d.peek()
+
   if (!token) {
     d.error(`Network "${owner}" expose.${field} must be an array`, token)
     return []
   }
+
   const value = d.parseConfigValue(token)
+
   if (!value || value.kind !== 'array') {
     d.error(`Network "${owner}" expose.${field} must be an array`, token)
     return []
   }
 
   const refs: NetworkNamedExposureRef[] = []
+
   for (const item of value.value) {
     if (item.kind !== 'string' || item.value.trim() === '') {
-      d.error(
-        `Network "${owner}" expose.${field} entries must be resource names`,
-        token,
-      )
+      d.error(`Network "${owner}" expose.${field} entries must be resource names`, token)
       continue
     }
+
     refs.push({ name: item.value, range: item.range })
   }
+
   return refs
 }
 
 function configString(value: ConfigValue | undefined): string | undefined {
-  return value?.kind === 'string' && value.value.trim() !== ''
-    ? value.value
-    : undefined
+  return value?.kind === 'string' && value.value.trim() !== '' ? value.value : undefined
 }
 
 function parseDatabaseExposureList(
@@ -56,23 +57,28 @@ function parseDatabaseExposureList(
   owner: string,
 ): NetworkDatabaseExposureDecl[] {
   const token = d.peek()
+
   if (!token) {
     d.error(`Network "${owner}" expose.databases must be an array`, token)
     return []
   }
+
   const value = d.parseConfigValue(token)
+
   if (!value || value.kind !== 'array') {
     d.error(`Network "${owner}" expose.databases must be an array`, token)
     return []
   }
 
   const databases: NetworkDatabaseExposureDecl[] = []
+
   for (const item of value.value) {
     if (item.kind !== 'object') {
       d.error(
         `Network "${owner}" expose.databases entries must be objects with database and connections`,
         token,
       )
+
       continue
     }
 
@@ -82,25 +88,18 @@ function parseDatabaseExposureList(
     const connections: NetworkNamedExposureRef[] = []
 
     if (!database) {
-      d.error(
-        `Network "${owner}" database exposure requires database: <name>`,
-        token,
-      )
+      d.error(`Network "${owner}" database exposure requires database: <name>`, token)
     }
+
     if (!connectionsValue || connectionsValue.kind !== 'array') {
-      d.error(
-        `Network "${owner}" database exposure requires connections: [<name>, ...]`,
-        token,
-      )
+      d.error(`Network "${owner}" database exposure requires connections: [<name>, ...]`, token)
     } else {
       for (const connection of connectionsValue.value) {
         if (connection.kind !== 'string' || connection.value.trim() === '') {
-          d.error(
-            `Network "${owner}" database connection entries must be resource names`,
-            token,
-          )
+          d.error(`Network "${owner}" database connection entries must be resource names`, token)
           continue
         }
+
         connections.push({ name: connection.value, range: connection.range })
       }
     }
@@ -118,21 +117,23 @@ function parseDatabaseExposureList(
       range: item.range,
     })
   }
+
   return databases
 }
 
-function parseExposeBlock(
-  d: ResourceParserDelegate,
-  owner: string,
-): NetworkExposeDecl | undefined {
+function parseExposeBlock(d: ResourceParserDelegate, owner: string): NetworkExposeDecl | undefined {
   const start = d.peek()
+
   if (!start || start.value !== 'expose') {
     return undefined
   }
+
   d.advance()
+
   if (!d.expect('colon')) {
     d.error('Expected : after expose', d.peek() ?? start)
   }
+
   if (!d.expect('lbrace')) {
     d.error('Expected { after expose:', d.peek() ?? start)
     return undefined
@@ -148,9 +149,11 @@ function parseExposeBlock(
 
   while (!d.eof()) {
     const token = d.peek()
+
     if (!token || token.kind === 'rbrace') {
       break
     }
+
     if (token.kind === 'block_comment') {
       d.advance()
       continue
@@ -158,13 +161,17 @@ function parseExposeBlock(
 
     const keyToken = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
+
     if (seenKeys.has(key)) {
       d.error(`Duplicate network exposure property "${key}"`, keyToken)
     }
+
     seenKeys.add(key)
+
     if (!d.expect('colon')) {
       d.error('Expected :', d.peek() ?? keyToken)
       break
@@ -189,9 +196,11 @@ function parseExposeBlock(
       case 'databases':
         databases.push(...parseDatabaseExposureList(d, owner))
         break
+
       default: {
         d.error(`Unknown network exposure property "${key}"`, keyToken)
         const value = d.peek()
+
         if (value) {
           d.parseConfigValue(value)
         }
@@ -200,6 +209,7 @@ function parseExposeBlock(
   }
 
   const closing = d.expect('rbrace')
+
   if (!closing) {
     d.error('Expected } to close expose block', d.peek() ?? start)
   }
@@ -220,17 +230,21 @@ export function parseNetworkBlock(
   docComment?: string,
 ): NetworkDecl | null {
   const start = d.expect('keyword')
+
   if (!start || start.value !== 'network') {
     return null
   }
 
   const nameToken = d.advance()
+
   if (!nameToken || nameToken.kind !== 'identifier') {
     d.error('Expected network block name', nameToken)
     d.skipToNextBlock()
     return null
   }
+
   const name = nameToken.value as string
+
   if (!d.expect('lbrace')) {
     d.error('Expected {', d.peek())
     d.skipToNextBlock()
@@ -246,20 +260,21 @@ export function parseNetworkBlock(
 
   while (!d.eof()) {
     const token = d.peek()
+
     if (!token || token.kind === 'rbrace') {
       break
     }
+
     if (token.kind === 'block_comment') {
       d.advance()
       continue
     }
-    if (
-      (token.kind === 'identifier' || token.kind === 'keyword') &&
-      token.value === 'expose'
-    ) {
+
+    if ((token.kind === 'identifier' || token.kind === 'keyword') && token.value === 'expose') {
       if (seenKeys.has('expose')) {
         d.error('Duplicate network property "expose"', token)
       }
+
       seenKeys.add('expose')
       expose = parseExposeBlock(d, name)
       continue
@@ -267,13 +282,17 @@ export function parseNetworkBlock(
 
     const keyToken = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
+
     if (seenKeys.has(key)) {
       d.error(`Duplicate network property "${key}"`, keyToken)
     }
+
     seenKeys.add(key)
+
     if (!d.expect('colon')) {
       d.error('Expected :', d.peek() ?? keyToken)
       break
@@ -282,6 +301,7 @@ export function parseNetworkBlock(
     if (key === 'label' || key === 'description') {
       const valueToken = d.peek()
       const value = d.parseValue()
+
       if (typeof value !== 'string') {
         d.error(`Network ${key} must be a quoted string`, valueToken)
       } else if (key === 'label') {
@@ -291,6 +311,7 @@ export function parseNetworkBlock(
         description = value
         descriptionRange = valueToken?.range
       }
+
       continue
     }
 
@@ -299,6 +320,7 @@ export function parseNetworkBlock(
   }
 
   const closing = d.expect('rbrace')
+
   if (!closing) {
     d.error('Expected } to close network block', d.peek() ?? start)
   }

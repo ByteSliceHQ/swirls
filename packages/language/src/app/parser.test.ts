@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
+
+import type { LanguageHost, OpenUiBindings } from '../host'
 import { parse } from '../parser'
 import { serialize } from '../serializer'
 import { validate } from '../validator'
-import type { LanguageHost, OpenUiBindings } from '../host'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 
 const NO_BINDINGS: OpenUiBindings = {
@@ -25,9 +26,8 @@ const openUiHost: LanguageHost = {
   openui: {
     extractBindings(source) {
       const names = (component: string) =>
-        [...source.matchAll(new RegExp(`${component}\\("([^"]+)"\\)`, 'g'))].map(
-          (m) => m[1] ?? '',
-        )
+        [...source.matchAll(new RegExp(`${component}\\("([^"]+)"\\)`, 'g'))].map((m) => m[1] ?? '')
+
       return {
         ...NO_BINDINGS,
         channels: names('Chat'),
@@ -38,6 +38,7 @@ const openUiHost: LanguageHost = {
       const errors = this.extractBindings(source)
         .disks.filter((name) => !expose.disks.includes(name))
         .map((name) => `DiskBrowser binds disk "${name}" which is not defined`)
+
       return errors.length === 0 ? { ok: true } : { ok: false, errors }
     },
   },
@@ -201,9 +202,10 @@ describe('app block parsing', () => {
     expect(second.errors).toEqual([])
     expect(second.ast.apps[0]?.name).toBe('support_center')
     expect(second.ast.apps[0]?.pages.length).toBe(3)
-    expect(
-      second.ast.apps[0]?.pages.find((page) => page.name === 'dashboard')?.icon,
-    ).toBe('layout-dashboard')
+
+    expect(second.ast.apps[0]?.pages.find((page) => page.name === 'dashboard')?.icon).toBe(
+      'layout-dashboard',
+    )
   })
 
   test('parses and validates audience block', () => {
@@ -223,6 +225,7 @@ app client_portal {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast)
     expect(diags.filter((d) => d.severity === 'error')).toEqual([])
@@ -242,6 +245,7 @@ app broken {
   }
 }
 `)
+
     expect(errors.length).toBeGreaterThan(0)
     expect(ast.apps[0]?.audience).toBeUndefined()
   })
@@ -262,6 +266,7 @@ app broken {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast, { host: openUiHost })
     expect(diags.some((d) => d.message.includes('platform: swirls'))).toBe(true)
@@ -277,10 +282,9 @@ app legacy {
   }
 }
 `)
+
     expect(errors.length).toBeGreaterThan(0)
-    expect(errors.some((e) => e.message.includes('no longer supported'))).toBe(
-      true,
-    )
+    expect(errors.some((e) => e.message.includes('no longer supported'))).toBe(true)
     expect(ast.apps[0]?.pages[0]?.render).toBeUndefined()
   })
 
@@ -297,15 +301,15 @@ app demo {
   }
 }
 `
+
     const { ast, errors } = parse(source)
-    const unknown = errors.find((e) =>
-      e.message.startsWith('Unknown page field'),
-    )
+    const unknown = errors.find((e) => e.message.startsWith('Unknown page field'))
+
     expect(unknown?.message).toBe(
       'Unknown page field "data". Expected one of: label, icon, viewport, render, channel, reviews, threads',
     )
-    const dataLine =
-      source.split('\n').findIndex((line) => line.includes('data runs')) + 1
+
+    const dataLine = source.split('\n').findIndex((line) => line.includes('data runs')) + 1
     expect(unknown?.range.start.line).toBe(dataLine)
     expect(ast.apps[0]?.pages[0]?.label).toBe('Dashboard')
     expect(ast.apps[0]?.pages[0]?.render).toBeDefined()
@@ -320,10 +324,9 @@ app demo {
   }
 }
 `)
+
     expect(errors.some((error) => error.message === 'Expected :')).toBe(true)
-    expect(
-      errors.some((error) => error.message.includes('Unknown page field')),
-    ).toBe(false)
+    expect(errors.some((error) => error.message.includes('Unknown page field'))).toBe(false)
   })
 
   test('accepts TableEditor on a full-viewport page', () => {
@@ -351,6 +354,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast).filter((d) => d.severity !== 'warning')
     expect(diags).toEqual([])
@@ -379,6 +383,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast).filter((d) => d.severity !== 'warning')
     expect(diags).toEqual([])
@@ -399,6 +404,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast).filter((d) => d.severity !== 'warning')
     expect(diags).toEqual([])
@@ -420,6 +426,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast).filter((d) => d.severity !== 'warning')
     expect(diags).toEqual([])
@@ -448,6 +455,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast).filter((d) => d.severity !== 'warning')
     expect(diags).toEqual([])
@@ -466,14 +474,12 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast, { host: openUiHost }).filter((d) => d.severity !== 'warning')
+
     expect(
-      diags.some(
-        (d) =>
-          d.message.includes('DiskBrowser') &&
-          d.message.includes('missing_disk'),
-      ),
+      diags.some((d) => d.message.includes('DiskBrowser') && d.message.includes('missing_disk')),
     ).toBe(true)
   })
 
@@ -501,6 +507,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast).filter((d) => d.severity !== 'warning')
     expect(diags).toEqual([])
@@ -518,6 +525,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const room = ast.apps[0]?.pages[0]
     expect(room?.channel).toBe('support_room')
@@ -538,9 +546,8 @@ app broken {
   }
 }
 `)
-    expect(
-      both.errors.some((e) => e.message.includes('both render: and channel:')),
-    ).toBe(true)
+
+    expect(both.errors.some((e) => e.message.includes('both render: and channel:'))).toBe(true)
   })
 
   test('channel page requires swirls platform channel', () => {
@@ -557,6 +564,7 @@ app broken {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast, { host: openUiHost })
     expect(diags.some((d) => d.message.includes('platform: swirls'))).toBe(true)
@@ -585,10 +593,7 @@ app inbox {
 
     const second = parse(serialize(ast))
     expect(second.errors).toEqual([])
-    expect(second.ast.apps[0]?.pages[0]?.threads).toEqual([
-      'support_room',
-      'ops_room',
-    ])
+    expect(second.ast.apps[0]?.pages[0]?.threads).toEqual(['support_room', 'ops_room'])
   })
 
   test('parses and round-trips a non-empty reviews workflow list with ranges', () => {
@@ -618,10 +623,7 @@ app review_queue {
 
     const second = parse(serialize(ast))
     expect(second.errors).toEqual([])
-    expect(second.ast.apps[0]?.pages[0]?.reviews).toEqual([
-      'refund_request',
-      'escalate_request',
-    ])
+    expect(second.ast.apps[0]?.pages[0]?.reviews).toEqual(['refund_request', 'escalate_request'])
   })
 
   test('rejects empty, quoted, and mutually exclusive reviews page bodies', () => {
@@ -634,9 +636,8 @@ app broken {
   }
 }
 `)
-    expect(
-      empty.errors.some((error) => error.message.includes('at least one')),
-    ).toBe(true)
+
+    expect(empty.errors.some((error) => error.message.includes('at least one'))).toBe(true)
 
     const quoted = parse(`
 ${PRELUDE}
@@ -647,11 +648,10 @@ app broken {
   }
 }
 `)
-    expect(
-      quoted.errors.some((error) =>
-        error.message.includes('bare workflow identifiers'),
-      ),
-    ).toBe(true)
+
+    expect(quoted.errors.some((error) => error.message.includes('bare workflow identifiers'))).toBe(
+      true,
+    )
 
     const combined = parse(`
 ${PRELUDE}
@@ -663,11 +663,10 @@ app broken {
   }
 }
 `)
-    expect(
-      combined.errors.some((error) =>
-        error.message.includes('channel: and reviews:'),
-      ),
-    ).toBe(true)
+
+    expect(combined.errors.some((error) => error.message.includes('channel: and reviews:'))).toBe(
+      true,
+    )
   })
 
   test('validates every reviews workflow reference', () => {
@@ -680,21 +679,20 @@ app broken {
   }
 }
 `)
+
     expect(errors).toEqual([])
 
     const diags = validate(ast)
+
     expect(
       diags.some((diagnostic) =>
-        diagnostic.message.includes(
-          'reviews workflow "missing_workflow" is not defined',
-        ),
+        diagnostic.message.includes('reviews workflow "missing_workflow" is not defined'),
       ),
     ).toBe(true)
+
     expect(
       diags.some((diagnostic) =>
-        diagnostic.message.includes(
-          'reviews workflow "refund_request" is not defined',
-        ),
+        diagnostic.message.includes('reviews workflow "refund_request" is not defined'),
       ),
     ).toBe(false)
   })
@@ -708,16 +706,16 @@ app review_queue {
   }
 }
 `)
+
     expect(errors).toEqual([])
 
     const emptyMap = () => new Map()
+
     const workspace = {
       forms: emptyMap(),
       webhooks: emptyMap(),
       schedules: emptyMap(),
-      workflows: new Map([
-        ['remote_review', [{ relativePath: 'remote.swirls', line: 1 }]],
-      ]),
+      workflows: new Map([['remote_review', [{ relativePath: 'remote.swirls', line: 1 }]]]),
       streams: emptyMap(),
       views: emptyMap(),
       auths: emptyMap(),
@@ -756,12 +754,12 @@ app review_queue {
       connectorBlocks: emptyMap(),
       actionBlocks: emptyMap(),
     } satisfies WorkspaceResourceIndex
+
     const diags = validate(ast, { workspace })
+
     expect(
       diags.some((diagnostic) =>
-        diagnostic.message.includes(
-          'reviews workflow "remote_review" is not defined',
-        ),
+        diagnostic.message.includes('reviews workflow "remote_review" is not defined'),
       ),
     ).toBe(false)
   })
@@ -794,6 +792,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     expect(ast.apps[0]?.brand?.tokens?.light?.canvas?.value).toBe('#f7f5f1')
     expect(ast.apps[0]?.brand?.tokens?.dark?.canvas?.value).toBe('#090807')
@@ -801,15 +800,9 @@ app support_center {
 
     const second = parse(serialize(ast))
     expect(second.errors).toEqual([])
-    expect(
-      second.ast.apps[0]?.brand?.tokens?.light?.brand_foreground?.value,
-    ).toBe('#ffffff')
-    expect(second.ast.apps[0]?.brand?.tokens?.light?.viewport?.value).toBe(
-      '#ffffff',
-    )
-    expect(second.ast.apps[0]?.brand?.tokens?.light?.warning?.value).toBe(
-      '#a66a1f',
-    )
+    expect(second.ast.apps[0]?.brand?.tokens?.light?.brand_foreground?.value).toBe('#ffffff')
+    expect(second.ast.apps[0]?.brand?.tokens?.light?.viewport?.value).toBe('#ffffff')
+    expect(second.ast.apps[0]?.brand?.tokens?.light?.warning?.value).toBe('#a66a1f')
     expect(second.ast.apps[0]?.brand?.tokens?.light?.radius?.value).toBe('8px')
   })
 
@@ -832,9 +825,8 @@ app support_center {
   }
 }
 `)
-    expect(errors.some((e) => e.message.includes('Unknown brand token'))).toBe(
-      true,
-    )
+
+    expect(errors.some((e) => e.message.includes('Unknown brand token'))).toBe(true)
   })
 
   test('rejects invalid brand token colors at validate time', () => {
@@ -856,11 +848,10 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const diags = validate(ast)
-    expect(
-      diags.some((d) => d.message.includes('tokens.light.brand must be')),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('tokens.light.brand must be'))).toBe(true)
   })
 
   test('parses brand avatar block and round-trips', () => {
@@ -883,24 +874,17 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     expect(ast.apps[0]?.brand?.avatar?.variant).toBe('marble')
-    expect(ast.apps[0]?.brand?.avatar?.colors).toEqual([
-      '#9e3b3b',
-      '#8b7355',
-      '#f7eeee',
-    ])
+    expect(ast.apps[0]?.brand?.avatar?.colors).toEqual(['#9e3b3b', '#8b7355', '#f7eeee'])
     expect(ast.apps[0]?.brand?.avatar?.shape).toBe('circle')
     expect(validate(ast).filter((d) => d.severity !== 'warning')).toEqual([])
 
     const second = parse(serialize(ast))
     expect(second.errors).toEqual([])
     expect(second.ast.apps[0]?.brand?.avatar?.variant).toBe('marble')
-    expect(second.ast.apps[0]?.brand?.avatar?.colors).toEqual([
-      '#9e3b3b',
-      '#8b7355',
-      '#f7eeee',
-    ])
+    expect(second.ast.apps[0]?.brand?.avatar?.colors).toEqual(['#9e3b3b', '#8b7355', '#f7eeee'])
     expect(second.ast.apps[0]?.brand?.avatar?.shape).toBe('circle')
   })
 
@@ -921,9 +905,8 @@ app support_center {
   }
 }
 `)
-    expect(
-      errors.some((e) => e.message.includes('Unknown avatar property')),
-    ).toBe(true)
+
+    expect(errors.some((e) => e.message.includes('Unknown avatar property'))).toBe(true)
   })
 
   test('rejects invalid brand avatar variant and colors at validate time', () => {
@@ -943,11 +926,11 @@ app support_center {
   }
 }
 `)
+
     expect(invalidVariant.errors).toEqual([])
+
     expect(
-      validate(invalidVariant.ast).some((d) =>
-        d.message.includes('avatar variant "neon"'),
-      ),
+      validate(invalidVariant.ast).some((d) => d.message.includes('avatar variant "neon"')),
     ).toBe(true)
 
     const invalidColors = parse(`
@@ -966,7 +949,9 @@ app support_center {
   }
 }
 `)
+
     expect(invalidColors.errors).toEqual([])
+
     expect(
       validate(invalidColors.ast).some((d) =>
         d.message.includes('avatar colors must be CSS colors'),
@@ -989,11 +974,11 @@ app support_center {
   }
 }
 `)
+
     expect(invalidShape.errors).toEqual([])
+
     expect(
-      validate(invalidShape.ast).some((d) =>
-        d.message.includes('avatar shape "rounded"'),
-      ),
+      validate(invalidShape.ast).some((d) => d.message.includes('avatar shape "rounded"')),
     ).toBe(true)
   })
 
@@ -1024,6 +1009,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const landing = ast.apps[0]?.landing
     expect(landing?.layout).toBe('split')
@@ -1034,9 +1020,7 @@ app support_center {
     const second = parse(serialize(ast))
     expect(second.errors).toEqual([])
     expect(second.ast.apps[0]?.landing?.layout).toBe('split')
-    expect(second.ast.apps[0]?.landing?.footer).toBe(
-      'Need access? Contact your admin.',
-    )
+    expect(second.ast.apps[0]?.landing?.footer).toBe('Need access? Contact your admin.')
   })
 
   test('parses landing discover block and round-trips', () => {
@@ -1069,6 +1053,7 @@ app support_center {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const discover = ast.apps[0]?.landing?.discover
     expect(discover?.index).toBe(true)
@@ -1079,8 +1064,6 @@ app support_center {
 
     const second = parse(serialize(ast))
     expect(second.errors).toEqual([])
-    expect(second.ast.apps[0]?.landing?.discover?.organization).toBe(
-      'Acme Support',
-    )
+    expect(second.ast.apps[0]?.landing?.discover?.organization).toBe('Acme Support')
   })
 })

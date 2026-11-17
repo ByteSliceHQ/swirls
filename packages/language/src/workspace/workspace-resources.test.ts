@@ -2,15 +2,13 @@ import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import {
-  buildWorkspaceResourceIndex,
-  buildWorkspaceStreamBlockIndex,
-  workspaceDuplicates,
-} from './workspace-resources'
 
-describe('buildWorkspaceStreamBlockIndex (compat)', () => {
+import { buildWorkspaceResourceIndex, workspaceDuplicates } from './workspace-resources'
+
+describe('stream blocks across files', () => {
   test('unions stream names from multiple files and detects duplicates', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-ws-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'a.swirls'),
@@ -20,6 +18,7 @@ workflow g { label: "G" root { type: code label: "R" code: @ts { return {} } } }
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'b.swirls'),
         `version: 1
@@ -28,6 +27,7 @@ workflow h { label: "H" root { type: code label: "R" code: @ts { return {} } } }
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'c.swirls'),
         `version: 1
@@ -37,12 +37,10 @@ workflow i { label: "I" root { type: code label: "R" code: @ts { return {} } } }
         'utf-8',
       )
 
-      const idx = buildWorkspaceStreamBlockIndex({ cwd: dir })
-      expect(idx.names.has('foo')).toBe(true)
-      expect(idx.names.has('bar')).toBe(true)
-      expect(idx.duplicateNames.length).toBe(1)
-      expect(idx.duplicateNames[0]?.name).toBe('foo')
-      expect(idx.duplicateNames[0]?.sites.length).toBe(2)
+      const { streams } = buildWorkspaceResourceIndex({ cwd: dir })
+      expect([...streams.keys()].sort()).toEqual(['bar', 'foo'])
+      expect(streams.get('foo')?.length).toBe(2)
+      expect(streams.get('bar')?.length).toBe(1)
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }
@@ -52,6 +50,7 @@ workflow i { label: "I" root { type: code label: "R" code: @ts { return {} } } }
 describe('buildWorkspaceResourceIndex', () => {
   test('indexes secrets vars and schemaLiterals across files', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-ws2-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'schemas.swirls'),
@@ -60,6 +59,7 @@ schema base { label: "B" schema: @json { { "type": "object", "properties": { "x"
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'rest.swirls'),
         `version: 1
@@ -78,10 +78,12 @@ secret s1 { label: "S" vars: [K1, K2] }
       const secretSite = idx.secrets.get('s1')?.sites[0]
       expect(secretSite?.range).toBeDefined()
       expect(secretSite?.range?.start.line).toBe(secretSite?.line)
+
       expect(idx.schemaLiterals.get('derived')).toEqual({
         type: 'object',
         properties: { x: { type: 'string' } },
       })
+
       expect(idx.secrets.get('s1')?.vars.sort()).toEqual(['K1', 'K2'])
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
@@ -90,6 +92,7 @@ secret s1 { label: "S" vars: [K1, K2] }
 
   test('workspaceDuplicates lists multiple resource kinds', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-ws3-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'a.swirls'),
@@ -99,6 +102,7 @@ schema dup { label: "D" schema: @json { {} } }
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'b.swirls'),
         `version: 1
@@ -120,6 +124,7 @@ schema dup { label: "D2" schema: @json { {} } }
 
   test('indexes mcp blocks and detects cross-file duplicates', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-ws-mcp-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'a.swirls'),
@@ -128,6 +133,7 @@ mcp axiom { label: "Axiom" url: "https://mcp.example.com/mcp" }
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'b.swirls'),
         `version: 1
@@ -152,6 +158,7 @@ mcp other { label: "Other" url: "https://mcp.example.com/other" }
 
   test('indexes connector blocks and detects cross-file duplicates', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-ws-connector-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'a.swirls'),
@@ -160,6 +167,7 @@ connector client_portal { label: "Client connector" }
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'b.swirls'),
         `version: 1
@@ -175,9 +183,7 @@ connector other_portal { label: "Other" }
       expect(idx.connectorBlocks.has('client_portal')).toBe(true)
 
       const dupes = workspaceDuplicates(idx)
-      const connectorDup = dupes.find(
-        (d) => d.kind === 'connector' && d.name === 'client_portal',
-      )
+      const connectorDup = dupes.find((d) => d.kind === 'connector' && d.name === 'client_portal')
       expect(connectorDup?.sites.length).toBe(2)
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })

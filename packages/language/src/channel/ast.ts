@@ -2,6 +2,7 @@ import {
   type ChannelPlatform,
   channelPlatformSchema,
 } from '@swirls/definition/deployment-definition'
+
 import type { SourceRange } from '../ast'
 
 /** Supported chat platforms for agent channel bindings; the definition owns the list. */
@@ -73,12 +74,6 @@ export interface ChannelDecl {
   range: SourceRange
 }
 
-export const CHANNEL_PLATFORMS: readonly ChannelPlatform[] =
-  channelPlatformSchema.options
+export const CHANNEL_PLATFORMS: readonly ChannelPlatform[] = channelPlatformSchema.options
 
-export const CHANNEL_MODES: readonly ChannelMode[] = [
-  'mention',
-  'dm',
-  'all',
-  'ambient',
-]
+export const CHANNEL_MODES: readonly ChannelMode[] = ['mention', 'dm', 'all', 'ambient']

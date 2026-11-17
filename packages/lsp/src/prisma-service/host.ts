@@ -17,7 +17,6 @@ import {
   handleHoverRequest,
 } from '@prisma/language-server/dist/lib/MessageHandler'
 import { PrismaSchema } from '@prisma/language-server/dist/lib/Schema'
-import { PRISMA_SCHEMA_HEADER } from '@swirls/definition/managed-database'
 import type {
   CompletionContext,
   CompletionItem,
@@ -29,6 +28,9 @@ import type {
   Range,
 } from 'vscode-languageserver'
 import { TextDocument } from 'vscode-languageserver-textdocument'
+
+import { PRISMA_SCHEMA_HEADER } from '@swirls/definition/managed-database'
+
 import type { PrismaBlock } from './blocks'
 
 /** Lines occupied by the synthetic datasource/generator header. */
@@ -66,9 +68,11 @@ export function prismaVirtualToOriginal(
 ): Position {
   const startLine = block.contentRange.start.line - 1
   const startCol = block.contentRange.start.column - 1
+
   if (line < HEADER_LINE_COUNT) {
     return { line: startLine, character: startCol }
   }
+
   return {
     line: startLine + (line - HEADER_LINE_COUNT),
     character: line === HEADER_LINE_COUNT ? startCol + character : character,
@@ -77,11 +81,7 @@ export function prismaVirtualToOriginal(
 
 function mapRangeToOriginal(block: PrismaBlock, range: Range): Range {
   return {
-    start: prismaVirtualToOriginal(
-      block,
-      range.start.line,
-      range.start.character,
-    ),
+    start: prismaVirtualToOriginal(block, range.start.line, range.start.character),
     end: prismaVirtualToOriginal(block, range.end.line, range.end.character),
   }
 }
@@ -108,21 +108,22 @@ export function getPrismaBlockDiagnostics(
   const schema = PrismaSchema.singleFile(doc)
   const map = handleDiagnosticsRequest(schema, onError)
   const out: Diagnostic[] = []
+
   for (const d of map.get(doc.uri)) {
     if (d.range.end.line < HEADER_LINE_COUNT) {
       continue
     }
+
     out.push({ ...d, range: mapRangeToOriginal(block, d.range) })
   }
+
   return out
 }
 
 /** Map completion-item text edits from virtual coords back to the .swirls doc. */
-function mapCompletionItemToOriginal(
-  block: PrismaBlock,
-  item: CompletionItem,
-): CompletionItem {
+function mapCompletionItemToOriginal(block: PrismaBlock, item: CompletionItem): CompletionItem {
   const mapped = { ...item }
+
   if (mapped.textEdit) {
     if ('range' in mapped.textEdit) {
       mapped.textEdit = {
@@ -137,12 +138,14 @@ function mapCompletionItemToOriginal(
       }
     }
   }
+
   if (mapped.additionalTextEdits) {
     mapped.additionalTextEdits = mapped.additionalTextEdits.map((e) => ({
       ...e,
       range: mapRangeToOriginal(block, e.range),
     }))
   }
+
   return mapped
 }
 
@@ -158,6 +161,7 @@ export function getPrismaBlockCompletions(
   const doc = virtualDocumentForBlock(block)
   const schema = PrismaSchema.singleFile(doc)
   const virt = prismaOriginalToVirtual(block, position.line, position.character)
+
   const list = handleCompletionRequest(
     schema,
     doc,
@@ -168,9 +172,11 @@ export function getPrismaBlockCompletions(
     },
     onError,
   )
+
   if (!list) {
     return null
   }
+
   return {
     isIncomplete: list.isIncomplete,
     items: list.items.map((item) => mapCompletionItemToOriginal(block, item)),
@@ -188,15 +194,18 @@ export function getPrismaBlockHover(
   const doc = virtualDocumentForBlock(block)
   const schema = PrismaSchema.singleFile(doc)
   const virt = prismaOriginalToVirtual(block, position.line, position.character)
+
   const hover = handleHoverRequest(
     schema,
     doc,
     { textDocument: { uri: doc.uri }, position: virt },
     onError,
   )
+
   if (!hover) {
     return null
   }
+
   return {
     ...hover,
     range: hover.range ? mapRangeToOriginal(block, hover.range) : undefined,
@@ -215,27 +224,34 @@ export function getPrismaBlockDefinition(
   const doc = virtualDocumentForBlock(block)
   const schema = PrismaSchema.singleFile(doc)
   const virt = prismaOriginalToVirtual(block, position.line, position.character)
+
   const links = handleDefinitionRequest(schema, doc, {
     textDocument: { uri: doc.uri },
     position: virt,
   })
+
   if (!links || links.length === 0) {
     return null
   }
+
   const locations: Location[] = []
+
   for (const link of links) {
     if (link.targetUri !== doc.uri) {
       continue
     }
+
     // A definition target inside the synthetic header (datasource/generator)
     // has no counterpart in the .swirls document.
     if (link.targetSelectionRange.end.line < HEADER_LINE_COUNT) {
       continue
     }
+
     locations.push({
       uri: swirlsUri,
       range: mapRangeToOriginal(block, link.targetSelectionRange),
     })
   }
+
   return locations.length > 0 ? locations : null
 }

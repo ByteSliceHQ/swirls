@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test'
+
 import type { Range } from 'vscode-languageserver'
 import { TextDocument } from 'vscode-languageserver-textdocument'
-import {
-  getTsFileRefDefinition,
-  getTsFileRefDocumentLinks,
-} from './ts-file-ref-nav'
+
+import { getTsFileRefDefinition, getTsFileRefDocumentLinks } from './ts-file-ref-nav'
 
 const sampleUri = 'file:///project/app.swirls'
+
 const sampleContent = `graph g {
   root {
     type: code
@@ -17,20 +17,19 @@ const sampleContent = `graph g {
 `
 
 /** Same boundary rules as positionInRange for 0-based LSP ranges from sourceRangeToLspRange. */
-function lspPositionInRange(
-  line: number,
-  character: number,
-  r: Range,
-): boolean {
+function lspPositionInRange(line: number, character: number, r: Range): boolean {
   if (line < r.start.line || line > r.end.line) {
     return false
   }
+
   if (line === r.start.line && character < r.start.character) {
     return false
   }
+
   if (line === r.end.line && character > r.end.character) {
     return false
   }
+
   return true
 }
 
@@ -47,6 +46,7 @@ describe('getTsFileRefDefinition', () => {
     const doc = TextDocument.create(sampleUri, 'swirls', 1, sampleContent)
     const atTs = sampleContent.indexOf('@ts')
     const openQuote = sampleContent.indexOf('"./logic')
+
     for (const offset of [atTs, atTs + 1, openQuote]) {
       const pos = doc.positionAt(offset)
       const loc = getTsFileRefDefinition(doc, pos, sampleUri)
@@ -69,9 +69,11 @@ describe('getTsFileRefDocumentLinks', () => {
     expect(links).toHaveLength(1)
     const link = links[0]
     expect(link).toBeDefined()
+
     if (!link) {
       throw new Error('expected document link')
     }
+
     expect(link.target).toContain('logic.ts.swirls')
 
     const r = link.range
@@ -84,6 +86,7 @@ describe('getTsFileRefDocumentLinks', () => {
       const p = doc.positionAt(offset)
       expect(lspPositionInRange(p.line, p.character, r)).toBe(true)
     }
+
     check(atTs)
     check(openQuote)
     check(inPath)

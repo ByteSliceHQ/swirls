@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { serialize } from '../serializer'
 import { validate } from '../validator'
@@ -13,6 +14,7 @@ role finance {
   }
 }
 `)
+
     expect(errors).toEqual([])
     expect(ast.roles.length).toBe(1)
     const r = ast.roles[0]
@@ -32,6 +34,7 @@ role exec {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const r = ast.roles[0]
     expect(r?.match[0]?.claim).toBe('org_role')
@@ -48,6 +51,7 @@ role finance_admin {
   }
 }
 `)
+
     expect(errors).toEqual([])
     const r = ast.roles[0]
     expect(r?.match.length).toBe(2)
@@ -68,6 +72,7 @@ role hr {
 
 secret s { vars: [ OPENAI_API_KEY ] }
 `)
+
     expect(errors).toEqual([])
     expect(ast.roles.map((r) => r.name)).toEqual(['finance', 'hr'])
     expect(ast.secrets.length).toBe(1)
@@ -83,17 +88,20 @@ role finance {
   }
 }
 `
+
     const first = parse(src)
     expect(first.errors).toEqual([])
     const { ast, errors } = parse(serialize(first.ast))
     expect(errors).toEqual([])
     expect(ast.roles[0]?.name).toBe('finance')
     expect(ast.roles[0]?.description).toBe('Finance')
+
     expect(ast.roles[0]?.match[0]).toMatchObject({
       claim: 'department',
       op: 'eq',
       values: ['finance'],
     })
+
     expect(ast.roles[0]?.match[1]).toMatchObject({
       claim: 'org_role',
       op: 'in',
@@ -106,20 +114,18 @@ role finance {
 role dup { match { a: "1" } }
 role dup { match { b: "2" } }
 `)
+
     const diags = validate(ast)
-    expect(diags.some((d) => d.message.includes('Duplicate role name'))).toBe(
-      true,
-    )
+    expect(diags.some((d) => d.message.includes('Duplicate role name'))).toBe(true)
   })
 
   test('warns on an empty match block', () => {
     const { ast } = parse(`role nobody { match { } }`)
     const diags = validate(ast)
-    expect(
-      diags.some(
-        (d) => d.severity === 'warning' && d.message.includes('empty match'),
-      ),
-    ).toBe(true)
+
+    expect(diags.some((d) => d.severity === 'warning' && d.message.includes('empty match'))).toBe(
+      true,
+    )
   })
 })
 
@@ -133,6 +139,7 @@ policy {
   }
 }
 `)
+
     expect(errors).toEqual([])
     expect(ast.policies.length).toBe(1)
     const g = ast.policies[0]?.grants[0]
@@ -149,6 +156,7 @@ policy {
   allow exec -> agent *
 }
 `)
+
     expect(errors).toEqual([])
     const g = ast.policies[0]?.grants[0]
     expect(g?.role).toBe('exec')
@@ -164,6 +172,7 @@ policy {
   allow org_admin -> agent *
 }
 `)
+
     expect(errors).toEqual([])
     const grants = ast.policies[0]?.grants ?? []
     expect(grants.length).toBe(3)
@@ -181,17 +190,20 @@ policy {
   allow exec -> agent *
 }
 `
+
     const first = parse(src)
     expect(first.errors).toEqual([])
     const { ast, errors } = parse(serialize(first.ast))
     expect(errors).toEqual([])
     const grants = ast.policies[0]?.grants ?? []
+
     expect(grants[0]).toMatchObject({
       effect: 'allow',
       role: 'finance',
       agent: 'accountant',
       workflows: ['brex', 'quickbooks'],
     })
+
     expect(grants[1]).toMatchObject({ role: 'exec', agent: '*' })
   })
 
@@ -204,7 +216,9 @@ policy {
   allow finance -> agent accountant
 }
 `)
+
     expect(errors).toEqual([])
+
     expect(ast.policies[0]?.files?.retention).toEqual({
       mode: 'days',
       days: 30,
@@ -219,6 +233,7 @@ policy {
   }
 }
 `)
+
     expect(errors).toEqual([])
     expect(ast.policies[0]?.files?.retention).toEqual({ mode: 'forever' })
   })
@@ -232,10 +247,12 @@ policy {
   allow finance -> agent accountant
 }
 `
+
     const first = parse(src)
     expect(first.errors).toEqual([])
     const { ast, errors } = parse(serialize(first.ast))
     expect(errors).toEqual([])
+
     expect(ast.policies[0]?.files?.retention).toEqual({
       mode: 'days',
       days: 30,

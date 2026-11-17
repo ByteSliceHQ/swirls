@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+
 import { parse } from '../parser'
 
 const FIXTURES_DIR = path.join(import.meta.dir, '../__fixtures__')
@@ -60,6 +61,7 @@ postgres local_db {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const p = ast.postgres[0]!
@@ -78,9 +80,7 @@ describe('type: postgres nodes', () => {
     const node = graph.nodes.find((n) => n.name === 'check_existing')!
     expect(node.type).toBe('postgres')
     expect(node.configFields.postgres?.kind).toBe('string')
-    expect((node.configFields.postgres as { value: string }).value).toBe(
-      'my_db',
-    )
+    expect((node.configFields.postgres as { value: string }).value).toBe('my_db')
     expect(node.configFields.select?.kind).toBe('sql_block')
     expect(node.configFields.params?.kind).toBe('ts_block')
   })
@@ -113,6 +113,7 @@ workflow g {
   flow { root -> q }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const node = ast.workflows[0]!.nodes.find((n) => n.name === 'q')!

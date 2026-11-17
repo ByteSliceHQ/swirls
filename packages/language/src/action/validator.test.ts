@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { validateActionBlocks } from './validator'
 
@@ -16,6 +17,7 @@ action slack_post_message {
   output: @json { { "type": "object", "properties": { "ok": { "type": "boolean" } } } }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.actions).toHaveLength(1)
@@ -32,6 +34,7 @@ describe('validateActionBlocks', () => {
 action a { provider: slack method: POST path: "/a" }
 action a { provider: slack method: POST path: "/b" }
 `)
+
     const diags = validateActionBlocks(ast)
     expect(diags.some((d) => d.message.includes('Duplicate action'))).toBe(true)
   })
@@ -45,12 +48,9 @@ action linear_issue {
   document: "query { viewer { id } }"
 }
 `)
+
     const diags = validateActionBlocks(ast)
-    expect(
-      diags.some((d) =>
-        d.message.includes('with document requires method POST'),
-      ),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('with document requires method POST'))).toBe(true)
   })
 
   test('rejects input/output when document is set', () => {
@@ -63,10 +63,9 @@ action linear_issue {
   input: { type: "object" }
 }
 `)
+
     const diags = validateActionBlocks(ast)
-    expect(
-      diags.some((d) => d.message.includes('must not declare input or output')),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('must not declare input or output'))).toBe(true)
   })
 
   test('parses document field on graphql actions', () => {
@@ -78,6 +77,7 @@ action linear_viewer {
   document: "query { viewer { id } }"
 }
 `)
+
     expect(errors).toEqual([])
     expect(ast.actions[0]?.graphqlDocument).toBe('query { viewer { id } }')
   })

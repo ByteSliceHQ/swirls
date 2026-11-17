@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parseDurationSeconds } from './duration'
 
 describe('parseDurationSeconds', () => {

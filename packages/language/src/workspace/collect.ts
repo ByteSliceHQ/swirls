@@ -1,8 +1,6 @@
 import { join } from 'pathe'
-import {
-  nodeWorkspaceFileSystem,
-  type SwirlsWorkspaceFileSystem,
-} from './sandbox'
+
+import { nodeWorkspaceFileSystem, type SwirlsWorkspaceFileSystem } from './sandbox'
 
 const IGNORE_DIRS = new Set(['node_modules', '__fixtures__'])
 
@@ -22,6 +20,7 @@ function collectSwirlsFilesRecursive(
       if (IGNORE_DIRS.has(entry.name)) {
         continue
       }
+
       collectSwirlsFilesRecursive(cwd, fileSystem, full, acc)
     } else if (
       entry.isFile() &&

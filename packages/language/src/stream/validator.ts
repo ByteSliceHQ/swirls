@@ -4,6 +4,7 @@
  */
 
 import { resourceNameSchema } from '@swirls/definition/schemas'
+
 import type { ConfigValue, Diagnostic, SourceRange, SwirlsFile } from '../ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import { nameLookup } from '../workspace/workspace-resources'
@@ -18,15 +19,13 @@ function diag(
   return { message, range, severity }
 }
 
-function validateResourceName(
-  name: string,
-  range: SourceRange,
-  kind: string,
-): Diagnostic[] {
+function validateResourceName(name: string, range: SourceRange, kind: string): Diagnostic[] {
   const result = resourceNameSchema.safeParse(name)
+
   if (result.success) {
     return []
   }
+
   const msg = result.error.issues[0]?.message ?? 'Invalid name'
   return [diag(`${kind} name: ${msg}`, range)]
 }
@@ -35,19 +34,19 @@ function tsPredicateHasBody(cv: ConfigValue | undefined): boolean {
   if (!cv) {
     return false
   }
+
   if (cv.kind === 'ts_block') {
     return Boolean(cv.code?.trim())
   }
+
   if (cv.kind === 'ts_file_ref') {
     return Boolean(cv.path?.trim())
   }
+
   return false
 }
 
-function validateStreamVersionEntry(
-  stream: StreamDecl,
-  decl: StreamVersionDecl,
-): Diagnostic[] {
+function validateStreamVersionEntry(stream: StreamDecl, decl: StreamVersionDecl): Diagnostic[] {
   const out: Diagnostic[] = []
   const id = `"${decl.key}"`
 
@@ -70,6 +69,7 @@ function validateStreamVersionEntry(
   }
 
   const prepare = decl.prepare
+
   if (!prepare) {
     out.push(
       diag(
@@ -104,6 +104,7 @@ export function validateStreamBlocks(
 ): Diagnostic[] {
   const out: Diagnostic[] = []
   const streamBlocks = ast.streams ?? []
+
   const workflowNames = nameLookup(
     new Set(ast.workflows.map((g) => g.name)),
     options?.workspace?.workflows,
@@ -118,9 +119,7 @@ export function validateStreamBlocks(
     }
 
     if (stream.workflowName === '') {
-      out.push(
-        diag('Stream block requires "workflow" (workflow name)', stream.range),
-      )
+      out.push(diag('Stream block requires "workflow" (workflow name)', stream.range))
     } else if (!workflowNames.has(stream.workflowName)) {
       out.push(
         diag(
@@ -131,12 +130,7 @@ export function validateStreamBlocks(
     }
 
     if (!stream.version || stream.version.trim() === '') {
-      out.push(
-        diag(
-          `Stream "${stream.name}" requires "version" (active writer)`,
-          stream.range,
-        ),
-      )
+      out.push(diag(`Stream "${stream.name}" requires "version" (active writer)`, stream.range))
     } else if (!isValidStreamVersionId(stream.version)) {
       out.push(
         diag(
@@ -150,23 +144,17 @@ export function validateStreamBlocks(
 
     if (vers.length === 0) {
       out.push(
-        diag(
-          `Stream "${stream.name}" requires a non-empty versions { } block`,
-          stream.range,
-        ),
+        diag(`Stream "${stream.name}" requires a non-empty versions { } block`, stream.range),
       )
     }
 
     const seenKeys = new Set<string>()
+
     for (const v of vers) {
       if (seenKeys.has(v.key)) {
-        out.push(
-          diag(
-            `Stream "${stream.name}" declares duplicate version key "${v.key}"`,
-            v.range,
-          ),
-        )
+        out.push(diag(`Stream "${stream.name}" declares duplicate version key "${v.key}"`, v.range))
       }
+
       seenKeys.add(v.key)
       out.push(...validateStreamVersionEntry(stream, v))
     }

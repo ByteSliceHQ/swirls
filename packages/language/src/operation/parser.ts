@@ -29,51 +29,57 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export function normalizeInlineScript(raw: string): string {
   const lines = raw.replace(/\r\n?/g, '\n').split('\n')
+
   while (lines.length > 0 && lines[0]?.trim() === '') {
     lines.shift()
   }
+
   while (lines.length > 0 && lines[lines.length - 1]?.trim() === '') {
     lines.pop()
   }
+
   if (lines.length === 0) {
     return ''
   }
+
   const indents = lines
     .filter((line) => line.trim() !== '')
     .map((line) => /^[ \t]*/.exec(line)?.[0].length ?? 0)
+
   const shared = Math.min(...indents)
   return `${lines.map((line) => line.slice(shared).trimEnd()).join('\n')}\n`
 }
 
-function parseJsonSchema(
-  d: ResourceParserDelegate,
-  key: string,
-): JsonSchemaLiteral | undefined {
+function parseJsonSchema(d: ResourceParserDelegate, key: string): JsonSchemaLiteral | undefined {
   const tok = d.peek()
+
   if (tok?.kind !== 'fenced_block' || tok.fencedLang !== 'json') {
     d.error(`Operation "${key}" must be an @json { } block`, tok)
     d.parseValue()
     return undefined
   }
+
   d.advance()
+
   try {
     const parsed: unknown = JSON.parse(tok.fencedContent ?? '')
+
     if (isRecord(parsed)) {
       return parsed
     }
+
     d.error(`Operation "${key}" must be a JSON object`, tok)
   } catch {
     d.error(`Invalid JSON in operation "${key}"`, tok)
   }
+
   return undefined
 }
 
 function parseCommand(d: ResourceParserDelegate): OperationCommandDecl | null {
   const tok = d.peek()
-  if (
-    tok?.kind === 'fenced_block' &&
-    (tok.fencedLang === 'ps' || tok.fencedLang === 'sh')
-  ) {
+
+  if (tok?.kind === 'fenced_block' && (tok.fencedLang === 'ps' || tok.fencedLang === 'sh')) {
     d.advance()
     return {
       lang: tok.fencedLang,
@@ -81,10 +87,8 @@ function parseCommand(d: ResourceParserDelegate): OperationCommandDecl | null {
       range: tok.range,
     }
   }
-  if (
-    tok?.kind === 'script_path_ref' &&
-    (tok.fencedLang === 'ps' || tok.fencedLang === 'sh')
-  ) {
+
+  if (tok?.kind === 'script_path_ref' && (tok.fencedLang === 'ps' || tok.fencedLang === 'sh')) {
     d.advance()
     return {
       lang: tok.fencedLang,
@@ -92,10 +96,12 @@ function parseCommand(d: ResourceParserDelegate): OperationCommandDecl | null {
       range: tok.range,
     }
   }
+
   d.error(
     'Operation "command" must be an @ps { } or @sh { } block, or an @ps "file.ps1" or @sh "file.sh" reference',
     tok,
   )
+
   d.parseValue()
   return null
 }
@@ -105,11 +111,13 @@ export function parseOperationBlock(
   docComment: string | undefined,
 ): OperationDecl | null {
   const start = d.expect('keyword')
+
   if (!start || start.value !== 'operation') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected operation block name', nameTok)
     d.skipToNextBlock()
@@ -131,31 +139,39 @@ export function parseOperationBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
+
     if (!d.expect('colon')) {
       d.error('Expected :', d.peek())
       break
     }
+
     const valueTok = d.peek()
 
     if (key === 'label' || key === 'description') {
       const value = d.parseValue()
+
       if (typeof value === 'string') {
         decl[key] = value
       }
+
       continue
     }
+
     if (key === 'platform' || key === 'runAs') {
       // Written bare (`platform: windows`) or quoted. A bare word is an
       // identifier token, which `parseValue` does not read.
@@ -168,7 +184,9 @@ export function parseOperationBlock(
         d.parseValue()
         continue
       }
+
       d.advance()
+
       if (key === 'platform') {
         decl.platform = String(valueTok.value)
         decl.platformRange = valueTok.range
@@ -176,35 +194,42 @@ export function parseOperationBlock(
         decl.runAs = String(valueTok.value)
         decl.runAsRange = valueTok.range
       }
+
       continue
     }
+
     if (key === 'timeout') {
       const value = d.parseValue()
+
       if (typeof value === 'number' && valueTok) {
         decl.timeout = value
         decl.timeoutRange = valueTok.range
       } else {
         d.error('Operation "timeout" must be a number of seconds', valueTok)
       }
+
       continue
     }
+
     if (key === 'inputSchema' || key === 'outputSchema') {
       const schema = parseJsonSchema(d, key)
+
       if (schema) {
         decl[key] = schema
       }
+
       continue
     }
+
     if (key === 'command') {
       const command = parseCommand(d)
+
       if (decl.command) {
-        d.error(
-          `Operation "${decl.name}" declares more than one command`,
-          valueTok,
-        )
+        d.error(`Operation "${decl.name}" declares more than one command`, valueTok)
       } else if (command) {
         decl.command = command
       }
+
       continue
     }
 

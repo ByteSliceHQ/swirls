@@ -5,29 +5,14 @@
  * Run via node dist/server.js (stdio). VS Code extension spawns this and connects.
  */
 
-import './stdio-guard'
-
 import fs, { existsSync } from 'node:fs'
+
+import './stdio-guard'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import {
-  validate,
-  validateTsFileRefs,
-} from '@swirls/language'
-import { parse } from './parse-cache'
-import {
-  collectVirtualDiagnostics,
-  getVirtualDiagnostics,
-  toDocumentDiagnostics,
-} from './ts-service/block-diagnostics'
-import {
-  buildWorkspaceResourceIndex,
-  emptyWorkspaceResourceIndex,
-  type SwirlsWorkspaceFileSystem,
-  type WorkspaceResourceIndex,
-  collectSwirlsFiles,
-} from '@swirls/language/workspace'
+
 import ts from 'typescript'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import {
   type CompletionItem,
   CompletionItemKind,
@@ -46,15 +31,20 @@ import {
   TextDocuments,
   type WorkspaceFolder,
 } from 'vscode-languageserver/node'
-import { TextDocument } from 'vscode-languageserver-textdocument'
-import { getAiNodeOptionsDiagnostics } from './ai-validation'
+
+import type { SwirlsFile } from '@swirls/language'
+import { validate, validateTsFileRefs } from '@swirls/language'
 import {
-  getBlockContext,
-  getCompletions,
-  getNodeContextAtPosition,
-} from './completions'
+  buildWorkspaceResourceIndex,
+  emptyWorkspaceResourceIndex,
+  type SwirlsWorkspaceFileSystem,
+  type WorkspaceResourceIndex,
+  collectSwirlsFiles,
+} from '@swirls/language/workspace'
+
+import { getAiNodeOptionsDiagnostics } from './ai-validation'
+import { getBlockContext, getCompletions, getNodeContextAtPosition } from './completions'
 import { getDefinition } from './definition'
-import { languageHost } from './language-host'
 import {
   buildHoverContent,
   type DeclWithDoc,
@@ -65,10 +55,9 @@ import {
   REVIEW_PROPERTY_HOVER,
 } from './hover'
 import { getJsonBlockDiagnostics } from './json-service/host'
-import {
-  collectPrismaBlocks,
-  findPrismaBlockAtPosition,
-} from './prisma-service/blocks'
+import { languageHost } from './language-host'
+import { parse } from './parse-cache'
+import { collectPrismaBlocks, findPrismaBlockAtPosition } from './prisma-service/blocks'
 import {
   getPrismaBlockCompletions,
   getPrismaBlockDefinition,
@@ -90,15 +79,14 @@ import {
   isStandaloneTsSwirlsUri,
   removeBindingsForParent,
 } from './ts-bindings'
+import { getTsFileRefDefinition, getTsFileRefDocumentLinks } from './ts-file-ref-nav'
 import {
-  getTsFileRefDefinition,
-  getTsFileRefDocumentLinks,
-} from './ts-file-ref-nav'
+  collectVirtualDiagnostics,
+  getVirtualDiagnostics,
+  toDocumentDiagnostics,
+} from './ts-service/block-diagnostics'
 import { getPostgresPlaceholderTsTypeString } from './ts-service/context-types'
-import {
-  createLanguageServiceFromMap,
-  virtualUriForBlock,
-} from './ts-service/host'
+import { createLanguageServiceFromMap, virtualUriForBlock } from './ts-service/host'
 import type { WorkspaceFileReader } from './ts-service/integration-types'
 import { getExpectedReturnType } from './ts-service/return-types'
 import {
@@ -154,6 +142,7 @@ function findWorkspaceFolderForUri(uri: string): WorkspaceFolder | null {
       return folder
     }
   }
+
   return null
 }
 
@@ -164,20 +153,25 @@ function findWorkspaceFolderForUri(uri: string): WorkspaceFolder | null {
  */
 function makeOverlayFileSystem(): SwirlsWorkspaceFileSystem {
   const overlay = new Map<string, string>()
+
   for (const doc of documents.all()) {
     const fsPath = tryFileURIToPath(doc.uri)
+
     if (fsPath !== null) {
       overlay.set(fsPath, doc.getText())
     }
   }
+
   return {
     readdirSync: (path, opts) => fs.readdirSync(path, opts),
     existsSync: (path) => fs.existsSync(path),
     readFileSync: (path, enc) => {
       const open = overlay.get(path)
+
       if (open !== undefined) {
         return open
       }
+
       return fs.readFileSync(path, enc)
     },
   }
@@ -185,18 +179,25 @@ function makeOverlayFileSystem(): SwirlsWorkspaceFileSystem {
 
 function getWorkspaceIndexForUri(uri: string): WorkspaceResourceIndex {
   const folder = findWorkspaceFolderForUri(uri)
+
   if (!folder) {
     return emptyWorkspaceResourceIndex()
   }
+
   const cwd = tryFileURIToPath(folder.uri)
+
   if (cwd === null) {
     return emptyWorkspaceResourceIndex()
   }
+
   const cached = workspaceIndexCache.get(cwd)
+
   if (cached) {
     return cached
   }
+
   let idx: WorkspaceResourceIndex
+
   try {
     idx = buildWorkspaceResourceIndex({
       cwd,
@@ -208,26 +209,32 @@ function getWorkspaceIndexForUri(uri: string): WorkspaceResourceIndex {
   } catch {
     idx = emptyWorkspaceResourceIndex()
   }
+
   workspaceIndexCache.set(cwd, idx)
   return idx
 }
 
 function getWorkspaceCwdForUri(uri: string): string | null {
   const folder = findWorkspaceFolderForUri(uri)
+
   if (!folder) {
     return null
   }
+
   return tryFileURIToPath(folder.uri)
 }
 
 function makeWorkspaceFileReader(cwd: string): WorkspaceFileReader {
   const fileSystem = makeOverlayFileSystem()
+
   return (relativePath: string) => {
     const fullPath = join(cwd, relativePath)
+
     try {
       if (!fileSystem.existsSync(fullPath)) {
         return undefined
       }
+
       return fileSystem.readFileSync(fullPath, 'utf-8')
     } catch {
       return undefined
@@ -235,10 +242,7 @@ function makeWorkspaceFileReader(cwd: string): WorkspaceFileReader {
   }
 }
 
-function collectTsBlocksForUri(
-  uri: string,
-  ast: import('@swirls/language').SwirlsFile,
-) {
+function collectTsBlocksForUri(uri: string, ast: SwirlsFile) {
   const workspace = getWorkspaceIndexForUri(uri)
   const cwd = getWorkspaceCwdForUri(uri)
   return collectTsBlocks(ast, {
@@ -256,6 +260,7 @@ function invalidateDiskBindings(): void {
   for (const uri of diskBindingParents) {
     removeBindingsForParent(uri)
   }
+
   diskBindingParents.clear()
   diskBindingRoots.clear()
 }
@@ -267,20 +272,25 @@ const diskBindingParents = new Set<string>()
 
 function openDocumentPaths(): Set<string> {
   const open = new Set<string>()
+
   for (const doc of documents.all()) {
     const fsPath = tryFileURIToPath(doc.uri)
+
     if (fsPath !== null) {
       open.add(fsPath)
     }
   }
+
   return open
 }
 
 function indexDslFileFromDisk(fsPath: string): void {
   const uri = pathToFileURL(fsPath).toString()
+
   if (!isDslSwirlsUri(uri)) {
     return
   }
+
   try {
     indexDslDocument(uri, fs.readFileSync(fsPath, 'utf8'))
     diskBindingParents.add(uri)
@@ -297,17 +307,22 @@ function indexDslFileFromDisk(fsPath: string): void {
  */
 function ensureDiskBindings(tsFileUri: string): void {
   const filePath = tryFileURIToPath(tsFileUri)
+
   if (filePath === null) {
     return
   }
+
   const cwd = getWorkspaceCwdForUri(tsFileUri)
   const root = cwd ?? dirname(filePath)
+
   if (diskBindingRoots.has(root)) {
     return
   }
+
   diskBindingRoots.add(root)
   const open = openDocumentPaths()
   let candidates: string[] = []
+
   try {
     if (cwd !== null) {
       candidates = collectSwirlsFiles({ cwd }).map((rel) => resolve(cwd, rel))
@@ -323,6 +338,7 @@ function ensureDiskBindings(tsFileUri: string): void {
   } catch {
     return
   }
+
   for (const candidate of candidates) {
     if (!open.has(candidate)) {
       indexDslFileFromDisk(candidate)
@@ -353,15 +369,19 @@ function clearTsCache(cache: Map<string, DocumentTsCache>): void {
   for (const entry of cache.values()) {
     entry.ls.dispose()
   }
+
   cache.clear()
 }
+
 const openStandaloneTsUris = new Set<string>()
 
 async function refreshAllStandaloneDiagnostics(): Promise<void> {
   clearTsCache(standaloneTsCache)
+
   await Promise.all(
     [...openStandaloneTsUris].map(async (u) => {
       const d = documents.get(u)
+
       if (d) {
         await refreshDiagnostics(u, d)
       }
@@ -372,10 +392,7 @@ async function refreshAllStandaloneDiagnostics(): Promise<void> {
 /**
  * Get or build TS cache for a DSL `.swirls` document. Reuses cache when version matches.
  */
-function getDocumentTsCache(
-  uri: string,
-  document: TextDocument,
-): DocumentTsCache | null {
+function getDocumentTsCache(uri: string, document: TextDocument): DocumentTsCache | null {
   const version = document.version
   const existing = documentTsCache.get(uri)
 
@@ -386,17 +403,14 @@ function getDocumentTsCache(
   const text = document.getText()
   const result = parse(text)
 
-
   const blocks = collectTsBlocksForUri(uri, result.ast)
   const contentMap = new Map<string, string>()
 
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i]
+
     if (block) {
-      contentMap.set(
-        virtualUriForBlock(String(i)),
-        buildVirtualTsContent(block),
-      )
+      contentMap.set(virtualUriForBlock(String(i)), buildVirtualTsContent(block))
     }
   }
 
@@ -408,10 +422,7 @@ function getDocumentTsCache(
   return cache
 }
 
-function getStandaloneDocumentTsCache(
-  uri: string,
-  document: TextDocument,
-): DocumentTsCache {
+function getStandaloneDocumentTsCache(uri: string, document: TextDocument): DocumentTsCache {
   const version = document.version
   const existing = standaloneTsCache.get(uri)
 
@@ -421,13 +432,11 @@ function getStandaloneDocumentTsCache(
 
   ensureDiskBindings(uri)
   const bindings = getBindingsForTsFileUri(uri)
-  const { block, ambiguous, unbound } = buildStandaloneTsBlockInfoFromBindings(
-    document,
-    bindings,
-  )
+  const { block, ambiguous, unbound } = buildStandaloneTsBlockInfoFromBindings(document, bindings)
   const contentMap = new Map<string, string>()
   contentMap.set(virtualUriForBlock('0'), buildVirtualTsContent(block))
   const ls = createLanguageServiceFromMap(contentMap)
+
   const cache: DocumentTsCache = {
     version,
     blocks: [block],
@@ -435,18 +444,17 @@ function getStandaloneDocumentTsCache(
     ls,
     standaloneMeta: { ambiguous, unbound },
   }
+
   existing?.ls.dispose()
   standaloneTsCache.set(uri, cache)
   return cache
 }
 
-function getTsLanguageServiceCache(
-  uri: string,
-  document: TextDocument,
-): DocumentTsCache | null {
+function getTsLanguageServiceCache(uri: string, document: TextDocument): DocumentTsCache | null {
   if (isStandaloneTsSwirlsUri(uri)) {
     return getStandaloneDocumentTsCache(uri, document)
   }
+
   return getDocumentTsCache(uri, document)
 }
 
@@ -473,6 +481,7 @@ function findBlockAtIndex(
 
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i]
+
     if (block && positionInRange(line, character, block.innerRange)) {
       return { block, index: i }
     }
@@ -481,10 +490,7 @@ function findBlockAtIndex(
   return null
 }
 
-function getStandaloneFileDiagnostics(
-  uri: string,
-  document: TextDocument,
-): Diagnostic[] {
+function getStandaloneFileDiagnostics(uri: string, document: TextDocument): Diagnostic[] {
   const diagnostics: Diagnostic[] = []
   const cache = getStandaloneDocumentTsCache(uri, document)
   const block = cache.blocks[0]
@@ -494,6 +500,7 @@ function getStandaloneFileDiagnostics(
   }
 
   const meta = cache.standaloneMeta
+
   if (meta?.unbound) {
     diagnostics.push({
       message:
@@ -519,20 +526,12 @@ function getStandaloneFileDiagnostics(
   }
 
   const virtualUri = virtualUriForBlock('0')
-  diagnostics.push(
-    ...toDocumentDiagnostics(
-      block,
-      collectVirtualDiagnostics(cache.ls, virtualUri),
-    ),
-  )
+  diagnostics.push(...toDocumentDiagnostics(block, collectVirtualDiagnostics(cache.ls, virtualUri)))
 
   return diagnostics
 }
 
-async function getDiagnostics(
-  uri: string,
-  document: TextDocument,
-): Promise<Diagnostic[]> {
+async function getDiagnostics(uri: string, document: TextDocument): Promise<Diagnostic[]> {
   if (isStandaloneTsSwirlsUri(uri)) {
     return getStandaloneFileDiagnostics(uri, document)
   }
@@ -563,28 +562,25 @@ async function getDiagnostics(
     diagnostics.push({
       message: d.message,
       range: toLspRange(d.range),
-      severity:
-        d.severity === 'warning'
-          ? DiagnosticSeverity.Warning
-          : DiagnosticSeverity.Error,
+      severity: d.severity === 'warning' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error,
     })
   }
 
   if (isDslSwirlsUri(uri)) {
     try {
       const swirlsPath = fileURLToPath(uri)
+
       const refDiags = validateTsFileRefs(result.ast, {
         swirlsFilePath: swirlsPath,
         existsSync,
       })
+
       for (const d of refDiags) {
         diagnostics.push({
           message: d.message,
           range: toLspRange(d.range),
           severity:
-            d.severity === 'warning'
-              ? DiagnosticSeverity.Warning
-              : DiagnosticSeverity.Error,
+            d.severity === 'warning' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error,
         })
       }
     } catch {
@@ -594,25 +590,23 @@ async function getDiagnostics(
 
   const allGraphNodes = result.ast.workflows.flatMap((g) => g.nodes)
   const aiOptionsDiags = getAiNodeOptionsDiagnostics(allGraphNodes)
+
   for (const d of aiOptionsDiags) {
     diagnostics.push({
       message: d.message,
       range: toLspRange(d.range),
-      severity:
-        d.severity === 'warning'
-          ? DiagnosticSeverity.Warning
-          : DiagnosticSeverity.Error,
+      severity: d.severity === 'warning' ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error,
     })
   }
 
   const blocks = collectTsBlocksForUri(uri, result.ast)
+
   const virtualDiagnostics = getVirtualDiagnostics(
     blocks.map((block) => buildVirtualTsContent(block)),
   )
+
   blocks.forEach((block, i) => {
-    diagnostics.push(
-      ...toDocumentDiagnostics(block, virtualDiagnostics[i] ?? []),
-    )
+    diagnostics.push(...toDocumentDiagnostics(block, virtualDiagnostics[i] ?? []))
   })
 
   const jsonBlocks = collectJsonBlocks(result.ast)
@@ -636,8 +630,10 @@ async function getDiagnostics(
   }
 
   const sqlBlocks = collectSqlBlocks(result.ast)
+
   for (const block of sqlBlocks) {
     const sqlDiags = getSqlBlockDiagnostics(block, result.ast)
+
     for (const d of sqlDiags) {
       diagnostics.push({
         message: d.message,
@@ -648,10 +644,12 @@ async function getDiagnostics(
   }
 
   const prismaBlocks = collectPrismaBlocks(result.ast)
+
   for (const block of prismaBlocks) {
     const prismaDiags = getPrismaBlockDiagnostics(block, (msg) =>
       connection.console.log(`[Swirls LSP] prisma: ${msg}`),
     )
+
     for (const d of prismaDiags) {
       diagnostics.push({
         message: d.message,
@@ -665,11 +663,7 @@ async function getDiagnostics(
 }
 
 /** Convert 0-based line and character in virtual content to a character offset. */
-function virtualOffsetInContent(
-  content: string,
-  line: number,
-  character: number,
-): number {
+function virtualOffsetInContent(content: string, line: number, character: number): number {
   const lines = content.split('\n')
   let offset = 0
 
@@ -681,10 +675,7 @@ function virtualOffsetInContent(
 }
 
 /** Convert offset in virtual content to 0-based line and character. */
-function offsetToLineChar(
-  content: string,
-  offset: number,
-): { line: number; character: number } {
+function offsetToLineChar(content: string, offset: number): { line: number; character: number } {
   const lines = content.split('\n')
   let pos = 0
 
@@ -695,6 +686,7 @@ function offsetToLineChar(
     if (offset < pos + lineLen) {
       return { line: i, character: offset - pos }
     }
+
     pos += lineLen
   }
 
@@ -715,26 +707,24 @@ const DIAGNOSTIC_DEBOUNCE_MS = 200
  */
 const CASCADE_DEBOUNCE_MS = 600
 /** One timer per document, so an edit in one file never cancels another's refresh. */
-const diagnosticDebounceTimers = new Map<
-  string,
-  ReturnType<typeof setTimeout>
->()
+const diagnosticDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 let cascadeDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
-async function refreshDiagnostics(
-  uri: string,
-  document: TextDocument,
-): Promise<void> {
+async function refreshDiagnostics(uri: string, document: TextDocument): Promise<void> {
   if (isDslSwirlsUri(uri)) {
     // The open buffer replaces whatever was read from disk for this file.
     const fsPath = tryFileURIToPath(uri)
+
     if (fsPath !== null) {
       const diskUri = pathToFileURL(fsPath).toString()
+
       if (diskUri !== uri && diskBindingParents.delete(diskUri)) {
         removeBindingsForParent(diskUri)
       }
+
       diskBindingParents.delete(uri)
     }
+
     indexDslDocument(uri, document.getText())
     await refreshAllStandaloneDiagnostics()
   }
@@ -748,16 +738,14 @@ async function refreshDiagnostics(
  * caller to catch it and would take the whole server down. Log and keep the
  * previous squiggles out of the way instead.
  */
-async function getDiagnosticsSafely(
-  uri: string,
-  document: TextDocument,
-): Promise<Diagnostic[]> {
+async function getDiagnosticsSafely(uri: string, document: TextDocument): Promise<Diagnostic[]> {
   try {
     return await getDiagnostics(uri, document)
   } catch (error) {
     connection.console.error(
       `[Swirls LSP] diagnostics failed for ${uri}: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
     )
+
     return []
   }
 }
@@ -770,14 +758,17 @@ async function refreshAllOpenDslDiagnostics(primary?: {
   if (primary) {
     await refreshDiagnostics(primary.uri, primary.document)
   }
+
   await Promise.all(
     documents.all().map(async (doc) => {
       if (primary && doc.uri === primary.uri) {
         return
       }
+
       if (!isDslSwirlsUri(doc.uri)) {
         return
       }
+
       const diagnostics = await getDiagnosticsSafely(doc.uri, doc)
       connection.sendDiagnostics({ uri: doc.uri, diagnostics })
     }),
@@ -786,6 +777,7 @@ async function refreshAllOpenDslDiagnostics(primary?: {
 
 function scheduleRefreshDiagnostics(uri: string, document: TextDocument): void {
   const pending = diagnosticDebounceTimers.get(uri)
+
   if (pending !== undefined) {
     clearTimeout(pending)
   }
@@ -794,6 +786,7 @@ function scheduleRefreshDiagnostics(uri: string, document: TextDocument): void {
     uri,
     setTimeout(() => {
       diagnosticDebounceTimers.delete(uri)
+
       if (isDslSwirlsUri(uri)) {
         // A change to any DSL file invalidates cross-file resource resolution.
         // Rebuilding is cheap (one parse, the rest are cache hits), so the
@@ -801,6 +794,7 @@ function scheduleRefreshDiagnostics(uri: string, document: TextDocument): void {
         invalidateWorkspaceIndices()
         scheduleCascadeRefresh()
       }
+
       void refreshDiagnostics(uri, document)
     }, DIAGNOSTIC_DEBOUNCE_MS),
   )
@@ -811,6 +805,7 @@ function scheduleCascadeRefresh(): void {
   if (cascadeDebounceTimer !== null) {
     clearTimeout(cascadeDebounceTimer)
   }
+
   cascadeDebounceTimer = setTimeout(() => {
     cascadeDebounceTimer = null
     void refreshAllOpenDslDiagnostics()
@@ -820,15 +815,18 @@ function scheduleCascadeRefresh(): void {
 connection.onInitialize((params: InitializeParams): InitializeResult => {
   // `InitializeParams.capabilities.workspace.workspaceFolders` is typed as `boolean | undefined`
   // in vscode-languageserver-protocol (not the spec’s richer object form). Match that.
-  workspaceFolderChangesSupported =
-    params.capabilities.workspace?.workspaceFolders === true
+  workspaceFolderChangesSupported = params.capabilities.workspace?.workspaceFolders === true
 
   const initialFolders: WorkspaceFolder[] = []
+
   if (params.workspaceFolders && params.workspaceFolders.length > 0) {
     initialFolders.push(...params.workspaceFolders)
+    // oxlint-disable-next-line typescript/no-deprecated -- clients without workspace folder support still send rootUri
   } else if (params.rootUri) {
+    // oxlint-disable-next-line typescript/no-deprecated -- see above
     initialFolders.push({ uri: params.rootUri, name: 'root' })
   }
+
   setWorkspaceFolders(initialFolders)
 
   return {
@@ -860,17 +858,22 @@ connection.onInitialized(() => {
   if (!workspaceFolderChangesSupported) {
     return
   }
+
   connection.workspace.onDidChangeWorkspaceFolders((event) => {
     const next = new Map<string, WorkspaceFolder>()
+
     for (const f of workspaceFolders) {
       next.set(f.uri, f)
     }
+
     for (const removed of event.removed) {
       next.delete(removed.uri)
     }
+
     for (const added of event.added) {
       next.set(added.uri, added)
     }
+
     setWorkspaceFolders([...next.values()])
   })
 })
@@ -882,11 +885,8 @@ connection.onDefinition((params) => {
     return null
   }
 
-  const refDef = getTsFileRefDefinition(
-    doc,
-    params.position,
-    params.textDocument.uri,
-  )
+  const refDef = getTsFileRefDefinition(doc, params.position, params.textDocument.uri)
+
   if (refDef) {
     return refDef
   }
@@ -905,17 +905,9 @@ connection.onDefinition((params) => {
 
     const ls = cache.ls
 
-    const virt = originalToVirtual(
-      block,
-      params.position.line,
-      params.position.character,
-    )
+    const virt = originalToVirtual(block, params.position.line, params.position.character)
 
-    const offset = virtualOffsetInContent(
-      virtualContent,
-      virt.line,
-      virt.character,
-    )
+    const offset = virtualOffsetInContent(virtualContent, virt.line, virt.character)
 
     const defs = ls.getDefinitionAtPosition(virtualUri, offset)
 
@@ -930,10 +922,7 @@ connection.onDefinition((params) => {
 
         const start = offsetToLineChar(virtualContent, d.textSpan.start)
 
-        const end = offsetToLineChar(
-          virtualContent,
-          d.textSpan.start + d.textSpan.length,
-        )
+        const end = offsetToLineChar(virtualContent, d.textSpan.start + d.textSpan.length)
 
         const origStart = virtualToOriginal(block, start.line, start.character)
         const origEnd = virtualToOriginal(block, end.line, end.character)
@@ -954,18 +943,21 @@ connection.onDefinition((params) => {
   }
 
   const parseResult = parse(doc.getText())
+
   {
     const prismaBlock = findPrismaBlockAtPosition(
       collectPrismaBlocks(parseResult.ast),
       params.position.line,
       params.position.character,
     )
+
     if (prismaBlock) {
       const prismaDefs = getPrismaBlockDefinition(
         prismaBlock,
         params.position,
         params.textDocument.uri,
       )
+
       if (prismaDefs) {
         return prismaDefs
       }
@@ -973,6 +965,7 @@ connection.onDefinition((params) => {
   }
 
   const cwd = getWorkspaceCwdForUri(params.textDocument.uri)
+
   const ctx =
     cwd !== null
       ? {
@@ -986,9 +979,11 @@ connection.onDefinition((params) => {
 
 connection.onDocumentLinks((params) => {
   const doc = documents.get(params.textDocument.uri)
+
   if (!doc) {
     return []
   }
+
   return getTsFileRefDocumentLinks(doc, params.textDocument.uri)
 })
 
@@ -1017,9 +1012,11 @@ connection.onReferences((params) => {
 
 connection.onCompletion((params) => {
   const { line, character } = params.position
+
   connection.console.log(
     `[Swirls LSP] completion request: uri=${params.textDocument.uri} position=(${line},${character})`,
   )
+
   const doc = documents.get(params.textDocument.uri)
 
   if (!doc) {
@@ -1045,12 +1042,14 @@ connection.onCompletion((params) => {
         connection.console.log(
           `[Swirls LSP] completion: inside @prisma island of database=${prismaBlock.databaseName}`,
         )
+
         const list = getPrismaBlockCompletions(
           prismaBlock,
           params.position,
           params.context,
           (msg) => connection.console.log(`[Swirls LSP] prisma: ${msg}`),
         )
+
         return list ?? []
       }
 
@@ -1078,22 +1077,24 @@ connection.onCompletion((params) => {
       params.position,
       getWorkspaceIndexForUri(params.textDocument.uri),
     )
+
     const linePrefix = doc.getText({
       start: { line: params.position.line, character: 0 },
       end: params.position,
     })
+
     const trimmed = linePrefix.replace(/^\s*/, '')
-    const blockContext = getBlockContext(
-      doc.getText(),
-      doc.offsetAt(params.position),
-    )
+    const blockContext = getBlockContext(doc.getText(), doc.offsetAt(params.position))
+
     connection.console.log(
       `[Swirls LSP] completion: blockContext=${blockContext} trimmed=${JSON.stringify(trimmed)} items=${items.length}`,
     )
+
     return items
   }
 
   const { block, index } = found
+
   connection.console.log(
     `[Swirls LSP] completion: in ts block graph=${block.workflowName} node=${block.nodeName}`,
   )
@@ -1107,37 +1108,24 @@ connection.onCompletion((params) => {
 
   const ls = cache.ls
 
-  const virt = originalToVirtual(
-    block,
-    params.position.line,
-    params.position.character,
-  )
+  const virt = originalToVirtual(block, params.position.line, params.position.character)
 
-  const offset = virtualOffsetInContent(
-    virtualContent,
-    virt.line,
-    virt.character,
-  )
+  const offset = virtualOffsetInContent(virtualContent, virt.line, virt.character)
 
   connection.console.log(
     `[Swirls LSP] completion: virtual pos=(${virt.line},${virt.character}) offset=${offset}`,
   )
 
-  const tsCompletions = ls.getCompletionsAtPosition(
-    virtualUri,
-    offset,
-    undefined,
-  )
+  const tsCompletions = ls.getCompletionsAtPosition(virtualUri, offset, undefined)
 
   if (!tsCompletions) {
-    connection.console.log(
-      '[Swirls LSP] completion: getCompletionsAtPosition returned null',
-    )
+    connection.console.log('[Swirls LSP] completion: getCompletionsAtPosition returned null')
 
     return []
   }
 
   const items: CompletionItem[] = []
+
   const kindMap: Record<string, CompletionItemKind> = {
     [ts.ScriptElementKind.functionElement]: CompletionItemKind.Function,
     [ts.ScriptElementKind.variableElement]: CompletionItemKind.Variable,
@@ -1167,9 +1155,7 @@ connection.onCompletion((params) => {
     })
   }
 
-  connection.console.log(
-    `[Swirls LSP] completion: returning ${items.length} TS completion items`,
-  )
+  connection.console.log(`[Swirls LSP] completion: returning ${items.length} TS completion items`)
 
   return items
 })
@@ -1216,11 +1202,7 @@ connection.onCompletionResolve((item) => {
   const ls = cache.ls
   const virt = originalToVirtual(block, data.line, data.character)
 
-  const offset = virtualOffsetInContent(
-    virtualContent,
-    virt.line,
-    virt.character,
-  )
+  const offset = virtualOffsetInContent(virtualContent, virt.line, virt.character)
 
   const details = ls.getCompletionEntryDetails(
     virtualUri,
@@ -1272,17 +1254,9 @@ connection.onSignatureHelp((params) => {
   }
 
   const ls = cache.ls
-  const virt = originalToVirtual(
-    block,
-    params.position.line,
-    params.position.character,
-  )
+  const virt = originalToVirtual(block, params.position.line, params.position.character)
 
-  const offset = virtualOffsetInContent(
-    virtualContent,
-    virt.line,
-    virt.character,
-  )
+  const offset = virtualOffsetInContent(virtualContent, virt.line, virt.character)
 
   const help = ls.getSignatureHelpItems(virtualUri, offset, undefined)
 
@@ -1315,6 +1289,7 @@ connection.onSignatureHelp((params) => {
 
 connection.onHover((params) => {
   const { line, character } = params.position
+
   connection.console.log(
     `[Swirls LSP] hover request: uri=${params.textDocument.uri} position=(${line},${character})`,
   )
@@ -1349,19 +1324,15 @@ connection.onHover((params) => {
       const word = getWordAtPosition(doc, params.position)
 
       if (word === 'review') {
-        const nodeCtx = getNodeContextAtPosition(
-          doc,
-          params.position,
-          result.ast,
-        )
+        const nodeCtx = getNodeContextAtPosition(doc, params.position, result.ast)
 
         if (nodeCtx) {
-          const line = doc.getText({
+          const lineText = doc.getText({
             start: { line: params.position.line, character: 0 },
             end: { line: params.position.line, character: 1 << 20 },
           })
 
-          const match = line.match(/\breview\b/)
+          const match = lineText.match(/\breview\b/)
 
           if (match && match.index !== undefined) {
             const startChar = match.index
@@ -1384,11 +1355,13 @@ connection.onHover((params) => {
       }
 
       const sqlBlocks = collectSqlBlocks(result.ast)
+
       const sqlBlock = findSqlBlockAtPosition(
         sqlBlocks,
         params.position.line,
         params.position.character,
       )
+
       if (
         sqlBlock &&
         sqlBlock.node.type === 'postgres' &&
@@ -1403,18 +1376,22 @@ connection.onHover((params) => {
           sqlBlock.innerRange,
           sqlBlock.code.length,
         )
+
         if (off !== null) {
           const key = findBracePlaceholderKeyAtCodeOffset(sqlBlock.code, off)
+
           if (key) {
-            const ts = getPostgresPlaceholderTsTypeString(
+            const tsType = getPostgresPlaceholderTsTypeString(
               sqlBlock.node,
               sqlBlock.postgresBlocks,
               key,
             )
+
             const typeLine =
-              ts !== undefined
-                ? `\`${ts}\``
+              tsType !== undefined
+                ? `\`${tsType}\``
                 : '`unknown` (not in declared table row schema)'
+
             return {
               contents: {
                 kind: 'markdown',
@@ -1478,17 +1455,9 @@ connection.onHover((params) => {
 
   const ls = cache.ls
 
-  const virt = originalToVirtual(
-    block,
-    params.position.line,
-    params.position.character,
-  )
+  const virt = originalToVirtual(block, params.position.line, params.position.character)
 
-  const offset = virtualOffsetInContent(
-    virtualContent,
-    virt.line,
-    virt.character,
-  )
+  const offset = virtualOffsetInContent(virtualContent, virt.line, virt.character)
 
   connection.console.log(
     `[Swirls LSP] hover: virtual pos=(${virt.line},${virt.character}) offset=${offset} contentLength=${virtualContent.length}`,
@@ -1497,9 +1466,7 @@ connection.onHover((params) => {
   const info = ls.getQuickInfoAtPosition(virtualUri, offset)
 
   if (!info) {
-    connection.console.log(
-      '[Swirls LSP] hover: getQuickInfoAtPosition returned null',
-    )
+    connection.console.log('[Swirls LSP] hover: getQuickInfoAtPosition returned null')
     return null
   }
 
@@ -1510,9 +1477,7 @@ connection.onHover((params) => {
     display = display.replace(/__ExpectedReturn/g, expectedReturn)
   }
 
-  const docs = info.documentation
-    ? ts.displayPartsToString(info.documentation)
-    : ''
+  const docs = info.documentation ? ts.displayPartsToString(info.documentation) : ''
 
   connection.console.log(
     `[Swirls LSP] hover: returning quickInfo display="${display.slice(0, 80)}${display.length > 80 ? '...' : ''}"`,
@@ -1530,24 +1495,22 @@ connection.onHover((params) => {
   }
 })
 
-documents.onDidOpen(
-  (e: { document: TextDocument } | { textDocument: { uri: string } }) => {
-    const uri = 'textDocument' in e ? e.textDocument.uri : e.document.uri
-    const doc = documents.get(uri)
+documents.onDidOpen((e: { document: TextDocument } | { textDocument: { uri: string } }) => {
+  const uri = 'textDocument' in e ? e.textDocument.uri : e.document.uri
+  const doc = documents.get(uri)
 
-    if (isStandaloneTsSwirlsUri(uri)) {
-      openStandaloneTsUris.add(uri)
-    }
+  if (isStandaloneTsSwirlsUri(uri)) {
+    openStandaloneTsUris.add(uri)
+  }
 
-    if (isDslSwirlsUri(uri)) {
-      invalidateWorkspaceIndices()
-    }
+  if (isDslSwirlsUri(uri)) {
+    invalidateWorkspaceIndices()
+  }
 
-    if (doc) {
-      void refreshDiagnostics(uri, doc)
-    }
-  },
-)
+  if (doc) {
+    void refreshDiagnostics(uri, doc)
+  }
+})
 
 documents.onDidChangeContent((e: TextDocumentChangeEvent<TextDocument>) => {
   const doc = documents.get(e.document.uri)
@@ -1562,32 +1525,40 @@ documents.onDidChangeContent((e: TextDocumentChangeEvent<TextDocument>) => {
 documents.onDidClose((e) => {
   const uri = e.document.uri
   const pending = diagnosticDebounceTimers.get(uri)
+
   if (pending !== undefined) {
     clearTimeout(pending)
     diagnosticDebounceTimers.delete(uri)
   }
+
   evictTsCache(documentTsCache, uri)
   evictTsCache(standaloneTsCache, uri)
+
   if (isStandaloneTsSwirlsUri(uri)) {
     openStandaloneTsUris.delete(uri)
   }
+
   if (isDslSwirlsUri(uri)) {
     // Closing the parent must not unbind its `.ts.swirls` files: fall back to
     // what is saved on disk.
     removeBindingsForParent(uri)
     invalidateWorkspaceIndices()
     const closedPath = tryFileURIToPath(uri)
+
     if (closedPath !== null && existsSync(closedPath)) {
       indexDslFileFromDisk(closedPath)
     }
+
     void refreshAllStandaloneDiagnostics()
   }
+
   connection.sendDiagnostics({ uri, diagnostics: [] })
 })
 
 connection.onDidChangeWatchedFiles(() => {
   invalidateWorkspaceIndices()
   invalidateDiskBindings()
+
   for (const doc of documents.all()) {
     if (isDslSwirlsUri(doc.uri)) {
       void refreshDiagnostics(doc.uri, doc)

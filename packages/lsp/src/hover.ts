@@ -1,3 +1,7 @@
+import type { Position, Range } from 'vscode-languageserver'
+import type { TextDocument } from 'vscode-languageserver-textdocument'
+
+import type { DecisionDecl } from '@swirls/language'
 import type {
   ActionDecl,
   AgentDecl,
@@ -27,11 +31,9 @@ import type {
   WebhookDecl,
   WorkflowDecl,
 } from '@swirls/language'
+import type { WorkspaceResourceIndex } from '@swirls/language/workspace'
+
 import { harnessProviders, harnessTypes } from './language-host'
-import {
-} from '@swirls/language'
-import type { Position, Range } from 'vscode-languageserver'
-import type { TextDocument } from 'vscode-languageserver-textdocument'
 import { positionInRange } from './ts-service/virtual-docs'
 
 /** Markdown content for hover on the `review` property key in a node block. */
@@ -41,10 +43,7 @@ export const REVIEW_PROPERTY_HOVER =
   'Title, description, and content can be string literals or @ts { } blocks. Schema can be a JSON object or @json { } block.'
 
 /** Return the identifier (word) that contains the given position, or null. */
-export function getWordAtPosition(
-  document: TextDocument,
-  position: Position,
-): string | null {
+export function getWordAtPosition(document: TextDocument, position: Position): string | null {
   const line = document.getText({
     start: { line: position.line, character: 0 },
     end: { line: position.line, character: 1 << 20 },
@@ -94,7 +93,7 @@ type SwirlsDeclaration =
   | { type: 'agent'; decl: AgentDecl }
   | {
       type: 'decision'
-      decl: import('@swirls/language').DecisionDecl & { description?: string }
+      decl: DecisionDecl & { description?: string }
     }
   | { type: 'mcp'; decl: McpDecl }
   | { type: 'channel'; decl: ChannelDecl }
@@ -116,7 +115,7 @@ export function getDeclarationAtPosition(
   document: TextDocument,
   position: Position,
   ast: SwirlsFile,
-  workspace?: import('@swirls/language/workspace').WorkspaceResourceIndex,
+  workspace?: WorkspaceResourceIndex,
 ): SwirlsDeclaration | null {
   const word = getWordAtPosition(document, position)
 
@@ -165,13 +164,9 @@ export function getDeclarationAtPosition(
   }
 
   const workflowMatch =
-    trimmed.match(/^\s*workflow\s+([a-zA-Z0-9_]+)/) ??
-    trimmed.match(/^\s*graph\s+([a-zA-Z0-9_]+)/)
+    trimmed.match(/^\s*workflow\s+([a-zA-Z0-9_]+)/) ?? trimmed.match(/^\s*graph\s+([a-zA-Z0-9_]+)/)
 
-  if (
-    workflowMatch &&
-    (word === 'workflow' || word === 'graph' || word === workflowMatch[1])
-  ) {
+  if (workflowMatch && (word === 'workflow' || word === 'graph' || word === workflowMatch[1])) {
     const graph = ast.workflows.find((g) => g.name === workflowMatch[1])
 
     if (graph) {
@@ -271,6 +266,7 @@ export function getDeclarationAtPosition(
 
   const decisionMatch = trimmed.match(/^\s*decision\s+([a-zA-Z0-9_]+)/)
   const declaration = ast.decisions?.find((d) => d.name === decisionMatch?.[1])
+
   if (declaration && (word === 'decision' || word === declaration.name)) {
     return {
       type: 'decision',
@@ -316,13 +312,8 @@ export function getDeclarationAtPosition(
 
   const connectionMatch = trimmed.match(/^\s*connection\s+([a-zA-Z0-9_]+)/)
 
-  if (
-    connectionMatch &&
-    (word === 'connection' || word === connectionMatch[1])
-  ) {
-    const connection = ast.connections?.find(
-      (c) => c.name === connectionMatch[1],
-    )
+  if (connectionMatch && (word === 'connection' || word === connectionMatch[1])) {
+    const connection = ast.connections?.find((c) => c.name === connectionMatch[1])
 
     if (connection) {
       return { type: 'connection', decl: connection }
@@ -380,9 +371,7 @@ export function getDeclarationAtPosition(
   }
 
   if (trimmed.match(/^\s*policy\s*\{?/) && word === 'policy') {
-    const policy = ast.policies?.find((p) =>
-      positionInRange(line, character, p.range),
-    )
+    const policy = ast.policies?.find((p) => positionInRange(line, character, p.range))
 
     if (policy) {
       return { type: 'policy', decl: policy }
@@ -400,11 +389,7 @@ export function getDeclarationAtPosition(
   }
 
   // Trigger binding line: form: ResourceName -> GraphName
-  if (
-    /^\s*(form|webhook|schedule)\s*:\s*[a-zA-Z0-9_]+\s*->\s*[a-zA-Z0-9_]+/.test(
-      trimmed,
-    )
-  ) {
+  if (/^\s*(form|webhook|schedule)\s*:\s*[a-zA-Z0-9_]+\s*->\s*[a-zA-Z0-9_]+/.test(trimmed)) {
     const bindingMatch = trimmed.match(
       /(form|webhook|schedule)\s*:\s*([a-zA-Z0-9_]+)\s*->\s*([a-zA-Z0-9_]+)/,
     )
@@ -449,13 +434,12 @@ export function getDeclarationAtPosition(
   }
 
   // Inside a graph: find which graph contains this position, then resolve node or edge
-  const containingWorkflow = ast.workflows.find((g) =>
-    positionInRange(line, character, g.range),
-  )
+  const containingWorkflow = ast.workflows.find((g) => positionInRange(line, character, g.range))
 
   if (containingWorkflow) {
     // root { ... }
     const rootMatch = trimmed.match(/^\s*root\s*\{?/)
+
     if (rootMatch && word === 'root') {
       const node = containingWorkflow.nodes.find((n) => n.name === 'root')
 
@@ -466,6 +450,7 @@ export function getDeclarationAtPosition(
 
     // node Name { ... }
     const nodeMatch = trimmed.match(/^\s*node\s+([a-zA-Z0-9_]+)/)
+
     if (nodeMatch && (word === 'node' || word === nodeMatch[1])) {
       const node = containingWorkflow.nodes.find((n) => n.name === nodeMatch[1])
 
@@ -502,40 +487,45 @@ export function getDeclarationAtPosition(
   // workflow: / graph: on workflow, map, fanout, or while nodes
   for (const g of ast.workflows) {
     const nodesToScan: NodeDecl[] = []
+
     const collect = (nodes: NodeDecl[]) => {
       for (const node of nodes) {
         nodesToScan.push(node)
+
         if (node.subgraph?.nodes?.length) {
           collect(node.subgraph.nodes)
         }
       }
     }
+
     collect(g.nodes)
 
     for (const node of nodesToScan) {
       const decisionRef = node.configFields.decision
+
       if (
         node.type === 'decision' &&
         decisionRef?.kind === 'string' &&
         word === decisionRef.value &&
         positionInRange(line, character, decisionRef.range)
       ) {
-        const declaration =
+        const decisionDecl =
           ast.decisions?.find((d) => d.name === decisionRef.value) ??
           workspace?.decisionBlocks?.get(decisionRef.value)
-        if (declaration) {
+
+        if (decisionDecl) {
           return {
             type: 'decision',
             decl: {
-              ...declaration,
+              ...decisionDecl,
               range: decisionRef.range,
-              description: `${declaration.name}: TypeSafe ${declaration.fields.model}. ${typeof declaration.fields.description === 'string' ? declaration.fields.description : 'Typed Choice, Score and Noul questions; explicit secret block binding.'}`,
+              description: `${decisionDecl.name}: TypeSafe ${decisionDecl.fields.model}. ${typeof decisionDecl.fields.description === 'string' ? decisionDecl.fields.description : 'Typed Choice, Score and Noul questions; explicit secret block binding.'}`,
             },
           }
         }
       }
-      const workflowConfig =
-        node.configFields.workflow ?? node.configFields.graph
+
+      const workflowConfig = node.configFields.workflow ?? node.configFields.graph
 
       if (!workflowConfig || workflowConfig.kind !== 'string') {
         continue
@@ -573,10 +563,7 @@ export function buildHoverContent(decl: { description?: string }): string {
  * Format TypeScript quick-info for LSP Markdown hover. Fenced `typescript`
  * blocks are highlighted in VS Code / Cursor; a plain string renders as one color.
  */
-export function markdownTsQuickInfo(
-  display: string,
-  documentation: string,
-): string {
+export function markdownTsQuickInfo(display: string, documentation: string): string {
   const block = ['```typescript', display, '```'].join('\n')
   return documentation ? `${block}\n\n${documentation}` : block
 }
@@ -609,28 +596,29 @@ function sourceToLspRange(range: {
 }
 
 /** The 0-based range of `word` on `line` that covers `character`, if any. */
-function wordRangeOnLine(
-  document: TextDocument,
-  position: Position,
-  word: string,
-): Range | null {
+function wordRangeOnLine(document: TextDocument, position: Position, word: string): Range | null {
   const text = document.getText({
     start: { line: position.line, character: 0 },
     end: { line: position.line, character: 1 << 20 },
   })
+
   const regex = new RegExp(`\\b${word}\\b`, 'g')
   let match = regex.exec(text)
+
   while (match !== null) {
     const start = match.index
     const end = start + word.length
+
     if (position.character >= start && position.character <= end) {
       return {
         start: { line: position.line, character: start },
         end: { line: position.line, character: end },
       }
     }
+
     match = regex.exec(text)
   }
+
   return null
 }
 
@@ -641,10 +629,12 @@ function harnessAtPosition(
 ): ComputerHarnessDecl | null {
   for (const computer of ast.computer ?? []) {
     const harness = computer.harness
+
     if (harness && positionInRange(line, character, harness.range)) {
       return harness
     }
   }
+
   return null
 }
 
@@ -659,6 +649,7 @@ export function getHarnessHover(
 ): HarnessHover | null {
   const { line, character } = position
   const harness = harnessAtPosition(ast, line, character)
+
   if (!harness) {
     return null
   }
@@ -675,19 +666,21 @@ export function getHarnessHover(
 
   if (positionInRange(line, character, harness.providerRange)) {
     const entry = harnessProviders.find((p) => p.name === harness.provider)
+
     const ships = entry?.package
       ? `\n\nShips as the package \`${entry.package}\`; the runtime owns its version.`
       : ''
+
     return {
       value: entry
-        ? `**${harness.provider}** harness: ${entry.description ?? ''}`.trimEnd() +
-          ships
+        ? `**${harness.provider}** harness: ${entry.description ?? ''}`.trimEnd() + ships
         : `**${harness.provider}** is not a harness provider this runtime offers.`,
       range: sourceToLspRange(harness.providerRange),
     }
   }
 
   const word = getWordAtPosition(document, position)
+
   const keyHover =
     word === 'harness' && line === harness.range.start.line - 1
       ? HARNESS_BLOCK_HOVER
@@ -696,9 +689,11 @@ export function getHarnessHover(
         : word === 'provider'
           ? HARNESS_PROVIDER_KEY_HOVER
           : null
+
   if (!keyHover || !word) {
     return null
   }
+
   const range = wordRangeOnLine(document, position, word)
   return range ? { value: keyHover, range } : null
 }

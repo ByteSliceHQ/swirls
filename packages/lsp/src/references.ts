@@ -1,13 +1,11 @@
-import {
-  type NodeDecl,
-  type SourceRange,
-  type SwirlsFile,
-} from '@swirls/language'
-import { parse } from './parse-cache'
 import type { Location, Position } from 'vscode-languageserver'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
+
+import { type NodeDecl, type SourceRange, type SwirlsFile } from '@swirls/language'
+
 import { getDefinition } from './definition'
 import { getDeclarationAtPosition } from './hover'
+import { parse } from './parse-cache'
 
 function toLspRange(range: SourceRange): {
   start: Location['range']['start']
@@ -22,6 +20,7 @@ function toLspRange(range: SourceRange): {
 function collectNodesDepthFirst(nodes: NodeDecl[], out: NodeDecl[]): void {
   for (const n of nodes) {
     out.push(n)
+
     if (n.subgraph?.nodes?.length) {
       collectNodesDepthFirst(n.subgraph.nodes, out)
     }
@@ -30,17 +29,15 @@ function collectNodesDepthFirst(nodes: NodeDecl[], out: NodeDecl[]): void {
 
 function allGraphNodes(ast: SwirlsFile): NodeDecl[] {
   const out: NodeDecl[] = []
+
   for (const g of ast.workflows) {
     collectNodesDepthFirst(g.nodes, out)
   }
+
   return out
 }
 
-function pushRange(
-  locations: Location[],
-  uri: string,
-  range: SourceRange | undefined,
-): void {
+function pushRange(locations: Location[], uri: string, range: SourceRange | undefined): void {
   if (range) {
     locations.push({ uri, range: toLspRange(range) })
   }
@@ -56,6 +53,7 @@ function pushNamedRanges(
   if (!names || !ranges) {
     return
   }
+
   for (let i = 0; i < names.length; i++) {
     if (names[i] === targetName) {
       pushRange(locations, uri, ranges[i])
@@ -70,13 +68,16 @@ function resolveDeclaration(
   ast: SwirlsFile,
 ) {
   let swirlsDecl = getDeclarationAtPosition(document, position, ast)
+
   if (!swirlsDecl) {
     const def = getDefinition(document, position, uri)
+
     if (def) {
       const anchor = Array.isArray(def) ? def[0] : def
       swirlsDecl = getDeclarationAtPosition(document, anchor.range.start, ast)
     }
   }
+
   return swirlsDecl
 }
 
@@ -93,6 +94,7 @@ function collectWorkflowReferences(
       }
     })
   }
+
   for (const policy of ast.policies) {
     for (const grant of policy.grants) {
       if (grant.workflow === workflowName) {
@@ -100,6 +102,7 @@ function collectWorkflowReferences(
       }
     }
   }
+
   for (const t of ast.triggers) {
     if (t.workflowName === workflowName) {
       pushRange(locations, uri, t.range)
@@ -108,10 +111,8 @@ function collectWorkflowReferences(
 
   for (const node of allGraphNodes(ast)) {
     const workflowConfig = node.configFields.workflow ?? node.configFields.graph
-    if (
-      workflowConfig?.kind === 'string' &&
-      workflowConfig.value === workflowName
-    ) {
+
+    if (workflowConfig?.kind === 'string' && workflowConfig.value === workflowName) {
       pushRange(locations, uri, workflowConfig.range)
     }
   }
@@ -132,32 +133,14 @@ function collectWorkflowReferences(
 
   for (const pol of ast.policies ?? []) {
     for (const grant of pol.grants) {
-      pushNamedRanges(
-        locations,
-        uri,
-        grant.workflows,
-        grant.workflowsRanges,
-        workflowName,
-      )
-      pushNamedRanges(
-        locations,
-        uri,
-        grant.tools,
-        grant.toolsRanges,
-        workflowName,
-      )
+      pushNamedRanges(locations, uri, grant.workflows, grant.workflowsRanges, workflowName)
+      pushNamedRanges(locations, uri, grant.tools, grant.toolsRanges, workflowName)
     }
   }
 
   for (const app of ast.apps ?? []) {
     for (const page of app.pages) {
-      pushNamedRanges(
-        locations,
-        uri,
-        page.reviews,
-        page.reviewsRanges,
-        workflowName,
-      )
+      pushNamedRanges(locations, uri, page.reviews, page.reviewsRanges, workflowName)
     }
   }
 
@@ -167,6 +150,7 @@ function collectWorkflowReferences(
         pushRange(locations, uri, caseDecl.workflowRange)
       }
     }
+
     for (const evalDecl of pb.evals) {
       if (evalDecl.workflow === workflowName) {
         pushRange(locations, uri, evalDecl.workflowRange)
@@ -233,14 +217,12 @@ export function getReferences(
 
   if (swirlsDecl.type === 'decision') {
     if (includeDeclaration) {
-      pushRange(
-        locations,
-        uri,
-        ast.decisions?.find((d) => d.name === swirlsDecl.decl.name)?.range,
-      )
+      pushRange(locations, uri, ast.decisions?.find((d) => d.name === swirlsDecl.decl.name)?.range)
     }
+
     for (const node of allGraphNodes(ast)) {
       const field = node.configFields.decision
+
       if (
         node.type === 'decision' &&
         field?.kind === 'string' &&
@@ -249,6 +231,7 @@ export function getReferences(
         pushRange(locations, uri, field.range)
       }
     }
+
     return locations
   }
 
@@ -275,10 +258,8 @@ export function getReferences(
 
     for (const node of allGraphNodes(ast)) {
       const agentField = node.configFields.agent
-      if (
-        agentField?.kind === 'string' &&
-        agentField.value === agentDecl.name
-      ) {
+
+      if (agentField?.kind === 'string' && agentField.value === agentDecl.name) {
         pushRange(locations, uri, agentField.range)
       }
     }
@@ -294,21 +275,10 @@ export function getReferences(
     }
 
     for (const ag of ast.agent ?? []) {
-      pushNamedRanges(
-        locations,
-        uri,
-        ag.skills,
-        ag.skillsRanges,
-        skillDecl.name,
-      )
+      pushNamedRanges(locations, uri, ag.skills, ag.skillsRanges, skillDecl.name)
+
       for (const prof of ag.profiles) {
-        pushNamedRanges(
-          locations,
-          uri,
-          prof.skills,
-          prof.skillsRanges,
-          skillDecl.name,
-        )
+        pushNamedRanges(locations, uri, prof.skills, prof.skillsRanges, skillDecl.name)
       }
     }
 
@@ -328,6 +298,7 @@ export function getReferences(
 
     for (const node of allGraphNodes(ast)) {
       const diskField = node.configFields.disk
+
       if (diskField?.kind === 'string' && diskField.value === diskDecl.name) {
         pushRange(locations, uri, diskField.range)
       }
@@ -345,6 +316,7 @@ export function getReferences(
 
     for (const ag of ast.agent ?? []) {
       pushNamedRanges(locations, uri, ag.mcp, ag.mcpRanges, mcpDecl.name)
+
       for (const prof of ag.profiles) {
         pushNamedRanges(locations, uri, prof.mcp, prof.mcpRanges, mcpDecl.name)
       }
@@ -368,6 +340,7 @@ export function getReferences(
 
     for (const node of allGraphNodes(ast)) {
       const connField = node.configFields.connection
+
       if (connField?.kind === 'string' && connField.value === connDecl.name) {
         pushRange(locations, uri, connField.range)
       }
@@ -404,13 +377,8 @@ export function getReferences(
         if (page.channel === channelDecl.name) {
           pushRange(locations, uri, page.channelRange)
         }
-        pushNamedRanges(
-          locations,
-          uri,
-          page.threads,
-          page.threadsRanges,
-          channelDecl.name,
-        )
+
+        pushNamedRanges(locations, uri, page.threads, page.threadsRanges, channelDecl.name)
       }
     }
 
@@ -426,10 +394,8 @@ export function getReferences(
 
     for (const node of allGraphNodes(ast)) {
       const actionField = node.configFields.action
-      if (
-        actionField?.kind === 'string' &&
-        actionField.value === actionDecl.name
-      ) {
+
+      if (actionField?.kind === 'string' && actionField.value === actionDecl.name) {
         pushRange(locations, uri, actionField.range)
       }
     }
@@ -476,10 +442,8 @@ export function getReferences(
 
     for (const node of allGraphNodes(ast)) {
       const streamField = node.configFields.stream
-      if (
-        streamField?.kind === 'string' &&
-        streamField.value === streamDecl.name
-      ) {
+
+      if (streamField?.kind === 'string' && streamField.value === streamDecl.name) {
         pushRange(locations, uri, streamField.range)
       }
     }

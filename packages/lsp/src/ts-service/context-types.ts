@@ -1,3 +1,4 @@
+import { decisionOutputSchema } from '@swirls/definition/decision'
 import type {
   ConfigValue,
   ConnectionDecl,
@@ -19,22 +20,11 @@ import {
   resolveNamedSchemasFromDecls,
 } from '@swirls/language'
 import type { WorkspaceResourceIndex } from '@swirls/language/workspace'
-import { decisionOutputSchema } from '@swirls/definition/decision'
-import {
-  EMBEDDED_EMPTY_SECRETS,
-  EMBEDDED_OPEN_OBJECT,
-} from './emitted-ts-literals'
-import {
-  integrationOutputTypeString,
-  integrationParamsReturnTypePreamble,
-  integrationParamsReturnTypeString,
-  type WorkspaceFileReader,
-} from './integration-types'
+
+import { EMBEDDED_EMPTY_SECRETS, EMBEDDED_OPEN_OBJECT } from './emitted-ts-literals'
+import { integrationOutputTypeString, type WorkspaceFileReader } from './integration-types'
 import { inferOutputTypeForNode } from './postgres-types'
-import {
-  type DbClientScopeKind,
-  renderDbContextField,
-} from './prisma-client-types'
+import { type DbClientScopeKind, renderDbContextField } from './prisma-client-types'
 import { jsonSchemaToTsType } from './schema-to-ts'
 
 export { getRootNode } from '@swirls/language'
@@ -52,18 +42,19 @@ export function getNamedSchemaMap(
   workspace?: WorkspaceResourceIndex,
 ): Map<string, JsonSchemaLiteral> {
   const merged = new Map<string, JsonSchemaLiteral>()
+
   if (workspace) {
     for (const [name, lit] of workspace.schemaLiterals) {
       merged.set(name, lit)
     }
   }
+
   if (fileAst?.schemas?.length) {
-    for (const [name, lit] of resolveNamedSchemasFromDecls(
-      fileAst.schemas ?? [],
-    ).map) {
+    for (const [name, lit] of resolveNamedSchemasFromDecls(fileAst.schemas ?? []).map) {
       merged.set(name, lit)
     }
   }
+
   return merged
 }
 
@@ -72,14 +63,17 @@ export function mergedWorkflowDecls(
   workspace?: WorkspaceResourceIndex,
 ): WorkflowDecl[] {
   const byName = new Map<string, WorkflowDecl>()
+
   if (workspace) {
     for (const [name, workflow] of workspace.workflowBlocks) {
       byName.set(name, workflow)
     }
   }
+
   for (const workflow of fileAst?.workflows ?? []) {
     byName.set(workflow.name, workflow)
   }
+
   return [...byName.values()]
 }
 
@@ -94,9 +88,11 @@ function resolveLit(
   if (obj !== undefined && typeof obj === 'object' && !Array.isArray(obj)) {
     return obj as JsonSchemaLiteral
   }
+
   if (ref) {
     return refMap.get(ref)
   }
+
   return undefined
 }
 
@@ -111,18 +107,18 @@ function streamPinnedRowLit(
     versionCv.value.trim() !== ''
       ? versionCv.value.trim()
       : undefined
+
   if (!streamDecl || !pin) {
     return undefined
   }
+
   const sv = streamDecl.versions.find((v) => v.key === pin)
+
   if (!sv) {
     return undefined
   }
-  return resolveLit(
-    sv.schema as Record<string, unknown> | undefined,
-    sv.schemaRef,
-    refMap,
-  )
+
+  return resolveLit(sv.schema as Record<string, unknown> | undefined, sv.schemaRef, refMap)
 }
 
 /** Inline mirror of {@link Content} from `@swirls/definition/schemas` for `Extract<>` in `formatted` fields. */
@@ -155,9 +151,11 @@ function workflowDeclUsesOutputFormat(graph: WorkflowDecl): boolean {
 
 function formattedFieldTs(fmt: string | undefined | null): string | undefined {
   const t = fmt?.trim()
+
   if (!t) {
     return undefined
   }
+
   switch (t) {
     case 'markdown':
       return `Extract<Content, { kind: 'markdown' }>`
@@ -180,14 +178,13 @@ function formattedFieldTs(fmt: string | undefined | null): string | undefined {
   }
 }
 
-function nodeShapeWithFormatted(
-  inner: string,
-  fmt: string | undefined | null,
-): string {
+function nodeShapeWithFormatted(inner: string, fmt: string | undefined | null): string {
   const narrow = formattedFieldTs(fmt)
+
   if (!narrow) {
     return `{ ${inner} }`
   }
+
   return `{ ${inner}; formatted?: ${narrow} }`
 }
 
@@ -195,13 +192,10 @@ function reviewSchemaLit(
   node: NodeDecl | undefined,
   refMap: Map<string, JsonSchemaLiteral>,
 ): JsonSchemaLiteral | undefined {
-  if (
-    !node?.reviewConfig ||
-    typeof node.reviewConfig !== 'object' ||
-    node.reviewConfig === null
-  ) {
+  if (!node?.reviewConfig || typeof node.reviewConfig !== 'object' || node.reviewConfig === null) {
     return undefined
   }
+
   const rc = node.reviewConfig as Record<string, unknown>
   return resolveLit(
     rc.schema as Record<string, unknown> | undefined,
@@ -214,21 +208,27 @@ function secretsTypeForNode(node: NodeDecl | undefined): string {
   if (!node) {
     return EMBEDDED_OPEN_OBJECT
   }
+
   const map = node.secretsMap
+
   if (map == null || Object.keys(map).length === 0) {
     return EMBEDDED_EMPTY_SECRETS
   }
+
   const blocks = Object.entries(map).map(([blockName, vars]) => {
     const blockKey = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(blockName)
       ? blockName
       : JSON.stringify(blockName)
+
     const varLines = vars.map((v) =>
       /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(v)
         ? `      ${v}?: string`
         : `      ${JSON.stringify(v)}?: string`,
     )
+
     return `    ${blockKey}: {\n${varLines.join('\n')}\n    }`
   })
+
   return `{\n${blocks.join('\n')}\n  }`
 }
 
@@ -276,18 +276,23 @@ function dbSectionForNode(
     if (configKey === 'condition') {
       return null
     }
+
     if (configKey === 'run') {
       const dbCv = node.configFields.database
       const dbName = dbCv?.kind === 'string' ? dbCv.value : undefined
       visible = databases.filter((d) => d.name === dbName)
+
       if (visible.length === 0) {
         return null
       }
+
       const opCv = node.configFields.operation
       const op = opCv?.kind === 'string' ? opCv.value : undefined
+
       if (op === undefined || !isDatabaseOperationScope(op)) {
         return null
       }
+
       scope = op
     }
   }
@@ -296,9 +301,11 @@ function dbSectionForNode(
     visible.map((d) => ({ name: d.name, schemaSource: d.schemaSource })),
     scope,
   )
+
   if (!rendered) {
     return null
   }
+
   return {
     declarations: rendered.declarations,
     dbField: `\n  db: ${rendered.dbType}`,
@@ -312,14 +319,12 @@ export function getGraphRefFromConfigFields(
   configFields: Record<string, { kind: string; value?: unknown }>,
 ): string | undefined {
   const workflowCv = configFields.workflow ?? configFields.graph
+
   if (workflowCv?.kind === 'string' && typeof workflowCv.value === 'string') {
     return workflowCv.value
   }
-  return undefined
-}
 
-function _isWorkflowNodeType(type: string): boolean {
-  return type === 'workflow' || type === 'graph'
+  return undefined
 }
 
 /**
@@ -332,6 +337,7 @@ export function getLoopBodyWorkflowDecl(
   if (node.type !== 'map' && node.type !== 'fanout' && node.type !== 'while') {
     return undefined
   }
+
   if (node.subgraph) {
     return {
       name: `${node.name}__loop_body`,
@@ -342,9 +348,11 @@ export function getLoopBodyWorkflowDecl(
       range: node.subgraph.range,
     }
   }
+
   const ref = getGraphRefFromConfigFields(
     node.configFields as Record<string, { kind: string; value?: unknown }>,
   )
+
   return ref ? allWorkflows.find((g) => g.name === ref) : undefined
 }
 
@@ -359,11 +367,14 @@ function leafPartialOutputsTsType(
 ): string {
   const refMap = getNamedSchemaMap(fileAst, workspace)
   const leafNodes = getLeafNodes(graph)
+
   if (leafNodes.length === 0) {
     return EMBEDDED_OPEN_OBJECT
   }
+
   const mustRun = getMustRunNodeNames(graph)
   const entries: string[] = []
+
   for (const node of leafNodes) {
     const safeName = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(node.name)
       ? node.name
@@ -378,12 +389,15 @@ function leafPartialOutputsTsType(
         node.outputSchemaRef,
         refMap,
       )
+
     const tsType =
       lit && typeof lit === 'object'
         ? jsonSchemaToTsType(lit as Record<string, unknown>)
         : 'unknown'
+
     entries.push(`${safeName}${optional}: ${tsType}`)
   }
+
   return `{ ${entries.join('; ')} }`
 }
 
@@ -398,15 +412,11 @@ function inferNodeOutputType(
   if (!node) {
     return undefined
   }
+
   if (node.type === 'integration') {
-    return integrationOutputTypeString(
-      node,
-      connections,
-      actions,
-      workspace,
-      readWorkspaceFile,
-    )
+    return integrationOutputTypeString(node, connections, actions, workspace, readWorkspaceFile)
   }
+
   return inferOutputTypeForNode(node, postgresBlocks)
 }
 
@@ -450,15 +460,16 @@ export function generateContextTypePreamble(
     rootNode?.inputSchemaRef,
     refMap,
   )
+
   const rootOutputLit = resolveLit(
     rootNode?.outputSchema as Record<string, unknown> | undefined,
     rootNode?.outputSchemaRef,
     refMap,
   )
-  const hasRootInput =
-    rootInputLit !== undefined && typeof rootInputLit === 'object'
-  const hasRootOutput =
-    rootOutputLit !== undefined && typeof rootOutputLit === 'object'
+
+  const hasRootInput = rootInputLit !== undefined && typeof rootInputLit === 'object'
+  const hasRootOutput = rootOutputLit !== undefined && typeof rootOutputLit === 'object'
+
   const inferredRootOutput = !hasRootOutput
     ? inferNodeOutputType(
         rootNode,
@@ -474,14 +485,14 @@ export function generateContextTypePreamble(
     typeLines.push(
       `type RootInput = ${jsonSchemaToTsType(rootInputLit as Record<string, unknown>)}`,
     )
+
     if (isRootContext) {
-      nodeEntries.push(
-        `    root: ${nodeShapeWithFormatted('input: RootInput', rootFmt)}`,
-      )
+      nodeEntries.push(`    root: ${nodeShapeWithFormatted('input: RootInput', rootFmt)}`)
     } else if (isDownstream && hasRootOutput) {
       typeLines.push(
         `type RootOutput = ${jsonSchemaToTsType(rootOutputLit as Record<string, unknown>)}`,
       )
+
       nodeEntries.push(
         `    root: ${nodeShapeWithFormatted('input: RootInput; output: RootOutput', rootFmt)}`,
       )
@@ -494,9 +505,7 @@ export function generateContextTypePreamble(
         `    root: ${nodeShapeWithFormatted('input: RootInput; output?: unknown', rootFmt)}`,
       )
     } else {
-      nodeEntries.push(
-        `    root: ${nodeShapeWithFormatted('input: RootInput', rootFmt)}`,
-      )
+      nodeEntries.push(`    root: ${nodeShapeWithFormatted('input: RootInput', rootFmt)}`)
     }
   } else if (isRootContext) {
     nodeEntries.push(
@@ -506,22 +515,20 @@ export function generateContextTypePreamble(
     typeLines.push(
       `type RootOutput = ${jsonSchemaToTsType(rootOutputLit as Record<string, unknown>)}`,
     )
-    nodeEntries.push(
-      `    root: ${nodeShapeWithFormatted('output: RootOutput', rootFmt)}`,
-    )
+
+    nodeEntries.push(`    root: ${nodeShapeWithFormatted('output: RootOutput', rootFmt)}`)
   } else if (isDownstream && inferredRootOutput) {
     nodeEntries.push(
       `    root: ${nodeShapeWithFormatted(`output: ${inferredRootOutput}`, rootFmt)}`,
     )
   } else {
-    nodeEntries.push(
-      `    root: ${nodeShapeWithFormatted('[key: string]: unknown', rootFmt)}`,
-    )
+    nodeEntries.push(`    root: ${nodeShapeWithFormatted('[key: string]: unknown', rootFmt)}`)
   }
 
   // Non-root nodes also get upstream output types (skip root — already merged into root entry above)
   for (const name of upstream) {
     const node = graph.nodes.find((n) => n.name === name)
+
     if (node?.isRoot === true || name === rootNode?.name) {
       continue
     }
@@ -536,13 +543,10 @@ export function generateContextTypePreamble(
         : undefined
 
       if (childGraph) {
-        const subgraphType = leafPartialOutputsTsType(
-          childGraph,
-          fileAst,
-          workspace,
-        )
+        const subgraphType = leafPartialOutputsTsType(childGraph, fileAst, workspace)
         const typeName = `${name.charAt(0).toUpperCase()}${name.slice(1)}Output`
         typeLines.push(`type ${typeName} = ${subgraphType}`)
+
         nodeEntries.push(
           `    ${name}: ${nodeShapeWithFormatted(`output: ${typeName}`, node.outputFormat)}`,
         )
@@ -553,10 +557,12 @@ export function generateContextTypePreamble(
       }
     } else if (node?.type === 'map' || node?.type === 'fanout') {
       const bodyGraph = getLoopBodyWorkflowDecl(node, allWorkflows)
+
       if (bodyGraph) {
         const leafT = leafPartialOutputsTsType(bodyGraph, fileAst, workspace)
         const typeName = `${name.charAt(0).toUpperCase()}${name.slice(1)}Output`
         typeLines.push(`type ${typeName} = ${leafT}[]`)
+
         nodeEntries.push(
           `    ${name}: ${nodeShapeWithFormatted(`output: ${typeName}`, node.outputFormat)}`,
         )
@@ -567,12 +573,12 @@ export function generateContextTypePreamble(
       }
     } else if (node?.type === 'while') {
       const bodyGraph = getLoopBodyWorkflowDecl(node, allWorkflows)
+
       if (bodyGraph) {
         const leafT = leafPartialOutputsTsType(bodyGraph, fileAst, workspace)
         const typeName = `${name.charAt(0).toUpperCase()}${name.slice(1)}Output`
-        typeLines.push(
-          `type ${typeName} = { iterations: number; lastOutput: ${leafT} }`,
-        )
+        typeLines.push(`type ${typeName} = { iterations: number; lastOutput: ${leafT} }`)
+
         nodeEntries.push(
           `    ${name}: ${nodeShapeWithFormatted(`output: ${typeName}`, node.outputFormat)}`,
         )
@@ -586,23 +592,18 @@ export function generateContextTypePreamble(
       }
     } else if (node?.type === 'stream') {
       const streamRef = node.configFields.stream
-      const streamName =
-        streamRef?.kind === 'string' ? String(streamRef.value) : undefined
-      const streamDecl = streamName
-        ? streams.find((s) => s.name === streamName)
-        : undefined
+      const streamName = streamRef?.kind === 'string' ? String(streamRef.value) : undefined
+      const streamDecl = streamName ? streams.find((s) => s.name === streamName) : undefined
       const versionCv = node.configFields.version
+
       const streamSchemaLit =
-        streamDecl !== undefined
-          ? streamPinnedRowLit(streamDecl, versionCv, refMap)
-          : undefined
+        streamDecl !== undefined ? streamPinnedRowLit(streamDecl, versionCv, refMap) : undefined
 
       if (streamSchemaLit && typeof streamSchemaLit === 'object') {
-        const itemType = jsonSchemaToTsType(
-          streamSchemaLit as Record<string, unknown>,
-        )
+        const itemType = jsonSchemaToTsType(streamSchemaLit as Record<string, unknown>)
         const typeName = `${name.charAt(0).toUpperCase()}${name.slice(1)}Output`
         typeLines.push(`type ${typeName} = ${itemType}`)
+
         nodeEntries.push(
           `    ${name}: ${nodeShapeWithFormatted(`output: ${typeName}[]`, node.outputFormat)}`,
         )
@@ -619,11 +620,14 @@ export function generateContextTypePreamble(
           node?.outputSchemaRef,
           refMap,
         )
+
       if (outLit && typeof outLit === 'object') {
         const typeName = `${name.charAt(0).toUpperCase()}${name.slice(1)}Output`
+
         typeLines.push(
           `type ${typeName} = ${jsonSchemaToTsType(outLit as Record<string, unknown>)}`,
         )
+
         nodeEntries.push(
           `    ${name}: ${nodeShapeWithFormatted(`output: ${typeName}`, node?.outputFormat)}`,
         )
@@ -636,6 +640,7 @@ export function generateContextTypePreamble(
           workspace,
           readWorkspaceFile,
         )
+
         nodeEntries.push(
           `    ${name}: ${nodeShapeWithFormatted(`output: ${inferred ?? 'unknown'}`, node?.outputFormat)}`,
         )
@@ -654,12 +659,11 @@ export function generateContextTypePreamble(
     if (schema && typeof schema === 'object' && !Array.isArray(schema)) {
       const typeName = `${name.charAt(0).toUpperCase()}${name.slice(1)}Review`
 
-      typeLines.push(
-        `type ${typeName} = ${jsonSchemaToTsType(schema as Record<string, unknown>)}`,
-      )
+      typeLines.push(`type ${typeName} = ${jsonSchemaToTsType(schema as Record<string, unknown>)}`)
       reviewEntries.push(`    ${name}: ${typeName}`)
     }
   }
+
   if (
     currentNode?.reviewConfig &&
     typeof currentNode.reviewConfig === 'object' &&
@@ -674,15 +678,14 @@ export function generateContextTypePreamble(
         typeLines.push(
           `type ${typeName} = ${jsonSchemaToTsType(schema as Record<string, unknown>)}`,
         )
+
         reviewEntries.push(`    ${nodeName}: ${typeName}`)
       }
     }
   }
 
   const reviewsType =
-    reviewEntries.length > 0
-      ? `{\n${reviewEntries.join('\n')}\n  }`
-      : '{ [key: string]: unknown }'
+    reviewEntries.length > 0 ? `{\n${reviewEntries.join('\n')}\n  }` : '{ [key: string]: unknown }'
 
   if (workflowDeclUsesOutputFormat(graph)) {
     typeLines.unshift(SWIRLS_CONTENT_TYPE_TS)
@@ -695,29 +698,30 @@ export function generateContextTypePreamble(
     currentNode?.type === 'shell'
       ? ''
       : `\n  secrets: ${secretsTypeForNode(
-          configKey === 'model' || currentNode?.type === 'decision'
-            ? undefined
-            : currentNode,
+          configKey === 'model' || currentNode?.type === 'decision' ? undefined : currentNode,
         )}`
 
   let iterationField = ''
+
   if (
     loopParent &&
-    (loopParent.type === 'map' ||
-      loopParent.type === 'fanout' ||
-      loopParent.type === 'while')
+    (loopParent.type === 'map' || loopParent.type === 'fanout' || loopParent.type === 'while')
   ) {
     const iterRoot = rootNode
+
     const iterLit = resolveLit(
       iterRoot?.inputSchema as Record<string, unknown> | undefined,
       iterRoot?.inputSchemaRef,
       refMap,
     )
+
     const iterT =
       iterLit && typeof iterLit === 'object'
         ? jsonSchemaToTsType(iterLit as Record<string, unknown>)
         : 'unknown'
+
     const prevT = leafPartialOutputsTsType(graph, fileAst, workspace)
+
     if (loopParent.type === 'map') {
       iterationField = `\n  iteration: { index: number; item: ${iterT}; total: number; previous?: ${prevT} }`
     } else if (loopParent.type === 'fanout') {
@@ -728,18 +732,22 @@ export function generateContextTypePreamble(
   } else if (loopHost?.type === 'while') {
     const bodyGraph = getLoopBodyWorkflowDecl(loopHost, allWorkflows)
     const iterRoot = bodyGraph ? getRootNode(bodyGraph) : undefined
+
     const iterLit = resolveLit(
       iterRoot?.inputSchema as Record<string, unknown> | undefined,
       iterRoot?.inputSchemaRef,
       refMap,
     )
+
     const iterT =
       iterLit && typeof iterLit === 'object'
         ? jsonSchemaToTsType(iterLit as Record<string, unknown>)
         : 'unknown'
+
     const prevT = bodyGraph
       ? leafPartialOutputsTsType(bodyGraph, fileAst, workspace)
       : EMBEDDED_OPEN_OBJECT
+
     iterationField = `\n  iteration: { index: number; input: ${iterT}; previous?: ${prevT} }`
   }
 
@@ -770,6 +778,7 @@ export function generateMigrationContextPreamble(
   databases: DatabaseDecl[],
 ): string {
   const target = databases.filter((d) => d.name === migration.database)
+
   const rendered =
     target.length > 0
       ? renderDbContextField(
@@ -777,6 +786,7 @@ export function generateMigrationContextPreamble(
           'migration',
         )
       : null
+
   const dbDeclarations = rendered ? `${rendered.declarations}\n\n` : ''
   const dbField = rendered ? `\n  db: ${rendered.dbType}` : ''
 
@@ -841,15 +851,16 @@ export function generateStreamBlockContextPreamble(
     rootNode?.inputSchemaRef,
     refMap,
   )
+
   const rootOutputLit = resolveLit(
     rootNode?.outputSchema as Record<string, unknown> | undefined,
     rootNode?.outputSchemaRef,
     refMap,
   )
-  const hasRootInput =
-    rootInputLit !== undefined && typeof rootInputLit === 'object'
-  const hasRootOutput =
-    rootOutputLit !== undefined && typeof rootOutputLit === 'object'
+
+  const hasRootInput = rootInputLit !== undefined && typeof rootInputLit === 'object'
+  const hasRootOutput = rootOutputLit !== undefined && typeof rootOutputLit === 'object'
+
   const inferredRootOutput = !hasRootOutput
     ? inferNodeOutputType(
         rootNode,
@@ -865,10 +876,12 @@ export function generateStreamBlockContextPreamble(
     typeLines.push(
       `type RootInput = ${jsonSchemaToTsType(rootInputLit as Record<string, unknown>)}`,
     )
+
     if (hasRootOutput) {
       typeLines.push(
         `type RootOutput = ${jsonSchemaToTsType(rootOutputLit as Record<string, unknown>)}`,
       )
+
       nodeEntries.push(
         `    root: ${nodeShapeWithFormatted('input: RootInput; output: RootOutput', rootFmt)}`,
       )
@@ -886,17 +899,14 @@ export function generateStreamBlockContextPreamble(
       typeLines.push(
         `type RootOutput = ${jsonSchemaToTsType(rootOutputLit as Record<string, unknown>)}`,
       )
-      nodeEntries.push(
-        `    root: ${nodeShapeWithFormatted('output: RootOutput', rootFmt)}`,
-      )
+
+      nodeEntries.push(`    root: ${nodeShapeWithFormatted('output: RootOutput', rootFmt)}`)
     } else if (inferredRootOutput) {
       nodeEntries.push(
         `    root: ${nodeShapeWithFormatted(`output: ${inferredRootOutput}`, rootFmt)}`,
       )
     } else {
-      nodeEntries.push(
-        `    root: ${nodeShapeWithFormatted('[key: string]: unknown', rootFmt)}`,
-      )
+      nodeEntries.push(`    root: ${nodeShapeWithFormatted('[key: string]: unknown', rootFmt)}`)
     }
   }
 
@@ -906,9 +916,7 @@ export function generateStreamBlockContextPreamble(
     }
 
     const name = node.name
-    const safeName = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)
-      ? name
-      : JSON.stringify(name)
+    const safeName = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name) ? name : JSON.stringify(name)
     const opt = mustRun.has(name) ? '' : '?'
 
     if (node.type === 'workflow' || node.type === 'graph') {
@@ -921,13 +929,10 @@ export function generateStreamBlockContextPreamble(
         : undefined
 
       if (childGraph) {
-        const subgraphType = leafPartialOutputsTsType(
-          childGraph,
-          fileAst,
-          workspace,
-        )
+        const subgraphType = leafPartialOutputsTsType(childGraph, fileAst, workspace)
         const typeName = `${name.charAt(0).toUpperCase()}${name.slice(1)}Output`
         typeLines.push(`type ${typeName} = ${subgraphType}`)
+
         nodeEntries.push(
           `    ${safeName}${opt}: ${nodeShapeWithFormatted(`output: ${typeName}`, node.outputFormat)}`,
         )
@@ -938,24 +943,19 @@ export function generateStreamBlockContextPreamble(
       }
     } else if (node.type === 'stream') {
       const streamRef = node.configFields.stream
-      const streamName =
-        streamRef?.kind === 'string' ? String(streamRef.value) : undefined
-      const streamDecl = streamName
-        ? streams.find((s) => s.name === streamName)
-        : undefined
+      const streamName = streamRef?.kind === 'string' ? String(streamRef.value) : undefined
+      const streamDecl = streamName ? streams.find((s) => s.name === streamName) : undefined
 
       const versionCv = node.configFields.version
+
       const streamSchemaLit =
-        streamDecl !== undefined
-          ? streamPinnedRowLit(streamDecl, versionCv, refMap)
-          : undefined
+        streamDecl !== undefined ? streamPinnedRowLit(streamDecl, versionCv, refMap) : undefined
 
       if (streamSchemaLit && typeof streamSchemaLit === 'object') {
-        const itemType = jsonSchemaToTsType(
-          streamSchemaLit as Record<string, unknown>,
-        )
+        const itemType = jsonSchemaToTsType(streamSchemaLit as Record<string, unknown>)
         const typeName = `${name.charAt(0).toUpperCase()}${name.slice(1)}Output`
         typeLines.push(`type ${typeName} = ${itemType}`)
+
         nodeEntries.push(
           `    ${safeName}${opt}: ${nodeShapeWithFormatted(`output: ${typeName}[]`, node.outputFormat)}`,
         )
@@ -972,11 +972,14 @@ export function generateStreamBlockContextPreamble(
           node.outputSchemaRef,
           refMap,
         )
+
       if (outLit && typeof outLit === 'object') {
         const typeName = `${name.charAt(0).toUpperCase()}${name.slice(1)}Output`
+
         typeLines.push(
           `type ${typeName} = ${jsonSchemaToTsType(outLit as Record<string, unknown>)}`,
         )
+
         nodeEntries.push(
           `    ${safeName}${opt}: ${nodeShapeWithFormatted(`output: ${typeName}`, node.outputFormat)}`,
         )
@@ -989,6 +992,7 @@ export function generateStreamBlockContextPreamble(
           workspace,
           readWorkspaceFile,
         )
+
         nodeEntries.push(
           `    ${safeName}${opt}: ${nodeShapeWithFormatted(`output: ${inferred ?? 'unknown'}`, node.outputFormat)}`,
         )
@@ -1028,25 +1032,28 @@ export function resolveNodeDecision(
   if (node?.type !== 'decision') {
     return undefined
   }
+
   const ref = node.configFields.decision
+
   if (ref?.kind !== 'string') {
     return undefined
   }
+
   const decl =
     fileAst?.decisions?.find((d) => d.name === ref.value) ??
     workspace?.decisionBlocks?.get(ref.value)
+
   if (!decl) {
     return undefined
   }
+
   try {
-    return resolveDecisionDefinition(
-      decl,
-      getNamedSchemaMap(fileAst, workspace),
-    )
+    return resolveDecisionDefinition(decl, getNamedSchemaMap(fileAst, workspace))
   } catch {
     return undefined
   }
 }
+
 function nodeDecisionOutput(
   node: NodeDecl | undefined,
   fileAst?: SwirlsFile,

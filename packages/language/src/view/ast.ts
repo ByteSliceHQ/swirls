@@ -3,12 +3,7 @@
  * Re-exported from the main ast.ts module.
  */
 
-import type {
-  ConfigValue,
-  JsonBlockInfo,
-  JsonSchemaLiteral,
-  SourceRange,
-} from '../ast'
+import type { ConfigValue, JsonBlockInfo, JsonSchemaLiteral, SourceRange } from '../ast'
 
 /** One stream reference in `streams: [a, b]`. */
 export interface ViewStreamRef {

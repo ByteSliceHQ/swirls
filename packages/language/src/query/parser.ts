@@ -14,10 +14,7 @@ function rangeFromTokens(start: Token, end: Token): SourceRange {
   }
 }
 
-export function parseQueryBlock(
-  d: ResourceParserDelegate,
-  docComment?: string,
-): QueryDecl | null {
+export function parseQueryBlock(d: ResourceParserDelegate, docComment?: string): QueryDecl | null {
   const start = d.expect('keyword')
 
   if (!start || (start.value as string) !== 'query') {
@@ -47,6 +44,7 @@ export function parseQueryBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -57,6 +55,7 @@ export function parseQueryBlock(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -69,6 +68,7 @@ export function parseQueryBlock(
     if (key === 'database') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv?.kind === 'string') {
         database = cv.value
         databaseRange = cv.range
@@ -78,39 +78,48 @@ export function parseQueryBlock(
           peeked ?? d.peek(),
         )
       }
+
       continue
     }
 
     if (key === 'sql') {
       const peeked = d.peek()
       const cv = peeked ? d.parseConfigValue(peeked) : undefined
+
       if (cv) {
         sql = cv
       }
+
       continue
     }
 
     if (key === 'label') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         label = v
       }
+
       continue
     }
 
     if (key === 'description') {
       const v = d.parseValue()
+
       if (typeof v === 'string') {
         description = v
       }
+
       continue
     }
 
     if (key === 'enabled') {
       const v = d.parseValue()
+
       if (typeof v === 'boolean') {
         enabled = v
       }
+
       continue
     }
 

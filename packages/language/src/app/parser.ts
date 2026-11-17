@@ -4,10 +4,8 @@
  * `brand`, and `page` blocks; OpenUI via `render: @openui { … }`.
  */
 
-import {
-  APP_BRAND_TOKEN_KEYS,
-  isAppBrandTokenKey,
-} from '@swirls/definition/app-brand-tokens'
+import { APP_BRAND_TOKEN_KEYS, isAppBrandTokenKey } from '@swirls/definition/app-brand-tokens'
+
 import type { SourceRange } from '../ast'
 import type { Token } from '../lexer'
 import type { ResourceParserDelegate } from '../parser-delegate'
@@ -40,18 +38,9 @@ function rangeFromTokens(start: Token, end: Token): SourceRange {
   }
 }
 
-const RESERVED_FIELDS: ReadonlySet<string> = new Set([
-  'domain',
-  'slot',
-  'split',
-  'table',
-])
+const RESERVED_FIELDS: ReadonlySet<string> = new Set(['domain', 'slot', 'split', 'table'])
 
-const SHELL_REGIONS: ReadonlySet<string> = new Set([
-  'topbar',
-  'leftbar',
-  'rightbar',
-])
+const SHELL_REGIONS: ReadonlySet<string> = new Set(['topbar', 'leftbar', 'rightbar'])
 
 function isReservedField(value: string): value is AppReservedFieldName {
   return RESERVED_FIELDS.has(value)
@@ -61,17 +50,16 @@ function parseReferenceName(
   d: ResourceParserDelegate,
 ): { value: string; range: SourceRange } | null {
   const tok = d.peek()
+
   if (!tok || typeof tok.value !== 'string') {
     return null
   }
-  if (
-    tok.kind === 'identifier' ||
-    tok.kind === 'keyword' ||
-    tok.kind === 'string'
-  ) {
+
+  if (tok.kind === 'identifier' || tok.kind === 'keyword' || tok.kind === 'string') {
     d.advance()
     return { value: tok.value, range: { ...tok.range } }
   }
+
   return null
 }
 
@@ -90,6 +78,7 @@ function parseEntryLabelBlock(d: ResourceParserDelegate): {
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -101,6 +90,7 @@ function parseEntryLabelBlock(d: ResourceParserDelegate): {
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -113,12 +103,14 @@ function parseEntryLabelBlock(d: ResourceParserDelegate): {
     if (key === 'label') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         label = val
         labelRange = valTok ? { ...valTok.range } : undefined
       } else {
         d.error('entry label must be a quoted string', valTok ?? t)
       }
+
       continue
     }
 
@@ -129,10 +121,7 @@ function parseEntryLabelBlock(d: ResourceParserDelegate): {
   return { label, labelRange, end: d.expect('rbrace') }
 }
 
-function parseBrandAvatarBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppBrandAvatar {
+function parseBrandAvatarBlock(d: ResourceParserDelegate, start: Token): AppBrandAvatar {
   const avatar: AppBrandAvatar = { range: { ...start.range } }
 
   if (!d.expect('lbrace')) {
@@ -142,6 +131,7 @@ function parseBrandAvatarBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -153,6 +143,7 @@ function parseBrandAvatarBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -165,10 +156,12 @@ function parseBrandAvatarBlock(
     if (key === 'variant') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val !== 'string') {
         d.error('brand avatar variant must be a quoted string', valTok ?? t)
         continue
       }
+
       avatar.variant = val
       avatar.variantRange = valTok ? { ...valTok.range } : undefined
       continue
@@ -177,9 +170,11 @@ function parseBrandAvatarBlock(
     if (key === 'colors') {
       const valTok = d.peek()
       const colors = parseQuotedStringList(d)
+
       if (colors === null) {
         continue
       }
+
       avatar.colors = colors
       avatar.colorsRange = valTok ? { ...valTok.range } : undefined
       continue
@@ -188,19 +183,18 @@ function parseBrandAvatarBlock(
     if (key === 'shape') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val !== 'string') {
         d.error('brand avatar shape must be a quoted string', valTok ?? t)
         continue
       }
+
       avatar.shape = val
       avatar.shapeRange = valTok ? { ...valTok.range } : undefined
       continue
     }
 
-    d.error(
-      `Unknown avatar property "${key}" — only variant, colors, and shape`,
-      keyTok ?? t,
-    )
+    d.error(`Unknown avatar property "${key}" — only variant, colors, and shape`, keyTok ?? t)
     d.parseValue()
   }
 
@@ -219,6 +213,7 @@ function parseBrandBlock(d: ResourceParserDelegate, start: Token): AppBrand {
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -230,6 +225,7 @@ function parseBrandBlock(d: ResourceParserDelegate, start: Token): AppBrand {
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -252,11 +248,14 @@ function parseBrandBlock(d: ResourceParserDelegate, start: Token): AppBrand {
     if (key === 'accent' || key === 'logo' || key === 'theme') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val !== 'string') {
         d.error(`brand ${key} must be a quoted string`, valTok ?? t)
         continue
       }
+
       const range = valTok ? { ...valTok.range } : undefined
+
       if (key === 'accent') {
         brand.accent = val
         brand.accentRange = range
@@ -267,6 +266,7 @@ function parseBrandBlock(d: ResourceParserDelegate, start: Token): AppBrand {
         brand.theme = val
         brand.themeRange = range
       }
+
       continue
     }
 
@@ -274,6 +274,7 @@ function parseBrandBlock(d: ResourceParserDelegate, start: Token): AppBrand {
       `Unknown brand property "${key}" — only accent, logo, theme, tokens, and avatar`,
       keyTok ?? t,
     )
+
     d.parseValue()
   }
 
@@ -289,23 +290,30 @@ function parseQuotedStringList(d: ResourceParserDelegate): string[] | null {
   }
 
   const items: string[] = []
+
   while (!d.eof()) {
     const token = d.peek()
+
     if (!token || token.kind === 'rbracket') {
       break
     }
+
     if (token.kind === 'block_comment' || token.kind === 'comma') {
       d.advance()
       continue
     }
+
     const val = d.parseValue()
+
     if (typeof val !== 'string') {
       d.error('List entries must be quoted strings', token)
       d.advance()
       continue
     }
+
     items.push(val)
     const next = d.peek()
+
     if (next?.kind !== 'comma' && next?.kind !== 'rbracket') {
       d.error('Expected , or ] after list entry', next)
     }
@@ -314,6 +322,7 @@ function parseQuotedStringList(d: ResourceParserDelegate): string[] | null {
   if (!d.expect('rbracket')) {
     d.error('Expected ] after list', d.peek())
   }
+
   return items
 }
 
@@ -322,10 +331,12 @@ function parseStringListValue(
 ): { values: string[]; range: SourceRange } | null {
   const start = d.peek()
   const val = d.parseValue()
+
   if (!Array.isArray(val) || val.some((item) => typeof item !== 'string')) {
     d.error('Expected a string list', start ?? d.peek())
     return null
   }
+
   const end = d.peek() ?? start
   return {
     values: val,
@@ -333,10 +344,7 @@ function parseStringListValue(
   }
 }
 
-function parseAudienceBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppAudience | null {
+function parseAudienceBlock(d: ResourceParserDelegate, start: Token): AppAudience | null {
   const audience: AppAudience = {
     admission: '',
     range: { ...start.range },
@@ -348,6 +356,7 @@ function parseAudienceBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -359,6 +368,7 @@ function parseAudienceBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -371,6 +381,7 @@ function parseAudienceBlock(
     if (key === 'admission' || key === 'auth' || key === 'idp') {
       const valTok = d.peek()
       const nameParsed = parseReferenceName(d)
+
       if (nameParsed) {
         if (key === 'admission') {
           audience.admission = nameParsed.value
@@ -384,6 +395,7 @@ function parseAudienceBlock(
         }
       } else {
         const val = d.parseValue()
+
         if (typeof val === 'string') {
           if (key === 'admission') {
             audience.admission = val
@@ -399,14 +411,17 @@ function parseAudienceBlock(
           d.error(`${key} must be an identifier or string`, valTok ?? t)
         }
       }
+
       continue
     }
 
     if (key === 'allow_domains' || key === 'deny_domains') {
       const parsed = parseStringListValue(d)
+
       if (!parsed) {
         continue
       }
+
       if (key === 'allow_domains') {
         audience.allowDomains = parsed.values
         audience.allowDomainsRange = parsed.range
@@ -414,6 +429,7 @@ function parseAudienceBlock(
         audience.denyDomains = parsed.values
         audience.denyDomainsRange = parsed.range
       }
+
       continue
     }
 
@@ -426,10 +442,7 @@ function parseAudienceBlock(
   return audience
 }
 
-function parseLandingFaqItemBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppLandingFaqItem {
+function parseLandingFaqItemBlock(d: ResourceParserDelegate, start: Token): AppLandingFaqItem {
   const item: AppLandingFaqItem = {
     question: '',
     answer: '',
@@ -443,9 +456,11 @@ function parseLandingFaqItemBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
@@ -453,9 +468,11 @@ function parseLandingFaqItemBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
+
     if (!d.expect('colon')) {
       d.error('Expected :', d.peek())
       break
@@ -463,10 +480,12 @@ function parseLandingFaqItemBlock(
 
     const valTok = d.peek()
     const val = d.parseValue()
+
     if (typeof val !== 'string') {
       d.error(`faq item ${key} must be a quoted string`, valTok ?? t)
       continue
     }
+
     const range = valTok ? { ...valTok.range } : undefined
 
     switch (key) {
@@ -479,10 +498,7 @@ function parseLandingFaqItemBlock(
         item.answerRange = range
         break
       default:
-        d.error(
-          `Unknown faq item property "${key}" — only question and answer`,
-          keyTok ?? t,
-        )
+        d.error(`Unknown faq item property "${key}" — only question and answer`, keyTok ?? t)
         break
     }
   }
@@ -492,10 +508,7 @@ function parseLandingFaqItemBlock(
   return item
 }
 
-function parseLandingFaqBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppLandingFaq {
+function parseLandingFaqBlock(d: ResourceParserDelegate, start: Token): AppLandingFaq {
   const faq: AppLandingFaq = { items: [], range: { ...start.range } }
 
   if (!d.expect('lbrace')) {
@@ -505,9 +518,11 @@ function parseLandingFaqBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
@@ -515,6 +530,7 @@ function parseLandingFaqBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -533,10 +549,7 @@ function parseLandingFaqBlock(
   return faq
 }
 
-function parseLandingDiscoverBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppLandingDiscover {
+function parseLandingDiscoverBlock(d: ResourceParserDelegate, start: Token): AppLandingDiscover {
   const discover: AppLandingDiscover = { range: { ...start.range } }
 
   if (!d.expect('lbrace')) {
@@ -546,9 +559,11 @@ function parseLandingDiscoverBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
@@ -556,6 +571,7 @@ function parseLandingDiscoverBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -572,6 +588,7 @@ function parseLandingDiscoverBlock(
 
     if (key === 'index') {
       const valTok = d.peek()
+
       if (
         valTok &&
         (valTok.kind === 'identifier' || valTok.kind === 'keyword') &&
@@ -582,6 +599,7 @@ function parseLandingDiscoverBlock(
         discover.indexRange = { ...valTok.range }
       } else {
         const val = d.parseValue()
+
         if (typeof val === 'boolean') {
           discover.index = val
           discover.indexRange = valTok ? { ...valTok.range } : undefined
@@ -589,14 +607,17 @@ function parseLandingDiscoverBlock(
           d.error('discover index must be true or false', valTok ?? t)
         }
       }
+
       continue
     }
 
     if (key === 'keywords' || key === 'capabilities') {
       const listStart = d.peek()
       const items = parseQuotedStringList(d)
+
       if (items) {
         const range = listStart ? { ...listStart.range } : undefined
+
         if (key === 'keywords') {
           discover.keywords = items
           discover.keywordsRange = range
@@ -605,15 +626,18 @@ function parseLandingDiscoverBlock(
           discover.capabilitiesRange = range
         }
       }
+
       continue
     }
 
     const valTok = d.peek()
     const val = d.parseValue()
+
     if (typeof val !== 'string') {
       d.error(`discover ${key} must be a quoted string`, valTok ?? t)
       continue
     }
+
     const range = valTok ? { ...valTok.range } : undefined
 
     switch (key) {
@@ -662,6 +686,7 @@ function parseLandingDiscoverBlock(
           `Unknown discover property "${key}" — see landing.discover in the app resource docs`,
           keyTok ?? t,
         )
+
         break
     }
   }
@@ -671,10 +696,7 @@ function parseLandingDiscoverBlock(
   return discover
 }
 
-function parseLandingBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppLanding {
+function parseLandingBlock(d: ResourceParserDelegate, start: Token): AppLanding {
   const landing: AppLanding = { range: { ...start.range } }
 
   if (!d.expect('lbrace')) {
@@ -684,6 +706,7 @@ function parseLandingBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -695,6 +718,7 @@ function parseLandingBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -712,11 +736,13 @@ function parseLandingBlock(
     if (key === 'layout') {
       const valTok = d.peek()
       const nameParsed = parseReferenceName(d)
+
       if (nameParsed) {
         landing.layout = nameParsed.value
         landing.layoutRange = nameParsed.range
       } else {
         const val = d.parseValue()
+
         if (typeof val === 'string') {
           landing.layout = val
           landing.layoutRange = valTok ? { ...valTok.range } : undefined
@@ -724,15 +750,18 @@ function parseLandingBlock(
           d.error('landing layout must be an identifier or string', valTok ?? t)
         }
       }
+
       continue
     }
 
     const valTok = d.peek()
     const val = d.parseValue()
+
     if (typeof val !== 'string') {
       d.error(`landing ${key} must be a quoted string`, valTok ?? t)
       continue
     }
+
     const range = valTok ? { ...valTok.range } : undefined
 
     switch (key) {
@@ -765,6 +794,7 @@ function parseLandingBlock(
           `Unknown landing property "${key}" — only layout, image, title, subtitle, sign_in_title, sign_in_hint, footer, and discover`,
           keyTok ?? t,
         )
+
         break
     }
   }
@@ -774,10 +804,7 @@ function parseLandingBlock(
   return landing
 }
 
-function parseBrandTokensBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppBrandTokens {
+function parseBrandTokensBlock(d: ResourceParserDelegate, start: Token): AppBrandTokens {
   const tokens: AppBrandTokens = { range: { ...start.range } }
 
   if (!d.expect('lbrace')) {
@@ -787,6 +814,7 @@ function parseBrandTokensBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -798,6 +826,7 @@ function parseBrandTokensBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -807,10 +836,8 @@ function parseBrandTokensBlock(
       continue
     }
 
-    d.error(
-      `Unknown tokens property "${key}" — only light and dark`,
-      keyTok ?? t,
-    )
+    d.error(`Unknown tokens property "${key}" — only light and dark`, keyTok ?? t)
+
     if (d.peek()?.kind === 'lbrace') {
       parseBrandTokenMapBlock(d, keyTok ?? t)
     } else if (d.peek()?.kind === 'colon') {
@@ -824,10 +851,7 @@ function parseBrandTokensBlock(
   return tokens
 }
 
-function parseBrandTokenMapBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppBrandTokenMap {
+function parseBrandTokenMapBlock(d: ResourceParserDelegate, start: Token): AppBrandTokenMap {
   const map: AppBrandTokenMap = {}
 
   if (!d.expect('lbrace')) {
@@ -837,6 +861,7 @@ function parseBrandTokenMapBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -848,6 +873,7 @@ function parseBrandTokenMapBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -859,6 +885,7 @@ function parseBrandTokenMapBlock(
 
     const valTok = d.peek()
     const val = d.parseValue()
+
     if (typeof val !== 'string') {
       d.error(`brand token "${key}" must be a quoted string`, valTok ?? t)
       continue
@@ -869,6 +896,7 @@ function parseBrandTokenMapBlock(
         `Unknown brand token "${key}" — one of: ${APP_BRAND_TOKEN_KEYS.join(', ')}`,
         keyTok ?? t,
       )
+
       continue
     }
 
@@ -899,6 +927,7 @@ function parseShellRegion(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -910,6 +939,7 @@ function parseShellRegion(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -920,18 +950,23 @@ function parseShellRegion(
     }
 
     const valTok = d.peek()
+
     if (valTok?.kind === 'lbracket') {
       d.advance()
       const items: string[] = []
+
       while (!d.eof() && d.peek()?.kind !== 'rbracket') {
         if (d.peek()?.kind === 'comma') {
           d.advance()
           continue
         }
+
         // widget.user_menu as dotted path: identifier(s) separated by dots
         const parts: string[] = []
+
         while (!d.eof()) {
           const p = d.peek()
+
           if (
             p &&
             (p.kind === 'identifier' || p.kind === 'keyword') &&
@@ -939,28 +974,35 @@ function parseShellRegion(
           ) {
             parts.push(p.value)
             d.advance()
+
             if (d.peek()?.kind === 'dot') {
               d.advance()
               continue
             }
+
             break
           }
+
           break
         }
+
         if (parts.length > 0) {
           items.push(parts.join('.'))
         } else {
           const s = d.parseValue()
+
           if (typeof s === 'string') {
             items.push(s)
           } else {
             break
           }
         }
+
         if (d.peek()?.kind === 'comma') {
           d.advance()
         }
       }
+
       d.expect('rbracket')
       props[key] = items
       continue
@@ -977,6 +1019,7 @@ function parseShellRegion(
     }
 
     const val = d.parseValue()
+
     if (typeof val === 'string' || typeof val === 'boolean') {
       props[key] = val
     } else if (val != null) {
@@ -1004,6 +1047,7 @@ function parseShellBlock(d: ResourceParserDelegate, start: Token): AppShell {
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -1015,18 +1059,13 @@ function parseShellBlock(d: ResourceParserDelegate, start: Token): AppShell {
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
 
     if (SHELL_REGIONS.has(key)) {
-      shell.regions.push(
-        parseShellRegion(
-          d,
-          key as 'topbar' | 'leftbar' | 'rightbar',
-          keyTok ?? t,
-        ),
-      )
+      shell.regions.push(parseShellRegion(d, key as 'topbar' | 'leftbar' | 'rightbar', keyTok ?? t))
       continue
     }
 
@@ -1038,11 +1077,13 @@ function parseShellBlock(d: ResourceParserDelegate, start: Token): AppShell {
     if (key === 'preset') {
       const valTok = d.peek()
       const nameParsed = parseReferenceName(d)
+
       if (nameParsed) {
         shell.preset = nameParsed.value
         shell.presetRange = nameParsed.range
       } else {
         const val = d.parseValue()
+
         if (typeof val === 'string') {
           shell.preset = val
           shell.presetRange = valTok ? { ...valTok.range } : undefined
@@ -1050,6 +1091,7 @@ function parseShellBlock(d: ResourceParserDelegate, start: Token): AppShell {
           d.error('shell preset must be an identifier or string', valTok ?? t)
         }
       }
+
       continue
     }
 
@@ -1062,14 +1104,12 @@ function parseShellBlock(d: ResourceParserDelegate, start: Token): AppShell {
   return shell
 }
 
-function parseNavSection(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppNavSection {
+function parseNavSection(d: ResourceParserDelegate, start: Token): AppNavSection {
   let title = ''
   let titleRange: SourceRange = { ...start.range }
 
   const titleTok = d.peek()
+
   if (titleTok?.kind === 'string' && typeof titleTok.value === 'string') {
     d.advance()
     title = titleTok.value
@@ -1090,6 +1130,7 @@ function parseNavSection(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -1101,6 +1142,7 @@ function parseNavSection(
 
     const kindTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       d.error('Expected a nav entry (page: name)', t)
       break
@@ -1108,9 +1150,11 @@ function parseNavSection(
 
     if (key !== 'page') {
       d.error(`Unknown nav entry "${key}" — only page`, kindTok ?? t)
+
       if (d.peek()?.kind === 'colon') {
         d.advance()
       }
+
       d.parseValue()
       continue
     }
@@ -1121,6 +1165,7 @@ function parseNavSection(
     }
 
     const nameParsed = parseReferenceName(d)
+
     if (!nameParsed) {
       d.error('Expected a page name after "page:"', d.peek())
       continue
@@ -1135,6 +1180,7 @@ function parseNavSection(
       const parsed = parseEntryLabelBlock(d)
       label = parsed.label
       labelRange = parsed.labelRange
+
       if (parsed.end) {
         entryEnd = { ...parsed.end.range }
       }
@@ -1171,6 +1217,7 @@ function parseNavBlock(d: ResourceParserDelegate, start: Token): AppNav {
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -1182,6 +1229,7 @@ function parseNavBlock(d: ResourceParserDelegate, start: Token): AppNav {
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -1192,9 +1240,11 @@ function parseNavBlock(d: ResourceParserDelegate, start: Token): AppNav {
     }
 
     d.error(`Unknown nav property "${key}" — only section`, keyTok ?? t)
+
     if (d.peek()?.kind === 'colon') {
       d.advance()
     }
+
     d.parseValue()
   }
 
@@ -1205,11 +1255,9 @@ function parseNavBlock(d: ResourceParserDelegate, start: Token): AppNav {
   }
 }
 
-function parseOpenUiBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppOpenUiBlock | null {
+function parseOpenUiBlock(d: ResourceParserDelegate, start: Token): AppOpenUiBlock | null {
   const tok = d.peek()
+
   if (
     !tok ||
     tok.kind !== 'fenced_block' ||
@@ -1219,12 +1267,11 @@ function parseOpenUiBlock(
     d.error('Expected @openui { … } after render:', tok ?? start)
     return null
   }
+
   d.advance()
   return {
     content: tok.fencedContent,
-    contentRange: tok.fencedContentRange
-      ? { ...tok.fencedContentRange }
-      : { ...tok.range },
+    contentRange: tok.fencedContentRange ? { ...tok.fencedContentRange } : { ...tok.range },
     range: { ...tok.range },
   }
 }
@@ -1243,13 +1290,16 @@ function parseWorkflowList(d: ResourceParserDelegate): {
 
   while (!d.eof()) {
     const token = d.peek()
+
     if (!token || token.kind === 'rbracket') {
       break
     }
+
     if (token.kind === 'block_comment' || token.kind === 'comma') {
       d.advance()
       continue
     }
+
     if (token.kind !== 'identifier' || typeof token.value !== 'string') {
       d.error('reviews entries must be bare workflow identifiers', token)
       d.advance()
@@ -1261,6 +1311,7 @@ function parseWorkflowList(d: ResourceParserDelegate): {
     ranges.push({ ...token.range })
 
     const next = d.peek()
+
     if (next?.kind !== 'comma' && next?.kind !== 'rbracket') {
       d.error('Expected , or ] after reviews workflow identifier', next)
     }
@@ -1270,11 +1321,9 @@ function parseWorkflowList(d: ResourceParserDelegate): {
     d.error('Expected ] after reviews list', d.peek())
     return null
   }
+
   if (names.length === 0) {
-    d.error(
-      'page reviews must contain at least one workflow identifier',
-      d.peek(),
-    )
+    d.error('page reviews must contain at least one workflow identifier', d.peek())
   }
 
   return { names, ranges }
@@ -1297,25 +1346,28 @@ function parseChannelList(
 
   while (!d.eof()) {
     const token = d.peek()
+
     if (!token || token.kind === 'rbracket') {
       break
     }
+
     if (token.kind === 'block_comment' || token.kind === 'comma') {
       d.advance()
       continue
     }
+
     const parsed = parseReferenceName(d)
+
     if (!parsed) {
-      d.error(
-        `${label} entries must be Surface channel identifiers`,
-        d.peek() ?? token,
-      )
+      d.error(`${label} entries must be Surface channel identifiers`, d.peek() ?? token)
       continue
     }
+
     names.push(parsed.value)
     ranges.push(parsed.range)
 
     const next = d.peek()
+
     if (next?.kind !== 'comma' && next?.kind !== 'rbracket') {
       d.error(`Expected , or ] after ${label} channel identifier`, next)
     }
@@ -1325,11 +1377,9 @@ function parseChannelList(
     d.error(`Expected ] after ${label} list`, d.peek())
     return null
   }
+
   if (names.length === 0) {
-    d.error(
-      `page ${label} must contain at least one channel identifier`,
-      d.peek(),
-    )
+    d.error(`page ${label} must contain at least one channel identifier`, d.peek())
   }
 
   return { names, ranges }
@@ -1349,24 +1399,23 @@ const PAGE_FIELDS = new Set([
   'threads',
 ])
 
-const PAGE_FIELD_HINT =
-  'label, icon, viewport, render, channel, reviews, threads'
+const PAGE_FIELD_HINT = 'label, icon, viewport, render, channel, reviews, threads'
 
 function skipRestOfLine(d: ResourceParserDelegate, line: number): void {
   while (!d.eof()) {
     const next = d.peek()
+
     if (!next || next.range.start.line !== line || next.kind === 'rbrace') {
       break
     }
+
     d.advance()
   }
 }
 
-function parsePageBlock(
-  d: ResourceParserDelegate,
-  start: Token,
-): AppPage | null {
+function parsePageBlock(d: ResourceParserDelegate, start: Token): AppPage | null {
   const nameTok = d.advance()
+
   if (
     !nameTok ||
     (nameTok.kind !== 'identifier' && nameTok.kind !== 'keyword') ||
@@ -1391,6 +1440,7 @@ function parsePageBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -1402,21 +1452,21 @@ function parsePageBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
 
     if (!PAGE_FIELDS.has(key)) {
-      d.error(
-        `Unknown page field "${key}". Expected one of: ${PAGE_FIELD_HINT}`,
-        keyTok ?? t,
-      )
+      d.error(`Unknown page field "${key}". Expected one of: ${PAGE_FIELD_HINT}`, keyTok ?? t)
+
       if (d.peek()?.kind === 'colon') {
         d.advance()
         d.parseValue()
       } else {
         skipRestOfLine(d, (keyTok ?? t).range.start.line)
       }
+
       continue
     }
 
@@ -1428,6 +1478,7 @@ function parsePageBlock(
     if (key === 'label' || key === 'icon') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         if (key === 'label') {
           page.label = val
@@ -1439,17 +1490,20 @@ function parsePageBlock(
       } else {
         d.error(`page ${key} must be a quoted string`, valTok ?? t)
       }
+
       continue
     }
 
     if (key === 'viewport') {
       const parsed = parseReferenceName(d)
+
       if (parsed) {
         page.viewport = parsed.value
         page.viewportRange = parsed.range
       } else {
         d.error('page viewport must be full', d.peek() ?? t)
       }
+
       continue
     }
 
@@ -1458,40 +1512,48 @@ function parsePageBlock(
         `page preset "${key}:" is no longer supported — use render: @openui { … } with OpenUI components instead`,
         keyTok ?? t,
       )
+
       d.parseValue()
       continue
     }
 
     if (key === 'render') {
       const openui = parseOpenUiBlock(d, keyTok ?? t)
+
       if (openui) {
         page.render = openui
       }
+
       continue
     }
 
     if (key === 'channel') {
       const parsed = parseReferenceName(d)
+
       if (parsed) {
         page.channel = parsed.value
         page.channelRange = parsed.range
       } else {
         d.error('page channel must be an identifier', d.peek() ?? t)
       }
+
       continue
     }
 
     if (key === 'reviews') {
       const parsed = parseWorkflowList(d)
+
       if (parsed) {
         page.reviews = parsed.names
         page.reviewsRanges = parsed.ranges
       }
+
       continue
     }
 
     if (key === 'threads') {
       const parsed = parseChannelList(d, 'threads')
+
       if (parsed) {
         page.threads = parsed.names
         page.threadsRanges = parsed.ranges
@@ -1505,10 +1567,9 @@ function parsePageBlock(
     page.threads != null ? 'threads:' : null,
     page.reviews != null ? 'reviews:' : null,
   ].filter((body): body is string => body !== null)
+
   if (declaredBodies.length > 1) {
-    d.error(
-      `page cannot declare both ${declaredBodies.join(' and ')} — use exactly one page body`,
-    )
+    d.error(`page cannot declare both ${declaredBodies.join(' and ')} — use exactly one page body`)
   }
 
   const end = d.expect('rbrace') ?? d.peek()
@@ -1516,10 +1577,7 @@ function parsePageBlock(
   return page
 }
 
-export function parseAppBlock(
-  d: ResourceParserDelegate,
-  docComment?: string,
-): AppDecl | null {
+export function parseAppBlock(d: ResourceParserDelegate, docComment?: string): AppDecl | null {
   const start = d.expect('keyword')
 
   if (!start || start.value !== 'app') {
@@ -1533,15 +1591,12 @@ export function parseAppBlock(
       'App name must be a bare identifier, not a quoted string (e.g. `app support_center {`)',
       nameTok,
     )
+
     d.skipToNextBlock()
     return null
   }
 
-  if (
-    !nameTok ||
-    nameTok.kind !== 'identifier' ||
-    typeof nameTok.value !== 'string'
-  ) {
+  if (!nameTok || nameTok.kind !== 'identifier' || typeof nameTok.value !== 'string') {
     d.error('Expected app name', nameTok)
     d.skipToNextBlock()
     return null
@@ -1566,6 +1621,7 @@ export function parseAppBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
@@ -1577,6 +1633,7 @@ export function parseAppBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -1594,17 +1651,17 @@ export function parseAppBlock(
     if (key === 'audience') {
       if (d.peek()?.kind === 'colon') {
         d.advance()
-        d.error(
-          'audience must be a block (`audience { … }`), not a string value',
-          keyTok ?? t,
-        )
+        d.error('audience must be a block (`audience { … }`), not a string value', keyTok ?? t)
         d.parseValue()
         continue
       }
+
       const parsedAudience = parseAudienceBlock(d, keyTok ?? t)
+
       if (parsedAudience) {
         audience = parsedAudience
       }
+
       continue
     }
 
@@ -1620,9 +1677,11 @@ export function parseAppBlock(
 
     if (key === 'page') {
       const page = parsePageBlock(d, keyTok ?? t)
+
       if (page) {
         pages.push(page)
       }
+
       continue
     }
 
@@ -1630,15 +1689,19 @@ export function parseAppBlock(
       if (keyTok) {
         reserved.push({ name: key, range: { ...keyTok.range } })
       }
+
       if (d.peek()?.kind === 'colon') {
         d.advance()
       }
+
       // slot/split/table may be blocks; skip a following brace body if present
       if (d.peek()?.kind === 'lbrace') {
         d.advance()
         let depth = 1
+
         while (!d.eof() && depth > 0) {
           const n = d.advance()
+
           if (n?.kind === 'lbrace') {
             depth++
           } else if (n?.kind === 'rbrace') {
@@ -1648,6 +1711,7 @@ export function parseAppBlock(
       } else {
         d.parseValue()
       }
+
       continue
     }
 
@@ -1659,6 +1723,7 @@ export function parseAppBlock(
     if (key === 'label' || key === 'description' || key === 'icon') {
       const valTok = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         if (key === 'label') {
           label = val
@@ -1670,6 +1735,7 @@ export function parseAppBlock(
       } else {
         d.error(`app ${key} must be a quoted string`, valTok ?? t)
       }
+
       continue
     }
 

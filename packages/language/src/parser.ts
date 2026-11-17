@@ -177,13 +177,16 @@ class Parser {
 
   private error(message: string, token?: Token | null): void {
     const t = token ?? this.peek()
+
     if (t) {
       this.errors.push({
         message,
         range: { ...t.range },
       })
+
       return
     }
+
     // At end of input there is no token to point at. Anchor the error to the
     // end of the last token so it is still reported.
     const last = this.tokens[this.tokens.length - 1]
@@ -198,6 +201,7 @@ class Parser {
    */
   private reportUnclosedDelimiters(): void {
     const open: Token[] = []
+
     for (const t of this.tokens) {
       if (t.kind === 'lbrace' || t.kind === 'lbracket') {
         open.push(t)
@@ -205,9 +209,12 @@ class Parser {
         open.pop()
       }
     }
+
     const unclosed = open[open.length - 1]
+
     if (unclosed) {
       const closer = unclosed.kind === 'lbrace' ? '}' : ']'
+
       this.error(
         `Unexpected end of file: expected "${closer}" to close the "${unclosed.kind === 'lbrace' ? '{' : '['}" on line ${unclosed.range.start.line}`,
         null,
@@ -223,20 +230,26 @@ class Parser {
   private reportDuplicateKeys(): void {
     const reportedLines = new Set(this.errors.map((e) => e.range.start.line))
     const scopes: Set<string>[] = []
+
     for (let i = 0; i < this.tokens.length; i++) {
       const t = this.tokens[i]
+
       if (!t) {
         continue
       }
+
       if (t.kind === 'lbrace' || t.kind === 'lbracket') {
         scopes.push(new Set())
         continue
       }
+
       if (t.kind === 'rbrace' || t.kind === 'rbracket') {
         scopes.pop()
         continue
       }
+
       const scope = scopes[scopes.length - 1]
+
       if (
         !scope ||
         (t.kind !== 'identifier' && t.kind !== 'keyword') ||
@@ -244,14 +257,13 @@ class Parser {
       ) {
         continue
       }
+
       const key = String(t.value)
-      if (
-        scope.has(key) &&
-        !REPEATABLE_KEYS.has(key) &&
-        !reportedLines.has(t.range.start.line)
-      ) {
+
+      if (scope.has(key) && !REPEATABLE_KEYS.has(key) && !reportedLines.has(t.range.start.line)) {
         this.error(`Duplicate property "${key}"`, t)
       }
+
       scope.add(key)
     }
   }
@@ -273,6 +285,7 @@ class Parser {
   private skipToNextBlock(): void {
     this.lastBlockComment = undefined
     let depth = 0
+
     while (!this.eof()) {
       const t = this.advance()
 
@@ -284,6 +297,7 @@ class Parser {
         depth++
       } else if (t.kind === 'rbrace') {
         depth--
+
         if (depth < 0) {
           break
         }
@@ -345,9 +359,7 @@ class Parser {
 
         if (
           next?.kind === 'keyword' &&
-          TOP_LEVEL_DECL_KEYWORDS.includes(
-            next.value as (typeof TOP_LEVEL_DECL_KEYWORDS)[number],
-          )
+          TOP_LEVEL_DECL_KEYWORDS.includes(next.value as (typeof TOP_LEVEL_DECL_KEYWORDS)[number])
         ) {
           this.lastBlockComment = t.value as string
         }
@@ -364,6 +376,7 @@ class Parser {
           this.expect('colon')
 
           const num = this.advance()
+
           if (num && num.kind === 'number') {
             ast.version = num.value as number
           }
@@ -383,9 +396,11 @@ class Parser {
 
         if (kw === 'webhook') {
           const decl = this.parseWebhook()
+
           if (decl) {
             ast.webhooks.push(decl)
           }
+
           continue
         }
 
@@ -421,17 +436,21 @@ class Parser {
 
         if (kw === 'stream') {
           const afterStream = this.tokens[this.index + 1]
+
           if (afterStream?.kind === 'colon') {
             this.error(
               '"stream:" is only valid inside a node { } block (did you forget to close a brace?)',
               t,
             )
+
             this.advance()
             this.expect('colon')
             const vt = this.peek()
+
             if (vt) {
               this.parseConfigValue(vt)
             }
+
             continue
           }
 
@@ -525,14 +544,13 @@ class Parser {
         }
 
         if (kw === 'decision') {
-          const decl = parseDecisionBlock(
-            this.delegate(),
-            this.lastBlockComment,
-          )
+          const decl = parseDecisionBlock(this.delegate(), this.lastBlockComment)
           this.lastBlockComment = undefined
+
           if (decl) {
             ast.decisions!.push(decl)
           }
+
           continue
         }
 
@@ -741,10 +759,7 @@ class Parser {
         }
 
         if (kw === 'review') {
-          this.error(
-            `"review" must appear inside a node block, not at top level`,
-            t,
-          )
+          this.error(`"review" must appear inside a node block, not at top level`, t)
           this.skipToNextBlock()
           continue
         }
@@ -786,15 +801,9 @@ class Parser {
       return null
     }
 
-    const {
-      props,
-      schemaBlock,
-      schemaRef,
-      schemaRefRange,
-      visibility,
-      visibilityRange,
-      authRef,
-    } = this.parseFormFields()
+    const { props, schemaBlock, schemaRef, schemaRefRange, visibility, visibilityRange, authRef } =
+      this.parseFormFields()
+
     const end = this.expect('rbrace') ?? this.peek()
 
     const form: FormDecl = {
@@ -877,25 +886,25 @@ class Parser {
           this.error('Expected `:` after `visibility`', this.peek())
           continue
         }
+
         const valTok = this.advance()
+
         if (!valTok || valTok.kind !== 'identifier') {
-          this.error(
-            'Expected `public` or `internal` after `visibility:`',
-            valTok,
-          )
+          this.error('Expected `public` or `internal` after `visibility:`', valTok)
           continue
         }
+
         const value = valTok.value
-        if (
-          typeof value !== 'string' ||
-          (value !== 'public' && value !== 'internal')
-        ) {
+
+        if (typeof value !== 'string' || (value !== 'public' && value !== 'internal')) {
           this.error(
             `Invalid visibility "${String(value)}"; expected \`public\` or \`internal\``,
             valTok,
           )
+
           continue
         }
+
         // Discriminated narrowing: `value` is now `'public' | 'internal'` —
         // no `as` cast required.
         visibility = value
@@ -911,18 +920,18 @@ class Parser {
           this.error('Expected `:` after `auth`', this.peek())
           continue
         }
+
         const valTok = this.advance()
+
         if (
           !valTok ||
           (valTok.kind !== 'identifier' && valTok.kind !== 'keyword') ||
           typeof valTok.value !== 'string'
         ) {
-          this.error(
-            'Expected auth block name (bare identifier) after `auth:`',
-            valTok,
-          )
+          this.error('Expected auth block name (bare identifier) after `auth:`', valTok)
           continue
         }
+
         authRef = { name: valTok.value, range: { ...valTok.range } }
         continue
       }
@@ -940,10 +949,7 @@ class Parser {
           let parsed: Record<string, unknown> = {}
 
           try {
-            parsed = JSON.parse(tok.fencedContent ?? '{}') as Record<
-              string,
-              unknown
-            >
+            parsed = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
           } catch {
             this.error('Invalid JSON in schema block', tok)
           }
@@ -974,10 +980,7 @@ class Parser {
       const valueTok = this.peek()
       const value = this.parseValue()
 
-      if (
-        value !== undefined &&
-        this.checkPropType(spec, key, value, valueTok)
-      ) {
+      if (value !== undefined && this.checkPropType(spec, key, value, valueTok)) {
         out[key] = value
       }
     }
@@ -1018,6 +1021,7 @@ class Parser {
 
     const { props, schemaBlock, schemaRef, schemaRefRange, secretRef, header } =
       this.parseWebhookProps()
+
     const end = this.expect('rbrace') ?? this.peek()
 
     return {
@@ -1087,10 +1091,7 @@ class Parser {
           let parsed: Record<string, unknown> = {}
 
           try {
-            parsed = JSON.parse(tok.fencedContent ?? '{}') as Record<
-              string,
-              unknown
-            >
+            parsed = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
           } catch {
             this.error('Invalid JSON in schema block', tok)
           }
@@ -1150,16 +1151,10 @@ class Parser {
               },
             }
           } else {
-            this.error(
-              'Expected secret var name after "."',
-              varTok ?? this.peek(),
-            )
+            this.error('Expected secret var name after "."', varTok ?? this.peek())
           }
         } else {
-          this.error(
-            'Expected secret block name (e.g. my_secret.VAR)',
-            blockTok,
-          )
+          this.error('Expected secret block name (e.g. my_secret.VAR)', blockTok)
           this.parseValue()
         }
 
@@ -1169,12 +1164,9 @@ class Parser {
       if (key === 'header') {
         const valTok = this.peek()
 
-        if (
-          valTok &&
-          valTok.kind === 'string' &&
-          typeof valTok.value === 'string'
-        ) {
+        if (valTok && valTok.kind === 'string' && typeof valTok.value === 'string') {
           this.advance()
+
           header = {
             value: valTok.value,
             range: { ...valTok.range },
@@ -1190,10 +1182,7 @@ class Parser {
       const valueTok = this.peek()
       const value = this.parseValue()
 
-      if (
-        value !== undefined &&
-        this.checkPropType(spec, key, value, valueTok)
-      ) {
+      if (value !== undefined && this.checkPropType(spec, key, value, valueTok)) {
         out[key] = value
       }
     }
@@ -1231,8 +1220,11 @@ class Parser {
       return null
     }
 
-    const { props, schemaBlock, schemaRef, schemaRefRange } =
-      this.parseResourceProps('schema', SCHEMA_PROPS)
+    const { props, schemaBlock, schemaRef, schemaRefRange } = this.parseResourceProps(
+      'schema',
+      SCHEMA_PROPS,
+    )
+
     const end = this.expect('rbrace') ?? this.peek()
 
     return {
@@ -1347,45 +1339,42 @@ class Parser {
 
       if (key === 'vars') {
         const list = this.parseSecretKeysList()
+
         if (list) {
           vars = list
         }
       } else if (key === 'label') {
         const v = this.parseValue()
+
         if (typeof v === 'string') {
           label = v
         }
       } else if (key === 'description') {
         const v = this.parseValue()
+
         if (typeof v === 'string') {
           description = v
         }
       } else if (key === 'type') {
         const typeTok = this.advance()
         let typeVal: string | undefined
+
         if (
           typeTok &&
-          (typeTok.kind === 'identifier' ||
-            typeTok.kind === 'keyword' ||
-            typeTok.kind === 'string')
+          (typeTok.kind === 'identifier' || typeTok.kind === 'keyword' || typeTok.kind === 'string')
         ) {
           typeVal = typeTok.value as string
         }
+
         if (typeVal === 'managed') {
           secretType = 'managed'
         } else if (typeVal !== undefined) {
-          this.error(
-            `Unknown secret type "${typeVal}" (expected managed)`,
-            typeTok,
-          )
+          this.error(`Unknown secret type "${typeVal}" (expected managed)`, typeTok)
         } else {
           this.error('Expected secret type identifier (managed)', typeTok)
         }
       } else {
-        this.error(
-          `Unknown secret property "${key}"; expected label, description, type, vars`,
-          t,
-        )
+        this.error(`Unknown secret property "${key}"; expected label, description, type, vars`, t)
         this.parseValue()
       }
     }
@@ -1458,27 +1447,28 @@ class Parser {
 
       if (key === 'label') {
         const v = this.parseValue()
+
         if (typeof v === 'string') {
           label = v
         }
+
         continue
       }
 
       if (key === 'description') {
         const v = this.parseValue()
+
         if (typeof v === 'string') {
           description = v
         }
+
         continue
       }
 
       if (key === 'type') {
         const typeTok = this.advance()
 
-        if (
-          typeTok &&
-          (typeTok.kind === 'identifier' || typeTok.kind === 'keyword')
-        ) {
+        if (typeTok && (typeTok.kind === 'identifier' || typeTok.kind === 'keyword')) {
           authType = typeTok.value as string
         } else if (typeTok && typeTok.kind === 'string') {
           authType = typeTok.value as string
@@ -1490,10 +1480,7 @@ class Parser {
       if (key === 'secrets') {
         const refTok = this.advance()
 
-        if (
-          refTok &&
-          (refTok.kind === 'identifier' || refTok.kind === 'keyword')
-        ) {
+        if (refTok && (refTok.kind === 'identifier' || refTok.kind === 'keyword')) {
           secretsRef = refTok.value as string
           secretsRefRange = { ...refTok.range }
         }
@@ -1573,10 +1560,7 @@ class Parser {
           let parsed: Record<string, unknown> = {}
 
           try {
-            parsed = JSON.parse(tok.fencedContent ?? '{}') as Record<
-              string,
-              unknown
-            >
+            parsed = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
           } catch {
             this.error('Invalid JSON in schema block', tok)
           }
@@ -1607,10 +1591,7 @@ class Parser {
       const valueTok = this.peek()
       const value = this.parseValue()
 
-      if (
-        value !== undefined &&
-        this.checkPropType(spec, key, value, valueTok)
-      ) {
+      if (value !== undefined && this.checkPropType(spec, key, value, valueTok)) {
         out[key] = value
       }
     }
@@ -1634,11 +1615,14 @@ class Parser {
         `Unknown ${block} property "${key}"; expected ${Object.keys(spec).join(', ')}`,
         keyTok,
       )
+
       return
     }
+
     if (seen.has(key)) {
       this.error(`Duplicate ${block} property "${key}"`, keyTok)
     }
+
     seen.add(key)
   }
 
@@ -1652,6 +1636,7 @@ class Parser {
     if (seen.has(key)) {
       this.error(`Duplicate ${block} property "${key}"`, keyTok)
     }
+
     seen.add(key)
   }
 
@@ -1663,12 +1648,15 @@ class Parser {
     valueTok: Token | null,
   ): boolean {
     const expected = spec[key]
+
     if (expected === undefined) {
       return false
     }
+
     if (expected === 'any' || typeof value === expected) {
       return true
     }
+
     this.error(`"${key}" must be a ${expected}`, valueTok)
     return false
   }
@@ -1699,28 +1687,35 @@ class Parser {
       this.advance()
       return t.value
     }
+
     if (t.kind === 'number') {
       this.advance()
       return t.value
     }
+
     if (t.kind === 'boolean') {
       this.advance()
       return t.value
     }
+
     if (t.kind === 'lbrace') {
       return this.parseObjectLiteral()
     }
+
     if (t.kind === 'lbracket') {
       return this.parseArrayLiteral()
     }
+
     if (t.kind === 'fenced_block') {
       const tok = this.advance()
       return tok?.fencedContent ?? ''
     }
+
     this.error(
       'Expected value (string, number, boolean, object, array, or @ts / @json / @sql block)',
       t,
     )
+
     return undefined
   }
 
@@ -1730,6 +1725,7 @@ class Parser {
     }
 
     const out: Record<string, unknown> = {}
+
     while (!this.eof()) {
       const t = this.peek()
 
@@ -1772,6 +1768,7 @@ class Parser {
         this.advance()
       }
     }
+
     this.expect('rbrace')
     return out
   }
@@ -1820,10 +1817,7 @@ class Parser {
 
           if (tok) {
             try {
-              out.schema = JSON.parse(tok.fencedContent ?? '{}') as Record<
-                string,
-                unknown
-              >
+              out.schema = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
             } catch {
               this.error('Invalid JSON in review schema block', tok)
             }
@@ -1835,12 +1829,7 @@ class Parser {
         } else {
           const v = this.parseValue()
 
-          if (
-            v !== undefined &&
-            typeof v === 'object' &&
-            v !== null &&
-            !Array.isArray(v)
-          ) {
+          if (v !== undefined && typeof v === 'object' && v !== null && !Array.isArray(v)) {
             out.schema = v
           } else if (v === null) {
             out.schema = null
@@ -1872,6 +1861,7 @@ class Parser {
         this.advance()
       }
     }
+
     this.expect('rbrace')
     return { config: out, schemaRefRange }
   }
@@ -1882,6 +1872,7 @@ class Parser {
     }
 
     const arr: unknown[] = []
+
     while (!this.eof()) {
       const t = this.peek()
 
@@ -1942,13 +1933,17 @@ class Parser {
         keys.push(t.value as string)
       } else {
         this.error('Expected string or identifier in secrets list', t)
+
         while (!this.eof()) {
           const u = this.peek()
+
           if (!u || u.kind === 'rbracket') {
             break
           }
+
           this.advance()
         }
+
         break
       }
 
@@ -1995,16 +1990,21 @@ class Parser {
 
       if (t.kind !== 'identifier' && t.kind !== 'keyword') {
         this.error('Expected secret block name in secrets map', t)
+
         while (!this.eof()) {
           const u = this.peek()
+
           if (!u || u.kind === 'rbrace' || u.kind === 'comma') {
             break
           }
+
           this.advance()
         }
+
         if (this.peek()?.kind === 'comma') {
           this.advance()
         }
+
         continue
       }
 
@@ -2077,6 +2077,7 @@ class Parser {
 
     while (!this.eof()) {
       const t = this.peek()
+
       if (!t || t.kind === 'rbrace') {
         break
       }
@@ -2084,10 +2085,7 @@ class Parser {
       if (t.kind === 'block_comment') {
         const next = this.tokens[this.index + 1]
 
-        if (
-          next?.kind === 'keyword' &&
-          (next.value === 'node' || next.value === 'root')
-        ) {
+        if (next?.kind === 'keyword' && (next.value === 'node' || next.value === 'root')) {
           this.lastBlockComment = t.value as string
         }
 
@@ -2114,22 +2112,28 @@ class Parser {
           'persistence { } blocks have been removed — use a top-level stream block instead',
           t,
         )
+
         this.advance()
         let depth = 0
+
         while (!this.eof()) {
           const tok = this.advance()
+
           if (!tok) {
             break
           }
+
           if (tok.kind === 'lbrace') {
             depth++
           } else if (tok.kind === 'rbrace') {
             depth--
+
             if (depth === 0) {
               break
             }
           }
         }
+
         continue
       }
 
@@ -2147,6 +2151,7 @@ class Parser {
         if (isSubgraph) {
           this.error('label is not valid inside subgraph { }', t)
         }
+
         this.noteProp(seen, block, t)
         this.advance()
         this.expect('colon')
@@ -2166,6 +2171,7 @@ class Parser {
         if (isSubgraph) {
           this.error('description is not valid inside subgraph { }', t)
         }
+
         this.noteProp(seen, block, t)
         this.advance()
         this.expect('colon')
@@ -2184,15 +2190,18 @@ class Parser {
         if (isSubgraph) {
           this.error('concurrency is not valid inside subgraph { }', t)
         }
+
         this.noteProp(seen, block, t)
         this.advance()
         this.expect('colon')
         const v = this.parseValue()
+
         if (typeof v === 'number') {
           concurrency = v
         } else if (v !== undefined) {
           this.error('"concurrency" must be a number', t)
         }
+
         continue
       }
 
@@ -2200,46 +2209,52 @@ class Parser {
         if (isSubgraph) {
           this.error('executionTokenTtl is not valid inside subgraph { }', t)
         }
+
         this.noteProp(seen, block, t)
         this.advance()
         this.expect('colon')
         const v = this.parseValue()
+
         if (typeof v === 'string') {
           executionTokenTtl = v
         } else {
-          this.error(
-            'executionTokenTtl must be a quoted duration like "150m"',
-            t,
-          )
+          this.error('executionTokenTtl must be a quoted duration like "150m"', t)
         }
+
         continue
       }
 
       if (t.kind === 'keyword' && t.value === 'flow') {
         const result = this.parseFlowBlock()
+
         if (result) {
           edges.push(...result.edges)
           flowRange = result.flowRange
         }
+
         continue
       }
 
       if (t.kind === 'keyword' && t.value === 'stream') {
         const afterStream = this.tokens[this.index + 1]
+
         if (afterStream?.kind === 'colon') {
           this.error('"stream:" is only valid inside a node { } block', t)
           this.advance()
           this.expect('colon')
           const vt = this.peek()
+
           if (vt) {
             this.parseConfigValue(vt)
           }
+
           continue
         }
       }
 
       if (t.kind === 'identifier') {
         const arrow = this.tokens[this.index + 1]
+
         if (arrow?.kind === 'arrow' || arrow?.kind === 'labeled_arrow') {
           this.error('Edge declarations must be inside a flow { } block', t)
           this.advance()
@@ -2259,9 +2274,11 @@ class Parser {
         this.advance()
         this.advance()
         const valueTok = this.peek()
+
         if (valueTok) {
           this.parseConfigValue(valueTok)
         }
+
         continue
       }
 
@@ -2285,29 +2302,27 @@ class Parser {
     this.lastBlockComment = undefined
     const start = this.expect('keyword')
     const startKw = start?.value as string
+
     if (!start || (startKw !== 'graph' && startKw !== 'workflow')) {
       return null
     }
+
     const nameTok = this.advance()
+
     if (!nameTok || nameTok.kind !== 'identifier') {
       this.error('Expected workflow name', nameTok)
       this.skipToNextBlock()
       return null
     }
+
     if (!this.expect('lbrace')) {
       this.error('Expected {', this.peek())
       this.skipToNextBlock()
       return null
     }
-    const {
-      nodes,
-      edges,
-      flowRange,
-      label,
-      description,
-      concurrency,
-      executionTokenTtl,
-    } = this.parseWorkflowInnerBody(false)
+
+    const { nodes, edges, flowRange, label, description, concurrency, executionTokenTtl } =
+      this.parseWorkflowInnerBody(false)
 
     const end = this.expect('rbrace') ?? this.peek()
 
@@ -2330,22 +2345,28 @@ class Parser {
     flowRange: SourceRange
   } | null {
     const flowStart = this.advance()!
+
     if (!this.expect('lbrace')) {
       this.error('Expected { after flow', this.peek())
       return null
     }
+
     const flowEdges: EdgeDecl[] = []
+
     while (!this.eof()) {
       const t = this.peek()
+
       if (!t || t.kind === 'rbrace') {
         break
       }
+
       if (t.kind === 'block_comment') {
         this.advance()
         continue
       }
-      const isNodeName =
-        t.kind === 'identifier' || (t.kind === 'keyword' && t.value === 'root')
+
+      const isNodeName = t.kind === 'identifier' || (t.kind === 'keyword' && t.value === 'root')
+
       if (isNodeName) {
         const src = t.value as string
         const arrow = this.tokens[this.index + 1]
@@ -2354,11 +2375,13 @@ class Parser {
           this.advance()
           this.advance()
           const targetTok = this.advance()
+
           const target =
             targetTok?.kind === 'identifier' ||
             (targetTok?.kind === 'keyword' && targetTok?.value === 'root')
               ? (targetTok.value as string)
               : ''
+
           if (target) {
             flowEdges.push({
               source: src,
@@ -2366,19 +2389,23 @@ class Parser {
               range: rangeFromTokens(t, targetTok ?? t),
             })
           }
+
           continue
         }
+
         if (arrow?.kind === 'labeled_arrow') {
           this.advance()
           this.advance()
           const targetTok = this.advance()
+
           const target =
             targetTok?.kind === 'identifier' ||
             (targetTok?.kind === 'keyword' && targetTok?.value === 'root')
               ? (targetTok.value as string)
               : ''
-          const edgeLabel =
-            typeof arrow.value === 'string' ? arrow.value : undefined
+
+          const edgeLabel = typeof arrow.value === 'string' ? arrow.value : undefined
+
           if (target) {
             flowEdges.push({
               source: src,
@@ -2387,11 +2414,14 @@ class Parser {
               range: rangeFromTokens(t, targetTok ?? t),
             })
           }
+
           continue
         }
       }
+
       this.advance()
     }
+
     const endTok = this.expect('rbrace') ?? this.peek()
     return {
       edges: flowEdges,
@@ -2431,9 +2461,7 @@ class Parser {
     let reviewSchemaRefRange: SourceRange | undefined
     let outputFormatVal: string | undefined
     let secretsMap: Record<string, string[]> | undefined
-    let secretsMapBlockRanges:
-      | { blockName: string; range: SourceRange }[]
-      | undefined
+    let secretsMapBlockRanges: { blockName: string; range: SourceRange }[] | undefined
 
     while (!this.eof()) {
       const t = this.peek()
@@ -2462,10 +2490,7 @@ class Parser {
       if (key === 'type') {
         const typeTok = this.advance()
 
-        if (
-          typeTok &&
-          (typeTok.kind === 'identifier' || typeTok.kind === 'keyword')
-        ) {
+        if (typeTok && (typeTok.kind === 'identifier' || typeTok.kind === 'keyword')) {
           typeVal = this.normalizeNodeType(typeTok.value as string)
         }
 
@@ -2494,12 +2519,11 @@ class Parser {
 
       if (key === 'format') {
         const fmtTok = this.advance()
-        if (
-          fmtTok &&
-          (fmtTok.kind === 'identifier' || fmtTok.kind === 'keyword')
-        ) {
+
+        if (fmtTok && (fmtTok.kind === 'identifier' || fmtTok.kind === 'keyword')) {
           outputFormatVal = fmtTok.value as string
         }
+
         continue
       }
 
@@ -2508,6 +2532,7 @@ class Parser {
 
         if (next?.kind === 'lbrace') {
           const parsedSecrets = this.parseSecretsMap()
+
           if (parsedSecrets) {
             secretsMap = parsedSecrets.map
             secretsMapBlockRanges = parsedSecrets.blockRanges
@@ -2526,10 +2551,7 @@ class Parser {
           const tok = this.advance()!
 
           try {
-            inputSchema = JSON.parse(tok.fencedContent ?? '{}') as Record<
-              string,
-              unknown
-            >
+            inputSchema = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
           } catch {
             this.error('Invalid JSON in inputSchema block', tok)
           }
@@ -2557,16 +2579,15 @@ class Parser {
 
         continue
       }
+
       if (key === 'outputSchema') {
         const next = this.peek()
+
         if (next?.kind === 'fenced_block' && next.fencedLang === 'json') {
           const tok = this.advance()!
 
           try {
-            outputSchema = JSON.parse(tok.fencedContent ?? '{}') as Record<
-              string,
-              unknown
-            >
+            outputSchema = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
           } catch {
             this.error('Invalid JSON in outputSchema block', tok)
           }
@@ -2591,29 +2612,37 @@ class Parser {
             outputSchema = v as Record<string, unknown>
           }
         }
+
         continue
       }
+
       if (key === 'review') {
         const next = this.peek()
+
         if (next?.kind === 'boolean' && next.value === true) {
           this.advance()
           reviewConfig = { enabled: true }
         } else if (next?.kind === 'lbrace') {
           const parsedReview = this.parseReviewConfigObject()
+
           if (parsedReview) {
             const obj = parsedReview.config
+
             reviewConfig = {
               ...obj,
               enabled: obj.enabled !== undefined ? obj.enabled : true,
             }
+
             reviewSchemaRefRange = parsedReview.schemaRefRange
           }
         } else {
           const v = this.parseValue()
+
           if (v === true) {
             reviewConfig = { enabled: true }
           } else if (v && typeof v === 'object' && !Array.isArray(v)) {
             const obj = v as Record<string, unknown>
+
             reviewConfig = {
               ...obj,
               enabled: obj.enabled !== undefined ? obj.enabled : true,
@@ -2687,9 +2716,7 @@ class Parser {
     let typeVal = 'code'
     let labelVal = nameTok.value as string
     let descriptionVal: string | undefined
-    let inputSchema: Record<string, unknown> | undefined
     let outputSchema: Record<string, unknown> | undefined
-    let inputSchemaBlock: JsonBlockInfo | undefined
     let outputSchemaBlock: JsonBlockInfo | undefined
     let outputSchemaRef: string | undefined
     let outputSchemaRefRange: SourceRange | undefined
@@ -2697,9 +2724,8 @@ class Parser {
     let reviewSchemaRefRange: SourceRange | undefined
     let outputFormatVal: string | undefined
     let secretsMap: Record<string, string[]> | undefined
-    let secretsMapBlockRanges:
-      | { blockName: string; range: SourceRange }[]
-      | undefined
+    let secretsMapBlockRanges: { blockName: string; range: SourceRange }[] | undefined
+
     let subgraph:
       | {
           nodes: NodeDecl[]
@@ -2732,19 +2758,23 @@ class Parser {
       /** `subgraph { ... }` has no colon (unlike other node properties). */
       if (key === 'subgraph') {
         const subKw = this.tokens[this.index - 1]
+
         if (!this.expect('lbrace')) {
           this.error('Expected { after subgraph', this.peek())
           this.skipToNextBlock()
           return null
         }
+
         const inner = this.parseWorkflowInnerBody(true)
         const endSg = this.expect('rbrace') ?? this.peek()
+
         subgraph = {
           nodes: inner.nodes,
           edges: inner.edges,
           flowRange: inner.flowRange,
           range: rangeFromTokens(subKw ?? start, endSg ?? start),
         }
+
         continue
       }
 
@@ -2755,10 +2785,7 @@ class Parser {
       if (key === 'type') {
         const typeTok = this.advance()
 
-        if (
-          typeTok &&
-          (typeTok.kind === 'identifier' || typeTok.kind === 'keyword')
-        ) {
+        if (typeTok && (typeTok.kind === 'identifier' || typeTok.kind === 'keyword')) {
           typeVal = this.normalizeNodeType(typeTok.value as string)
         }
 
@@ -2787,12 +2814,11 @@ class Parser {
 
       if (key === 'format') {
         const fmtTok = this.advance()
-        if (
-          fmtTok &&
-          (fmtTok.kind === 'identifier' || fmtTok.kind === 'keyword')
-        ) {
+
+        if (fmtTok && (fmtTok.kind === 'identifier' || fmtTok.kind === 'keyword')) {
           outputFormatVal = fmtTok.value as string
         }
+
         continue
       }
 
@@ -2801,6 +2827,7 @@ class Parser {
 
         if (next?.kind === 'lbrace') {
           const parsedSecrets = this.parseSecretsMap()
+
           if (parsedSecrets) {
             secretsMap = parsedSecrets.map
             secretsMapBlockRanges = parsedSecrets.blockRanges
@@ -2815,31 +2842,29 @@ class Parser {
       const keyToken = this.tokens[this.index - 1] ?? this.peek()
 
       if (key === 'inputSchema') {
-        this.error(
-          'inputSchema is only allowed in root { } blocks',
-          keyToken ?? this.peek()!,
-        )
+        this.error('inputSchema is only allowed in root { } blocks', keyToken ?? this.peek()!)
         this.skipToNextBlock()
         return null
       }
+
       if (key === 'outputSchema') {
         this.error(
           'Use "schema" instead of "outputSchema" in node blocks',
           keyToken ?? this.peek()!,
         )
+
         this.skipToNextBlock()
         return null
       }
+
       if (key === 'schema') {
         const next = this.peek()
+
         if (next?.kind === 'fenced_block' && next.fencedLang === 'json') {
           const tok = this.advance()!
 
           try {
-            outputSchema = JSON.parse(tok.fencedContent ?? '{}') as Record<
-              string,
-              unknown
-            >
+            outputSchema = JSON.parse(tok.fencedContent ?? '{}') as Record<string, unknown>
           } catch {
             this.error('Invalid JSON in schema block', tok)
           }
@@ -2864,29 +2889,37 @@ class Parser {
             outputSchema = v as Record<string, unknown>
           }
         }
+
         continue
       }
+
       if (key === 'review') {
         const next = this.peek()
+
         if (next?.kind === 'boolean' && next.value === true) {
           this.advance()
           reviewConfig = { enabled: true }
         } else if (next?.kind === 'lbrace') {
           const parsedReview = this.parseReviewConfigObject()
+
           if (parsedReview) {
             const obj = parsedReview.config
+
             reviewConfig = {
               ...obj,
               enabled: obj.enabled !== undefined ? obj.enabled : true,
             }
+
             reviewSchemaRefRange = parsedReview.schemaRefRange
           }
         } else {
           const v = this.parseValue()
+
           if (v === true) {
             reviewConfig = { enabled: true }
           } else if (v && typeof v === 'object' && !Array.isArray(v)) {
             const obj = v as Record<string, unknown>
+
             reviewConfig = {
               ...obj,
               enabled: obj.enabled !== undefined ? obj.enabled : true,
@@ -2914,9 +2947,7 @@ class Parser {
       description: descriptionVal,
       docComment,
       configFields,
-      inputSchema,
       outputSchema,
-      inputSchemaBlock,
       outputSchemaBlock,
       outputSchemaRef,
       outputSchemaRefRange,
@@ -3019,6 +3050,7 @@ class Parser {
         }
       }
     }
+
     return undefined
   }
 
@@ -3031,11 +3063,13 @@ class Parser {
 
     while (!this.eof()) {
       const t = this.peek()
+
       if (!t || t.kind === 'rbrace') {
         break
       }
 
       const key = this.parsePropertyKey()
+
       if (!key) {
         break
       }
@@ -3045,15 +3079,19 @@ class Parser {
       }
 
       const next = this.peek()
+
       if (!next) {
         this.error(`Expected a value for "${key}"`)
         break
       }
+
       const before = this.index
       const value = this.parseConfigValue(next)
+
       if (value) {
         out[key] = value
       }
+
       if (this.index === before) {
         this.error(`Expected a value for "${key}"`, next)
         this.advance()
@@ -3061,6 +3099,7 @@ class Parser {
 
       this.expect('comma')
     }
+
     this.expect('rbrace')
     return out
   }
@@ -3081,9 +3120,11 @@ class Parser {
 
       const before = this.index
       const value = this.parseConfigValue(t)
+
       if (value) {
         arr.push(value)
       }
+
       // A token that is not a value must still be consumed, or this loop
       // never ends.
       if (this.index === before) {
@@ -3152,8 +3193,7 @@ class Parser {
 
       if (
         t.kind === 'identifier' ||
-        (t.kind === 'keyword' &&
-          ['form', 'webhook', 'schedule'].includes(t.value as string))
+        (t.kind === 'keyword' && ['form', 'webhook', 'schedule'].includes(t.value as string))
       ) {
         const first = t.value as string
         const colon = this.tokens[this.index + 1]

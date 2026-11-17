@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { agentContextToDeploymentPayload } from './validator'
 
@@ -70,6 +71,7 @@ workflow g {
   flow { root -> ask }
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.agent?.length).toBe(1)
@@ -79,9 +81,7 @@ workflow g {
     expect(ag?.profiles?.[0]?.name).toBe('r1')
     expect(ag?.profiles?.[0]?.tools).toEqual(['tool_a'])
     expect(ag?.tools).toEqual(['tool_a', 'tool_b'])
-    const node = ast.workflows
-      ?.find((g) => g.name === 'g')
-      ?.nodes.find((n) => n.name === 'ask')
+    const node = ast.workflows?.find((g) => g.name === 'g')?.nodes.find((n) => n.name === 'ask')
     expect(node?.type).toBe('agent')
     expect(configString(node?.configFields.agent)).toBe('my_agent')
   })
@@ -114,6 +114,7 @@ workflow g {
   }
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const ag = ast.agent?.[0]
@@ -147,6 +148,7 @@ workflow g {
   }
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const ag = ast.agent?.[0]
@@ -174,6 +176,7 @@ agent second {
   system: @ts { return "second" }
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.agent?.[0]?.sandbox?.autoDeleteMinutes).toBe(-1)
@@ -208,6 +211,7 @@ workflow g {
   }
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const lead = ast.agent?.find((a) => a.name === 'lead')
@@ -216,6 +220,7 @@ workflow g {
 
   test('wallet block serializes nested fields', async () => {
     const { serialize } = await import('../serializer')
+
     const src = `
 secret s { vars: [ OPENAI_API_KEY ] }
 
@@ -230,12 +235,11 @@ agent researcher {
   }
 }
 `
+
     const first = parse(src)
     expect(first.errors).toEqual([])
     const out = serialize(first.ast)
-    expect(out).toContain(
-      'wallet: { budget: 50, cadence: weekly, maxPerCall: 2 }',
-    )
+    expect(out).toContain('wallet: { budget: 50, cadence: weekly, maxPerCall: 2 }')
     const round = parse(out)
     expect(round.errors).toEqual([])
     const wallet = round.ast.agent?.[0]?.wallet
@@ -264,6 +268,7 @@ agent sre_assistant {
 
 secret s { vars: [ OPENROUTER_API_KEY ] }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const ag = ast.agent?.[0]
@@ -293,9 +298,11 @@ workflow g {
   }
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const ag = ast.agent?.[0]
+
     expect(ag?.suggestions).toEqual([
       {
         label: 'Write a poem',
@@ -307,6 +314,7 @@ workflow g {
 
   test('suggestions round-trip through serializer', async () => {
     const { serialize } = await import('../serializer')
+
     const src = `
 secret s { vars: [ OPENROUTER_API_KEY ] }
 
@@ -328,15 +336,19 @@ workflow g {
   }
 }
 `
+
     const first = parse(src)
     expect(first.errors).toEqual([])
     const out = serialize(first.ast)
+
     expect(out).toContain(
       'suggestions: [ { label: "Write a poem", message: "Write a beautiful yet succinct poem about" } ]',
     )
+
     const round = parse(out)
     expect(round.errors).toEqual([])
     expect(round.ast.agent?.[0]?.suggestions?.[0]?.label).toBe('Write a poem')
+
     expect(round.ast.agent?.[0]?.suggestions?.[0]?.message).toBe(
       'Write a beautiful yet succinct poem about',
     )
@@ -362,10 +374,9 @@ workflow g {
   }
 }
 `
+
     const { errors } = parse(src)
-    expect(
-      errors.some((e) => e.message.includes('suggestions: expected an array')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('suggestions: expected an array'))).toBe(true)
   })
 
   test('preserves suggestion missing message for validator', () => {
@@ -388,12 +399,13 @@ workflow g {
   }
 }
 `
+
     const { ast, errors } = parse(src)
-    expect(
-      errors.some((e) =>
-        e.message.includes('suggestions[0]: message must be a string'),
-      ),
-    ).toBe(true)
+
+    expect(errors.some((e) => e.message.includes('suggestions[0]: message must be a string'))).toBe(
+      true,
+    )
+
     expect(ast.agent?.[0]?.suggestions).toEqual([
       {
         label: 'Only label',
@@ -414,15 +426,14 @@ agent worker {
   computer: pr_bot
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const agent = ast.agent?.[0]
     expect(agent?.computer).toBe('pr_bot')
     expect(agent?.computerRange).toBeDefined()
     const range = agent?.computerRange
-    expect(
-      range ? src.slice(range.start.offset, range.end.offset) : undefined,
-    ).toBe('pr_bot')
+    expect(range ? src.slice(range.start.offset, range.end.offset) : undefined).toBe('pr_bot')
     expect(agent?.sandbox).toBeUndefined()
     expect(agent?.disks).toBeUndefined()
   })
@@ -440,6 +451,7 @@ agent a {
   }
 }
 `)
+
     expect(present.errors).toEqual([])
     const agent = present.ast.agent?.[0]
     expect(agent?.sandbox).toBeDefined()
@@ -458,6 +470,7 @@ agent a {
   }
 }
 `)
+
     expect(absent.errors).toEqual([])
     expect(absent.ast.agent?.[0]?.sandbox).toBeUndefined()
     expect(absent.ast.agent?.[0]?.disks).toBeUndefined()
@@ -478,14 +491,13 @@ agent a {
   }
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const profile = ast.agent?.[0]?.profiles?.[0]
     expect(profile?.computer).toBe('box')
     const range = profile?.computerRange
-    expect(
-      range ? src.slice(range.start.offset, range.end.offset) : undefined,
-    ).toBe('box')
+    expect(range ? src.slice(range.start.offset, range.end.offset) : undefined).toBe('box')
   })
 })
 
@@ -514,6 +526,7 @@ ${body}
     cache_retention: long
   }`),
     )
+
     expect(errors).toEqual([])
     const ctx = ast.agent?.[0]?.context
     expect(ctx?.budget).toBe(120000)
@@ -524,9 +537,7 @@ ${body}
   })
 
   test('parses a partial context block, leaving the rest managed', () => {
-    const { ast, errors } = parse(
-      withAgentBody('  context: { cache_retention: none }'),
-    )
+    const { ast, errors } = parse(withAgentBody('  context: { cache_retention: none }'))
     expect(errors).toEqual([])
     const ctx = ast.agent?.[0]?.context
     expect(ctx?.cacheRetention).toBe('none')
@@ -558,6 +569,7 @@ ${body}
     keep_recent_turns: 2
   }`),
     )
+
     expect(errors).toEqual([])
     const ctx = ast.agent?.[0]?.context
     expect(ctx?.budget).toBe(64000)
@@ -571,34 +583,32 @@ ${body}
     budget: 8000
   }`),
     )
+
     expect(
-      errors.some((e) =>
-        e.message.includes('Unexpected key "compact_after" in context block'),
-      ),
+      errors.some((e) => e.message.includes('Unexpected key "compact_after" in context block')),
     ).toBe(true)
+
     expect(ast.agent?.[0]?.context?.budget).toBe(8000)
   })
 
   test('reports a non-numeric budget', () => {
     const { errors } = parse(withAgentBody('  context: { budget: "lots" }'))
-    expect(
-      errors.some((e) => e.message === 'context.budget must be a number'),
-    ).toBe(true)
+    expect(errors.some((e) => e.message === 'context.budget must be a number')).toBe(true)
   })
 
   test('reports a cache_retention that is not a bare name', () => {
     const { errors } = parse(withAgentBody('  context: { cache_retention: 3 }'))
+
     expect(
       errors.some((e) =>
-        e.message.includes(
-          'context.cache_retention must be none, short, or long',
-        ),
+        e.message.includes('context.cache_retention must be none, short, or long'),
       ),
     ).toBe(true)
   })
 
   test('context block round-trips through the serializer', async () => {
     const { serialize } = await import('../serializer')
+
     const src = withAgentBody(`  context {
     budget: 120000
     compact_at: 0.8
@@ -610,6 +620,7 @@ ${body}
     const first = parse(src)
     expect(first.errors).toEqual([])
     const out = serialize(first.ast)
+
     expect(out).toContain(
       'context: { budget: 120000, compact_at: 0.8, keep_recent_turns: 3, prune_tool_results_after: 5, cache_retention: long }',
     )
@@ -618,9 +629,11 @@ ${body}
     // on the deployment payload: the values, stripped of editor-only fields.
     const round = parse(out)
     expect(round.errors).toEqual([])
-    expect(
-      agentContextToDeploymentPayload(round.ast.agent?.[0]?.context),
-    ).toEqual(agentContextToDeploymentPayload(first.ast.agent?.[0]?.context))
+
+    expect(agentContextToDeploymentPayload(round.ast.agent?.[0]?.context)).toEqual(
+      agentContextToDeploymentPayload(first.ast.agent?.[0]?.context),
+    )
+
     expect(serialize(round.ast)).toBe(out)
   })
 
@@ -650,6 +663,7 @@ agent operator {
   secrets: ai_creds
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.agent?.[0]?.provider).toBe('openrouter')
@@ -668,6 +682,7 @@ agent operator {
   secrets: ai_creds
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     expect(ast.agent?.[0]?.provider).toBe('openrouter')
@@ -686,25 +701,20 @@ agent operator {
   secrets: ai_creds
 }
 `
+
     const { ast, errors } = parse(src)
     expect(errors).toEqual([])
     const agent = ast.agent?.[0]
     expect(agent?.provider).toBe('openai')
     const range = agent?.providerRange
-    expect(
-      range ? src.slice(range.start.offset, range.end.offset) : undefined,
-    ).toBe('openai')
+    expect(range ? src.slice(range.start.offset, range.end.offset) : undefined).toBe('openai')
   })
 })
 
 function configString(cv: unknown): string | undefined {
-  if (
-    cv &&
-    typeof cv === 'object' &&
-    'kind' in cv &&
-    (cv as { kind: string }).kind === 'string'
-  ) {
+  if (cv && typeof cv === 'object' && 'kind' in cv && (cv as { kind: string }).kind === 'string') {
     return (cv as { kind: string; value: string }).value
   }
+
   return undefined
 }

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 
 describe('stream block parsing', () => {
@@ -34,6 +35,7 @@ stream out {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     expect(ast.streams.length).toBe(1)
@@ -71,6 +73,7 @@ stream my_stream {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors.length).toBe(0)
     expect(ast.streams[0]?.label).toBe('my_stream')

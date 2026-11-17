@@ -20,30 +20,24 @@ function validateTsRefsOnNodes(
       if (cv.kind !== 'ts_file_ref') {
         continue
       }
+
       const raw = cv.path.trim()
+
       if (!raw) {
         out.push(diag('@ts file path is empty', cv.range))
       } else if (!pathEndsWithTsSwirls(raw)) {
-        out.push(
-          diag(
-            `@ts file reference must end with .ts.swirls, got "${raw}"`,
-            cv.pathRange,
-          ),
-        )
+        out.push(diag(`@ts file reference must end with .ts.swirls, got "${raw}"`, cv.pathRange))
       } else {
         const abs = resolveTsRefFullPath(swirlsFilePath, raw)
+
         if (!existsSync(abs)) {
           out.push(diag(`@ts file not found: ${raw}`, cv.pathRange))
         }
       }
     }
+
     if (node.subgraph?.nodes?.length) {
-      validateTsRefsOnNodes(
-        node.subgraph.nodes,
-        swirlsFilePath,
-        existsSync,
-        out,
-      )
+      validateTsRefsOnNodes(node.subgraph.nodes, swirlsFilePath, existsSync, out)
     }
   }
 }
@@ -58,10 +52,7 @@ export interface ValidateTsFileRefsOptions {
  * Validate that `@ts "…"` references exist and use the `.ts.swirls` suffix.
  * Run after `parse` + `validate` when filesystem access is available.
  */
-export function validateTsFileRefs(
-  ast: SwirlsFile,
-  opts: ValidateTsFileRefsOptions,
-): Diagnostic[] {
+export function validateTsFileRefs(ast: SwirlsFile, opts: ValidateTsFileRefsOptions): Diagnostic[] {
   const out: Diagnostic[] = []
   const { swirlsFilePath, existsSync } = opts
 
@@ -71,18 +62,16 @@ export function validateTsFileRefs(
         if (cv == null || cv.kind !== 'ts_file_ref') {
           continue
         }
+
         const raw = cv.path.trim()
+
         if (!raw) {
           out.push(diag('@ts file path is empty', cv.range))
         } else if (!pathEndsWithTsSwirls(raw)) {
-          out.push(
-            diag(
-              `@ts file reference must end with .ts.swirls, got "${raw}"`,
-              cv.pathRange,
-            ),
-          )
+          out.push(diag(`@ts file reference must end with .ts.swirls, got "${raw}"`, cv.pathRange))
         } else {
           const abs = resolveTsRefFullPath(swirlsFilePath, raw)
+
           if (!existsSync(abs)) {
             out.push(diag(`@ts file not found: ${raw}`, cv.pathRange))
           }

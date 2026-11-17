@@ -21,6 +21,7 @@ export function validateIntegrationNodes(
   opts?: { workspace?: WorkspaceResourceIndex },
 ): Diagnostic[] {
   const integrationNodes: NodeDecl[] = []
+
   for (const graph of ast.workflows) {
     for (const node of graph.nodes) {
       if (node.type === 'integration') {
@@ -28,6 +29,7 @@ export function validateIntegrationNodes(
       }
     }
   }
+
   // Workspace action maps are huge (the registry catalog). Copy them only
   // when this file actually has an integration node to check.
   if (integrationNodes.length === 0) {
@@ -39,9 +41,7 @@ export function validateIntegrationNodes(
   const actions = mergeActionDecls(ast, opts?.workspace)
 
   for (const node of integrationNodes) {
-    out.push(
-      ...validateIntegrationNode(node, connections, actions, opts?.workspace),
-    )
+    out.push(...validateIntegrationNode(node, connections, actions, opts?.workspace))
   }
 
   return out
@@ -84,11 +84,8 @@ function validateIntegrationNode(
   }
 
   const paramsCv = node.configFields.params
-  if (
-    paramsCv &&
-    paramsCv.kind !== 'ts_block' &&
-    paramsCv.kind !== 'ts_file_ref'
-  ) {
+
+  if (paramsCv && paramsCv.kind !== 'ts_block' && paramsCv.kind !== 'ts_file_ref') {
     out.push(
       diag(
         'Integration node "params" must be a @ts block returning an object',
@@ -111,6 +108,7 @@ function validateIntegrationNode(
   }
 
   const binding = connectionProviderForNode(node, connections)
+
   if (!binding) {
     out.push(
       diag(
@@ -118,24 +116,25 @@ function validateIntegrationNode(
         node.range,
       ),
     )
+
     return out
   }
 
   const actionDecl = findActionDecl(actions, actionName)
+
   if (!actionDecl) {
-    const known = actions
-      .filter((a) => a.provider === binding.provider)
-      .map((a) => a.name)
+    const known = actions.filter((a) => a.provider === binding.provider).map((a) => a.name)
+
     const hint =
-      known.length > 0
-        ? ` Known actions for "${binding.provider}": ${known.join(', ')}.`
-        : ''
+      known.length > 0 ? ` Known actions for "${binding.provider}": ${known.join(', ')}.` : ''
+
     out.push(
       diag(
         `Integration node references undefined action block "${actionName}".${hint}`,
         node.configFields.action?.range ?? node.range,
       ),
     )
+
     return out
   }
 
@@ -150,6 +149,7 @@ function validateIntegrationNode(
 
   const inputSchema = resolveActionInputSchema(actionDecl, workspace)
   const requiredInput = inputSchema?.required
+
   if (
     Array.isArray(requiredInput) &&
     requiredInput.length > 0 &&

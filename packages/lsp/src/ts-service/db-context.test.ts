@@ -7,7 +7,9 @@
  */
 
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '@swirls/language'
+
 import { createLanguageServiceFromMap, virtualUriForBlock } from './host'
 import { buildVirtualTsContent, collectTsBlocks } from './virtual-docs'
 
@@ -29,27 +31,22 @@ const DB_DECL = `database app_db {
 }
 `
 
-function diagnosticsForBlock(
-  source: string,
-  blockPredicate?: (code: string) => boolean,
-) {
+function diagnosticsForBlock(source: string, blockPredicate?: (code: string) => boolean) {
   const { ast, errors } = parse(source)
   expect(errors).toHaveLength(0)
   const blocks = collectTsBlocks(ast)
-  const idx = blockPredicate
-    ? blocks.findIndex((b) => blockPredicate(b.code))
-    : 0
+  const idx = blockPredicate ? blocks.findIndex((b) => blockPredicate(b.code)) : 0
   expect(idx).toBeGreaterThanOrEqual(0)
   const contentMap = new Map<string, string>()
+
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i]
+
     if (block) {
-      contentMap.set(
-        virtualUriForBlock(String(i)),
-        buildVirtualTsContent(block),
-      )
+      contentMap.set(virtualUriForBlock(String(i)), buildVirtualTsContent(block))
     }
   }
+
   const ls = createLanguageServiceFromMap(contentMap)
   return ls.getSemanticDiagnostics(virtualUriForBlock(String(idx)))
 }
@@ -85,6 +82,7 @@ describe('context.db in code nodes', () => {
       return {}
 `),
     )
+
     expect(diags).toHaveLength(0)
   })
 
@@ -96,6 +94,7 @@ describe('context.db in code nodes', () => {
       })
 `),
     )
+
     expect(diags.length).toBeGreaterThan(0)
   })
 
@@ -105,6 +104,7 @@ describe('context.db in code nodes', () => {
       return await context.db.app_db.gadget.findMany({})
 `),
     )
+
     expect(diags.length).toBeGreaterThan(0)
   })
 
@@ -114,6 +114,7 @@ describe('context.db in code nodes', () => {
       return await context.db.app_db.$transaction(async () => {})
 `),
     )
+
     expect(diags.length).toBeGreaterThan(0)
   })
 
@@ -128,6 +129,7 @@ graph main {
   }
 }
 `)
+
     expect(diags.length).toBeGreaterThan(0)
   })
 })
@@ -161,12 +163,10 @@ ${runBody}
 describe('context.db on governed database nodes', () => {
   test('operation: query allows findMany', () => {
     const diags = diagnosticsForBlock(
-      databaseNodeSource(
-        'query',
-        'return await context.db.app_db.user.findMany({})',
-      ),
+      databaseNodeSource('query', 'return await context.db.app_db.user.findMany({})'),
       (code) => code.includes('findMany'),
     )
+
     expect(diags).toHaveLength(0)
   })
 
@@ -178,6 +178,7 @@ describe('context.db on governed database nodes', () => {
       ),
       (code) => code.includes('create'),
     )
+
     expect(diags.length).toBeGreaterThan(0)
   })
 
@@ -193,15 +194,14 @@ describe('context.db on governed database nodes', () => {
       ),
       (code) => code.includes('$transaction'),
     )
+
     expect(okDiags).toHaveLength(0)
 
     const directDiags = diagnosticsForBlock(
-      databaseNodeSource(
-        'transaction',
-        'return await context.db.app_db.user.findMany({})',
-      ),
+      databaseNodeSource('transaction', 'return await context.db.app_db.user.findMany({})'),
       (code) => code.includes('findMany'),
     )
+
     expect(directDiags.length).toBeGreaterThan(0)
   })
 
@@ -232,14 +232,14 @@ graph main {
   }
 }
 `
+
     const conditionDiags = diagnosticsForBlock(source, (code) =>
       code.includes('context.db !== undefined'),
     )
+
     expect(conditionDiags.length).toBeGreaterThan(0)
 
-    const runDiags = diagnosticsForBlock(source, (code) =>
-      code.includes('deleteMany'),
-    )
+    const runDiags = diagnosticsForBlock(source, (code) => code.includes('deleteMany'))
     expect(runDiags).toHaveLength(0)
   })
 })
@@ -262,9 +262,8 @@ migration backfill_emails {
   }
 }
 `
-    const diags = diagnosticsForBlock(source, (code) =>
-      code.includes('toLowerCase'),
-    )
+
+    const diags = diagnosticsForBlock(source, (code) => code.includes('toLowerCase'))
     expect(diags).toHaveLength(0)
   })
 
@@ -278,9 +277,8 @@ migration bad_ctx {
   }
 }
 `
-    const diags = diagnosticsForBlock(source, (code) =>
-      code.includes('context.nodes.root'),
-    )
+
+    const diags = diagnosticsForBlock(source, (code) => code.includes('context.nodes.root'))
     expect(diags.length).toBeGreaterThan(0)
   })
 })
@@ -298,6 +296,7 @@ describe('select/include narrowing through context.db', () => {
       return { e, id: row.id }
 `),
     )
+
     // row.id must be an error: it was not selected.
     expect(diags.length).toBeGreaterThan(0)
   })
@@ -314,6 +313,7 @@ describe('select/include narrowing through context.db', () => {
       return { titles }
 `),
     )
+
     expect(diags).toHaveLength(0)
   })
 })

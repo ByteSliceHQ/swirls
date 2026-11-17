@@ -7,6 +7,7 @@
  */
 
 import { resourceNameSchema } from '@swirls/definition/schemas'
+
 import type { Diagnostic, SourceRange, SwirlsFile } from '../ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 
@@ -18,15 +19,13 @@ function diag(
   return { message, range, severity }
 }
 
-function validateResourceName(
-  name: string,
-  range: SourceRange,
-  kind: string,
-): Diagnostic[] {
+function validateResourceName(name: string, range: SourceRange, kind: string): Diagnostic[] {
   const result = resourceNameSchema.safeParse(name)
+
   if (result.success) {
     return []
   }
+
   const msg = result.error.issues[0]?.message ?? 'Invalid name'
   return [diag(`${kind} name: ${msg}`, range)]
 }
@@ -50,6 +49,7 @@ export function validateConnectorBlocks(
     if (names.has(c.name)) {
       out.push(diag(`Duplicate connector block name "${c.name}"`, c.range))
     }
+
     names.add(c.name)
   }
 

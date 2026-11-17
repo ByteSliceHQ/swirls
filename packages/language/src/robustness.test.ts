@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import fs from 'node:fs'
 import path from 'node:path'
+
 import { parse } from './parser'
 import { serialize } from './serializer'
 import { collectSwirlsFiles } from './workspace/collect'
@@ -25,6 +26,7 @@ describe('parser never hangs or throws on malformed input', () => {
       path.join(import.meta.dir, '../examples/decisions.swirls'),
       'utf8',
     )
+
     for (let i = 0; i < source.length; i += 7) {
       expect(() => parse(source.slice(0, i))).not.toThrow()
     }
@@ -33,14 +35,12 @@ describe('parser never hangs or throws on malformed input', () => {
 
 describe('nothing is dropped silently', () => {
   test.each([
-    ["a single-quoted string", "form a { label: 'single' }\n"],
+    ['a single-quoted string', "form a { label: 'single' }\n"],
     ['a stray semicolon', 'form a { label: "A" };\n'],
     ['a # comment', '# not a comment\n'],
   ])('%s is reported and the next block still parses', (_name, head) => {
     const { ast, errors } = parse(head + FORM_B)
-    expect(errors.some((e) => e.message.startsWith('Unexpected character'))).toBe(
-      true,
-    )
+    expect(errors.some((e) => e.message.startsWith('Unexpected character'))).toBe(true)
     expect(ast.forms.map((f) => f.name)).toContain('b')
   })
 
@@ -62,19 +62,18 @@ describe('serialize output parses back', () => {
   test.each(['decisions.swirls', 'decisions-release.swirls', 'disk.swirls'])(
     'examples/%s',
     (file) => {
-      const source = fs.readFileSync(
-        path.join(import.meta.dir, '../examples', file),
-        'utf8',
-      )
+      const source = fs.readFileSync(path.join(import.meta.dir, '../examples', file), 'utf8')
       const first = parse(source)
       expect(first.errors).toEqual([])
       const second = parse(serialize(first.ast))
       expect(second.errors).toEqual([])
+
       const count = (ast: typeof first.ast) => ({
         workflows: ast.workflows.length,
         decisions: (ast.decisions ?? []).length,
         disks: (ast.disk ?? []).length,
       })
+
       expect(count(second.ast)).toEqual(count(first.ast))
     },
   )
@@ -85,38 +84,45 @@ describe('shipped .swirls files parse cleanly', () => {
     path.join(import.meta.dir, '../examples'),
     path.join(import.meta.dir, '../../../cookbook'),
   ]
+
   const files = roots.flatMap((root) =>
     collectSwirlsFiles({ cwd: root }).map((f) => path.join(root, f)),
   )
+
   test(`${files.length} files`, () => {
     expect(files.length).toBeGreaterThan(50)
+
     const failures = files
       .map((f) => ({ f, errors: parse(fs.readFileSync(f, 'utf8')).errors }))
       .filter((r) => r.errors.length > 0)
       .map((r) => `${r.f}: ${r.errors[0]?.message}`)
+
     expect(failures).toEqual([])
   })
 })
 
 describe('serialize is stable', () => {
   const examples = path.join(import.meta.dir, '../examples')
-  const files = collectSwirlsFiles({ cwd: examples }).filter(
-    (f) => !f.endsWith('.ts.swirls'),
-  )
+  const files = collectSwirlsFiles({ cwd: examples }).filter((f) => !f.endsWith('.ts.swirls'))
 
   test(`a second pass changes nothing (${files.length} files)`, () => {
     const unstable: string[] = []
+
     for (const file of files) {
       const first = parse(fs.readFileSync(path.join(examples, file), 'utf8'))
+
       if (first.errors.length > 0) {
         continue
       }
+
       const once = serialize(first.ast)
       const second = parse(once)
+
       if (second.errors.length > 0 || serialize(second.ast) !== once) {
         unstable.push(file)
       }
     }
+
     expect(unstable).toEqual([])
   })
 
@@ -133,6 +139,7 @@ describe('serialize is stable', () => {
       '}',
       '',
     ].join('\n')
+
     const once = serialize(parse(source).ast)
     expect(once).toContain('      return `line one\n  line two`\n')
     expect(serialize(parse(once).ast)).toBe(once)
@@ -141,6 +148,7 @@ describe('serialize is stable', () => {
   test('doc comments on blocks and nodes are written back', () => {
     const source =
       '/**\n * Intake form\n */\nform f {\n  label: "F"\n}\n\nworkflow w {\n  label: "W"\n  /** entry */\n  root {\n    type: code\n    label: "root"\n    code: @ts { return 1 }\n  }\n}\n'
+
     const once = serialize(parse(source).ast)
     expect(once).toContain('/**\n * Intake form\n */\nform f {')
     expect(once).toContain('  /** entry */\n  root {')

@@ -19,32 +19,35 @@ import {
   isValidAppBrandTokenValue,
 } from '@swirls/definition/app-brand-tokens'
 import { resourceNameSchema } from '@swirls/definition/schemas'
+
 import type { Diagnostic, SourceRange, SwirlsFile } from '../ast'
 import { type ChannelDecl, isSurfaceChannelPlatform } from '../channel/ast'
 import type { LanguageHost, OpenUiSupport } from '../host'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import { nameLookup } from '../workspace/workspace-resources'
+import type { AppDecl } from './ast'
 import type { AppPage } from './ast'
 import { isAppLandingLayout, isAppShellPreset } from './ast'
 import { APP_THEMES, isAppTheme } from './themes'
 
 /** True when pages expose chat, reviews, workflows, agents, or database writes. */
-function appPagesHaveMutatingExpose(
-  pages: AppPage[],
-  openui: OpenUiSupport | undefined,
-): boolean {
+function appPagesHaveMutatingExpose(pages: AppPage[], openui: OpenUiSupport | undefined): boolean {
   for (const page of pages) {
     if (page.channel != null) {
       return true
     }
+
     if (page.threads != null && page.threads.length > 0) {
       return true
     }
+
     if (page.reviews != null && page.reviews.length > 0) {
       return true
     }
+
     if (page.render != null && openui) {
       const bindings = openui.extractBindings(page.render.content)
+
       if (
         bindings.agents.length > 0 ||
         bindings.channels.length > 0 ||
@@ -55,20 +58,20 @@ function appPagesHaveMutatingExpose(
       }
     }
   }
+
   return false
 }
 
 function validateAudienceBlock(
   appName: string,
-  audience: NonNullable<import('./ast').AppDecl['audience']>,
+  audience: NonNullable<AppDecl['audience']>,
   pages: AppPage[],
   openui: OpenUiSupport | undefined,
 ): Diagnostic[] {
   const out: Diagnostic[] = []
+
   if (!audience.admission) {
-    out.push(
-      diag(`App "${appName}" audience requires admission`, audience.range),
-    )
+    out.push(diag(`App "${appName}" audience requires admission`, audience.range))
     return out
   }
 
@@ -84,6 +87,7 @@ function validateAudienceBlock(
     for (const issue of parsed.error.issues) {
       const path = issue.path[0]
       let range = audience.range
+
       if (path === 'admission' && audience.admissionRange) {
         range = audience.admissionRange
       } else if (path === 'auth' && audience.authRange) {
@@ -95,22 +99,19 @@ function validateAudienceBlock(
       } else if (path === 'denyDomains' && audience.denyDomainsRange) {
         range = audience.denyDomainsRange
       }
+
       out.push(diag(`App "${appName}" audience: ${issue.message}`, range))
     }
+
     return out
   }
 
-  for (const pattern of [
-    ...(audience.allowDomains ?? []),
-    ...(audience.denyDomains ?? []),
-  ]) {
+  for (const pattern of [...(audience.allowDomains ?? []), ...(audience.denyDomains ?? [])]) {
     if (!appAudienceDomainPatternSchema.safeParse(pattern).success) {
       out.push(
         diag(
           `App "${appName}" audience domain pattern "${pattern}" is invalid`,
-          audience.allowDomainsRange ??
-            audience.denyDomainsRange ??
-            audience.range,
+          audience.allowDomainsRange ?? audience.denyDomainsRange ?? audience.range,
         ),
       )
     }
@@ -136,15 +137,13 @@ function diag(
   return { message, range, severity }
 }
 
-function validateResourceName(
-  name: string,
-  range: SourceRange,
-  kind: string,
-): Diagnostic[] {
+function validateResourceName(name: string, range: SourceRange, kind: string): Diagnostic[] {
   const result = resourceNameSchema.safeParse(name)
+
   if (result.success) {
     return []
   }
+
   const msg = result.error.issues[0]?.message ?? 'Invalid name'
   return [diag(`${kind} name: ${msg}`, range)]
 }
@@ -154,27 +153,27 @@ function channelsByName(
   workspace?: WorkspaceResourceIndex,
 ): Map<string, ChannelDecl> {
   const byName = new Map((ast.channels ?? []).map((c) => [c.name, c]))
+
   for (const [name, decl] of workspace?.channelBlocks ?? []) {
     if (!byName.has(name)) {
       byName.set(name, decl)
     }
   }
+
   return byName
 }
 
-function validateHttpsUrl(
-  value: string,
-  range: SourceRange,
-  label: string,
-): Diagnostic[] {
+function validateHttpsUrl(value: string, range: SourceRange, label: string): Diagnostic[] {
   try {
     const parsed = new URL(value)
+
     if (parsed.protocol !== 'https:') {
       return [diag(`${label} must be an https URL`, range)]
     }
   } catch {
     return [diag(`${label} must be a valid absolute https URL`, range)]
   }
+
   return []
 }
 
@@ -185,13 +184,9 @@ function validateLandingCopy(
   maxLength: number,
 ): Diagnostic[] {
   if (value.length > maxLength) {
-    return [
-      diag(
-        `${label} must be at most ${maxLength} characters (got ${value.length})`,
-        range,
-      ),
-    ]
+    return [diag(`${label} must be at most ${maxLength} characters (got ${value.length})`, range)]
   }
+
   return []
 }
 
@@ -208,34 +203,42 @@ export function validateAppBlocks(
   }
 
   const channels = channelsByName(ast, options?.workspace)
+
   const viewNames = nameLookup(
     new Set((ast.views ?? []).map((v) => v.name)),
     options?.workspace?.views,
   )
+
   const workflowNames = nameLookup(
     new Set(ast.workflows.map((w) => w.name)),
     options?.workspace?.workflows,
   )
+
   const agentNames = nameLookup(
     new Set((ast.agent ?? []).map((a) => a.name)),
     options?.workspace?.agent,
   )
+
   const databaseNames = nameLookup(
     new Set((ast.databases ?? []).map((d) => d.name)),
     options?.workspace?.databases,
   )
+
   const postgresNames = nameLookup(
     new Set((ast.postgres ?? []).map((p) => p.name)),
     options?.workspace?.postgres,
   )
+
   const queryNames = nameLookup(
     new Set((ast.queries ?? []).map((q) => q.name)),
     options?.workspace?.queries,
   )
+
   const streamNames = nameLookup(
     new Set((ast.streams ?? []).map((s) => s.name)),
     options?.workspace?.streams,
   )
+
   const diskNames = nameLookup(
     new Set((ast.disk ?? []).map((d) => d.name)),
     options?.workspace?.disk,
@@ -249,6 +252,7 @@ export function validateAppBlocks(
     }
 
     const sameName = appBlocks.filter((x) => x.name === app.name)
+
     if (sameName.length > 1) {
       out.push(diag(`Duplicate app name "${app.name}"`, app.range))
     }
@@ -263,6 +267,7 @@ export function validateAppBlocks(
     }
 
     const theme = app.brand?.theme
+
     if (theme !== undefined && !isAppTheme(theme)) {
       out.push(
         diag(
@@ -273,6 +278,7 @@ export function validateAppBlocks(
     }
 
     const avatar = app.brand?.avatar
+
     if (avatar?.variant !== undefined && !isAppAvatarVariant(avatar.variant)) {
       out.push(
         diag(
@@ -281,6 +287,7 @@ export function validateAppBlocks(
         ),
       )
     }
+
     if (avatar?.colors !== undefined) {
       if (avatar.colors.length === 0) {
         out.push(
@@ -295,17 +302,16 @@ export function validateAppBlocks(
             out.push(
               diag(
                 `App "${app.name}" brand avatar colors must be CSS colors (hex, oklch(), rgb(), or hsl())`,
-                avatar.colorsRange ??
-                  avatar.range ??
-                  app.brand?.range ??
-                  app.range,
+                avatar.colorsRange ?? avatar.range ?? app.brand?.range ?? app.range,
               ),
             )
+
             break
           }
         }
       }
     }
+
     if (avatar?.shape !== undefined && !isAppAvatarShape(avatar.shape)) {
       out.push(
         diag(
@@ -319,33 +325,36 @@ export function validateAppBlocks(
       ['light', app.brand?.tokens?.light],
       ['dark', app.brand?.tokens?.dark],
     ] as const
+
     for (const [mode, map] of tokenModes) {
       if (map === undefined) {
         continue
       }
+
       for (const [key, entry] of Object.entries(map)) {
         if (entry === undefined) {
           continue
         }
+
         if (!isAppBrandTokenKey(key)) {
           continue
         }
+
         if (!isValidAppBrandTokenValue(key, entry.value)) {
           const expected =
             key === 'radius'
               ? 'a CSS length (for example "8px")'
               : 'a CSS color (hex, oklch(), rgb(), or hsl())'
+
           out.push(
-            diag(
-              `App "${app.name}" brand tokens.${mode}.${key} must be ${expected}`,
-              entry.range,
-            ),
+            diag(`App "${app.name}" brand tokens.${mode}.${key} must be ${expected}`, entry.range),
           )
         }
       }
     }
 
     const landingLayout = app.landing?.layout
+
     if (landingLayout !== undefined && !isAppLandingLayout(landingLayout)) {
       out.push(
         diag(
@@ -421,6 +430,7 @@ export function validateAppBlocks(
     }
 
     const discover = app.landing?.discover
+
     if (discover !== undefined) {
       if (discover.metaTitle !== undefined) {
         out.push(
@@ -432,6 +442,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.metaDescription !== undefined) {
         out.push(
           ...validateLandingCopy(
@@ -442,6 +453,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.summary !== undefined) {
         out.push(
           ...validateLandingCopy(
@@ -452,6 +464,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.audience !== undefined) {
         out.push(
           ...validateLandingCopy(
@@ -462,6 +475,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.organization !== undefined) {
         out.push(
           ...validateLandingCopy(
@@ -472,6 +486,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.applicationCategory !== undefined) {
         out.push(
           ...validateLandingCopy(
@@ -482,6 +497,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.locale !== undefined) {
         out.push(
           ...validateLandingCopy(
@@ -492,6 +508,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.ogImage !== undefined) {
         out.push(
           ...validateHttpsUrl(
@@ -501,6 +518,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.canonical !== undefined) {
         out.push(
           ...validateHttpsUrl(
@@ -510,6 +528,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.organizationUrl !== undefined) {
         out.push(
           ...validateHttpsUrl(
@@ -519,6 +538,7 @@ export function validateAppBlocks(
           ),
         )
       }
+
       if (discover.keywords !== undefined) {
         if (discover.keywords.length > 20) {
           out.push(
@@ -528,6 +548,7 @@ export function validateAppBlocks(
             ),
           )
         }
+
         for (const [index, keyword] of discover.keywords.entries()) {
           if (keyword.length > 50) {
             out.push(
@@ -539,6 +560,7 @@ export function validateAppBlocks(
           }
         }
       }
+
       if (discover.capabilities !== undefined) {
         if (discover.capabilities.length > 20) {
           out.push(
@@ -548,6 +570,7 @@ export function validateAppBlocks(
             ),
           )
         }
+
         for (const [index, capability] of discover.capabilities.entries()) {
           if (capability.length > 120) {
             out.push(
@@ -559,6 +582,7 @@ export function validateAppBlocks(
           }
         }
       }
+
       if (discover.faq !== undefined) {
         if (discover.faq.items.length > 20) {
           out.push(
@@ -568,6 +592,7 @@ export function validateAppBlocks(
             ),
           )
         }
+
         for (const item of discover.faq.items) {
           out.push(
             ...validateLandingCopy(
@@ -577,6 +602,7 @@ export function validateAppBlocks(
               200,
             ),
           )
+
           out.push(
             ...validateLandingCopy(
               item.answer,
@@ -590,6 +616,7 @@ export function validateAppBlocks(
     }
 
     const preset = app.shell?.preset
+
     if (preset !== undefined && !isAppShellPreset(preset)) {
       out.push(
         diag(
@@ -600,21 +627,18 @@ export function validateAppBlocks(
     }
 
     if (app.pages.length === 0) {
-      out.push(
-        diag(`App "${app.name}" requires at least one "page"`, app.range),
-      )
+      out.push(diag(`App "${app.name}" requires at least one "page"`, app.range))
     }
 
     const pageNames = new Set<string>()
+
     for (const page of app.pages) {
       if (pageNames.has(page.name)) {
         out.push(
-          diag(
-            `App "${app.name}" declares page "${page.name}" more than once`,
-            page.nameRange,
-          ),
+          diag(`App "${app.name}" declares page "${page.name}" more than once`, page.nameRange),
         )
       }
+
       pageNames.add(page.name)
 
       if (page.viewport !== undefined && page.viewport !== 'full') {
@@ -632,11 +656,9 @@ export function validateAppBlocks(
       const hasThreads = threads != null
       const reviews = page.reviews
       const hasReviews = reviews != null
+
       const bodyCount =
-        Number(hasRender) +
-        Number(hasChannel) +
-        Number(hasThreads) +
-        Number(hasReviews)
+        Number(hasRender) + Number(hasChannel) + Number(hasThreads) + Number(hasReviews)
 
       if (bodyCount === 0) {
         out.push(
@@ -669,6 +691,7 @@ export function validateAppBlocks(
             ),
           )
         }
+
         for (const [index, workflowName] of reviews.entries()) {
           if (!workflowNames.has(workflowName)) {
             out.push(
@@ -684,6 +707,7 @@ export function validateAppBlocks(
       if (hasChannel) {
         const channelName = page.channel!
         const channelRange = page.channelRange ?? page.range
+
         if (!channels.has(channelName)) {
           out.push(
             diag(
@@ -693,6 +717,7 @@ export function validateAppBlocks(
           )
         } else {
           const channel = channels.get(channelName)!
+
           if (!isSurfaceChannelPlatform(channel.platform)) {
             out.push(
               diag(
@@ -701,6 +726,7 @@ export function validateAppBlocks(
               ),
             )
           }
+
           if (!channel.agent) {
             out.push(
               diag(
@@ -728,8 +754,10 @@ export function validateAppBlocks(
             ),
           )
         }
+
         for (const [index, channelName] of threads!.entries()) {
           const channelRange = page.threadsRanges?.[index] ?? page.range
+
           if (!channels.has(channelName)) {
             out.push(
               diag(
@@ -739,6 +767,7 @@ export function validateAppBlocks(
             )
           } else {
             const channel = channels.get(channelName)!
+
             if (!isSurfaceChannelPlatform(channel.platform)) {
               out.push(
                 diag(
@@ -747,6 +776,7 @@ export function validateAppBlocks(
                 ),
               )
             }
+
             if (!channel.agent) {
               out.push(
                 diag(
@@ -775,6 +805,7 @@ export function validateAppBlocks(
         )
       } else if (page.render != null && openui) {
         const bindings = openui.extractBindings(page.render.content)
+
         for (const channelName of bindings.channels) {
           if (!channels.has(channelName)) {
             out.push(
@@ -785,6 +816,7 @@ export function validateAppBlocks(
             )
           } else {
             const channel = channels.get(channelName)
+
             if (channel && !isSurfaceChannelPlatform(channel.platform)) {
               out.push(
                 diag(
@@ -809,13 +841,11 @@ export function validateAppBlocks(
             disks: [...diskNames],
           },
         })
+
         if (!openUi.ok) {
           for (const message of openUi.errors) {
             out.push(
-              diag(
-                `App "${app.name}" page "${page.name}" @openui: ${message}`,
-                page.render.range,
-              ),
+              diag(`App "${app.name}" page "${page.name}" @openui: ${message}`, page.render.range),
             )
           }
         }
@@ -824,22 +854,16 @@ export function validateAppBlocks(
 
     if (app.nav) {
       if (app.nav.sections.length === 0) {
-        out.push(
-          diag(
-            `App "${app.name}" nav requires at least one section`,
-            app.nav.range,
-          ),
-        )
+        out.push(diag(`App "${app.name}" nav requires at least one section`, app.nav.range))
       }
+
       for (const section of app.nav.sections) {
         if (section.title.trim() === '') {
           out.push(
-            diag(
-              `App "${app.name}" nav section requires a quoted title`,
-              section.titleRange,
-            ),
+            diag(`App "${app.name}" nav section requires a quoted title`, section.titleRange),
           )
         }
+
         if (section.entries.length === 0) {
           out.push(
             diag(
@@ -848,6 +872,7 @@ export function validateAppBlocks(
             ),
           )
         }
+
         for (const entry of section.entries) {
           if (!pageNames.has(entry.pageName)) {
             out.push(
@@ -860,12 +885,7 @@ export function validateAppBlocks(
         }
       }
     } else if (app.pages.length > 1) {
-      out.push(
-        diag(
-          `App "${app.name}" has multiple pages and requires a "nav" block`,
-          app.range,
-        ),
-      )
+      out.push(diag(`App "${app.name}" has multiple pages and requires a "nav" block`, app.range))
     }
 
     if (app.audience) {
@@ -877,6 +897,7 @@ export function validateAppBlocks(
         field.name === 'domain'
           ? `\`${field.name}\` is reserved for custom domains (RFC 0017) and not yet supported`
           : `\`${field.name}\` is reserved for a later app phase and not yet supported`
+
       out.push(diag(msg, field.range))
     }
   }

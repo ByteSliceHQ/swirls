@@ -105,13 +105,7 @@ export type TokenKind =
 /** The fenced languages that hold a device script: PowerShell and sh. */
 export type ScriptBlockLang = 'ps' | 'sh'
 
-export type FencedBlockLang =
-  | 'ts'
-  | 'json'
-  | 'sql'
-  | 'prisma'
-  | 'openui'
-  | ScriptBlockLang
+export type FencedBlockLang = 'ts' | 'json' | 'sql' | 'prisma' | 'openui' | ScriptBlockLang
 
 export interface Token {
   kind: TokenKind
@@ -196,6 +190,7 @@ export class Lexer {
     } else {
       this.column++
     }
+
     return ch
   }
 
@@ -220,6 +215,7 @@ export class Lexer {
   private skipHorizontalWhitespace(): void {
     while (!this.eof()) {
       const ch = this.peek()
+
       if (ch === ' ' || ch === '\t') {
         this.advance()
       } else {
@@ -246,6 +242,7 @@ export class Lexer {
         this.advance()
         break
       }
+
       content += this.advance()
     }
 
@@ -258,9 +255,11 @@ export class Lexer {
 
     while (!this.eof()) {
       const ch = this.peek()
+
       if (ch === '\\') {
         this.advance()
         const next = this.advance()
+
         switch (next) {
           case '"':
             value += '"'
@@ -312,6 +311,7 @@ export class Lexer {
         s += this.advance()
       }
     }
+
     return s
   }
 
@@ -319,17 +319,22 @@ export class Lexer {
   private skipJsonStringContent(): void {
     while (!this.eof()) {
       const ch = this.peek()
+
       if (ch === '\\') {
         this.advance()
+
         if (!this.eof()) {
           this.advance()
         }
+
         continue
       }
+
       if (ch === '"') {
         this.advance()
         return
       }
+
       this.advance()
     }
   }
@@ -338,17 +343,22 @@ export class Lexer {
   private skipTsDoubleString(): void {
     while (!this.eof()) {
       const ch = this.peek()
+
       if (ch === '\\') {
         this.advance()
+
         if (!this.eof()) {
           this.advance()
         }
+
         continue
       }
+
       if (ch === '"') {
         this.advance()
         return
       }
+
       this.advance()
     }
   }
@@ -357,17 +367,22 @@ export class Lexer {
   private skipTsSingleString(): void {
     while (!this.eof()) {
       const ch = this.peek()
+
       if (ch === '\\') {
         this.advance()
+
         if (!this.eof()) {
           this.advance()
         }
+
         continue
       }
+
       if (ch === "'") {
         this.advance()
         return
       }
+
       this.advance()
     }
   }
@@ -375,16 +390,21 @@ export class Lexer {
   /** Skip SQL single-quoted string; '' is escaped quote. */
   private skipSqlSingleString(): void {
     this.advance() // opening '
+
     while (!this.eof()) {
       const ch = this.peek()
+
       if (ch === "'") {
         this.advance()
+
         if (this.peek() === "'") {
           this.advance()
           continue
         }
+
         return
       }
+
       this.advance()
     }
   }
@@ -396,23 +416,29 @@ export class Lexer {
   private skipTemplateLiteral(): void {
     while (!this.eof()) {
       const ch = this.peek()
+
       if (ch === '\\') {
         this.advance()
+
         if (!this.eof()) {
           this.advance()
         }
+
         continue
       }
+
       if (ch === '`') {
         this.advance()
         return
       }
+
       if (ch === '$' && this.peekAhead(1) === '{') {
         this.advance()
         this.advance()
         this.scanTsBraceGroup()
         continue
       }
+
       this.advance()
     }
   }
@@ -422,51 +448,62 @@ export class Lexer {
    */
   private scanTsBraceGroup(): void {
     let depth = 1
+
     while (depth > 0 && !this.eof()) {
       if (this.peek() === '/' && this.peekAhead(1) === '/') {
         this.skipLineComment()
         continue
       }
+
       if (this.peek() === '/' && this.peekAhead(1) === '*') {
         this.advance()
         this.advance()
+
         while (!this.eof()) {
           if (this.peek() === '*' && this.peekAhead(1) === '/') {
             this.advance()
             this.advance()
             break
           }
+
           this.advance()
         }
+
         continue
       }
 
       const ch = this.peek()
+
       if (ch === '"') {
         this.advance()
         this.skipTsDoubleString()
         continue
       }
+
       if (ch === "'") {
         this.advance()
         this.skipTsSingleString()
         continue
       }
+
       if (ch === '`') {
         this.advance()
         this.skipTemplateLiteral()
         continue
       }
+
       if (ch === '{') {
         depth++
         this.advance()
         continue
       }
+
       if (ch === '}') {
         depth--
         this.advance()
         continue
       }
+
       this.advance()
     }
   }
@@ -476,54 +513,67 @@ export class Lexer {
    */
   private scanTsBlockBody(): void {
     let depth = 1
+
     while (depth > 0 && !this.eof()) {
       if (this.peek() === '/' && this.peekAhead(1) === '/') {
         this.skipLineComment()
         continue
       }
+
       if (this.peek() === '/' && this.peekAhead(1) === '*') {
         this.advance()
         this.advance()
+
         while (!this.eof()) {
           if (this.peek() === '*' && this.peekAhead(1) === '/') {
             this.advance()
             this.advance()
             break
           }
+
           this.advance()
         }
+
         continue
       }
 
       const ch = this.peek()
+
       if (ch === '"') {
         this.advance()
         this.skipTsDoubleString()
         continue
       }
+
       if (ch === "'") {
         this.advance()
         this.skipTsSingleString()
         continue
       }
+
       if (ch === '`') {
         this.advance()
         this.skipTemplateLiteral()
         continue
       }
+
       if (ch === '{') {
         depth++
         this.advance()
         continue
       }
+
       if (ch === '}') {
         depth--
+
         if (depth === 0) {
           return
         }
+
         this.advance()
         continue
       }
+
       this.advance()
     }
   }
@@ -533,26 +583,33 @@ export class Lexer {
    */
   private scanJsonBlockBody(): void {
     let depth = 1
+
     while (depth > 0 && !this.eof()) {
       const ch = this.peek()
+
       if (ch === '"') {
         this.advance()
         this.skipJsonStringContent()
         continue
       }
+
       if (ch === '{') {
         depth++
         this.advance()
         continue
       }
+
       if (ch === '}') {
         depth--
+
         if (depth === 0) {
           return
         }
+
         this.advance()
         continue
       }
+
       this.advance()
     }
   }
@@ -562,58 +619,75 @@ export class Lexer {
    */
   private scanSqlBlockBody(): void {
     let depth = 1
+
     while (depth > 0 && !this.eof()) {
       if (this.peek() === '-' && this.peekAhead(1) === '-') {
         while (!this.eof() && this.peek() !== '\n') {
           this.advance()
         }
+
         continue
       }
+
       if (this.peek() === '/' && this.peekAhead(1) === '*') {
         this.advance()
         this.advance()
+
         while (!this.eof()) {
           if (this.peek() === '*' && this.peekAhead(1) === '/') {
             this.advance()
             this.advance()
             break
           }
+
           this.advance()
         }
+
         continue
       }
 
       const ch = this.peek()
+
       if (ch === "'") {
         this.skipSqlSingleString()
         continue
       }
+
       if (ch === '"') {
         this.advance()
+
         while (!this.eof() && this.peek() !== '"') {
           if (this.peek() === '\\' && !this.eof()) {
             this.advance()
           }
+
           this.advance()
         }
+
         if (this.peek() === '"') {
           this.advance()
         }
+
         continue
       }
+
       if (ch === '{') {
         depth++
         this.advance()
         continue
       }
+
       if (ch === '}') {
         depth--
+
         if (depth === 0) {
           return
         }
+
         this.advance()
         continue
       }
+
       this.advance()
     }
   }
@@ -625,6 +699,7 @@ export class Lexer {
    */
   private scanPrismaBlockBody(): void {
     let depth = 1
+
     while (depth > 0 && !this.eof()) {
       if (this.peek() === '/' && this.peekAhead(1) === '/') {
         this.skipLineComment()
@@ -632,24 +707,30 @@ export class Lexer {
       }
 
       const ch = this.peek()
+
       if (ch === '"') {
         this.advance()
         this.skipTsDoubleString()
         continue
       }
+
       if (ch === '{') {
         depth++
         this.advance()
         continue
       }
+
       if (ch === '}') {
         depth--
+
         if (depth === 0) {
           return
         }
+
         this.advance()
         continue
       }
+
       this.advance()
     }
   }
@@ -685,6 +766,7 @@ export class Lexer {
   private scanScriptBlockBody(lang: ScriptBlockLang): void {
     let depth = 1
     let atWordStart = true
+
     while (depth > 0 && !this.eof()) {
       const ch = this.peek()
       const wordStart = atWordStart
@@ -697,82 +779,98 @@ export class Lexer {
             this.advance()
             break
           }
+
           this.advance()
         }
+
         continue
       }
+
       if (ch === '#' && wordStart) {
         while (!this.eof() && this.peek() !== '\n') {
           this.advance()
         }
+
         continue
       }
+
       if (lang === 'ps' && ch === '@') {
         const quote = this.peekAhead(1)
         const afterQuote = this.peekAhead(2)
-        if (
-          (quote === '"' || quote === "'") &&
-          (afterQuote === '\n' || afterQuote === '\r')
-        ) {
+
+        if ((quote === '"' || quote === "'") && (afterQuote === '\n' || afterQuote === '\r')) {
           // A here-string runs to a line that starts with the quote and `@`.
           this.advance()
           this.advance()
+
           while (!this.eof()) {
-            if (
-              this.peek() === '\n' &&
-              this.peekAhead(1) === quote &&
-              this.peekAhead(2) === '@'
-            ) {
+            if (this.peek() === '\n' && this.peekAhead(1) === quote && this.peekAhead(2) === '@') {
               this.advance()
               this.advance()
               this.advance()
               break
             }
+
             this.advance()
           }
+
           continue
         }
       }
+
       if (ch === "'") {
         // No escapes inside single quotes, in sh or in PowerShell. A doubled
         // quote in PowerShell reads as two strings side by side, which
         // balances the same way.
         this.advance()
+
         while (!this.eof() && this.peek() !== "'") {
           this.advance()
         }
+
         if (this.peek() === "'") {
           this.advance()
         }
+
         continue
       }
+
       if (ch === '"') {
         const escape = lang === 'ps' ? '`' : '\\'
         this.advance()
+
         while (!this.eof() && this.peek() !== '"') {
           if (this.peek() === escape) {
             this.advance()
           }
+
           this.advance()
         }
+
         if (this.peek() === '"') {
           this.advance()
         }
+
         continue
       }
+
       if (ch === '{') {
         depth++
         this.advance()
         continue
       }
+
       if (ch === '}') {
         depth--
+
         if (depth === 0) {
           return
         }
+
         this.advance()
         continue
       }
+
       this.advance()
     }
   }
@@ -795,6 +893,7 @@ export class Lexer {
     this.skipHorizontalWhitespace()
     const id = this.readIdentifier()
     let lang: FencedBlockLang | null = null
+
     if (id === 'ts') {
       lang = 'ts'
     } else if (id === 'json') {
@@ -808,6 +907,7 @@ export class Lexer {
     } else if (id === 'ps' || id === 'sh') {
       lang = id
     }
+
     if (lang === null) {
       this.offset = saveOff
       this.line = saveLine
@@ -816,12 +916,14 @@ export class Lexer {
     }
 
     this.skipHorizontalWhitespace()
+
     if (this.peek() !== '{') {
       this.offset = saveOff
       this.line = saveLine
       this.column = saveCol
       return null
     }
+
     this.advance() // {
 
     const contentStart = this.startPos()
@@ -876,15 +978,18 @@ export class Lexer {
     this.advance() // @
     this.skipHorizontalWhitespace()
     const id = this.readIdentifier()
+
     if (id !== 'ts' && id !== 'ps' && id !== 'sh') {
       this.offset = saveOff
       this.line = saveLine
       this.column = saveCol
       return null
     }
+
     const lang = id
 
     this.skipHorizontalWhitespace()
+
     if (this.peek() !== '"') {
       this.offset = saveOff
       this.line = saveLine
@@ -898,9 +1003,11 @@ export class Lexer {
 
     while (!this.eof()) {
       const ch = this.peek()
+
       if (ch === '\\') {
         this.advance()
         const next = this.advance()
+
         switch (next) {
           case '"':
             value += '"'
@@ -1123,6 +1230,7 @@ export class Lexer {
 
     if (ch === '@') {
       const atBlock = this.readAtLangBlock()
+
       if (atBlock) {
         return {
           kind: 'fenced_block',
@@ -1133,7 +1241,9 @@ export class Lexer {
           fencedLang: atBlock.fencedLang,
         }
       }
+
       const pathRef = this.readAtPathRef()
+
       if (pathRef) {
         if (pathRef.lang === 'ts') {
           return {
@@ -1143,6 +1253,7 @@ export class Lexer {
             pathInnerRange: pathRef.pathInnerRange,
           }
         }
+
         return {
           kind: 'script_path_ref',
           value: pathRef.path,
@@ -1151,6 +1262,7 @@ export class Lexer {
           fencedLang: pathRef.lang,
         }
       }
+
       this.advance() // invalid @directive; skip and continue
       return this.next()
     }
@@ -1166,14 +1278,17 @@ export class Lexer {
     // Integration node paths and similar values: /chat.postMessage, /v1/users
     if (ch === '/') {
       let value = this.advance()!
+
       while (!this.eof()) {
         const next = this.peek()
+
         if (/[a-zA-Z0-9_./-]/.test(next)) {
           value += this.advance()
         } else {
           break
         }
       }
+
       return {
         kind: 'string',
         value,
@@ -1228,14 +1343,17 @@ export class Lexer {
         if (this.eof()) {
           break
         }
+
         // Not end of input: `next()` met a character that starts no token.
         // Skip it and keep going, so one stray character cannot hide the
         // rest of the file.
         const start = this.startPos()
         const ch = String.fromCodePoint(this.source.codePointAt(this.offset)!)
+
         for (let i = 0; i < ch.length; i++) {
           this.advance()
         }
+
         // A byte order mark at the very start is not an error.
         if (!(ch === '\uFEFF' && start.offset === 0)) {
           this.errors.push({
@@ -1243,6 +1361,7 @@ export class Lexer {
             range: range(start, this.startPos()),
           })
         }
+
         continue
       }
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { validateAgentMcpRefs } from '../mcp/validator'
 import { parse } from '../parser'
 import { validate } from '../validator'
@@ -15,11 +16,10 @@ agent lead {
   team: [ lead ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
-    expect(
-      errors.some((e) => e.message.includes('cannot include itself')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('cannot include itself'))).toBe(true)
   })
 
   test('rejects team cycle', () => {
@@ -38,6 +38,7 @@ agent b {
   team: [ a ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
     expect(errors.some((e) => e.message.includes('cycle'))).toBe(true)
@@ -72,11 +73,10 @@ agent lead {
   team: [ worker ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
-    expect(
-      errors.some((e) => e.message.includes('conflicts with a workflow tool')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('conflicts with a workflow tool'))).toBe(true)
   })
 })
 
@@ -97,13 +97,13 @@ agent a {
   }
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
+
     expect(
       errors.some((e) =>
-        e.message.includes(
-          'maxPerCall must be less than or equal to wallet.budget',
-        ),
+        e.message.includes('maxPerCall must be less than or equal to wallet.budget'),
       ),
     ).toBe(true)
   })
@@ -137,12 +137,12 @@ secrets creds {
   vars: [ OPENROUTER_API_KEY ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('must declare a non-empty properties object'),
-      ),
+      errors.some((e) => e.message.includes('must declare a non-empty properties object')),
     ).toBe(true)
   })
 
@@ -173,12 +173,12 @@ secrets creds {
   vars: [ OPENROUTER_API_KEY ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('must declare a non-empty properties object'),
-      ),
+      errors.some((e) => e.message.includes('must declare a non-empty properties object')),
     ).toBe(true)
   })
 
@@ -212,12 +212,12 @@ secrets creds {
   vars: [ OPENROUTER_API_KEY ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('must declare a non-empty properties object'),
-      ),
+      errors.some((e) => e.message.includes('must declare a non-empty properties object')),
     ).toBe(false)
   })
 
@@ -253,21 +253,19 @@ secrets creds {
   vars: [ OPENROUTER_API_KEY ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
+
     expect(
-      errors.some((e) =>
-        e.message.includes('must declare a non-empty properties object'),
-      ),
+      errors.some((e) => e.message.includes('must declare a non-empty properties object')),
     ).toBe(true)
   })
 })
 
 describe('validateAgentBlocks tool leaf output schema', () => {
   const leafSchemaError = (errors: { message: string }[]) =>
-    errors.some((e) =>
-      e.message.includes('requires output schema on leaf node'),
-    )
+    errors.some((e) => e.message.includes('requires output schema on leaf node'))
 
   test('accepts an AI kind:text leaf with no output schema', () => {
     const source = `
@@ -306,6 +304,7 @@ secrets creds {
   vars: [ OPENROUTER_API_KEY ]
 }
 `
+
     const { ast } = parse(source)
     expect(leafSchemaError(validateAgentBlocks(ast))).toBe(false)
   })
@@ -347,6 +346,7 @@ secrets creds {
   vars: [ OPENROUTER_API_KEY ]
 }
 `
+
     const { ast } = parse(source)
     expect(leafSchemaError(validateAgentBlocks(ast))).toBe(false)
   })
@@ -388,6 +388,7 @@ secrets creds {
   vars: [ OPENROUTER_API_KEY ]
 }
 `
+
     const { ast } = parse(source)
     expect(leafSchemaError(validateAgentBlocks(ast))).toBe(true)
   })
@@ -427,6 +428,7 @@ secrets creds {
   vars: [ OPENROUTER_API_KEY ]
 }
 `
+
     const { ast } = parse(source)
     expect(leafSchemaError(validateAgentBlocks(ast))).toBe(true)
   })
@@ -442,11 +444,10 @@ agent sre {
   mcp: [ missing_slot ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentMcpRefs(ast)
-    expect(errors.some((e) => e.message.includes('undefined mcp block'))).toBe(
-      true,
-    )
+    expect(errors.some((e) => e.message.includes('undefined mcp block'))).toBe(true)
   })
 
   test('flags profile mcp that is not a subset of the agent mcp list', () => {
@@ -470,11 +471,10 @@ agent sre {
   }
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentMcpRefs(ast)
-    expect(
-      errors.some((e) => e.message.includes('is not listed on agent')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('is not listed on agent'))).toBe(true)
   })
 })
 
@@ -498,6 +498,7 @@ agent a {
   ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
     expect(errors.some((e) => e.message.includes('at most 6'))).toBe(true)
@@ -517,14 +518,11 @@ agent a {
   ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
-    expect(errors.some((e) => e.message.includes('suggestions[0].label'))).toBe(
-      true,
-    )
-    expect(
-      errors.some((e) => e.message.includes('suggestions[1].message')),
-    ).toBe(true)
+    expect(errors.some((e) => e.message.includes('suggestions[0].label'))).toBe(true)
+    expect(errors.some((e) => e.message.includes('suggestions[1].message'))).toBe(true)
   })
 
   test('rejects duplicate suggestion labels', () => {
@@ -541,11 +539,10 @@ agent a {
   ]
 }
 `
+
     const { ast } = parse(source)
     const errors = validateAgentBlocks(ast)
-    expect(errors.some((e) => e.message.includes('label must be unique'))).toBe(
-      true,
-    )
+    expect(errors.some((e) => e.message.includes('label must be unique'))).toBe(true)
   })
 })
 
@@ -563,9 +560,7 @@ ${body}
 
   const contextErrors = (body: string) => {
     const { ast } = parse(agentWith(body))
-    return validateAgentBlocks(ast).filter((e) =>
-      e.message.includes('context.'),
-    )
+    return validateAgentBlocks(ast).filter((e) => e.message.includes('context.'))
   }
 
   test('accepts a fully declared context block', () => {
@@ -587,9 +582,7 @@ ${body}
   test('rejects a non-positive budget', () => {
     expect(
       contextErrors('  context { budget: 0 }').some((e) =>
-        e.message.includes(
-          'context.budget must be a positive whole number of tokens',
-        ),
+        e.message.includes('context.budget must be a positive whole number of tokens'),
       ),
     ).toBe(true)
   })
@@ -606,9 +599,7 @@ ${body}
     for (const value of ['0', '1.5', '-0.2']) {
       expect(
         contextErrors(`  context { compact_at: ${value} }`).some((e) =>
-          e.message.includes(
-            'context.compact_at must be a fraction greater than 0 and at most 1',
-          ),
+          e.message.includes('context.compact_at must be a fraction greater than 0 and at most 1'),
         ),
       ).toBe(true)
     }
@@ -622,9 +613,7 @@ ${body}
     for (const value of ['-1', '2.5']) {
       expect(
         contextErrors(`  context { keep_recent_turns: ${value} }`).some((e) =>
-          e.message.includes(
-            'context.keep_recent_turns must be a whole number of 0 or more',
-          ),
+          e.message.includes('context.keep_recent_turns must be a whole number of 0 or more'),
         ),
       ).toBe(true)
     }
@@ -637,9 +626,7 @@ ${body}
   test('rejects prune_tool_results_after below one', () => {
     expect(
       contextErrors('  context { prune_tool_results_after: 0 }').some((e) =>
-        e.message.includes(
-          'context.prune_tool_results_after must be a whole number of 1 or more',
-        ),
+        e.message.includes('context.prune_tool_results_after must be a whole number of 1 or more'),
       ),
     ).toBe(true)
   })
@@ -647,18 +634,14 @@ ${body}
   test('rejects a cache_retention outside the tier list', () => {
     expect(
       contextErrors('  context { cache_retention: forever }').some((e) =>
-        e.message.includes(
-          'context.cache_retention must be none, short, or long',
-        ),
+        e.message.includes('context.cache_retention must be none, short, or long'),
       ),
     ).toBe(true)
   })
 
   test('accepts every cache_retention tier', () => {
     for (const tier of ['none', 'short', 'long']) {
-      expect(contextErrors(`  context { cache_retention: ${tier} }`)).toEqual(
-        [],
-      )
+      expect(contextErrors(`  context { cache_retention: ${tier} }`)).toEqual([])
     }
   })
 })
@@ -675,9 +658,9 @@ agent support {
 ${body}
 }
 `)
+
     return validateAgentBlocks(ast).filter(
-      (e) =>
-        e.message.includes('maxTokens') || e.message.includes('temperature'),
+      (e) => e.message.includes('maxTokens') || e.message.includes('temperature'),
     )
   }
 
@@ -715,9 +698,8 @@ agent support {
   maxTokens: 0
 }
 `)
-    const error = validateAgentBlocks(ast).find((e) =>
-      e.message.includes('maxTokens'),
-    )
+
+    const error = validateAgentBlocks(ast).find((e) => e.message.includes('maxTokens'))
     expect(error?.range.start.line).toBe(8)
   })
 
@@ -739,18 +721,16 @@ agent support {
 
   test('caps temperature at 1 for the anthropic provider', () => {
     expect(samplingErrors('  temperature: 1', 'anthropic')).toEqual([])
+
     expect(
       samplingErrors('  temperature: 1.5', 'anthropic').some((e) =>
-        e.message.includes(
-          'temperature must be between 0 and 1 for provider "anthropic"',
-        ),
+        e.message.includes('temperature must be between 0 and 1 for provider "anthropic"'),
       ),
     ).toBe(true)
+
     expect(
       samplingErrors('  temperature: 2', 'anthropic').some((e) =>
-        e.message.includes(
-          'temperature must be between 0 and 1 for provider "anthropic"',
-        ),
+        e.message.includes('temperature must be between 0 and 1 for provider "anthropic"'),
       ),
     ).toBe(true)
   })
@@ -775,14 +755,15 @@ agent worker {
   computer: missing
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
+
     const found = validate(ast).find((diagnostic) =>
       diagnostic.message.includes('undefined computer'),
     )
-    expect(found?.message).toBe(
-      'Agent "worker" references undefined computer block "missing"',
-    )
+
+    expect(found?.message).toBe('Agent "worker" references undefined computer block "missing"')
     expect(found?.severity ?? 'error').toBe('error')
     expect(found?.range).toEqual(ast.agent?.[0]?.computerRange)
   })
@@ -804,14 +785,18 @@ agent worker {
   computer: codex_box
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
+
     const found = validate(ast).find((diagnostic) =>
       diagnostic.message.includes('declares a harness'),
     )
+
     expect(found?.message).toBe(
       'Agent "worker" cannot bind computer "codex_box" because it declares a harness. Only shell nodes can bind a harness computer for now; bind a computer without a harness block',
     )
+
     expect(found?.severity ?? 'error').toBe('error')
     expect(found?.range).toEqual(ast.agent?.[0]?.computerRange)
   })
@@ -828,9 +813,8 @@ agent worker {
   computer: box
 }
 `).map((diagnostic) => diagnostic.message)
-    expect(
-      messages.some((message) => message.includes('declares a harness')),
-    ).toBe(false)
+
+    expect(messages.some((message) => message.includes('declares a harness'))).toBe(false)
   })
 
   test('errors when computer: has no usable name', () => {
@@ -846,12 +830,11 @@ agent worker {
   computer: ${value}
 }
 `
+
       const { ast } = parse(source)
       expect(ast.agent?.[0]?.computer).toBe('')
       const messages = validate(ast).map((diagnostic) => diagnostic.message)
-      expect(messages).toContain(
-        'Agent "worker" computer: must name a top-level computer block',
-      )
+      expect(messages).toContain('Agent "worker" computer: must name a top-level computer block')
     }
   })
 
@@ -865,23 +848,18 @@ agent worker {
   computer: remote_box
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
-    const local = validateAgentBlocks(ast).map(
-      (diagnostic) => diagnostic.message,
-    )
-    expect(local).toContain(
-      'Agent "worker" references undefined computer block "remote_box"',
-    )
+    const local = validateAgentBlocks(ast).map((diagnostic) => diagnostic.message)
+    expect(local).toContain('Agent "worker" references undefined computer block "remote_box"')
+
     const workspace = {
       computerBlocks: new Map([['remote_box', { name: 'remote_box' }]]),
     } as unknown as WorkspaceResourceIndex
-    const resolved = validateAgentBlocks(ast, { workspace }).map(
-      (diagnostic) => diagnostic.message,
-    )
-    expect(
-      resolved.some((message) => message.includes('undefined computer')),
-    ).toBe(false)
+
+    const resolved = validateAgentBlocks(ast, { workspace }).map((diagnostic) => diagnostic.message)
+    expect(resolved.some((message) => message.includes('undefined computer'))).toBe(false)
   })
 
   test('rejects sandbox and disks, including empty, when computer: is set', () => {
@@ -903,42 +881,44 @@ agent worker {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const agent = ast.agent?.[0]
     const found = validate(ast)
+
     const sandbox = found.find((diagnostic) =>
       diagnostic.message.includes('cannot set sandbox together'),
     )
+
     const disks = found.find((diagnostic) =>
       diagnostic.message.includes('cannot set disks together'),
     )
+
     const profiles = found.filter((diagnostic) =>
       diagnostic.message.includes('cannot set sandbox: when the agent'),
     )
-    expect(sandbox?.message).toBe(
-      'Agent "worker" cannot set sandbox together with computer:',
-    )
+
+    expect(sandbox?.message).toBe('Agent "worker" cannot set sandbox together with computer:')
     expect(sandbox?.range).toEqual(agent?.sandbox?.range)
-    expect(disks?.message).toBe(
-      'Agent "worker" cannot set disks together with computer:',
-    )
+    expect(disks?.message).toBe('Agent "worker" cannot set disks together with computer:')
     expect(disks?.range).toEqual(agent?.disksRange)
+
     expect(profiles.map((diagnostic) => diagnostic.message).sort()).toEqual([
       'Profile "oncall" of agent "worker" cannot set sandbox: when the agent sets computer:',
       'Profile "other" of agent "worker" cannot set sandbox: when the agent sets computer:',
     ])
+
     const oncallSandbox = agent?.profiles?.[0]?.sandbox?.range
     const otherSandbox = agent?.profiles?.[1]?.sandbox?.range
     expect(oncallSandbox).toBeDefined()
     expect(otherSandbox).toBeDefined()
     expect(profiles[0]?.range).toEqual(oncallSandbox)
     expect(profiles[1]?.range).toEqual(otherSandbox)
-    expect(
-      found.some((diagnostic) =>
-        diagnostic.message.includes('undefined computer'),
-      ),
-    ).toBe(false)
+
+    expect(found.some((diagnostic) => diagnostic.message.includes('undefined computer'))).toBe(
+      false,
+    )
   })
 
   test('a computer: with no sandbox or disks is otherwise clean', () => {
@@ -963,6 +943,7 @@ workflow g {
   }
 }
 `)
+
     expect(found).toEqual([])
   })
 
@@ -978,17 +959,16 @@ agent worker {
   }
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
-    const found = validate(ast).filter((diagnostic) =>
-      diagnostic.message.includes('computer'),
-    )
+    const found = validate(ast).filter((diagnostic) => diagnostic.message.includes('computer'))
+
     expect(found.map((diagnostic) => diagnostic.message)).toEqual([
       'Profile "oncall" cannot set computer:',
     ])
-    expect(found[0]?.range).toEqual(
-      ast.agent?.[0]?.profiles?.[0]?.computerRange,
-    )
+
+    expect(found[0]?.range).toEqual(ast.agent?.[0]?.profiles?.[0]?.computerRange)
   })
 
   test('a legacy agent with sandbox, disks, and a profile sandbox stays clean', () => {
@@ -1015,6 +995,7 @@ workflow g {
   }
 }
 `)
+
     expect(found).toEqual([])
   })
 
@@ -1037,16 +1018,18 @@ workflow g {
   }
 }
 `
+
     const withComputer = parse(body('computer: pr_bot'))
     const withoutComputer = parse(body(''))
     expect(withComputer.errors).toEqual([])
     expect(withoutComputer.errors).toEqual([])
-    expect(
-      withComputer.ast.workflows[0]?.nodes[0]?.configFields.computer,
-    ).toMatchObject({ kind: 'string', value: 'pr_bot' })
-    expect(
-      validate(withComputer.ast).map((diagnostic) => diagnostic.message),
-    ).toEqual(
+
+    expect(withComputer.ast.workflows[0]?.nodes[0]?.configFields.computer).toMatchObject({
+      kind: 'string',
+      value: 'pr_bot',
+    })
+
+    expect(validate(withComputer.ast).map((diagnostic) => diagnostic.message)).toEqual(
       validate(withoutComputer.ast).map((diagnostic) => diagnostic.message),
     )
   })
@@ -1064,6 +1047,7 @@ agent operator {
   secrets: ai_creds
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(ast.agent?.[0]?.provider).toBe('openrouter')
@@ -1081,15 +1065,16 @@ agent operator {
   secrets: ai_creds
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     const messages = validate(ast).map((diagnostic) => diagnostic.message)
+
     expect(messages).toContain(
       'Agent "operator" secret block must declare "OPENROUTER_API_KEY" for provider "openrouter"',
     )
-    expect(
-      messages.some((message) => message.includes('Invalid agent provider')),
-    ).toBe(false)
+
+    expect(messages.some((message) => message.includes('Invalid agent provider'))).toBe(false)
   })
 
   test('an explicit provider still selects that vendor key', () => {
@@ -1104,6 +1089,7 @@ agent operator {
   secrets: ai_creds
 }
 `
+
     const { ast, errors } = parse(source)
     expect(errors).toEqual([])
     expect(validate(ast)).toEqual([])

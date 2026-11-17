@@ -8,16 +8,16 @@
     "url": "git+https://github.com/ByteSliceHQ/swirls.git",
     "directory": "packages/lsp"
   },
-  "exports": {
-    ".": "./dist/server.js"
-  },
-  "main": "./dist/server.js",
   "bin": {
     "swirls-lsp": "./dist/server.js"
   },
   "files": [
     "dist"
   ],
+  "main": "./dist/server.js",
+  "exports": {
+    ".": "./dist/server.js"
+  },
   "scripts": {
     "build": "tsup && bun scripts/copy-wasm.ts",
     "typecheck": "tsc --noEmit",

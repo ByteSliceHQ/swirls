@@ -45,6 +45,7 @@ export function parseDurationSeconds(literal: string): number | null {
   }
 
   const amount = Number(amountText)
+
   if (!Number.isSafeInteger(amount)) {
     return null
   }

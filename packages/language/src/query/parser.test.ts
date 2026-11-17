@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse, validate } from '../index'
 import { extractSqlParams, isReadOnlySqlHeuristic } from './sql-params'
 
@@ -33,6 +34,7 @@ query open_pipeline {
   }
 }
 `)
+
     expect(errors.length).toBe(0)
     const query = ast.queries[0]!
     expect(query.database).toBe('crm')

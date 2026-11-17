@@ -1,11 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+
 import type { EdgeDecl, NodeDecl, SourceRange, WorkflowDecl } from '../ast'
-import {
-  getLeafNodes,
-  getLineageNodeNames,
-  getMustRunNodeNames,
-  getRootNode,
-} from './analysis'
+import { getLeafNodes, getLineageNodeNames, getMustRunNodeNames, getRootNode } from './analysis'
 
 const r: SourceRange = {
   start: { line: 0, column: 0, offset: 0 },
@@ -43,6 +39,7 @@ describe('getLeafNodes', () => {
       [node('a', 'code'), node('b', 'code'), node('c', 'code')],
       [edge('a', 'b'), edge('a', 'c')],
     )
+
     const leaves = getLeafNodes(g).map((n) => n.name)
     expect(leaves.sort()).toEqual(['b', 'c'])
   })
@@ -54,6 +51,7 @@ describe('getLineageNodeNames', () => {
       [node('a', 'code'), node('b', 'code'), node('c', 'code')],
       [edge('a', 'b'), edge('b', 'c')],
     )
+
     const lineage = getLineageNodeNames(g, 'c')
     expect(lineage.sort()).toEqual(['a', 'b'])
   })
@@ -65,24 +63,16 @@ describe('getMustRunNodeNames', () => {
       [node('a', 'code'), node('b', 'code'), node('c', 'code')],
       [edge('a', 'b'), edge('b', 'c')],
     )
+
     expect(getMustRunNodeNames(g)).toEqual(new Set(['a', 'b', 'c']))
   })
 
   test('diamond: all nodes are must-run', () => {
     const g = workflow(
-      [
-        node('root', 'code'),
-        node('b', 'code'),
-        node('c', 'code'),
-        node('end', 'code'),
-      ],
-      [
-        edge('root', 'b'),
-        edge('root', 'c'),
-        edge('b', 'end'),
-        edge('c', 'end'),
-      ],
+      [node('root', 'code'), node('b', 'code'), node('c', 'code'), node('end', 'code')],
+      [edge('root', 'b'), edge('root', 'c'), edge('b', 'end'), edge('c', 'end')],
     )
+
     expect(getMustRunNodeNames(g)).toEqual(new Set(['root', 'b', 'c', 'end']))
   })
 
@@ -91,6 +81,7 @@ describe('getMustRunNodeNames', () => {
       [node('root', 'switch'), node('case1', 'code'), node('case2', 'code')],
       [edge('root', 'case1', 'x'), edge('root', 'case2', 'y')],
     )
+
     const must = getMustRunNodeNames(g)
     expect(must.has('root')).toBe(true)
     expect(must.has('case1')).toBe(false)
@@ -102,6 +93,7 @@ describe('getMustRunNodeNames', () => {
       [node('pre', 'code'), node('sw', 'switch'), node('leaf', 'code')],
       [edge('pre', 'sw'), edge('sw', 'leaf', 'a')],
     )
+
     const must = getMustRunNodeNames(g)
     expect(must.has('pre')).toBe(true)
     expect(must.has('sw')).toBe(true)
@@ -113,6 +105,7 @@ describe('getMustRunNodeNames', () => {
       [node('root', 'switch'), node('mid', 'switch'), node('deep', 'code')],
       [edge('root', 'mid', 'a'), edge('mid', 'deep', 'b')],
     )
+
     const must = getMustRunNodeNames(g)
     expect(must.has('root')).toBe(true)
     expect(must.has('mid')).toBe(false)
@@ -129,6 +122,7 @@ describe('getMustRunNodeNames', () => {
       [node('r1', 'code'), node('r2', 'code'), node('x', 'code')],
       [edge('r1', 'x')],
     )
+
     const must = getMustRunNodeNames(g)
     expect(must.has('r1')).toBe(true)
     expect(must.has('r2')).toBe(true)

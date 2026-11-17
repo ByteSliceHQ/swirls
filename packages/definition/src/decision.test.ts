@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { decisionQuestionsSchema, validateDecisionResponse } from './decision'
 
 const questions = decisionQuestionsSchema.parse({
@@ -14,6 +15,7 @@ const questions = decisionQuestionsSchema.parse({
   },
   urgent: { type: 'noul', instructions: 'Urgent?' },
 })
+
 const response = () => ({
   model: 'jev-1.13.0',
   usage: { input_tokens: 40, output_tokens: 0 },
@@ -34,15 +36,17 @@ const response = () => ({
     urgent: { type: 'noul' as const, noul: 0.1 },
   },
 })
+
 describe('decision response contract', () => {
   test('structured score legends compare by JSON value rather than property order', () => {
-    const questions = decisionQuestionsSchema.parse({
+    const scoreQuestions = decisionQuestionsSchema.parse({
       score: {
         type: 'score',
         instructions: 'Assess',
         criteria: [{ label: 'low', examples: ['a'] }, 'high'],
       },
     })
+
     const result = {
       model: 'jev-1.13.0',
       usage: { input_tokens: 10, output_tokens: 0 },
@@ -56,11 +60,14 @@ describe('decision response contract', () => {
         },
       },
     }
-    expect(validateDecisionResponse(result, questions)).toEqual(result)
+
+    expect(validateDecisionResponse(result, scoreQuestions)).toEqual(result)
   })
+
   test('preserves fractional score, independent confidence and the complete distributions', () => {
     expect(validateDecisionResponse(response(), questions)).toEqual(response())
   })
+
   test.each([
     (r: ReturnType<typeof response>) => {
       r.answers.department.choice = 'unknown'
@@ -106,13 +113,16 @@ describe('decision response contract', () => {
     change(result)
     expect(() => validateDecisionResponse(result, questions)).toThrow()
   })
+
   test('both decisive no and decisive yes Noul results remain probabilities', () => {
     for (const p of [0, 1]) {
       const result = response()
       result.answers.urgent.noul = p
-      expect(
-        validateDecisionResponse(result, questions).answers.urgent,
-      ).toEqual({ type: 'noul', noul: p })
+
+      expect(validateDecisionResponse(result, questions).answers.urgent).toEqual({
+        type: 'noul',
+        noul: p,
+      })
     }
   })
 })

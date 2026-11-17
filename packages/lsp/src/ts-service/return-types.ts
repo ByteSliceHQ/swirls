@@ -8,6 +8,7 @@ import type {
   WorkflowDecl,
 } from '@swirls/language'
 import type { WorkspaceResourceIndex } from '@swirls/language/workspace'
+
 import {
   getGraphRefFromConfigFields,
   getLoopBodyWorkflowDecl,
@@ -18,6 +19,7 @@ import {
   postgresParamsReturnTypeString,
   resolveNodeDecision,
 } from './context-types'
+import type { WorkspaceFileReader } from './integration-types'
 import { jsonSchemaToTsType } from './schema-to-ts'
 
 /** Minimal block shape needed to resolve expected return type (avoids circular dependency on virtual-docs). */
@@ -28,8 +30,8 @@ interface TsBlockForReturnType {
   postgresBlocks?: PostgresDecl[]
   connections?: SwirlsFile['connections']
   actions?: SwirlsFile['actions']
-  workspace?: import('@swirls/language/workspace').WorkspaceResourceIndex
-  readWorkspaceFile?: import('./integration-types').WorkspaceFileReader
+  workspace?: WorkspaceResourceIndex
+  readWorkspaceFile?: WorkspaceFileReader
   /** Top-level `stream { versions { … } }` parent when typing per-version `@ts`. */
   streamDecl?: StreamDecl
   /** Version entry (`vN { }`) for `prepare` typing. */
@@ -69,6 +71,7 @@ function getSubgraphInputReturnType(
   const rootNode = getRootNode(graph)
 
   const lit = resolveNodeInputSchemaLiteral(rootNode, fileAst, workspace)
+
   if (!lit) {
     return undefined
   }
@@ -84,15 +87,19 @@ function resolveNodeInputSchemaLiteral(
   if (!node) {
     return undefined
   }
+
   if (node.inputSchema && typeof node.inputSchema === 'object') {
     return node.inputSchema as Record<string, unknown>
   }
+
   if (node.inputSchemaRef) {
     const L = getNamedSchemaMap(fileAst, workspace).get(node.inputSchemaRef)
+
     if (L) {
       return L
     }
   }
+
   return undefined
 }
 
@@ -104,12 +111,15 @@ function resolveNodeOutputSchemaLiteral(
   if (node.outputSchema && typeof node.outputSchema === 'object') {
     return node.outputSchema as Record<string, unknown>
   }
+
   if (node.outputSchemaRef) {
     const L = getNamedSchemaMap(fileAst, workspace).get(node.outputSchemaRef)
+
     if (L) {
       return L
     }
   }
+
   return undefined
 }
 
@@ -122,12 +132,15 @@ function getLoopBodyInputReturnType(
   if (node.type !== 'map' && node.type !== 'while') {
     return undefined
   }
+
   const body = getLoopBodyWorkflowDecl(node, allWorkflows)
   const rootNode = body ? getRootNode(body) : undefined
   const lit = resolveNodeInputSchemaLiteral(rootNode, fileAst, workspace)
+
   if (!lit) {
     return undefined
   }
+
   return jsonSchemaToTsType(lit)
 }
 
@@ -147,10 +160,7 @@ function getSwitchCasesUnionType(node: NodeDecl): string | undefined {
   }
 
   const labels = casesCv.value
-    .filter(
-      (c): c is ConfigValue & { kind: 'string'; value: string } =>
-        c.kind === 'string',
-    )
+    .filter((c): c is ConfigValue & { kind: 'string'; value: string } => c.kind === 'string')
     .map((c) => c.value)
 
   if (labels.length === 0) {
@@ -170,6 +180,7 @@ function getOutputSchemaReturnType(
   workspace?: WorkspaceResourceIndex,
 ): string | undefined {
   const lit = resolveNodeOutputSchemaLiteral(node, fileAst, workspace)
+
   if (!lit) {
     return undefined
   }
@@ -181,9 +192,7 @@ function getOutputSchemaReturnType(
  * Return preamble type aliases that must precede `__ExpectedReturn` in the virtual TS file.
  * GraphQL integration `params` blocks emit recursive input-object aliases as separate declarations.
  */
-export function getExpectedReturnTypePreamble(
-  block: TsBlockForReturnType,
-): string | undefined {
+export function getExpectedReturnTypePreamble(block: TsBlockForReturnType): string | undefined {
   if (block.configKey === 'params' && block.node.type === 'integration') {
     return integrationParamsReturnTypePreamble(
       block.node,
@@ -193,6 +202,7 @@ export function getExpectedReturnTypePreamble(
       block.readWorkspaceFile,
     )
   }
+
   return undefined
 }
 
@@ -208,22 +218,16 @@ export function getExpectedReturnTypePreamble(
  * - searchQueries + parallel node: string[]
  * - urls + parallel node: string[]
  */
-export function getExpectedReturnType(
-  block: TsBlockForReturnType,
-): string | undefined {
+export function getExpectedReturnType(block: TsBlockForReturnType): string | undefined {
   switch (block.configKey) {
     case 'model':
-      return ['decision', 'ai', 'agent'].includes(block.node.type)
-        ? 'string'
-        : undefined
+      return ['decision', 'ai', 'agent'].includes(block.node.type) ? 'string' : undefined
+
     case 'state': {
-      const decision = resolveNodeDecision(
-        block.node,
-        block.fileAst,
-        block.workspace,
-      )
+      const decision = resolveNodeDecision(block.node, block.fileAst, block.workspace)
       return decision ? jsonSchemaToTsType(decision.inputSchema) : undefined
     }
+
     case 'input': {
       if (block.node.type === 'workflow' || block.node.type === 'graph') {
         return getSubgraphInputReturnType(
@@ -233,6 +237,7 @@ export function getExpectedReturnType(
           block.workspace,
         )
       }
+
       if (block.node.type === 'while') {
         return getLoopBodyInputReturnType(
           block.node,
@@ -241,8 +246,10 @@ export function getExpectedReturnType(
           block.workspace,
         )
       }
+
       return undefined
     }
+
     case 'items': {
       if (block.node.type === 'map' || block.node.type === 'fanout') {
         const t = getLoopBodyInputReturnType(
@@ -251,10 +258,13 @@ export function getExpectedReturnType(
           block.fileAst,
           block.workspace,
         )
+
         return t ? `${t}[]` : undefined
       }
+
       return undefined
     }
+
     case 'update': {
       if (block.node.type === 'while') {
         return getLoopBodyInputReturnType(
@@ -264,50 +274,58 @@ export function getExpectedReturnType(
           block.workspace,
         )
       }
+
       return undefined
     }
+
     case 'prompt': {
       if (block.node.type === 'ai') {
         return 'string'
       }
+
       return undefined
     }
+
     case 'router': {
       if (block.node.type === 'switch') {
         return getSwitchCasesUnionType(block.node)
       }
+
       return undefined
     }
+
     case 'code':
-      return getOutputSchemaReturnType(
-        block.node,
-        block.fileAst,
-        block.workspace,
-      )
+      return getOutputSchemaReturnType(block.node, block.fileAst, block.workspace)
     case 'condition':
       return 'boolean'
+
     case 'prepare': {
       const sv = block.streamVersionDecl
+
       if (!sv) {
         return undefined
       }
+
       if (sv.schema && typeof sv.schema === 'object') {
         return jsonSchemaToTsType(sv.schema as Record<string, unknown>)
       }
+
       if (sv.schemaRef) {
-        const L = getNamedSchemaMap(block.fileAst, block.workspace).get(
-          sv.schemaRef,
-        )
+        const L = getNamedSchemaMap(block.fileAst, block.workspace).get(sv.schemaRef)
+
         if (L) {
           return jsonSchemaToTsType(L)
         }
       }
+
       return undefined
     }
+
     case 'params': {
       if (block.postgresBlocks && block.node.type === 'postgres') {
         return postgresParamsReturnTypeString(block.node, block.postgresBlocks)
       }
+
       if (block.node.type === 'integration') {
         return integrationParamsReturnTypeString(
           block.node,
@@ -317,32 +335,42 @@ export function getExpectedReturnType(
           block.readWorkspaceFile,
         )
       }
+
       return undefined
     }
+
     case 'objective': {
       if (block.node.type === 'parallel') {
         return 'string'
       }
+
       return undefined
     }
+
     case 'query': {
       if (block.node.type === 'search') {
         return 'string'
       }
+
       return undefined
     }
+
     case 'searchQueries': {
       if (block.node.type === 'parallel') {
         return 'string[]'
       }
+
       return undefined
     }
+
     case 'urls': {
       if (block.node.type === 'parallel') {
         return 'string[]'
       }
+
       return undefined
     }
+
     default:
       return undefined
   }

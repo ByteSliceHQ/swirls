@@ -28,23 +28,14 @@ export const fileUploadGrantPurposeSchema = z.enum([
   'execution',
 ])
 
-export type FileUploadGrantPurpose = z.infer<
-  typeof fileUploadGrantPurposeSchema
->
+export type FileUploadGrantPurpose = z.infer<typeof fileUploadGrantPurposeSchema>
 
 /** Text-presentable contentMediaType values (dual-mode: string or handle). */
-export const TEXT_PRESENTABLE_MEDIA_TYPES = [
-  'text/plain',
-  'text/html',
-  'text/markdown',
-] as const
+export const TEXT_PRESENTABLE_MEDIA_TYPES = ['text/plain', 'text/html', 'text/markdown'] as const
 
-export type TextPresentableMediaType =
-  (typeof TEXT_PRESENTABLE_MEDIA_TYPES)[number]
+export type TextPresentableMediaType = (typeof TEXT_PRESENTABLE_MEDIA_TYPES)[number]
 
-const textPresentableMediaTypeSet = new Set<string>(
-  TEXT_PRESENTABLE_MEDIA_TYPES,
-)
+const textPresentableMediaTypeSet = new Set<string>(TEXT_PRESENTABLE_MEDIA_TYPES)
 
 export const fileHandleSchema = z
   .object({
@@ -81,12 +72,9 @@ export function isPartialFileHandle(
   if (typeof value !== 'object' || value === null) {
     return false
   }
+
   const record = value as Record<string, unknown>
-  return (
-    record.kind === FILE_HANDLE_KIND &&
-    typeof record.id === 'string' &&
-    !isFileHandle(value)
-  )
+  return record.kind === FILE_HANDLE_KIND && typeof record.id === 'string' && !isFileHandle(value)
 }
 
 export function isTextPresentableMediaType(
@@ -100,12 +88,11 @@ export function schemaNodeMarksFileValue(schema: JSONSchema7): boolean {
   if (schema.$ref === SWIRLS_FILE_REF) {
     return true
   }
-  if (
-    typeof schema.contentMediaType === 'string' &&
-    schema.contentMediaType.length > 0
-  ) {
+
+  if (typeof schema.contentMediaType === 'string' && schema.contentMediaType.length > 0) {
     return true
   }
+
   return false
 }
 
@@ -131,15 +118,16 @@ export function assertFileHandleSafe(value: unknown): void {
   if (typeof value !== 'object' || value === null) {
     return
   }
+
   const record = value as Record<string, unknown>
+
   if (record.kind !== FILE_HANDLE_KIND) {
     return
   }
+
   for (const key of FORBIDDEN_HANDLE_KEYS) {
     if (key in record) {
-      throw new Error(
-        `File handle must not include forbidden field "${key}"`,
-      )
+      throw new Error(`File handle must not include forbidden field "${key}"`)
     }
   }
 }
@@ -159,45 +147,48 @@ export type FileRetention = z.infer<typeof fileRetentionSchema>
 const RETENTION_DAYS_PATTERN = /^([0-9]+)d$/
 
 /** Parse DSL retention literal (`30d` or bare `forever`). */
-export function parseFileRetentionLiteral(
-  literal: string,
-): FileRetention | null {
+export function parseFileRetentionLiteral(literal: string): FileRetention | null {
   const trimmed = literal.trim()
+
   if (trimmed === 'forever') {
     return { mode: 'forever' }
   }
+
   const match = RETENTION_DAYS_PATTERN.exec(trimmed)
   const daysText = match?.[1]
+
   if (daysText === undefined) {
     return null
   }
+
   const days = Number(daysText)
+
   if (!Number.isSafeInteger(days) || days <= 0) {
     return null
   }
+
   return { mode: 'days', days }
 }
 
-export const FILE_RETENTION_SYNTAX_HINT =
-  'retention must be forever or a day count like 30d'
+export const FILE_RETENTION_SYNTAX_HINT = 'retention must be forever or a day count like 30d'
 
 /** API: minted upload grant returned to clients. */
 export const fileUploadGrantResponseSchema = z.object({
-  id: z.string().uuid(),
-  projectId: z.string().uuid(),
+  id: z.uuid(),
+  projectId: z.uuid(),
   expiresAt: z.string(),
   maxBytes: z.number().int().positive(),
   maxFiles: z.number().int().positive(),
 })
 
 export const initFileUploadResponseSchema = z.object({
-  objectId: z.string().uuid(),
-  uploadUrl: z.string().url(),
+  objectId: z.uuid(),
+  uploadUrl: z.url(),
   expiresAt: z.string(),
 })
 
 export const previewFileResponseSchema = z.object({
-  url: z.string().url(),
+  url: z.url(),
   expiresAt: z.string(),
 })
 

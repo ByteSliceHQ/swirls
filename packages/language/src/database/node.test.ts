@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+
 import { parse } from '../parser'
 import { validate } from '../validator'
 import { buildWorkspaceResourceIndex } from '../workspace/workspace-resources'
@@ -81,10 +82,9 @@ workflow g {
   flow { root -> q }
 }
 `)
+
     expect(
-      diags.some((d) =>
-        d.message.includes('references database "nope" which is not defined'),
-      ),
+      diags.some((d) => d.message.includes('references database "nope" which is not defined')),
     ).toBe(true)
   })
 
@@ -103,9 +103,8 @@ workflow g {
   flow { root -> q }
 }
 `)
-    expect(
-      diags.some((d) => d.message.includes('"operation" must be one of')),
-    ).toBe(true)
+
+    expect(diags.some((d) => d.message.includes('"operation" must be one of'))).toBe(true)
   })
 
   test('missing run is reported as a required field', () => {
@@ -122,6 +121,7 @@ workflow g {
   flow { root -> q }
 }
 `)
+
     expect(diags.some((d) => d.message.includes('requires "run"'))).toBe(true)
   })
 
@@ -141,15 +141,15 @@ workflow g {
   flow { root -> q }
 }
 `)
-    expect(
-      diags.some((d) => d.message.includes('"condition" must be a @ts block')),
-    ).toBe(true)
+
+    expect(diags.some((d) => d.message.includes('"condition" must be a @ts block'))).toBe(true)
   })
 })
 
 describe('type: database node workspace resolution', () => {
   test('a database block declared in another file resolves the node ref', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swirls-db-node-ws-'))
+
     try {
       fs.writeFileSync(
         path.join(dir, 'consumer.swirls'),
@@ -168,6 +168,7 @@ workflow g {
 `,
         'utf-8',
       )
+
       fs.writeFileSync(
         path.join(dir, 'provider.swirls'),
         `version: 1
@@ -179,32 +180,22 @@ database remote_db {
       )
 
       const workspace = buildWorkspaceResourceIndex({ cwd: dir })
-      const consumer = fs.readFileSync(
-        path.join(dir, 'consumer.swirls'),
-        'utf-8',
-      )
+      const consumer = fs.readFileSync(path.join(dir, 'consumer.swirls'), 'utf-8')
       const { ast, errors } = parse(consumer)
       expect(errors.length).toBe(0)
 
       // Local validation cannot see the other file, so it flags the ref.
       const diagsLocal = validate(ast)
+
       expect(
         diagsLocal.some((d) =>
-          d.message.includes(
-            'references database "remote_db" which is not defined',
-          ),
+          d.message.includes('references database "remote_db" which is not defined'),
         ),
       ).toBe(true)
 
       // With the workspace index the cross-file database block resolves.
-      const diagsWs = validate(ast, { workspace }).filter(
-        (d) => d.severity !== 'warning',
-      )
-      expect(
-        diagsWs.some((d) =>
-          d.message.includes('references database "remote_db"'),
-        ),
-      ).toBe(false)
+      const diagsWs = validate(ast, { workspace }).filter((d) => d.severity !== 'warning')
+      expect(diagsWs.some((d) => d.message.includes('references database "remote_db"'))).toBe(false)
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }

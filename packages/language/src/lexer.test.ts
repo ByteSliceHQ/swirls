@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+
 import { tokenize } from './lexer'
 
 const EXAMPLES_DIR = path.join(import.meta.dir, '../examples')
@@ -16,8 +17,10 @@ describe('tokenize', () => {
       const tokens = tokenize(
         'form webhook schedule graph trigger secret auth node type label postgres disk select insert update delete params table',
       )
+
       const kinds = tokens.map((t) => t.kind)
       expect(kinds.every((k) => k === 'keyword')).toBe(true)
+
       expect(tokens.map((t) => t.value)).toEqual([
         'form',
         'webhook',
@@ -42,6 +45,7 @@ describe('tokenize', () => {
 
     test('identifiers', () => {
       const tokens = tokenize('foo bar_baz Qux1')
+
       expect(tokens.map((t) => ({ kind: t.kind, value: t.value }))).toEqual([
         { kind: 'identifier', value: 'foo' },
         { kind: 'identifier', value: 'bar_baz' },
@@ -60,6 +64,7 @@ describe('tokenize', () => {
 
     test('slash-prefixed path literals', () => {
       const tokens = tokenize('path: /chat.postMessage')
+
       expect(tokens.map((t) => ({ kind: t.kind, value: t.value }))).toEqual([
         { kind: 'identifier', value: 'path' },
         { kind: 'colon', value: ':' },
@@ -69,6 +74,7 @@ describe('tokenize', () => {
 
     test('numbers', () => {
       const tokens = tokenize('1 42 3.14')
+
       expect(tokens.map((t) => ({ kind: t.kind, value: t.value }))).toEqual([
         { kind: 'number', value: 1 },
         { kind: 'number', value: 42 },
@@ -85,13 +91,7 @@ describe('tokenize', () => {
     })
 
     test('braces and brackets', () => {
-      const _tokens = tokenize('{ } [ ]')
-      expect(getTokenKinds('{ } [ ]')).toEqual([
-        'lbrace',
-        'rbrace',
-        'lbracket',
-        'rbracket',
-      ])
+      expect(getTokenKinds('{ } [ ]')).toEqual(['lbrace', 'rbrace', 'lbracket', 'rbracket'])
     })
 
     test('colon and comma', () => {
@@ -99,12 +99,7 @@ describe('tokenize', () => {
     })
 
     test('arrow', () => {
-      const _tokens = tokenize('a -> b')
-      expect(getTokenKinds('a -> b')).toEqual([
-        'identifier',
-        'arrow',
-        'identifier',
-      ])
+      expect(getTokenKinds('a -> b')).toEqual(['identifier', 'arrow', 'identifier'])
     })
 
     test('labeled arrow', () => {
@@ -131,9 +126,7 @@ describe('tokenize', () => {
       expect(first.range.start.line).toBe(1)
       expect(first.range.start.column).toBe(1)
       expect(first.range.start.offset).toBe(0)
-      const labelTok = tokens.find(
-        (t) => t.kind === 'keyword' && t.value === 'label',
-      )!
+      const labelTok = tokens.find((t) => t.kind === 'keyword' && t.value === 'label')!
       expect(labelTok.range.start.line).toBe(2)
       expect(labelTok.range.start.column).toBe(3)
     })
@@ -151,9 +144,7 @@ describe('tokenize', () => {
     test('ts block has fencedContent and fencedLang', () => {
       const source = 'code: @ts {\nconst x = 1\n}\n'
       const tokens = tokenize(source)
-      const fenced = tokens.find(
-        (t) => t.kind === 'fenced_block' && t.fencedLang === 'ts',
-      )
+      const fenced = tokens.find((t) => t.kind === 'fenced_block' && t.fencedLang === 'ts')
       expect(fenced).toBeDefined()
       expect(fenced?.value).toBe('@ts')
       expect(fenced?.fencedLang).toBe('ts')
@@ -162,10 +153,10 @@ describe('tokenize', () => {
     })
 
     test('ts block with nested object literal in body', () => {
-      const source =
-        'code: @ts {\nconst email = ""\nreturn { email: email.toLowerCase() }\n}\n'
+      const source = 'code: @ts {\nconst email = ""\nreturn { email: email.toLowerCase() }\n}\n'
       const tokens = tokenize(source)
       const fenced = tokens.find((t) => t.kind === 'fenced_block')
+
       expect(fenced?.fencedContent?.trim()).toBe(
         'const email = ""\nreturn { email: email.toLowerCase() }',
       )
@@ -190,9 +181,7 @@ describe('tokenize', () => {
     test('json block', () => {
       const source = 'schema: @json {{"a": 1}}\n'
       const tokens = tokenize(source)
-      const fenced = tokens.find(
-        (t) => t.kind === 'fenced_block' && t.fencedLang === 'json',
-      )
+      const fenced = tokens.find((t) => t.kind === 'fenced_block' && t.fencedLang === 'json')
       expect(fenced).toBeDefined()
       expect(fenced?.value).toBe('@json')
       expect(fenced?.fencedLang).toBe('json')
@@ -202,9 +191,7 @@ describe('tokenize', () => {
     test('sql block', () => {
       const source = 'query: @sql {SELECT * FROM t}\n'
       const tokens = tokenize(source)
-      const fenced = tokens.find(
-        (t) => t.kind === 'fenced_block' && t.fencedLang === 'sql',
-      )
+      const fenced = tokens.find((t) => t.kind === 'fenced_block' && t.fencedLang === 'sql')
       expect(fenced).toBeDefined()
       expect(fenced?.value).toBe('@sql')
       expect(fenced?.fencedContent?.trim()).toBe('SELECT * FROM t')
@@ -248,15 +235,13 @@ describe('tokenize', () => {
       const tokens = tokenize('// comment\nform x')
       const kinds = tokens.map((t) => t.kind)
       expect(kinds).not.toContain('block_comment')
-      expect(
-        tokens.some((t) => t.kind === 'keyword' && t.value === 'form'),
-      ).toBe(true)
+      expect(tokens.some((t) => t.kind === 'keyword' && t.value === 'form')).toBe(true)
     })
 
     test('block comment is emitted as single token', () => {
       const tokens = tokenize('/* doc */ graph g')
       expect(tokens[0]?.kind).toBe('block_comment')
-      expect((tokens[0]?.value as string).trim()).toBe('doc')
+      expect(String(tokens[0]?.value).trim()).toBe('doc')
     })
   })
 
@@ -299,13 +284,16 @@ describe('tokenize', () => {
     for (const file of exampleFiles) {
       test(`${file} tokenizes without throwing and produces tokens`, () => {
         const filePath = path.join(EXAMPLES_DIR, file)
+
         if (!fs.existsSync(filePath)) {
           console.warn(`Skipping ${file}: not found`)
           return
         }
+
         const source = fs.readFileSync(filePath, 'utf8')
         const tokens = tokenize(source)
         expect(Array.isArray(tokens)).toBe(true)
+
         for (let i = 0; i < tokens.length; i++) {
           const t = tokens[i]!
           expect(t).not.toBeNull()

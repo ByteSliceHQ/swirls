@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parseDeploymentDefinition } from './deployment-definition'
 
 const workflowId = '11111111-1111-4111-8111-111111111111'
@@ -50,7 +51,9 @@ describe('parseDeploymentDefinition', () => {
       agent: 'assistant',
       prompt: 'return "hello"',
     })
+
     const workflow = definition.workflows[0]
+
     if (!workflow) {
       throw new Error('test fixture is missing its workflow')
     }
@@ -59,10 +62,13 @@ describe('parseDeploymentDefinition', () => {
       ...definition,
       workflows: [{ ...workflow, executionTokenTtlSeconds: 10_800 }],
     })
+
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
+
     expect(parsed.data.workflows?.[0]?.executionTokenTtlSeconds).toBe(10_800)
   })
 
@@ -77,6 +83,7 @@ describe('parseDeploymentDefinition', () => {
     )
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
@@ -98,6 +105,7 @@ describe('parseDeploymentDefinition', () => {
     )
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
@@ -136,6 +144,7 @@ describe('parseDeploymentDefinition managed database blocks', () => {
     })
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
@@ -145,6 +154,7 @@ describe('parseDeploymentDefinition managed database blocks', () => {
       schema: 'model User {\n  id Int @id\n}',
       schemaChecksum: 'a'.repeat(64),
     })
+
     expect(parsed.data.databaseMigrations?.[0]).toMatchObject({
       name: 'collapse_names',
       database: 'my_db',
@@ -254,9 +264,11 @@ describe('parseDeploymentDefinition app pages', () => {
     })
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
+
     expect(parsed.data.apps?.[0]?.pages).toEqual([
       {
         name: 'dashboard',
@@ -298,9 +310,11 @@ describe('parseDeploymentDefinition app pages', () => {
     })
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
+
     expect(parsed.data.apps?.[0]?.brand).toMatchObject({
       accent: '#B33A2B',
       tokens: {
@@ -337,9 +351,11 @@ describe('parseDeploymentDefinition app pages', () => {
     })
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
+
     expect(parsed.data.apps?.[0]?.brand?.avatar).toEqual({
       variant: 'marble',
       colors: ['#9e3b3b', '#8b7355'],
@@ -359,6 +375,7 @@ describe('parseDeploymentDefinition app pages', () => {
         },
       ],
     })
+
     expect(unknown.success).toBe(false)
 
     const invalid = parseDeploymentDefinition({
@@ -372,6 +389,7 @@ describe('parseDeploymentDefinition app pages', () => {
         },
       ],
     })
+
     expect(invalid.success).toBe(false)
   })
 
@@ -387,6 +405,7 @@ describe('parseDeploymentDefinition app pages', () => {
         },
       ],
     })
+
     expect(invalidVariant.success).toBe(false)
 
     const emptyColors = parseDeploymentDefinition({
@@ -400,6 +419,7 @@ describe('parseDeploymentDefinition app pages', () => {
         },
       ],
     })
+
     expect(emptyColors.success).toBe(false)
 
     const invalidShape = parseDeploymentDefinition({
@@ -413,6 +433,7 @@ describe('parseDeploymentDefinition app pages', () => {
         },
       ],
     })
+
     expect(invalidShape.success).toBe(false)
   })
 
@@ -436,9 +457,11 @@ describe('parseDeploymentDefinition app pages', () => {
     })
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
+
     expect(parsed.data.apps?.[0]?.pages[0]).toEqual({
       name: 'room',
       icon: 'hash',
@@ -465,13 +488,12 @@ describe('parseDeploymentDefinition app pages', () => {
     })
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
-    expect(parsed.data.apps?.[0]?.pages[0]?.reviews).toEqual([
-      'refund_request',
-      'escalate_request',
-    ])
+
+    expect(parsed.data.apps?.[0]?.pages[0]?.reviews).toEqual(['refund_request', 'escalate_request'])
   })
 
   test('requires exactly one page body and non-empty reviews', () => {
@@ -485,6 +507,7 @@ describe('parseDeploymentDefinition app pages', () => {
         },
       ],
     })
+
     expect(noBody.success).toBe(false)
 
     const emptyReviews = parseDeploymentDefinition({
@@ -497,6 +520,7 @@ describe('parseDeploymentDefinition app pages', () => {
         },
       ],
     })
+
     expect(emptyReviews.success).toBe(false)
   })
 
@@ -548,9 +572,11 @@ describe('parseDeploymentDefinition back-compat', () => {
     })
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
+
     expect(parsed.data).not.toHaveProperty('generativeApps')
   })
 })
@@ -603,9 +629,11 @@ describe('agent context block schema', () => {
     )
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
+
     expect(parsed.data.agentBlocks?.[0]?.context).toEqual({
       budget: 120000,
       compactAt: 0.8,
@@ -621,29 +649,17 @@ describe('agent context block schema', () => {
   })
 
   test('rejects out-of-range knobs', () => {
-    expect(parseDeploymentDefinition(withContext({ budget: 0 })).success).toBe(
-      false,
-    )
-    expect(
-      parseDeploymentDefinition(withContext({ compactAt: 0 })).success,
-    ).toBe(false)
-    expect(
-      parseDeploymentDefinition(withContext({ compactAt: 1.5 })).success,
-    ).toBe(false)
-    expect(
-      parseDeploymentDefinition(withContext({ keepRecentTurns: -1 })).success,
-    ).toBe(false)
-    expect(
-      parseDeploymentDefinition(withContext({ pruneToolResultsAfter: 0 }))
-        .success,
-    ).toBe(false)
+    expect(parseDeploymentDefinition(withContext({ budget: 0 })).success).toBe(false)
+    expect(parseDeploymentDefinition(withContext({ compactAt: 0 })).success).toBe(false)
+    expect(parseDeploymentDefinition(withContext({ compactAt: 1.5 })).success).toBe(false)
+    expect(parseDeploymentDefinition(withContext({ keepRecentTurns: -1 })).success).toBe(false)
+    expect(parseDeploymentDefinition(withContext({ pruneToolResultsAfter: 0 })).success).toBe(false)
   })
 
   test('rejects a cache retention outside the tier list', () => {
-    expect(
-      parseDeploymentDefinition(withContext({ cacheRetention: 'forever' }))
-        .success,
-    ).toBe(false)
+    expect(parseDeploymentDefinition(withContext({ cacheRetention: 'forever' })).success).toBe(
+      false,
+    )
   })
 })
 
@@ -674,9 +690,11 @@ describe('channel response policy schema', () => {
     )
 
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
+
     const block = parsed.data.channelBlocks?.[0]
     expect(block?.mode).toBe('ambient')
     expect(block?.engagementTimeoutSeconds).toBe(1800)
@@ -690,9 +708,8 @@ describe('channel response policy schema', () => {
 
   test('accepts the zero-valued ends of the ranges', () => {
     expect(
-      parseDeploymentDefinition(
-        withPolicy({ cooldownSeconds: 0, maxUnpromptedPerHour: 0 }),
-      ).success,
+      parseDeploymentDefinition(withPolicy({ cooldownSeconds: 0, maxUnpromptedPerHour: 0 }))
+        .success,
     ).toBe(true)
   })
 
@@ -702,40 +719,27 @@ describe('channel response policy schema', () => {
         withPolicy({ engagementTimeoutSeconds: 86400, cooldownSeconds: 86400 }),
       ).success,
     ).toBe(true)
-    expect(
-      parseDeploymentDefinition(withPolicy({ engagementTimeoutSeconds: 86401 }))
-        .success,
-    ).toBe(false)
-    expect(
-      parseDeploymentDefinition(withPolicy({ cooldownSeconds: 86401 })).success,
-    ).toBe(false)
+
+    expect(parseDeploymentDefinition(withPolicy({ engagementTimeoutSeconds: 86401 })).success).toBe(
+      false,
+    )
+
+    expect(parseDeploymentDefinition(withPolicy({ cooldownSeconds: 86401 })).success).toBe(false)
   })
 
   test('rejects out-of-range and non-integer knobs', () => {
-    expect(
-      parseDeploymentDefinition(withPolicy({ engagementTimeoutSeconds: 0 }))
-        .success,
-    ).toBe(false)
-    expect(
-      parseDeploymentDefinition(withPolicy({ cooldownSeconds: -1 })).success,
-    ).toBe(false)
-    expect(
-      parseDeploymentDefinition(withPolicy({ maxUnpromptedPerHour: -1 }))
-        .success,
-    ).toBe(false)
-    expect(
-      parseDeploymentDefinition(withPolicy({ maxUnpromptedPerHour: 1.5 }))
-        .success,
-    ).toBe(false)
-    expect(
-      parseDeploymentDefinition(withPolicy({ cooldownSeconds: '15s' })).success,
-    ).toBe(false)
+    expect(parseDeploymentDefinition(withPolicy({ engagementTimeoutSeconds: 0 })).success).toBe(
+      false,
+    )
+
+    expect(parseDeploymentDefinition(withPolicy({ cooldownSeconds: -1 })).success).toBe(false)
+    expect(parseDeploymentDefinition(withPolicy({ maxUnpromptedPerHour: -1 })).success).toBe(false)
+    expect(parseDeploymentDefinition(withPolicy({ maxUnpromptedPerHour: 1.5 })).success).toBe(false)
+    expect(parseDeploymentDefinition(withPolicy({ cooldownSeconds: '15s' })).success).toBe(false)
   })
 
   test('rejects a mode outside the list', () => {
-    expect(
-      parseDeploymentDefinition(withPolicy({ mode: 'whenever' })).success,
-    ).toBe(false)
+    expect(parseDeploymentDefinition(withPolicy({ mode: 'whenever' })).success).toBe(false)
   })
 
   test('rewrites stored platform portal to swirls', () => {
@@ -750,10 +754,13 @@ describe('channel response policy schema', () => {
         },
       ],
     })
+
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       throw parsed.error
     }
+
     expect(parsed.data.channelBlocks?.[0]?.platform).toBe('swirls')
   })
 })
@@ -772,13 +779,17 @@ describe('parseDeploymentDefinition computer blocks', () => {
 
   test('keeps a harness block with its runtime', () => {
     const harness = { type: 'coding', provider: 'codex', runtime: 'v1' }
+
     const parsed = parseDeploymentDefinition({
       computerBlocks: [{ ...computerBlock, harness }],
     })
+
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       return
     }
+
     expect(parsed.data.computerBlocks?.[0]?.harness).toEqual(harness)
   })
 
@@ -786,19 +797,21 @@ describe('parseDeploymentDefinition computer blocks', () => {
     const parsed = parseDeploymentDefinition({
       computerBlocks: [computerBlock],
     })
+
     expect(parsed.success).toBe(true)
+
     if (!parsed.success) {
       return
     }
+
     expect(parsed.data.computerBlocks?.[0]).not.toHaveProperty('harness')
   })
 
   test('rejects a harness without a runtime', () => {
     const parsed = parseDeploymentDefinition({
-      computerBlocks: [
-        { ...computerBlock, harness: { type: 'coding', provider: 'codex' } },
-      ],
+      computerBlocks: [{ ...computerBlock, harness: { type: 'coding', provider: 'codex' } }],
     })
+
     expect(parsed.success).toBe(false)
   })
 })

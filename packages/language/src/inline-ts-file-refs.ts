@@ -1,4 +1,5 @@
 import { readFileSync as nodeReadFileSync } from 'node:fs'
+
 import type { NodeDecl, SwirlsFile } from './ast'
 import { resolveTsRefFullPath } from './ts-ref-path'
 
@@ -19,6 +20,7 @@ function inlineTsRefsOnNodes(
       if (cv.kind === 'ts_file_ref') {
         const resolved = resolveTsRefFullPath(swirlsFilePath, cv.path)
         const code = read(resolved, 'utf-8')
+
         node.configFields[key] = {
           kind: 'ts_block',
           code,
@@ -27,6 +29,7 @@ function inlineTsRefsOnNodes(
         }
       }
     }
+
     if (node.subgraph?.nodes?.length) {
       inlineTsRefsOnNodes(node.subgraph.nodes, swirlsFilePath, read)
     }
@@ -37,10 +40,7 @@ function inlineTsRefsOnNodes(
  * Load every `ts_file_ref` into inline `ts_block` / `code`.
  * Mutates `ast`. Throws if a file cannot be read.
  */
-export function inlineTsFileRefs(
-  ast: SwirlsFile,
-  opts: InlineTsFileRefsOptions,
-): void {
+export function inlineTsFileRefs(ast: SwirlsFile, opts: InlineTsFileRefsOptions): void {
   const read = opts.readFileSync ?? nodeReadFileSync
   const { swirlsFilePath } = opts
 
@@ -48,9 +48,11 @@ export function inlineTsFileRefs(
     for (const sv of stream.versions ?? []) {
       for (const ck of ['condition', 'prepare'] as const) {
         const cv = sv[ck]
+
         if (cv?.kind === 'ts_file_ref') {
           const resolved = resolveTsRefFullPath(swirlsFilePath, cv.path)
           const code = read(resolved, 'utf-8')
+
           sv[ck] = {
             kind: 'ts_block',
             code,
@@ -64,9 +66,11 @@ export function inlineTsFileRefs(
 
   for (const migration of ast.migrations ?? []) {
     const cv = migration.operation
+
     if (cv?.kind === 'ts_file_ref') {
       const resolved = resolveTsRefFullPath(swirlsFilePath, cv.path)
       const code = read(resolved, 'utf-8')
+
       migration.operation = {
         kind: 'ts_block',
         code,
@@ -81,6 +85,7 @@ export function inlineTsFileRefs(
   // are in the file: those bytes are what gets hashed and signed.
   for (const operation of ast.operations ?? []) {
     const command = operation.command
+
     if (command?.path !== undefined && command.script === undefined) {
       const resolved = resolveTsRefFullPath(swirlsFilePath, command.path)
       command.script = read(resolved, 'utf-8')

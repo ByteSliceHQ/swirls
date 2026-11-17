@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "description": "The Swirls deployment definition: the versioned schema a .swirls project compiles to and a runtime consumes.",
   "license": "MIT",
-  "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ByteSliceHQ/swirls.git",
     "directory": "packages/definition"
   },
+  "type": "module",
   "exports": {
     ".": "./src/deployment-definition.ts",
     "./deployment-definition": "./src/deployment-definition.ts",

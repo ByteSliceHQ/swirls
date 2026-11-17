@@ -1,4 +1,5 @@
 import { resourceNameSchema } from '@swirls/definition/schemas'
+
 import type { Diagnostic, SourceRange, SwirlsFile } from '../ast'
 import type { WorkspaceResourceIndex } from '../workspace/workspace-resources'
 import { nameLookup } from '../workspace/workspace-resources'
@@ -13,15 +14,13 @@ function diag(
   return { message, range, severity }
 }
 
-function validateResourceName(
-  name: string,
-  range: SourceRange,
-  kind: string,
-): Diagnostic[] {
+function validateResourceName(name: string, range: SourceRange, kind: string): Diagnostic[] {
   const result = resourceNameSchema.safeParse(name)
+
   if (result.success) {
     return []
   }
+
   const msg = result.error.issues[0]?.message ?? 'Invalid name'
   return [diag(`${kind} name: ${msg}`, range)]
 }
@@ -32,6 +31,7 @@ export function validateQueryBlocks(
 ): Diagnostic[] {
   const out: Diagnostic[] = []
   const queryBlocks = ast.queries ?? []
+
   const databaseNames = nameLookup(
     new Set((ast.databases ?? []).map((d) => d.name)),
     options?.workspace?.databases,
@@ -40,6 +40,7 @@ export function validateQueryBlocks(
   for (const query of queryBlocks) {
     out.push(...validateResourceName(query.name, query.range, 'Query'))
     const sameName = queryBlocks.filter((x) => x.name === query.name)
+
     if (sameName.length > 1) {
       out.push(diag(`Duplicate query name "${query.name}"`, query.range))
     }
@@ -50,16 +51,11 @@ export function validateQueryBlocks(
   return out
 }
 
-function validateQueryDecl(
-  query: QueryDecl,
-  databaseNames: Set<string>,
-): Diagnostic[] {
+function validateQueryDecl(query: QueryDecl, databaseNames: Set<string>): Diagnostic[] {
   const out: Diagnostic[] = []
 
   if (!query.database) {
-    out.push(
-      diag(`Query "${query.name}" requires "database: <name>"`, query.range),
-    )
+    out.push(diag(`Query "${query.name}" requires "database: <name>"`, query.range))
   } else if (!databaseNames.has(query.database)) {
     out.push(
       diag(
@@ -70,30 +66,19 @@ function validateQueryDecl(
   }
 
   if (!query.sql) {
-    out.push(
-      diag(
-        `Query "${query.name}" requires "sql: @sql { … }"`,
-        query.range,
-      ),
-    )
+    out.push(diag(`Query "${query.name}" requires "sql: @sql { … }"`, query.range))
     return out
   }
 
   if (query.sql.kind !== 'sql_block') {
-    out.push(
-      diag(`Query "${query.name}": sql must be a @sql block`, query.sql.range),
-    )
+    out.push(diag(`Query "${query.name}": sql must be a @sql block`, query.sql.range))
     return out
   }
 
   const body = query.sql.code?.trim() ?? ''
+
   if (body.length === 0) {
-    out.push(
-      diag(
-        `Query "${query.name}": sql requires a non-empty @sql block`,
-        query.sql.range,
-      ),
-    )
+    out.push(diag(`Query "${query.name}": sql requires a non-empty @sql block`, query.sql.range))
     return out
   }
 
@@ -108,8 +93,10 @@ function validateQueryDecl(
 
   for (const param of extractSqlParams(body)) {
     const result = resourceNameSchema.safeParse(param)
+
     if (!result.success) {
       const msg = result.error.issues[0]?.message ?? 'Invalid name'
+
       out.push(
         diag(
           `Query "${query.name}": sql placeholder {{${param}}} is invalid (${msg})`,

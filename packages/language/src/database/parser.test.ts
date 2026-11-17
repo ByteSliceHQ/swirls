@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+
 import { parse } from '../parser'
 import { serialize } from '../serializer'
 import { validate } from '../validator'
@@ -63,6 +64,7 @@ database labelled {
   }
 }
 `)
+
     expect(errors.length).toBe(0)
     expect(ast.databases[0]?.label).toBe('Primary')
     expect(ast.databases[0]?.description).toBe('The main DB')
@@ -82,12 +84,15 @@ database app_db {
   }
 }
 `)
+
     expect(errors.length).toBe(0)
     expect(ast.databases[0]?.connections).toHaveLength(2)
+
     expect(ast.databases[0]?.connections[0]).toMatchObject({
       name: 'app',
       label: 'Application connection',
     })
+
     expect(ast.databases[0]?.connections[1]).toMatchObject({
       name: 'analytics',
       description: 'Analytics workloads',
@@ -109,6 +114,7 @@ database edge_db {
   }
 }
 `)
+
     expect(errors.length).toBe(0)
     expect(ast.databases.length).toBe(1)
     const src = ast.databases[0]!.schemaSource
@@ -124,9 +130,8 @@ database bad {
   schema: @json { { "type": "object" } }
 }
 `)
-    expect(
-      errors.some((e) => e.message.includes('must be an @prisma { } block')),
-    ).toBe(true)
+
+    expect(errors.some((e) => e.message.includes('must be an @prisma { } block'))).toBe(true)
   })
 
   test('migration block parses database, order, and operation', () => {
@@ -139,6 +144,7 @@ database bad {
     expect(m.database).toBe('my_db')
     expect(m.order).toBe(1)
     expect(m.operation?.kind).toBe('ts_block')
+
     if (m.operation?.kind === 'ts_block') {
       expect(m.operation.code).toContain('context.db.my_db.user.update')
     }
@@ -181,10 +187,9 @@ database empty_db {
   label: "Empty"
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) => d.message.includes('non-empty schema: @prisma')),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('non-empty schema: @prisma'))).toBe(true)
   })
 
   test('duplicate database names are reported', () => {
@@ -192,10 +197,9 @@ database empty_db {
 database dup { schema: @prisma { model A { id Int @id } } }
 database dup { schema: @prisma { model B { id Int @id } } }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) => d.message.includes('Duplicate database block name')),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('Duplicate database block name'))).toBe(true)
   })
 
   test('unknown database reference in migration is reported', () => {
@@ -206,11 +210,11 @@ migration m {
   operation: @ts { return 1 }
 }
 `)
+
     const diags = validate(ast)
+
     expect(
-      diags.some((d) =>
-        d.message.includes('references database "nope" which is not defined'),
-      ),
+      diags.some((d) => d.message.includes('references database "nope" which is not defined')),
     ).toBe(true)
   })
 
@@ -223,11 +227,11 @@ migration m {
   operation: @ts { return 1 }
 }
 `)
+
     const diags = validate(ast)
+
     expect(
-      diags.some((d) =>
-        d.message.includes('requires "order" as a non-negative integer'),
-      ),
+      diags.some((d) => d.message.includes('requires "order" as a non-negative integer')),
     ).toBe(true)
   })
 
@@ -245,10 +249,9 @@ migration m2 {
   operation: @ts { return 2 }
 }
 `)
+
     const diags = validate(ast)
-    expect(
-      diags.some((d) => d.message.includes('reuses order 1 for database "db"')),
-    ).toBe(true)
+    expect(diags.some((d) => d.message.includes('reuses order 1 for database "db"'))).toBe(true)
   })
 
   test('empty operation is reported', () => {
@@ -260,11 +263,11 @@ migration m {
   operation: @ts { }
 }
 `)
+
     const diags = validate(ast)
+
     expect(
-      diags.some((d) =>
-        d.message.includes('requires "operation" (a non-empty @ts block)'),
-      ),
+      diags.some((d) => d.message.includes('requires "operation" (a non-empty @ts block)')),
     ).toBe(true)
   })
 
@@ -275,6 +278,7 @@ database db {
   role writer { access: write }
 }
 `)
+
     expect(errors.some((e) => e.message.includes('use "connection'))).toBe(true)
   })
 
@@ -285,6 +289,7 @@ database db {
   connection owner { }
 }
 `)
+
     const diags = validate(ast)
     expect(diags.some((d) => d.message.includes('reserved'))).toBe(true)
   })
@@ -295,11 +300,10 @@ database db {
     const { ast } = parse(`
 database ok { schema: @prisma { model A { id Int @id } } }
 `)
+
     ast.databases[0]!.name = 'bad-name'
     const diags = validateDatabaseBlocks(ast)
-    expect(diags.some((d) => d.message.includes('Database block name'))).toBe(
-      true,
-    )
+    expect(diags.some((d) => d.message.includes('Database block name'))).toBe(true)
   })
 
   test('invalid migration block name is reported', () => {
@@ -311,6 +315,7 @@ migration ok {
   operation: @ts { return 1 }
 }
 `)
+
     ast.migrations[0]!.name = 'bad-name'
     const diags = validateMigrationBlocks(ast)
     expect(diags.some((d) => d.message.includes('Migration name'))).toBe(true)

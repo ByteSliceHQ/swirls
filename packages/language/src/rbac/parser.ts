@@ -8,16 +8,11 @@ import {
   type FileRetention,
   parseFileRetentionLiteral,
 } from '@swirls/definition/file-values'
+
 import type { SourceRange } from '../ast'
 import type { Token } from '../lexer'
 import type { ResourceParserDelegate } from '../parser-delegate'
-import type {
-  ClaimCondition,
-  FilePolicySettings,
-  PolicyDecl,
-  PolicyGrant,
-  RoleDecl,
-} from './ast'
+import type { ClaimCondition, FilePolicySettings, PolicyDecl, PolicyGrant, RoleDecl } from './ast'
 
 function rangeFromTokens(start: Token, end: Token): SourceRange {
   return {
@@ -29,6 +24,7 @@ function rangeFromTokens(start: Token, end: Token): SourceRange {
 /** Parse `retention: 30d` or `retention: forever` inside `files { }`. */
 function parseRetentionValue(d: ResourceParserDelegate): FileRetention | null {
   const t = d.peek()
+
   if (!t) {
     return null
   }
@@ -41,17 +37,22 @@ function parseRetentionValue(d: ResourceParserDelegate): FileRetention | null {
 
   if (t.kind === 'number') {
     const numTok = d.advance()
+
     if (!numTok) {
       return null
     }
+
     const unitTok = d.peek()
+
     if (!unitTok || unitTok.kind !== 'identifier' || unitTok.value !== 'd') {
       d.error(
         `Expected day unit after retention amount (${FILE_RETENTION_SYNTAX_HINT})`,
         unitTok ?? numTok,
       )
+
       return null
     }
+
     d.advance()
     return parseFileRetentionLiteral(`${numTok.value}d`)
   }
@@ -67,10 +68,7 @@ function parseRetentionValue(d: ResourceParserDelegate): FileRetention | null {
 }
 
 /** Parse `files { retention: 30d }` nested in a policy block. */
-function parseFilesBlock(
-  d: ResourceParserDelegate,
-  startTok: Token,
-): FilePolicySettings | null {
+function parseFilesBlock(d: ResourceParserDelegate, startTok: Token): FilePolicySettings | null {
   if (!d.expect('lbrace')) {
     d.error('Expected { after files', d.peek())
     d.skipToNextBlock()
@@ -83,9 +81,11 @@ function parseFilesBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
@@ -93,6 +93,7 @@ function parseFilesBlock(
 
     const keyTok = d.peek()
     const key = d.parsePropertyKey()
+
     if (!key || !keyTok) {
       break
     }
@@ -109,11 +110,13 @@ function parseFilesBlock(
     }
 
     const valueTok = d.peek()
+
     if (!valueTok) {
       break
     }
 
     const parsed = parseRetentionValue(d)
+
     if (parsed) {
       retention = parsed
       retentionRange = rangeFromTokens(valueTok, d.peek() ?? valueTok)
@@ -145,9 +148,11 @@ function parseMatchBlock(d: ResourceParserDelegate): ClaimCondition[] {
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
@@ -155,6 +160,7 @@ function parseMatchBlock(d: ResourceParserDelegate): ClaimCondition[] {
 
     const keyTok = d.peek()
     const claim = d.parsePropertyKey()
+
     if (!claim || !keyTok) {
       break
     }
@@ -165,6 +171,7 @@ function parseMatchBlock(d: ResourceParserDelegate): ClaimCondition[] {
     }
 
     const vt = d.peek()
+
     if (!vt) {
       break
     }
@@ -172,6 +179,7 @@ function parseMatchBlock(d: ResourceParserDelegate): ClaimCondition[] {
     if (vt.kind === 'identifier' || vt.kind === 'keyword') {
       // Bare-word scalar (e.g. `org_role: admin`).
       d.advance()
+
       conditions.push({
         claim,
         claimRange: keyTok.range as SourceRange,
@@ -180,10 +188,12 @@ function parseMatchBlock(d: ResourceParserDelegate): ClaimCondition[] {
         valueRange: vt.range as SourceRange,
         range: rangeFromTokens(keyTok, vt),
       })
+
       continue
     }
 
     const value = d.parseValue()
+
     if (Array.isArray(value)) {
       // List value => membership ("in").
       conditions.push({
@@ -219,11 +229,13 @@ export function parseRoleBlock(
   docComment: string | undefined,
 ): RoleDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'role') {
     return null
   }
 
   const nameTok = d.advance()
+
   if (!nameTok || nameTok.kind !== 'identifier') {
     d.error('Expected role name', nameTok)
     d.skipToNextBlock()
@@ -242,9 +254,11 @@ export function parseRoleBlock(
 
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
@@ -257,6 +271,7 @@ export function parseRoleBlock(
     }
 
     const key = d.parsePropertyKey()
+
     if (!key) {
       break
     }
@@ -269,10 +284,12 @@ export function parseRoleBlock(
     if (key === 'description') {
       const vt = d.peek()
       const val = d.parseValue()
+
       if (typeof val === 'string') {
         description = val
         descriptionRange = vt?.range as SourceRange | undefined
       }
+
       continue
     }
 
@@ -300,17 +317,22 @@ function parseNameList(
     d.error('Expected [', d.peek())
     return null
   }
+
   const names: string[] = []
   const ranges: SourceRange[] = []
+
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbracket') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
     }
+
     if (t.kind === 'identifier' || t.kind === 'keyword') {
       d.advance()
       names.push(t.value as string)
@@ -320,43 +342,45 @@ function parseNameList(
       d.skipToNextBlock()
       return null
     }
+
     d.expect('comma')
   }
+
   if (!d.expect('rbracket')) {
     d.error('Expected ]', d.peek())
     d.skipToNextBlock()
     return null
   }
+
   return { names, ranges }
 }
 
 /** Parse one `allow|deny <role> -> agent <name>|* { … }` grant. */
-function parseGrant(
-  d: ResourceParserDelegate,
-  effect: 'allow' | 'deny',
-): PolicyGrant | null {
+function parseGrant(d: ResourceParserDelegate, effect: 'allow' | 'deny'): PolicyGrant | null {
   const effectTok = d.advance() // 'allow' | 'deny'
+
   if (!effectTok) {
     return null
   }
 
   const roleTok = d.advance()
-  if (
-    !roleTok ||
-    (roleTok.kind !== 'identifier' && roleTok.kind !== 'keyword')
-  ) {
+
+  if (!roleTok || (roleTok.kind !== 'identifier' && roleTok.kind !== 'keyword')) {
     d.error(`Expected role name after \`${effect}\``, roleTok)
     return null
   }
 
   const arrowTok = d.peek()
+
   if (!arrowTok || arrowTok.kind !== 'arrow') {
     d.error('Expected `->` after role name', arrowTok)
     return null
   }
+
   d.advance()
 
   const agentKw = d.peek()
+
   if (
     !(
       agentKw &&
@@ -367,25 +391,22 @@ function parseGrant(
     d.error('Expected `agent` or `workflow` after `->`', agentKw)
     return null
   }
+
   const isWorkflow = agentKw.value === 'workflow'
   d.advance()
 
   const agentTok = d.advance()
   let agent: string
   let agentRange: SourceRange
+
   if (agentTok?.kind === 'star') {
     if (isWorkflow) {
-      d.error(
-        'Workflow grants must name one workflow; wildcard grants are not supported',
-        agentTok,
-      )
+      d.error('Workflow grants must name one workflow; wildcard grants are not supported', agentTok)
     }
+
     agent = '*'
     agentRange = agentTok.range as SourceRange
-  } else if (
-    agentTok &&
-    (agentTok.kind === 'identifier' || agentTok.kind === 'keyword')
-  ) {
+  } else if (agentTok && (agentTok.kind === 'identifier' || agentTok.kind === 'keyword')) {
     agent = agentTok.value as string
     agentRange = agentTok.range as SourceRange
   } else {
@@ -403,42 +424,57 @@ function parseGrant(
     if (isWorkflow) {
       d.error('Workflow grants do not accept a body', d.peek())
     }
+
     d.advance()
+
     while (!d.eof()) {
       const t = d.peek()
+
       if (!t || t.kind === 'rbrace') {
         break
       }
+
       if (t.kind === 'block_comment') {
         d.advance()
         continue
       }
+
       const key = d.parsePropertyKey()
+
       if (!key) {
         break
       }
+
       if (!d.expect('colon')) {
         d.error('Expected : after grant key', d.peek())
         break
       }
+
       if (key === 'workflows') {
         const list = parseNameList(d)
+
         if (list) {
           workflows = list.names
           workflowsRanges = list.ranges
         }
+
         continue
       }
+
       if (key === 'tools') {
         const list = parseNameList(d)
+
         if (list) {
           tools = list.names
           toolsRanges = list.ranges
         }
+
         continue
       }
+
       d.parseValue()
     }
+
     endTok = d.expect('rbrace') ?? endTok
   }
 
@@ -463,6 +499,7 @@ export function parsePolicyBlock(
   docComment: string | undefined,
 ): PolicyDecl | null {
   const start = d.expect('keyword')
+
   if (!start || (start.value as string) !== 'policy') {
     return null
   }
@@ -475,33 +512,40 @@ export function parsePolicyBlock(
 
   const grants: PolicyGrant[] = []
   let files: FilePolicySettings | undefined
+
   while (!d.eof()) {
     const t = d.peek()
+
     if (!t || t.kind === 'rbrace') {
       break
     }
+
     if (t.kind === 'block_comment') {
       d.advance()
       continue
     }
-    if (
-      (t.kind === 'keyword' || t.kind === 'identifier') &&
-      t.value === 'files'
-    ) {
+
+    if ((t.kind === 'keyword' || t.kind === 'identifier') && t.value === 'files') {
       d.advance()
       const parsed = parseFilesBlock(d, t)
+
       if (parsed) {
         files = parsed
       }
+
       continue
     }
+
     if (t.kind === 'keyword' && (t.value === 'allow' || t.value === 'deny')) {
       const grant = parseGrant(d, t.value)
+
       if (grant) {
         grants.push(grant)
       }
+
       continue
     }
+
     // Unexpected token: report once and skip it to avoid looping.
     d.error('Expected `files`, `allow`, or `deny` in policy block', t)
     d.advance()

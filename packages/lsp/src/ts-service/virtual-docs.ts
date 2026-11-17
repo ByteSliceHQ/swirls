@@ -1,3 +1,6 @@
+import type { Position } from 'vscode-languageserver'
+import type { TextDocument } from 'vscode-languageserver-textdocument'
+
 import type {
   DatabaseDecl,
   MigrationDecl,
@@ -10,8 +13,7 @@ import type {
   WorkflowDecl,
 } from '@swirls/language'
 import type { WorkspaceResourceIndex } from '@swirls/language/workspace'
-import type { Position } from 'vscode-languageserver'
-import type { TextDocument } from 'vscode-languageserver-textdocument'
+
 import type { TsSwirlsBinding } from '../ts-bindings'
 import {
   generateContextTypePreamble,
@@ -21,14 +23,9 @@ import {
   getRootNode,
   mergedWorkflowDecls,
 } from './context-types'
-import {
-  integrationActionsForAst,
-  integrationConnectionsForAst,
-} from './integration-types'
-import {
-  getExpectedReturnType,
-  getExpectedReturnTypePreamble,
-} from './return-types'
+import type { WorkspaceFileReader } from './integration-types'
+import { integrationActionsForAst, integrationConnectionsForAst } from './integration-types'
+import { getExpectedReturnType, getExpectedReturnTypePreamble } from './return-types'
 
 /** Minimal graph for `.ts.swirls` files with no parent binding. */
 const UNBOUND_STANDALONE_WORKFLOW: WorkflowDecl = {
@@ -61,10 +58,12 @@ const UNBOUND_NODE = UNBOUND_STANDALONE_WORKFLOW.nodes[0]!
 function wholeDocumentSourceRange(doc: TextDocument): SourceRange {
   const lineCount = doc.lineCount
   const lastIdx = Math.max(0, lineCount - 1)
+
   const lastLineText = doc.getText({
     start: { line: lastIdx, character: 0 },
     end: { line: lastIdx, character: Number.MAX_SAFE_INTEGER },
   })
+
   const text = doc.getText()
 
   return {
@@ -164,7 +163,7 @@ export interface TsBlockInfo {
   /** Workspace index for cross-file action/schema resolution. */
   workspace?: WorkspaceResourceIndex
   /** Read project files by path relative to workspace root (for GraphQL schema sidecars). */
-  readWorkspaceFile?: import('./integration-types').WorkspaceFileReader
+  readWorkspaceFile?: WorkspaceFileReader
   /**
    * Managed `database` blocks visible to this block (current file merged with
    * the workspace index); used to type `context.db`.
@@ -182,11 +181,9 @@ export interface TsBlockInfo {
  * Databases visible to TS blocks in a file: current-file decls plus
  * workspace-indexed ones from other files (current file wins on name clash).
  */
-function mergedDatabases(
-  ast: SwirlsFile,
-  workspace?: WorkspaceResourceIndex,
-): DatabaseDecl[] {
+function mergedDatabases(ast: SwirlsFile, workspace?: WorkspaceResourceIndex): DatabaseDecl[] {
   const out = [...(ast.databases ?? [])]
+
   if (workspace) {
     for (const [name, decl] of workspace.databaseBlocks) {
       if (!out.some((d) => d.name === name)) {
@@ -194,6 +191,7 @@ function mergedDatabases(
       }
     }
   }
+
   return out
 }
 
@@ -205,20 +203,21 @@ function collectTsBlocksFromGraph(
   actions: SwirlsFile['actions'],
   workspace: WorkspaceResourceIndex | undefined,
   databases: DatabaseDecl[],
-  readWorkspaceFile?: import('./integration-types').WorkspaceFileReader,
+  readWorkspaceFile?: WorkspaceFileReader,
 ): TsBlockInfo[] {
   const blocks: TsBlockInfo[] = []
   const pgBlocks = ast.postgres ?? []
   const streamDecls = ast.streams ?? []
   const allWorkflows = mergedWorkflowDecls(ast, workspace)
+
   for (const node of graph.nodes) {
     for (const [configKey, value] of Object.entries(node.configFields)) {
       if (value?.kind === 'ts_block' && value.innerRange) {
         const loopHost =
-          node.type === 'while' &&
-          (configKey === 'condition' || configKey === 'update')
+          node.type === 'while' && (configKey === 'condition' || configKey === 'update')
             ? node
             : undefined
+
         blocks.push({
           code: value.code,
           innerRange: value.innerRange,
@@ -241,6 +240,7 @@ function collectTsBlocksFromGraph(
         })
       }
     }
+
     if (node.subgraph) {
       const subGraph: WorkflowDecl = {
         name: `${graph.name}__${node.name}__subgraph`,
@@ -250,11 +250,8 @@ function collectTsBlocksFromGraph(
         flowRange: node.subgraph.flowRange,
         range: node.subgraph.range,
       }
-      if (
-        node.type === 'map' ||
-        node.type === 'fanout' ||
-        node.type === 'while'
-      ) {
+
+      if (node.type === 'map' || node.type === 'fanout' || node.type === 'while') {
         blocks.push(
           ...collectTsBlocksFromGraph(
             subGraph,
@@ -270,6 +267,7 @@ function collectTsBlocksFromGraph(
       }
     }
   }
+
   return blocks
 }
 
@@ -280,7 +278,7 @@ export function collectTsBlocks(
   ast: SwirlsFile,
   opts?: {
     workspace?: WorkspaceResourceIndex
-    readWorkspaceFile?: import('./integration-types').WorkspaceFileReader
+    readWorkspaceFile?: WorkspaceFileReader
   },
 ): TsBlockInfo[] {
   const blocks: TsBlockInfo[] = []
@@ -290,6 +288,7 @@ export function collectTsBlocks(
   const actions = integrationActionsForAst(ast, opts?.workspace)
   const databases = mergedDatabases(ast, opts?.workspace)
   const allWorkflows = mergedWorkflowDecls(ast, opts?.workspace)
+
   for (const graph of ast.workflows) {
     blocks.push(
       ...collectTsBlocksFromGraph(
@@ -307,6 +306,7 @@ export function collectTsBlocks(
 
   for (const migration of ast.migrations ?? []) {
     const op = migration.operation
+
     if (op?.kind === 'ts_block' && op.innerRange) {
       blocks.push({
         code: op.code,
@@ -330,7 +330,9 @@ export function collectTsBlocks(
     const referencedWorkflow =
       ast.workflows.find((g) => g.name === stream.workflowName) ??
       opts?.workspace?.workflowBlocks.get(stream.workflowName)
+
     const workflowForBlock = referencedWorkflow ?? UNBOUND_STANDALONE_WORKFLOW
+
     const rootNode = referencedWorkflow
       ? (getRootNode(referencedWorkflow) ?? referencedWorkflow.nodes[0])
       : UNBOUND_NODE
@@ -342,6 +344,7 @@ export function collectTsBlocks(
     for (const sv of stream.versions ?? []) {
       for (const configKey of ['condition', 'prepare'] as const) {
         const value = sv[configKey]
+
         if (value?.kind === 'ts_block' && value.innerRange) {
           blocks.push({
             code: value.code,
@@ -372,11 +375,7 @@ export function collectTsBlocks(
 /**
  * Check if a position (0-based line, 0-based character) is inside the given range (1-based line/column).
  */
-export function positionInRange(
-  line: number,
-  character: number,
-  range: SourceRange,
-): boolean {
+export function positionInRange(line: number, character: number, range: SourceRange): boolean {
   const start = range.start
   const end = range.end
 
@@ -407,24 +406,31 @@ export function offsetInInnerRangeCode(
   if (!positionInRange(position.line, position.character, innerRange)) {
     return null
   }
+
   const start = {
     line: innerRange.start.line - 1,
     character: innerRange.start.column - 1,
   }
+
   const end = {
     line: innerRange.end.line - 1,
     character: innerRange.end.column - 1,
   }
+
   const dStart = document.offsetAt(start)
   const dPos = document.offsetAt(position)
   const dEnd = document.offsetAt(end)
+
   if (dPos < dStart || dPos > dEnd) {
     return null
   }
+
   const off = dPos - dStart
+
   if (off < 0 || off > codeLength) {
     return null
   }
+
   return off
 }
 
@@ -541,20 +547,21 @@ export function virtualToOriginal(
   virtualChar: number,
 ): { line: number; character: number } {
   const preambleLines = getPreambleLineCount(block)
+
   if (virtualLine < preambleLines) {
     return {
       line: block.innerRange.start.line - 1,
       character: block.innerRange.start.column - 1,
     }
   }
-  const originalLine =
-    block.innerRange.start.line - 1 + (virtualLine - preambleLines)
+
+  const originalLine = block.innerRange.start.line - 1 + (virtualLine - preambleLines)
+
   // The block's first line starts mid-line in the source (after `@ts {`), so
   // its columns are offset; later lines start at column 0 in both.
   const originalChar =
-    virtualLine === preambleLines
-      ? virtualChar + (block.innerRange.start.column - 1)
-      : virtualChar
+    virtualLine === preambleLines ? virtualChar + (block.innerRange.start.column - 1) : virtualChar
+
   return { line: originalLine, character: originalChar }
 }
 
@@ -570,10 +577,12 @@ export function originalToVirtual(
   const preambleLines = getPreambleLineCount(block)
   const startLine = block.innerRange.start.line - 1
   const virtualLine = preambleLines + (originalLine - startLine)
+
   const virtualChar =
     originalLine === startLine
       ? Math.max(0, originalChar - (block.innerRange.start.column - 1))
       : originalChar
+
   return { line: virtualLine, character: virtualChar }
 }
 

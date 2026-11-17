@@ -3,63 +3,55 @@ import { deviceSelectorSchema } from './device'
 
 export { decisionNodeConfigSchema } from './decision'
 
-import type {
-  JSONSchema7,
-  JSONSchema7Type,
-  JSONSchema7TypeName,
-} from 'json-schema'
+import type { JSONSchema7, JSONSchema7Type, JSONSchema7TypeName } from 'json-schema'
 import { z } from 'zod'
 
 export const positionSchema = z.object({ x: z.number(), y: z.number() })
 
-export const jsonSchemaSchema: z.ZodType<JSONSchema7, JSONSchema7> = z.lazy(
-  () =>
-    z.object({
-      $schema: z.string().optional(),
-      $id: z.string().optional(),
-      $ref: z.string().optional(),
-      $defs: z.record(z.string(), jsonSchemaSchema).optional(),
-      type: z
-        .union([
-          z.custom<JSONSchema7TypeName>(),
-          z.array(z.custom<JSONSchema7TypeName>()),
-        ])
-        .optional(),
-      properties: z.record(z.string(), jsonSchemaSchema).optional(),
-      required: z.array(z.string()).optional(),
-      title: z.string().optional(),
-      description: z.string().optional(),
-      default: z.custom<JSONSchema7Type>().optional(),
-      examples: z.array(z.custom<JSONSchema7Type>()).optional(),
-      items: z.union([jsonSchemaSchema, z.array(jsonSchemaSchema)]).optional(),
-      additionalProperties: z.union([z.boolean(), jsonSchemaSchema]).optional(),
-      patternProperties: z.record(z.string(), jsonSchemaSchema).optional(),
-      // General validations
-      enum: z.array(z.custom<JSONSchema7Type>()).optional(),
-      const: z.custom<JSONSchema7Type>().optional(),
-      // Number validations
-      minimum: z.number().optional(),
-      maximum: z.number().optional(),
-      // String validations
-      minLength: z.number().optional(),
-      maxLength: z.number().optional(),
-      pattern: z.string().optional(),
-      /** RFC draft: hint for string encoding (e.g. text/markdown for markdown projection). */
-      contentMediaType: z.string().optional(),
-      // Array validations
-      minItems: z.number().optional(),
-      maxItems: z.number().optional(),
-      uniqueItems: z.boolean().optional(),
-      // Composition
-      allOf: z.array(jsonSchemaSchema).optional(),
-      anyOf: z.array(jsonSchemaSchema).optional(),
-      oneOf: z.array(jsonSchemaSchema).optional(),
-      not: jsonSchemaSchema.optional(),
-      if: jsonSchemaSchema.optional(),
-      else: jsonSchemaSchema.optional(),
-      // biome-ignore lint/suspicious/noThenProperty: `then` is a valid JSON Schema property
-      then: jsonSchemaSchema.optional(),
-    }),
+export const jsonSchemaSchema: z.ZodType<JSONSchema7, JSONSchema7> = z.lazy(() =>
+  z.object({
+    $schema: z.string().optional(),
+    $id: z.string().optional(),
+    $ref: z.string().optional(),
+    $defs: z.record(z.string(), jsonSchemaSchema).optional(),
+    type: z
+      .union([z.custom<JSONSchema7TypeName>(), z.array(z.custom<JSONSchema7TypeName>())])
+      .optional(),
+    properties: z.record(z.string(), jsonSchemaSchema).optional(),
+    required: z.array(z.string()).optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    default: z.custom<JSONSchema7Type>().optional(),
+    examples: z.array(z.custom<JSONSchema7Type>()).optional(),
+    items: z.union([jsonSchemaSchema, z.array(jsonSchemaSchema)]).optional(),
+    additionalProperties: z.union([z.boolean(), jsonSchemaSchema]).optional(),
+    patternProperties: z.record(z.string(), jsonSchemaSchema).optional(),
+    // General validations
+    enum: z.array(z.custom<JSONSchema7Type>()).optional(),
+    const: z.custom<JSONSchema7Type>().optional(),
+    // Number validations
+    minimum: z.number().optional(),
+    maximum: z.number().optional(),
+    // String validations
+    minLength: z.number().optional(),
+    maxLength: z.number().optional(),
+    pattern: z.string().optional(),
+    /** RFC draft: hint for string encoding (e.g. text/markdown for markdown projection). */
+    contentMediaType: z.string().optional(),
+    // Array validations
+    minItems: z.number().optional(),
+    maxItems: z.number().optional(),
+    uniqueItems: z.boolean().optional(),
+    // Composition
+    allOf: z.array(jsonSchemaSchema).optional(),
+    anyOf: z.array(jsonSchemaSchema).optional(),
+    oneOf: z.array(jsonSchemaSchema).optional(),
+    not: jsonSchemaSchema.optional(),
+    if: jsonSchemaSchema.optional(),
+    else: jsonSchemaSchema.optional(),
+    // oxlint-disable-next-line unicorn/no-thenable -- `then` is a JSON Schema keyword
+    then: jsonSchemaSchema.optional(),
+  }),
 )
 
 export const nodeTypeMap = {
@@ -187,20 +179,9 @@ export function isContentEnvelope(value: unknown): value is Content {
 }
 
 /** AI node kind: text (plain), object (structured output), image, video, embed. */
-export const aiKindSchema = z.enum([
-  'text',
-  'object',
-  'image',
-  'video',
-  'embed',
-])
+export const aiKindSchema = z.enum(['text', 'object', 'image', 'video', 'embed'])
 
-export const aiProviderSchema = z.enum([
-  'openrouter',
-  'anthropic',
-  'openai',
-  'google',
-])
+export const aiProviderSchema = z.enum(['openrouter', 'anthropic', 'openai', 'google'])
 
 /** Kind-specific options only (image: n, size, aspectRatio; others: none for now). */
 export const aiImageOptionsSchema = z.object({
@@ -348,12 +329,7 @@ export const deviceNodeConfigSchema = z.object({
   /** The operation's input: an object literal, or @ts returning an object. */
   input: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
   /** Seconds to wait for a device to collect the run before giving up on it. */
-  waitSeconds: z
-    .number()
-    .int()
-    .min(30)
-    .max(DEVICE_NODE_WAIT_SECONDS_MAX)
-    .optional(),
+  waitSeconds: z.number().int().min(30).max(DEVICE_NODE_WAIT_SECONDS_MAX).optional(),
 })
 
 export const diskNodeConfigSchema = z.object({
@@ -380,7 +356,7 @@ export const agentNodeConfigSchema = z.object({
   prompt: z.string().optional(),
   /** Capability profile to narrow the agent's tools/sandbox for this node. */
   profile: z.string().optional(),
-  /** @deprecated Legacy name for profile in older deployment snapshots. */
+  /** Legacy name for `profile`, still read from older deployment snapshots. */
   role: z.string().optional(),
   tools: z.array(z.string()).optional(),
   /** Per-call system prompt @ts override (optional). */
@@ -434,6 +410,7 @@ export const searchNodeConfigSchema = z
     if (config.provider !== 'telem') {
       return
     }
+
     for (const field of TELEM_UNSUPPORTED_SEARCH_FIELDS) {
       if (config[field] !== undefined) {
         ctx.addIssue({
@@ -443,6 +420,7 @@ export const searchNodeConfigSchema = z
         })
       }
     }
+
     if (
       config.sources !== undefined &&
       (config.sources.length !== 1 || config.sources[0] !== 'web')
@@ -496,16 +474,13 @@ export const waitNodeConfigSchema = z.object({
   secondsFromConfig: z.string().optional(),
 })
 
-const workflowNodeTypeSchema = z.union([
-  z.literal(nodeTypeMap.workflow),
-  z.literal('graph'),
-])
+const workflowNodeTypeSchema = z.union([z.literal(nodeTypeMap.workflow), z.literal('graph')])
 
 export const subgraphNodeConfigSchema = z.object({
   type: workflowNodeTypeSchema,
-  workflowId: z.string().uuid().optional(),
+  workflowId: z.uuid().optional(),
   workflow: z.string().optional(),
-  graphId: z.string().uuid().optional(),
+  graphId: z.uuid().optional(),
   graph: z.string().optional(),
   input: z.string().optional(),
 })
@@ -516,9 +491,9 @@ export const mapNodeConfigSchema = z.object({
   items: z.string().optional(),
   maxItems: z.number().optional(),
   concurrency: z.number().optional(),
-  workflowId: z.string().uuid().optional(),
+  workflowId: z.uuid().optional(),
   workflow: z.string().optional(),
-  graphId: z.string().uuid().optional(),
+  graphId: z.uuid().optional(),
   graph: z.string().optional(),
 })
 
@@ -528,9 +503,9 @@ export const fanoutNodeConfigSchema = z.object({
   items: z.string().optional(),
   maxItems: z.number().optional(),
   concurrency: z.number().optional(),
-  workflowId: z.string().uuid().optional(),
+  workflowId: z.uuid().optional(),
   workflow: z.string().optional(),
-  graphId: z.string().uuid().optional(),
+  graphId: z.uuid().optional(),
   graph: z.string().optional(),
 })
 
@@ -541,9 +516,9 @@ export const whileNodeConfigSchema = z.object({
   condition: z.string().optional(),
   update: z.string().optional(),
   maxIterations: z.number().optional(),
-  workflowId: z.string().uuid().optional(),
+  workflowId: z.uuid().optional(),
   workflow: z.string().optional(),
-  graphId: z.string().uuid().optional(),
+  graphId: z.uuid().optional(),
   graph: z.string().optional(),
 })
 
@@ -554,10 +529,7 @@ export const switchNodeConfigSchema = z.object({
       z
         .string()
         .min(1, 'Case name is required')
-        .regex(
-          /^[a-zA-Z0-9_]+$/,
-          'Case must contain only letters, numbers, and underscores',
-        ),
+        .regex(/^[a-zA-Z0-9_]+$/, 'Case must contain only letters, numbers, and underscores'),
     )
     .min(1, 'At least one case is required'),
   router: z.string().optional(),
@@ -566,10 +538,7 @@ export const switchNodeConfigSchema = z.object({
 export const reviewActionSchema = z.object({
   id: z
     .string()
-    .regex(
-      /^[a-zA-Z0-9_]+$/,
-      'Action id must contain only letters, numbers, and underscores',
-    ),
+    .regex(/^[a-zA-Z0-9_]+$/, 'Action id must contain only letters, numbers, and underscores'),
   label: z.string().min(1, 'Label is required'),
   outcome: z.enum(['approve', 'reject']),
 })
@@ -694,10 +663,7 @@ export type Position = z.infer<typeof positionSchema>
 export const resourceNameSchema = z
   .string()
   .min(1, 'Name is required')
-  .regex(
-    /^[a-zA-Z0-9_]+$/,
-    'Name must contain only letters, numbers, and underscores',
-  )
+  .regex(/^[a-zA-Z0-9_]+$/, 'Name must contain only letters, numbers, and underscores')
 
 export const formSubmissionResponseSchema = z.object({
   message: z.string(),
@@ -708,13 +674,7 @@ export const formSubmissionResponseSchema = z.object({
  * Tier for AI model classification. Used to charge different credit amounts
  * based on the cost the model has on the upstream provider (OpenRouter).
  */
-export type AIModelTier =
-  | 'embed'
-  | 'cheap'
-  | 'mid'
-  | 'frontier'
-  | 'image'
-  | 'video'
+export type AIModelTier = 'embed' | 'cheap' | 'mid' | 'frontier' | 'image' | 'video'
 
 /**
  * Credit policy for a node type. The shape varies by how the node is priced:

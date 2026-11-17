@@ -31,16 +31,16 @@ The server runs as a **stdio** process: the editor spawns it and talks over stdi
 
 ### Components
 
-| Component | Role |
-|----------|------|
-| **server.ts** | LSP connection, document sync, routing of requests to the right provider (DSL vs TS vs JSON vs SQL), diagnostics orchestration, and caching of per-document TS state. |
-| **completions.ts** | **DSL completions**: top-level keywords (`form`, `graph`, …), node types, property keys, trigger bindings (form/webhook/schedule → graph), and node names for edges. Uses the AST to suggest only valid names (e.g. graphs for trigger target). |
-| **hover.ts** | **DSL hover**: resolve the declaration at the cursor (`getDeclarationAtPosition`) and show description (and doc comment) for forms, webhooks, schedules, graphs, triggers, and nodes; special hover for the `review` property. |
-| **definition.ts** | **DSL go-to-definition**: use `getDeclarationAtPosition` and return the declaration’s `range` (e.g. the `node entry { ... }` block or the `form contact_form { ... }` block). |
-| **references.ts** | **DSL find-references**: for a node, return the node’s definition range plus every edge that uses it as source or target; for other declarations, return the definition when requested. |
-| **ts-service/** | **Embedded TypeScript**: collect all `@ts { }` regions from the AST, build “virtual” TS files (with a small preamble for Swirls context types and a function wrapper), run the TypeScript **Language Service** on them, and map positions/ranges back to the original `.swirls` file. Used for diagnostics, completions, hover, definition, and signature help inside `@ts { }`. |
-| **json-service/** | **Embedded JSON**: for each `@json { }` block (e.g. schema), run **vscode-json-languageservice** validation and map diagnostics back to the `.swirls` document. |
-| **sql-service/** | **Embedded SQL**: detect cursor inside an `@sql { }` block and provide SQL keyword (and stream/table) completions; no full SQL parser, just block detection and simple completions. |
+| Component          | Role                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **server.ts**      | LSP connection, document sync, routing of requests to the right provider (DSL vs TS vs JSON vs SQL), diagnostics orchestration, and caching of per-document TS state.                                                                                                                                                                                                            |
+| **completions.ts** | **DSL completions**: top-level keywords (`form`, `graph`, …), node types, property keys, trigger bindings (form/webhook/schedule → graph), and node names for edges. Uses the AST to suggest only valid names (e.g. graphs for trigger target).                                                                                                                                  |
+| **hover.ts**       | **DSL hover**: resolve the declaration at the cursor (`getDeclarationAtPosition`) and show description (and doc comment) for forms, webhooks, schedules, graphs, triggers, and nodes; special hover for the `review` property.                                                                                                                                                   |
+| **definition.ts**  | **DSL go-to-definition**: use `getDeclarationAtPosition` and return the declaration’s `range` (e.g. the `node entry { ... }` block or the `form contact_form { ... }` block).                                                                                                                                                                                                    |
+| **references.ts**  | **DSL find-references**: for a node, return the node’s definition range plus every edge that uses it as source or target; for other declarations, return the definition when requested.                                                                                                                                                                                          |
+| **ts-service/**    | **Embedded TypeScript**: collect all `@ts { }` regions from the AST, build “virtual” TS files (with a small preamble for Swirls context types and a function wrapper), run the TypeScript **Language Service** on them, and map positions/ranges back to the original `.swirls` file. Used for diagnostics, completions, hover, definition, and signature help inside `@ts { }`. |
+| **json-service/**  | **Embedded JSON**: for each `@json { }` block (e.g. schema), run **vscode-json-languageservice** validation and map diagnostics back to the `.swirls` document.                                                                                                                                                                                                                  |
+| **sql-service/**   | **Embedded SQL**: detect cursor inside an `@sql { }` block and provide SQL keyword (and stream/table) completions; no full SQL parser, just block detection and simple completions.                                                                                                                                                                                              |
 
 ### Embedded blocks
 
@@ -70,8 +70,8 @@ Run `bun test` in this package; structural coverage fails if an AST ref field is
 
 ## Summary
 
-| Question | Answer |
-|----------|--------|
-| What is an LSP? | A standard protocol so a single language server can provide diagnostics, completions, hover, definition, references, etc., to any LSP-capable editor. |
-| Why do we need one? | To get editor support for `.swirls` (errors, autocomplete, docs, navigation) and to reuse TypeScript/JSON (and partial SQL) support inside `@ts` / `@json` / `@sql` blocks. |
+| Question                     | Answer                                                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What is an LSP?              | A standard protocol so a single language server can provide diagnostics, completions, hover, definition, references, etc., to any LSP-capable editor.                                                                           |
+| Why do we need one?          | To get editor support for `.swirls` (errors, autocomplete, docs, navigation) and to reuse TypeScript/JSON (and partial SQL) support inside `@ts` / `@json` / `@sql` blocks.                                                     |
 | How does it use swirls-lang? | It parses and validates every file with `parse`/`validate`, uses the AST to find declarations and ranges, and uses the AST to locate `@ts` / `@json` / `@sql` blocks so it can delegate to the right embedded language service. |

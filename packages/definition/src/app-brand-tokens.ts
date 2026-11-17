@@ -46,31 +46,34 @@ export function isAppBrandTokenKey(value: string): value is AppBrandTokenKey {
 /** Quoted CSS color: hex, rgb/a, hsl/a, oklch/oklab, or transparent. */
 export function isCssColorValue(value: string): boolean {
   const trimmed = value.trim()
+
   if (trimmed === 'transparent') {
     return true
   }
+
   if (/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(trimmed)) {
     return true
   }
+
   return /^(?:oklch|oklab|rgb|rgba|hsl|hsla|hwb)\([^)]*\)$/i.test(trimmed)
 }
 
 /** CSS length used for `radius` (`8px`, `0.5rem`, `0`). */
 export function isCssLengthValue(value: string): boolean {
   const trimmed = value.trim()
+
   if (trimmed === '0') {
     return true
   }
+
   return /^-?(?:\d+|\d*\.\d+)(?:px|rem|em|%)$/.test(trimmed)
 }
 
-export function isValidAppBrandTokenValue(
-  key: AppBrandTokenKey,
-  value: string,
-): boolean {
+export function isValidAppBrandTokenValue(key: AppBrandTokenKey, value: string): boolean {
   if (key === 'radius') {
     return isCssLengthValue(value)
   }
+
   return isCssColorValue(value)
 }
 
@@ -84,9 +87,11 @@ export function resolveAppBrandTokenMap(input: {
   mode: 'light' | 'dark'
 }): AppBrandTokenMap {
   const fromMode = input.tokens?.[input.mode] ?? {}
+
   if (fromMode.brand !== undefined || input.accent === undefined) {
     return { ...fromMode }
   }
+
   return { ...fromMode, brand: input.accent }
 }
 
@@ -109,12 +114,7 @@ const TOKEN_CSS_VARS: Record<AppBrandTokenKey, readonly string[]> = {
   active: ['--accent', '--secondary', '--sidebar-accent'],
   field: ['--muted'],
   border: ['--border', '--input', '--sidebar-border'],
-  brand: [
-    '--primary',
-    '--brand',
-    '--sidebar-primary',
-    '--selection-background',
-  ],
+  brand: ['--primary', '--brand', '--sidebar-primary', '--selection-background'],
   brand_foreground: [
     '--primary-foreground',
     '--sidebar-primary-foreground',
@@ -138,9 +138,11 @@ export const appBrandTokenMapSchema = z
   .superRefine((map, ctx) => {
     for (const key of APP_BRAND_TOKEN_KEYS) {
       const value = map[key]
+
       if (value === undefined) {
         continue
       }
+
       if (!isValidAppBrandTokenValue(key, value)) {
         ctx.addIssue({
           code: 'custom',
@@ -159,20 +161,22 @@ export const appBrandTokensSchema = z
   .strict()
 
 /** Expand a sparse author map into CSS custom properties for inline styles. */
-export function brandTokensToCssVars(
-  tokens: AppBrandTokenMap,
-): Record<string, string> {
+export function brandTokensToCssVars(tokens: AppBrandTokenMap): Record<string, string> {
   const vars: Record<string, string> = {}
 
   for (const key of APP_BRAND_TOKEN_KEYS) {
     const value = tokens[key]
+
     if (value === undefined) {
       continue
     }
+
     const properties = TOKEN_CSS_VARS[key]
+
     for (const property of properties) {
       vars[property] = value
     }
+
     if (key === 'brand') {
       const focusRing = `color-mix(in srgb, ${value} 42%, transparent)`
       vars['--ring'] = focusRing
