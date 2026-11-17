@@ -32,6 +32,23 @@ function loadSwitchRouting(): { doc: TextDocument; content: string } {
 }
 
 describe('getDefinition', () => {
+  test('still resolves when another block in the file has a parse error', () => {
+    const { content } = loadSwitchRouting()
+    const broken = `${content}\nform half_typed {\n  label:\n}\n`
+    const doc = TextDocument.create(URI, 'swirls', 1, broken)
+    const flowLine = 107
+    const lineText = doc.getText({
+      start: { line: flowLine, character: 0 },
+      end: { line: flowLine, character: 200 },
+    })
+    const loc = getDefinition(
+      doc,
+      { line: flowLine, character: lineText.indexOf('root') },
+      URI,
+    )
+    expect(loc?.range.start.line).toBe(20)
+  })
+
   test('go-to-definition on node name in flow block returns node declaration', () => {
     const { doc } = loadSwitchRouting()
     const flowLine = 107

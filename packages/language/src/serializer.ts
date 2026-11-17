@@ -1,5 +1,10 @@
 /**
- * Serialize SwirlsFile AST back to .swirls source string (for formatting / round-trip).
+ * Write a SwirlsFile AST back out as `.swirls` source.
+ *
+ * The output parses to the same AST, embedded code is kept byte for byte, and
+ * serializing the result again changes nothing. It is not a formatter: the AST
+ * does not hold `//` comments or the order blocks were written in, so those are
+ * lost and blocks come out grouped by kind. Do not wire it to format-on-save.
  */
 
 import type { FileRetention } from '@swirls/definition/file-values'
@@ -158,12 +163,7 @@ function serializeReviewConfig(
 
     if (codeLikeKeys.has(k) && typeof v === 'string') {
       if (v.includes('\n')) {
-        entries.push(
-          `${keyIndent}${key}: @ts {\n${v
-            .split('\n')
-            .map((line) => `${keyIndent}  ${line}`)
-            .join('\n')}\n${keyIndent}}`,
-        )
+        entries.push(`${keyIndent}${key}: ${fenced('ts', v, keyIndent)}`)
       } else {
         entries.push(`${keyIndent}${key}: ${escapeString(v)}`)
       }
@@ -202,6 +202,37 @@ function serializeReviewConfig(
   return entries.length ? `{\n${entries.join('\n')}\n${indent}}` : '{}'
 }
 
+/**
+ * Marks a line of embedded code while the output is assembled, so a caller
+ * that indents a whole block (an inline subgraph) leaves it alone. Removed
+ * before `serialize` returns.
+ */
+const VERBATIM = '\u0000'
+
+/**
+ * Write an embedded block back exactly as it was read. The body is everything
+ * between the braces, so it is emitted verbatim: re-indenting it would change
+ * the text of any multi-line template string inside, and would grow by one
+ * level on every round trip. Only the whitespace before the closing brace is
+ * normalised. A body built in code (no leading newline) is laid out on its own
+ * lines, or kept inline when it is a single line.
+ */
+function fenced(lang: string, code: string | undefined, indent: string): string {
+  const body = (code ?? '').replace(/\s+$/, '')
+  if (body.trim() === '') {
+    return `@${lang} {\n${indent}}`
+  }
+  const sourceShaped = /^[ \t]*\r?\n/.test(body)
+  if (sourceShaped) {
+    const lines = body.replace(/^([ \t]*\r?\n)+/, '').split('\n')
+    return `@${lang} {\n${lines.map((line) => VERBATIM + line).join('\n')}\n${indent}}`
+  }
+  if (!body.includes('\n')) {
+    return `@${lang} { ${body.trim()} }`
+  }
+  return `@${lang} {\n${body}\n${indent}}`
+}
+
 function serializeConfigValue(value: ConfigValue, indent: string): string {
   switch (value.kind) {
     case 'string':
@@ -229,26 +260,12 @@ function serializeConfigValue(value: ConfigValue, indent: string): string {
       return `[${items.join(', ')}]`
     }
     case 'ts_block': {
-      const body = (value.code || '').trimEnd()
-      const inner = body
-        ? body
-            .split('\n')
-            .map((line) => `${indent}  ${line}`)
-            .join('\n')
-        : ''
-      return inner ? `@ts {\n${inner}\n${indent}}` : `@ts {\n${indent}}`
+      return fenced('ts', value.code, indent)
     }
     case 'ts_file_ref':
       return `@ts ${escapeString(value.path)}`
     case 'sql_block': {
-      const body = (value.code || '').trimEnd()
-      const inner = body
-        ? body
-            .split('\n')
-            .map((line) => `${indent}  ${line}`)
-            .join('\n')
-        : ''
-      return inner ? `@sql {\n${inner}\n${indent}}` : `@sql {\n${indent}}`
+      return fenced('sql', value.code, indent)
     }
     default:
       return '""'
@@ -281,7 +298,7 @@ function serializeForm(f: FormDecl): string {
   } else if (f.schema != null) {
     if (f.schemaBlock != null) {
       lines.push(
-        `  schema: @json {\n${(f.schemaBlock.code || '').trimEnd()}\n  }`,
+        `  schema: ${fenced('json', f.schemaBlock.code, '  ')}`,
       )
     } else {
       lines.push(`  schema: ${serializeObjectLiteral(f.schema, '  ')}`)
@@ -306,7 +323,7 @@ function serializeWebhook(w: WebhookDecl): string {
   } else if (w.schema != null) {
     if (w.schemaBlock != null) {
       lines.push(
-        `  schema: @json {\n${(w.schemaBlock.code || '').trimEnd()}\n  }`,
+        `  schema: ${fenced('json', w.schemaBlock.code, '  ')}`,
       )
     } else {
       lines.push(`  schema: ${serializeObjectLiteral(w.schema, '  ')}`)
@@ -721,7 +738,7 @@ function serializeActionSchemaField(
   }
   if (schema != null) {
     if (block != null) {
-      return `${indent}${key}: @json {\n${(block.code || '').trimEnd()}\n${indent}}`
+      return `${indent}${key}: ${fenced('json', block.code, indent)}`
     }
     return `${indent}${key}: ${serializeObjectLiteral(schema, indent)}`
   }
@@ -863,9 +880,7 @@ function serializeRoot(n: NodeDecl): string {
   } else if (n.inputSchema != null) {
     if (n.inputSchemaBlock != null) {
       lines.push(
-        '    inputSchema: @json {\n' +
-          (n.inputSchemaBlock.code || '').trimEnd() +
-          '\n    }',
+        `    inputSchema: ${fenced('json', n.inputSchemaBlock.code, '    ')}`,
       )
     } else {
       lines.push(
@@ -878,9 +893,7 @@ function serializeRoot(n: NodeDecl): string {
   } else if (n.outputSchema != null) {
     if (n.outputSchemaBlock != null) {
       lines.push(
-        '    outputSchema: @json {\n' +
-          (n.outputSchemaBlock.code || '').trimEnd() +
-          '\n    }',
+        `    outputSchema: ${fenced('json', n.outputSchemaBlock.code, '    ')}`,
       )
     } else {
       lines.push(
@@ -942,9 +955,7 @@ function serializeNode(n: NodeDecl): string {
   } else if (n.outputSchema != null) {
     if (n.outputSchemaBlock != null) {
       lines.push(
-        '    schema: @json {\n' +
-          (n.outputSchemaBlock.code || '').trimEnd() +
-          '\n    }',
+        `    schema: ${fenced('json', n.outputSchemaBlock.code, '    ')}`,
       )
     } else {
       lines.push(
@@ -999,7 +1010,9 @@ function serializeSubgraphBody(sg: NonNullable<NodeDecl['subgraph']>): string {
     const block = node.isRoot ? serializeRoot(node) : serializeNode(node)
     const indented = block
       .split('\n')
-      .map((line) => (line.length > 0 ? nest + line : ''))
+      .map((line) =>
+        line.length > 0 && !line.startsWith(VERBATIM) ? nest + line : line,
+      )
       .join('\n')
     parts.push(indented)
   }
@@ -1048,9 +1061,7 @@ function serializePostgres(r: PostgresDecl): string {
     const tableLines: string[] = []
     if (t.schemaBlock != null) {
       tableLines.push(
-        '    schema: @json {\n' +
-          (t.schemaBlock.code || '').trimEnd() +
-          '\n    }',
+        `    schema: ${fenced('json', t.schemaBlock.code, '    ')}`,
       )
     } else if (t.schema != null) {
       const json = JSON.stringify(t.schema, null, 2)
@@ -1081,7 +1092,7 @@ function serializeDatabase(d: DatabaseDecl): string {
   }
 
   lines.push(
-    '  schema: @prisma {\n' + (d.schemaSource || '').trimEnd() + '\n  }',
+    `  schema: ${fenced('prisma', d.schemaSource, '  ')}`,
   )
 
   for (const connection of d.connections ?? []) {
@@ -1193,7 +1204,7 @@ function serializeAgentProfile(profile: AgentProfileDecl): string {
     lines.push(`    description: ${escapeString(profile.description)}`)
   }
   if (profile.systemCode?.trim()) {
-    lines.push(`    system: @ts {\n${profile.systemCode.trimEnd()}\n    }`)
+    lines.push(`    system: ${fenced('ts', profile.systemCode, '    ')}`)
   }
   const tools = serializeIdentifierList(profile.tools)
   if (tools) {
@@ -1240,7 +1251,7 @@ function serializeAgent(a: AgentDecl): string {
     lines.push(`  secrets: ${a.secretsRef}`)
   }
   if (a.systemCode?.trim()) {
-    lines.push(`  system: @ts {\n${a.systemCode.trimEnd()}\n  }`)
+    lines.push(`  system: ${fenced('ts', a.systemCode, '  ')}`)
   }
   if (a.temperature != null) {
     lines.push(`  temperature: ${a.temperature}`)
@@ -1437,7 +1448,7 @@ function serializeSchemaDecl(s: SchemaDecl): string {
   } else if (s.schema != null) {
     if (s.schemaBlock != null) {
       lines.push(
-        `  schema: @json {\n${(s.schemaBlock.code || '').trimEnd()}\n  }`,
+        `  schema: ${fenced('json', s.schemaBlock.code, '  ')}`,
       )
     } else {
       lines.push(`  schema: ${serializeObjectLiteral(s.schema, '  ')}`)
@@ -1508,9 +1519,7 @@ function serializeStream(s: StreamDecl): string {
       lines.push(`      schema: ${vv.schemaRef}`)
     } else if (vv.schemaBlock != null) {
       lines.push(
-        '      schema: @json {\n' +
-          (vv.schemaBlock.code || '').trimEnd() +
-          '\n      }',
+        `      schema: ${fenced('json', vv.schemaBlock.code, '      ')}`,
       )
     } else if (vv.schema != null) {
       lines.push(`      schema: ${serializeObjectLiteral(vv.schema, '      ')}`)
@@ -1558,7 +1567,7 @@ function serializeView(v: ViewDecl): string {
     lines.push(`  schema: ${v.schemaRef}`)
   } else if (v.schemaBlock != null) {
     lines.push(
-      '  schema: @json {\n' + (v.schemaBlock.code || '').trimEnd() + '\n  }',
+      `  schema: ${fenced('json', v.schemaBlock.code, '  ')}`,
     )
   } else if (v.schema != null) {
     lines.push(`  schema: ${serializeObjectLiteral(v.schema, '  ')}`)
@@ -1689,7 +1698,7 @@ function serializeMock(m: MockDecl): string {
     lines.push(`  node: ${m.node}`)
   }
   if (m.output) {
-    lines.push(`  output: @json {\n${m.output.code.trimEnd()}\n  }`)
+    lines.push(`  output: ${fenced('json', m.output.code, '  ')}`)
   } else if (m.outputLiteral) {
     lines.push(`  output: ${JSON.stringify(m.outputLiteral)}`)
   }
@@ -1713,7 +1722,7 @@ function serializeMock(m: MockDecl): string {
     lines.push(`    auto: ${m.review.auto}`)
     if (m.review.formData) {
       lines.push(
-        `    formData: @json {\n${m.review.formData.code.trimEnd()}\n    }`,
+        `    formData: ${fenced('json', m.review.formData.code, '    ')}`,
       )
     }
     lines.push('  }')
@@ -1752,12 +1761,12 @@ function serializeAssertion(a: ExpectAssertion, indent: string): string[] {
       return [`${indent}duration: { max: ${JSON.stringify(a.max)} }`]
     case 'output':
       return a.value
-        ? [`${indent}output: @json {\n${a.value.code.trimEnd()}\n${indent}}`]
+        ? [`${indent}output: ${fenced('json', a.value.code, indent)}`]
         : [`${indent}output: ${JSON.stringify(a.literal ?? {})}`]
     case 'nodeOutput':
       return a.value
         ? [
-            `${indent}node ${a.node}.output: @json {\n${a.value.code.trimEnd()}\n${indent}}`,
+            `${indent}node ${a.node}.output: ${fenced('json', a.value.code, indent)}`,
           ]
         : [`${indent}node ${a.node}.output: ${JSON.stringify(a.literal ?? {})}`]
     case 'nodeStatus':
@@ -1768,7 +1777,7 @@ function serializeAssertion(a: ExpectAssertion, indent: string): string[] {
       return [`${indent}matches: ${JSON.stringify(a.value)}`]
     case 'equals':
       return a.value
-        ? [`${indent}equals: @json {\n${a.value.code.trimEnd()}\n${indent}}`]
+        ? [`${indent}equals: ${fenced('json', a.value.code, indent)}`]
         : [`${indent}equals: ${JSON.stringify(a.literal)}`]
     case 'similar':
       return [
@@ -1806,7 +1815,7 @@ function serializeAssertion(a: ExpectAssertion, indent: string): string[] {
 
 function serializeJudge(judge: JudgeDecl, indent: string): string {
   if (judge.ts?.kind === 'ts_block') {
-    return `${indent}judge: @ts {\n${judge.ts.code.trimEnd()}\n${indent}}`
+    return `${indent}judge: ${fenced('ts', judge.ts.code, indent)}`
   }
   const parts: string[] = []
   if (judge.rubric) {
@@ -1838,14 +1847,14 @@ function serializeCaseOrEvalBody(
   lines.push(`${indent}workflow: ${entry.workflow}`)
   if (entry.input) {
     lines.push(
-      `${indent}input: @json {\n${entry.input.code.trimEnd()}\n${indent}}`,
+      `${indent}input: ${fenced('json', entry.input.code, indent)}`,
     )
   } else if (entry.inputLiteral) {
     lines.push(`${indent}input: ${JSON.stringify(entry.inputLiteral)}`)
   }
   if (entry.dataset) {
     lines.push(
-      `${indent}dataset: @json {\n${entry.dataset.code.trimEnd()}\n${indent}}`,
+      `${indent}dataset: ${fenced('json', entry.dataset.code, indent)}`,
     )
   }
   if (entry.timeout) {
@@ -2034,5 +2043,5 @@ export function serialize(ast: SwirlsFile): string {
         .join('\n')}\n}\n`,
     )
   }
-  return parts.join('\n')
+  return parts.join('\n').replaceAll(VERBATIM, '')
 }

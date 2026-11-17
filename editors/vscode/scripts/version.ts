@@ -1,6 +1,9 @@
 /**
- * Bump Swirls language stack versions in lockstep, commit, and create a vscode-v* tag.
- * Pushing that tag runs `.github/workflows/publish-vscode-extension.yaml`.
+ * Bump the VS Code extension's version, commit, and create a vscode-v* tag.
+ *
+ * The extension bundles the language server, so its version is its own: the
+ * `@swirls/*` packages are versioned separately. Nothing publishes on a tag
+ * yet; after pushing, run `bun run publish` in editors/vscode.
  *
  * Usage: bun run scripts/version.ts [patch|minor|major] [--dry-run]
  * Default: patch
@@ -93,15 +96,10 @@ async function requireTagMissing(repoRoot: string, tag: string): Promise<void> {
 const SCRIPT_DIR = import.meta.dir
 // editors/vscode (extension package root)
 const EXTENSION_ROOT = join(SCRIPT_DIR, '..')
-// Monorepo root (three levels up from scripts/)
+// Repository root (three levels up from scripts/)
 const REPO_ROOT = join(SCRIPT_DIR, '..', '..', '..')
 
-const LSP_ROOT = join(REPO_ROOT, 'packages', 'lsp')
-const LANGUAGE_ROOT = join(REPO_ROOT, 'packages', 'language')
-
 const EXTENSION_PKG = 'editors/vscode/package.json'
-const LSP_PKG = 'packages/lsp/package.json'
-const LANGUAGE_PKG = 'packages/language/package.json'
 const LOCKFILE = 'bun.lock'
 
 const argv = process.argv.slice(2)
@@ -115,7 +113,7 @@ await requireCleanWorkingTree(REPO_ROOT)
 const currentVersion = await readPackageVersion(EXTENSION_ROOT)
 const nextVersion = bumpSemver(currentVersion, bump)
 const tag = `vscode-v${nextVersion}`
-const commitMessage = `chore(swirls-lang): bump version to ${nextVersion}`
+const commitMessage = `chore(vscode): bump version to ${nextVersion}`
 
 // Preview only: no file changes, commit, or tag.
 if (dryRun) {
@@ -128,34 +126,21 @@ if (dryRun) {
 
 await requireTagMissing(REPO_ROOT, tag)
 
-// Bump extension via bun pm; mirror same version on @swirls/lsp and @swirls/language (lockstep).
 await Bun.$`bun pm version ${bump} --no-git-tag-version --ignore-scripts`.cwd(
   EXTENSION_ROOT,
 )
-await Bun.$`bun pm pkg set version=${nextVersion}`.cwd(LSP_ROOT)
-await Bun.$`bun pm pkg set version=${nextVersion}`.cwd(LANGUAGE_ROOT)
 
-// Refresh root lockfile after all three package.json edits.
+// Refresh the root lockfile after the package.json edit.
 await Bun.$`bun install`.cwd(REPO_ROOT)
 
 const extensionVersion = await readPackageVersion(EXTENSION_ROOT)
-const lspVersion = await readPackageVersion(LSP_ROOT)
-const languageVersion = await readPackageVersion(LANGUAGE_ROOT)
-
-if (
-  extensionVersion !== nextVersion ||
-  lspVersion !== nextVersion ||
-  languageVersion !== nextVersion
-) {
+if (extensionVersion !== nextVersion) {
   throw new Error(
-    `Version mismatch after bump. extension=${extensionVersion}, lsp=${lspVersion}, language=${languageVersion}, expected=${nextVersion}`,
+    `Version mismatch after bump: got ${extensionVersion}, expected ${nextVersion}`,
   )
 }
 
-// Stage manifests + lockfile, commit, tag (push triggers CI publish).
-await Bun.$`git add ${LOCKFILE} ${EXTENSION_PKG} ${LSP_PKG} ${LANGUAGE_PKG}`.cwd(
-  REPO_ROOT,
-)
+await Bun.$`git add ${LOCKFILE} ${EXTENSION_PKG}`.cwd(REPO_ROOT)
 await Bun.$`git commit -m ${commitMessage}`.cwd(REPO_ROOT)
 await Bun.$`git tag -m ${commitMessage} ${tag}`.cwd(REPO_ROOT)
 

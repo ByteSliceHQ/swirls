@@ -56,6 +56,43 @@ export interface ParseError {
   range: SourceRange
 }
 
+type PropSpec = Record<string, 'string' | 'boolean' | 'number' | 'any'>
+
+const FORM_PROPS: PropSpec = {
+  label: 'string',
+  description: 'string',
+  enabled: 'boolean',
+  schema: 'any',
+  visibility: 'any',
+  auth: 'any',
+}
+
+const WEBHOOK_PROPS: PropSpec = {
+  label: 'string',
+  description: 'string',
+  enabled: 'boolean',
+  schema: 'any',
+  secret: 'any',
+  header: 'any',
+}
+
+const SCHEMA_PROPS: PropSpec = {
+  label: 'string',
+  description: 'string',
+  schema: 'any',
+}
+
+const SCHEDULE_PROPS: PropSpec = {
+  label: 'string',
+  description: 'string',
+  cron: 'string',
+  timezone: 'string',
+  enabled: 'boolean',
+}
+
+/** Keys that list entries rather than set a value (`page:` in an app nav). */
+const REPEATABLE_KEYS = new Set(['page'])
+
 export interface ParseResult {
   ast: SwirlsFile
   errors: ParseError[]
@@ -175,6 +212,47 @@ class Parser {
         `Unexpected end of file: expected "${closer}" to close the "${unclosed.kind === 'lbrace' ? '{' : '['}" on line ${unclosed.range.start.line}`,
         null,
       )
+    }
+  }
+
+  /**
+   * A key written twice in one `{ }` scope is a mistake in every block kind:
+   * the second value silently replaced the first. Block parsers that already
+   * report it are not repeated here.
+   */
+  private reportDuplicateKeys(): void {
+    const reportedLines = new Set(this.errors.map((e) => e.range.start.line))
+    const scopes: Set<string>[] = []
+    for (let i = 0; i < this.tokens.length; i++) {
+      const t = this.tokens[i]
+      if (!t) {
+        continue
+      }
+      if (t.kind === 'lbrace' || t.kind === 'lbracket') {
+        scopes.push(new Set())
+        continue
+      }
+      if (t.kind === 'rbrace' || t.kind === 'rbracket') {
+        scopes.pop()
+        continue
+      }
+      const scope = scopes[scopes.length - 1]
+      if (
+        !scope ||
+        (t.kind !== 'identifier' && t.kind !== 'keyword') ||
+        this.tokens[i + 1]?.kind !== 'colon'
+      ) {
+        continue
+      }
+      const key = String(t.value)
+      if (
+        scope.has(key) &&
+        !REPEATABLE_KEYS.has(key) &&
+        !reportedLines.has(t.range.start.line)
+      ) {
+        this.error(`Duplicate property "${key}"`, t)
+      }
+      scope.add(key)
     }
   }
 
@@ -680,6 +758,7 @@ class Parser {
       this.skipToNextBlock()
     }
 
+    this.reportDuplicateKeys()
     this.reportUnclosedDelimiters()
     return { ast, errors: this.errors }
   }
@@ -758,6 +837,8 @@ class Parser {
     authRef?: FormDecl['authRef']
   } {
     const out: Record<string, unknown> = {}
+    const seen = new Set<string>()
+    const spec = FORM_PROPS
     let schemaBlock: JsonBlockInfo | undefined
     let schemaRef: string | undefined
     let schemaRefRange: SourceRange | undefined
@@ -777,11 +858,14 @@ class Parser {
         continue
       }
 
+      const keyTok = this.peek()
       const key = this.parsePropertyKey()
 
       if (!key) {
         break
       }
+
+      this.checkPropKey('form', spec, seen, key, keyTok)
 
       if (key === 'visibility') {
         // `visibility:` is a key:value pair matching the rest of the form
@@ -887,9 +971,13 @@ class Parser {
         }
       }
 
+      const valueTok = this.peek()
       const value = this.parseValue()
 
-      if (value !== undefined) {
+      if (
+        value !== undefined &&
+        this.checkPropType(spec, key, value, valueTok)
+      ) {
         out[key] = value
       }
     }
@@ -957,6 +1045,8 @@ class Parser {
     header?: WebhookDecl['header']
   } {
     const out: Record<string, unknown> = {}
+    const seen = new Set<string>()
+    const spec = WEBHOOK_PROPS
     let schemaBlock: JsonBlockInfo | undefined
     let schemaRef: string | undefined
     let schemaRefRange: SourceRange | undefined
@@ -975,11 +1065,14 @@ class Parser {
         continue
       }
 
+      const keyTok = this.peek()
       const key = this.parsePropertyKey()
 
       if (!key) {
         break
       }
+
+      this.checkPropKey('webhook', spec, seen, key, keyTok)
 
       if (!this.expect('colon')) {
         this.error('Expected :', this.peek())
@@ -1094,9 +1187,13 @@ class Parser {
         continue
       }
 
+      const valueTok = this.peek()
       const value = this.parseValue()
 
-      if (value !== undefined) {
+      if (
+        value !== undefined &&
+        this.checkPropType(spec, key, value, valueTok)
+      ) {
         out[key] = value
       }
     }
@@ -1135,7 +1232,7 @@ class Parser {
     }
 
     const { props, schemaBlock, schemaRef, schemaRefRange } =
-      this.parseResourceProps()
+      this.parseResourceProps('schema', SCHEMA_PROPS)
     const end = this.expect('rbrace') ?? this.peek()
 
     return {
@@ -1174,7 +1271,7 @@ class Parser {
       return null
     }
 
-    const { props } = this.parseResourceProps() as {
+    const { props } = this.parseResourceProps('schedule', SCHEDULE_PROPS) as {
       props: Record<string, unknown> & { cron?: string; timezone?: string }
     }
 
@@ -1285,6 +1382,10 @@ class Parser {
           this.error('Expected secret type identifier (managed)', typeTok)
         }
       } else {
+        this.error(
+          `Unknown secret property "${key}"; expected label, description, type, vars`,
+          t,
+        )
         this.parseValue()
       }
     }
@@ -1423,13 +1524,17 @@ class Parser {
     }
   }
 
-  private parseResourceProps(): {
+  private parseResourceProps(
+    block: string,
+    spec: PropSpec,
+  ): {
     props: Record<string, unknown>
     schemaBlock?: JsonBlockInfo
     schemaRef?: string
     schemaRefRange?: SourceRange
   } {
     const out: Record<string, unknown> = {}
+    const seen = new Set<string>()
     let schemaBlock: JsonBlockInfo | undefined
     let schemaRef: string | undefined
     let schemaRefRange: SourceRange | undefined
@@ -1446,11 +1551,14 @@ class Parser {
         continue
       }
 
+      const keyTok = this.peek()
       const key = this.parsePropertyKey()
 
       if (!key) {
         break
       }
+
+      this.checkPropKey(block, spec, seen, key, keyTok)
 
       if (!this.expect('colon')) {
         this.error('Expected :', this.peek())
@@ -1496,14 +1604,73 @@ class Parser {
         }
       }
 
+      const valueTok = this.peek()
       const value = this.parseValue()
 
-      if (value !== undefined) {
+      if (
+        value !== undefined &&
+        this.checkPropType(spec, key, value, valueTok)
+      ) {
         out[key] = value
       }
     }
 
     return { props: out, schemaBlock, schemaRef, schemaRefRange }
+  }
+
+  /**
+   * Report a key the block does not define, or one given twice. The value is
+   * still parsed by the caller so the parser stays aligned with the source.
+   */
+  private checkPropKey(
+    block: string,
+    spec: PropSpec,
+    seen: Set<string>,
+    key: string,
+    keyTok: Token | null,
+  ): void {
+    if (!(key in spec)) {
+      this.error(
+        `Unknown ${block} property "${key}"; expected ${Object.keys(spec).join(', ')}`,
+        keyTok,
+      )
+      return
+    }
+    if (seen.has(key)) {
+      this.error(`Duplicate ${block} property "${key}"`, keyTok)
+    }
+    seen.add(key)
+  }
+
+  /** Report a property that appears twice in one block. */
+  private noteProp(
+    seen: Set<string>,
+    block: string,
+    keyTok: Token,
+    key = String(keyTok.value),
+  ): void {
+    if (seen.has(key)) {
+      this.error(`Duplicate ${block} property "${key}"`, keyTok)
+    }
+    seen.add(key)
+  }
+
+  /** False (after reporting) when a value has the wrong type for its key. */
+  private checkPropType(
+    spec: PropSpec,
+    key: string,
+    value: unknown,
+    valueTok: Token | null,
+  ): boolean {
+    const expected = spec[key]
+    if (expected === undefined) {
+      return false
+    }
+    if (expected === 'any' || typeof value === expected) {
+      return true
+    }
+    this.error(`"${key}" must be a ${expected}`, valueTok)
+    return false
   }
 
   private parsePropertyKey(): string | null {
@@ -1905,6 +2072,8 @@ class Parser {
     let concurrency: number | undefined
     let executionTokenTtl: string | undefined
     let flowRange: SourceRange | undefined
+    const seen = new Set<string>()
+    const block = isSubgraph ? 'subgraph' : 'workflow'
 
     while (!this.eof()) {
       const t = this.peek()
@@ -1978,6 +2147,7 @@ class Parser {
         if (isSubgraph) {
           this.error('label is not valid inside subgraph { }', t)
         }
+        this.noteProp(seen, block, t)
         this.advance()
         this.expect('colon')
 
@@ -1985,6 +2155,8 @@ class Parser {
 
         if (typeof v === 'string') {
           label = v
+        } else if (v !== undefined) {
+          this.error('"label" must be a string', t)
         }
 
         continue
@@ -1994,12 +2166,15 @@ class Parser {
         if (isSubgraph) {
           this.error('description is not valid inside subgraph { }', t)
         }
+        this.noteProp(seen, block, t)
         this.advance()
         this.expect('colon')
         const v = this.parseValue()
 
         if (typeof v === 'string') {
           description = v
+        } else if (v !== undefined) {
+          this.error('"description" must be a string', t)
         }
 
         continue
@@ -2009,11 +2184,14 @@ class Parser {
         if (isSubgraph) {
           this.error('concurrency is not valid inside subgraph { }', t)
         }
+        this.noteProp(seen, block, t)
         this.advance()
         this.expect('colon')
         const v = this.parseValue()
         if (typeof v === 'number') {
           concurrency = v
+        } else if (v !== undefined) {
+          this.error('"concurrency" must be a number', t)
         }
         continue
       }
@@ -2022,6 +2200,7 @@ class Parser {
         if (isSubgraph) {
           this.error('executionTokenTtl is not valid inside subgraph { }', t)
         }
+        this.noteProp(seen, block, t)
         this.advance()
         this.expect('colon')
         const v = this.parseValue()
@@ -2070,6 +2249,23 @@ class Parser {
         }
       }
 
+      // Anything else is not part of the block. Say so instead of dropping
+      // it: a misspelt property would otherwise vanish without a trace.
+      if (
+        (t.kind === 'identifier' || t.kind === 'keyword') &&
+        this.tokens[this.index + 1]?.kind === 'colon'
+      ) {
+        this.error(`Unknown ${block} property "${String(t.value)}"`, t)
+        this.advance()
+        this.advance()
+        const valueTok = this.peek()
+        if (valueTok) {
+          this.parseConfigValue(valueTok)
+        }
+        continue
+      }
+
+      this.error(`Unexpected token in ${block} block`, t)
       this.advance()
     }
 
@@ -2219,6 +2415,7 @@ class Parser {
     }
 
     const configFields: Record<string, ConfigValue> = {}
+    const seenProps = new Set<string>()
     let typeVal = 'code'
     let labelVal = 'root'
     let descriptionVal: string | undefined
@@ -2255,6 +2452,8 @@ class Parser {
       if (!key) {
         break
       }
+
+      this.noteProp(seenProps, 'node', t, key)
 
       if (!this.expect('colon')) {
         break
@@ -2484,6 +2683,7 @@ class Parser {
     }
 
     const configFields: Record<string, ConfigValue> = {}
+    const seenProps = new Set<string>()
     let typeVal = 'code'
     let labelVal = nameTok.value as string
     let descriptionVal: string | undefined
@@ -2526,6 +2726,8 @@ class Parser {
       if (!key) {
         break
       }
+
+      this.noteProp(seenProps, 'node', t, key)
 
       /** `subgraph { ... }` has no colon (unlike other node properties). */
       if (key === 'subgraph') {

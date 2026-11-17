@@ -805,10 +805,6 @@ export function getDefinition(
 ): Location | Location[] | null {
   const result = parse(document.getText())
 
-  if (result.errors.length > 0) {
-    return null
-  }
-
   const resourceLoc = tryStandaloneResourceDefinition(
     position,
     result.ast,

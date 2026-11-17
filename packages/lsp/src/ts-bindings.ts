@@ -69,9 +69,6 @@ function addBinding(absPath: string, binding: TsSwirlsBinding): void {
 export function indexDslDocument(parentUri: string, text: string): void {
   removeBindingsForParent(parentUri)
   const result = parse(text)
-  if (result.errors.length > 0) {
-    return
-  }
 
   let parentPath: string
   try {

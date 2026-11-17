@@ -8,8 +8,8 @@
 import './stdio-guard'
 
 import fs, { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   validate,
   validateTsFileRefs,
@@ -25,6 +25,7 @@ import {
   emptyWorkspaceResourceIndex,
   type SwirlsWorkspaceFileSystem,
   type WorkspaceResourceIndex,
+  collectSwirlsFiles,
 } from '@swirls/language/workspace'
 import ts from 'typescript'
 import {
@@ -249,6 +250,85 @@ function invalidateWorkspaceIndices(): void {
   workspaceIndexCache.clear()
 }
 
+/** Files changed on disk: forget what was read from it so it is read again. */
+function invalidateDiskBindings(): void {
+  for (const uri of diskBindingParents) {
+    removeBindingsForParent(uri)
+  }
+  diskBindingParents.clear()
+  diskBindingRoots.clear()
+}
+
+/** Roots whose unopened `.swirls` files have had their `@ts "…"` targets indexed. */
+const diskBindingRoots = new Set<string>()
+/** Parent URIs indexed from disk rather than from an open document. */
+const diskBindingParents = new Set<string>()
+
+function openDocumentPaths(): Set<string> {
+  const open = new Set<string>()
+  for (const doc of documents.all()) {
+    const fsPath = tryFileURIToPath(doc.uri)
+    if (fsPath !== null) {
+      open.add(fsPath)
+    }
+  }
+  return open
+}
+
+function indexDslFileFromDisk(fsPath: string): void {
+  const uri = pathToFileURL(fsPath).toString()
+  if (!isDslSwirlsUri(uri)) {
+    return
+  }
+  try {
+    indexDslDocument(uri, fs.readFileSync(fsPath, 'utf8'))
+    diskBindingParents.add(uri)
+  } catch {
+    // unreadable file: nothing to bind
+  }
+}
+
+/**
+ * A `.ts.swirls` file gets its `context` type from the `.swirls` file that
+ * references it. That parent is usually not open, so read the candidates from
+ * disk once: the whole workspace folder, or with no folder the file's own
+ * directory and the one above it.
+ */
+function ensureDiskBindings(tsFileUri: string): void {
+  const filePath = tryFileURIToPath(tsFileUri)
+  if (filePath === null) {
+    return
+  }
+  const cwd = getWorkspaceCwdForUri(tsFileUri)
+  const root = cwd ?? dirname(filePath)
+  if (diskBindingRoots.has(root)) {
+    return
+  }
+  diskBindingRoots.add(root)
+  const open = openDocumentPaths()
+  let candidates: string[] = []
+  try {
+    if (cwd !== null) {
+      candidates = collectSwirlsFiles({ cwd }).map((rel) => resolve(cwd, rel))
+    } else {
+      for (const dir of [root, dirname(root)]) {
+        for (const name of fs.readdirSync(dir)) {
+          if (name.endsWith('.swirls')) {
+            candidates.push(join(dir, name))
+          }
+        }
+      }
+    }
+  } catch {
+    return
+  }
+  for (const candidate of candidates) {
+    if (!open.has(candidate)) {
+      indexDslFileFromDisk(candidate)
+    }
+  }
+}
+
 /** Per-document cache: one TypeScript Program (LS) for all @ts { } blocks, keyed by document version. */
 interface DocumentTsCache {
   version: number
@@ -305,10 +385,6 @@ function getDocumentTsCache(
   const text = document.getText()
   const result = parse(text)
 
-  if (result.errors.length > 0) {
-    evictTsCache(documentTsCache, uri)
-    return null
-  }
 
   const blocks = collectTsBlocksForUri(uri, result.ast)
   const contentMap = new Map<string, string>()
@@ -342,6 +418,7 @@ function getStandaloneDocumentTsCache(
     return existing
   }
 
+  ensureDiskBindings(uri)
   const bindings = getBindingsForTsFileUri(uri)
   const { block, ambiguous, unbound } = buildStandaloneTsBlockInfoFromBindings(
     document,
@@ -647,6 +724,15 @@ async function refreshDiagnostics(
   document: TextDocument,
 ): Promise<void> {
   if (isDslSwirlsUri(uri)) {
+    // The open buffer replaces whatever was read from disk for this file.
+    const fsPath = tryFileURIToPath(uri)
+    if (fsPath !== null) {
+      const diskUri = pathToFileURL(fsPath).toString()
+      if (diskUri !== uri && diskBindingParents.delete(diskUri)) {
+        removeBindingsForParent(diskUri)
+      }
+      diskBindingParents.delete(uri)
+    }
     indexDslDocument(uri, document.getText())
     await refreshAllStandaloneDiagnostics()
   }
@@ -866,7 +952,7 @@ connection.onDefinition((params) => {
   }
 
   const parseResult = parse(doc.getText())
-  if (parseResult.errors.length === 0) {
+  {
     const prismaBlock = findPrismaBlockAtPosition(
       collectPrismaBlocks(parseResult.ast),
       params.position.line,
@@ -946,7 +1032,7 @@ connection.onCompletion((params) => {
     const text = doc.getText()
     const parseResult = parse(text)
 
-    if (parseResult.errors.length === 0) {
+    {
       const prismaBlock = findPrismaBlockAtPosition(
         collectPrismaBlocks(parseResult.ast),
         params.position.line,
@@ -1245,7 +1331,7 @@ connection.onHover((params) => {
     // Not inside a ts block: try swirls-level hover (form, graph, node, etc.)
     const result = parse(doc.getText())
 
-    if (result.errors.length === 0) {
+    {
       const prismaBlock = findPrismaBlockAtPosition(
         collectPrismaBlocks(result.ast),
         params.position.line,
@@ -1484,8 +1570,14 @@ documents.onDidClose((e) => {
     openStandaloneTsUris.delete(uri)
   }
   if (isDslSwirlsUri(uri)) {
+    // Closing the parent must not unbind its `.ts.swirls` files: fall back to
+    // what is saved on disk.
     removeBindingsForParent(uri)
     invalidateWorkspaceIndices()
+    const closedPath = tryFileURIToPath(uri)
+    if (closedPath !== null && existsSync(closedPath)) {
+      indexDslFileFromDisk(closedPath)
+    }
     void refreshAllStandaloneDiagnostics()
   }
   connection.sendDiagnostics({ uri, diagnostics: [] })
@@ -1493,6 +1585,7 @@ documents.onDidClose((e) => {
 
 connection.onDidChangeWatchedFiles(() => {
   invalidateWorkspaceIndices()
+  invalidateDiskBindings()
   for (const doc of documents.all()) {
     if (isDslSwirlsUri(doc.uri)) {
       void refreshDiagnostics(doc.uri, doc)

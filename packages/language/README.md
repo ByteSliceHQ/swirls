@@ -1,91 +1,67 @@
 # @swirls/language
 
-Parser, AST, validator, and serializer for the **.swirls** DSL (domain-specific language). A `.swirls` file describes Swirls resources—forms, webhooks, schedules, workflows, triggers, optional top-level `secret` and `auth` blocks—in a single file. This package provides the core language machinery: turning source text into a structured representation and back.
+Lexer, parser, AST, validator and serializer for the `.swirls` language. This is the reference implementation: the language server, the CLI and any runtime read `.swirls` files through it.
 
-## Components
+```ts
+import { parse, validate } from '@swirls/language'
 
-### Lexer
+const { ast, errors } = parse(source)
+const diagnostics = errors.length > 0 ? [] : validate(ast)
+```
 
-**Role:** Turn raw source text into a stream of **tokens** with **source positions**.
+## What is in the package
 
-The lexer (in `lexer.ts`) reads the file character-by-character and produces tokens such as:
+| Piece | Entry point | What it does |
+|---|---|---|
+| Lexer | `tokenize`, `Lexer` | Source text to tokens with line, column and offset. Embedded blocks (`@ts { }`, `@json { }`, `@sql { }`, `@prisma { }`, `@openui { }`) are one token each, with the range of their body. |
+| Parser | `parse` | Tokens to a `SwirlsFile` AST plus a list of `ParseError`. Hand-written recursive descent. |
+| Validator | `validate` | Semantic checks on an AST: names, references, graph shape, per-block rules. Returns `Diagnostic[]` with `error` or `warning` severity. |
+| Serializer | `serialize` | An AST back to source. |
+| Workspace | `@swirls/language/workspace` | Find the `.swirls` files of a project and index their resources, so references resolve across files. |
+| Parse cache | `createParseCache` | A content-keyed LRU around `parse`, for callers that parse the same text repeatedly (an editor, a watcher). |
 
-- **Keywords** — `form`, `webhook`, `schedule`, `workflow`, `trigger`, `secret`, `auth`, `node`, `type`, `label`, `schema`, `cron`, `review`, `persistence`, `flow`, etc.
-- **Identifiers** — resource and node names (e.g. `contact_form`, `entry`).
-- **Literals** — strings (`"..."`), numbers, booleans (`true`/`false`).
-- **Punctuation** — `{`, `}`, `[`, `]`, `:`, `,`, `->`, `-["label"]->`.
-- **Embedded blocks** — `@ts { ... }`, `@ts "path.ts.swirls"`, `@json { ... }`, `@sql { ... }` with brace-balanced bodies for `{ ... }` forms (strings/comments aware). Each `fenced_block` or `ts_path_ref` token carries the inner content/path and its range so the parser and LSP can treat embedded code as a distinct region.
+Every AST node carries a `range`, which is what editor features and diagnostics are built on.
 
-Every token has a `range` (start/end line, column, and offset). That information is essential for the parser (to attach ranges to AST nodes) and for the LSP (for diagnostics, hover, and go-to-definition).
+## Top-level blocks
 
-**Exports:** `Lexer`, `tokenize`, and types `Token`, `TokenKind`, `FencedBlockLang`.
+`form`, `webhook`, `schedule`, `workflow` (`graph` is a legacy alias), `stream`, `view`, `trigger`, `secret`, `auth`, `postgres`, `database`, `migration`, `disk`, `computer`, `operation`, `skill`, `agent`, `decision`, `mcp`, `network`, `channel`, `connection`, `connector`, `action`, `app`, `schema`, `role`, `policy`, `mock`, `playbook`, `query`.
 
-### Parser
+The files under [`examples/`](examples) cover each of them and are parsed and validated by the test suite.
 
-**Role:** Consume tokens and build an **abstract syntax tree (AST)** that represents the whole file.
+## Parsing behaviour worth knowing
 
-The parser (in `parser.ts`) is a **recursive-descent** parser: it walks the token stream and, for each top-level keyword (`form`, `webhook`, `schedule`, `workflow`, `trigger`, `secret`, `auth`), calls a dedicated parse function. It produces a `SwirlsFile` AST that contains:
+- **The parser always returns an AST.** On an error it reports it, skips to the next top-level block and carries on, so one broken block does not hide the rest of the file. Tools can keep working on the blocks that parsed.
+- **Nothing is dropped silently.** An unrecognised character, an unknown or repeated key in a block, a wrongly typed value and an unclosed brace are all reported with a range.
+- **Validate only a clean parse.** `validate` assumes the file parsed without errors; on a recovered AST it would report references to blocks that failed to parse.
 
-- `forms`, `webhooks`, `schedules`, `workflows`, `triggers`, `secrets`, `auths`
-- Optional `version`
+## The runtime's part: `LanguageHost`
 
-Each declaration (form, workflow, node, edge, trigger, etc.) has a **source range** so tools can map back to the original text. The parser also collects **parse errors** (unexpected tokens, missing braces, etc.) with ranges so the LSP can show red squiggles in the right place.
+Some rules belong to the runtime that will run the file, not to the language: which integration providers exist, and how the body of an `@openui { }` block is checked. Pass them in:
 
-**Exports:** `parse`, and types `ParseResult`, `ParseError`.
+```ts
+validate(ast, {
+  workspace, // optional: index from @swirls/language/workspace
+  host: {
+    providers: { has: (key) => catalog.has(key) },
+    openui: { extractBindings, validate },
+  },
+})
+```
 
-### AST
+With no `host` those checks are skipped: a provider only has to be a well-formed key.
 
-**Role:** Typed representation of the structure of a .swirls file.
+## Serializer limits
 
-The AST types (in `ast.ts`) define the shape of the language:
+`serialize` output parses to the same AST, keeps embedded code byte for byte, and is stable when run again. It is not a formatter. The AST does not hold `//` comments or the order blocks were written in, so comments are lost and blocks come out grouped by kind.
 
-- **SwirlsFile** — root: `version?`, `forms`, `webhooks`, `schedules`, `workflows`, `triggers`, `secrets`, `auths`.
-- **Resource declarations** — `FormDecl`, `WebhookDecl`, `ScheduleDecl` with name, label, description, schema, etc.; `SecretsDecl` and `AuthDecl` also support optional `label` and `description`.
-- **WorkflowDecl** — `nodes`, `edges`, optional `persistence`, optional `flowRange` (range of the `flow { ... }` block).
-- **NodeDecl** — `name`, `type` (e.g. `code`, `ai`, `http`), `configFields` (e.g. `code`, `prompt` as `ConfigValue`), optional `inputSchema`/`outputSchema`, `reviewConfig`.
-- **EdgeDecl** — `source`, `target`, optional `label`.
-- **TriggerDecl** — `resourceType`, `resourceName`, `workflowName`.
+## Development
 
-All declarations include a **SourceRange**. Config values can be primitives, objects, arrays, or **ts_block** / **sql_block** (code + range + innerRange) for LSP and execution. Schema fields can carry **JsonBlockInfo** (code + innerRange) when the schema was written in a `\`\`\`json` block.
+```bash
+bun test
+```
 
-**Exports:** All AST types and `SourcePosition`, `SourceRange`.
+```bash
+bun run typecheck
+```
 
-### Validator
-
-**Role:** Run **semantic checks** after parsing. The parser only checks syntax; the validator enforces Swirls rules.
-
-The validator (in `validator.ts`) uses schemas from `@swirls/definition` and the AST to produce **diagnostics** (errors and warnings) with ranges:
-
-- **Resource names** — must match the allowed pattern (e.g. `[a-zA-Z0-9_]+`).
-- **Node types** — must be one of the known types (e.g. `code`, `ai`, `http`, `switch`).
-- **Workflow structure** — edges must reference existing nodes; workflow must be a **DAG** with exactly one root (no cycles).
-- **Triggers** — must reference existing forms/webhooks/schedules and workflows.
-- **Node config** — required fields per node type (e.g. `code` for code nodes, `kind` for AI nodes).
-- **Persistence** — non-empty condition block when persistence is used.
-- **Review config** — validated against the review schema when present.
-
-**Exports:** `validate`, and type `Diagnostic`.
-
-### Serializer
-
-**Role:** Turn the AST back into **.swirls source text**.
-
-The serializer (in `serializer.ts`) walks the AST and emits the DSL string (e.g. `form name { ... }`, `workflow name { node x { ... } flow { a -> b } }`). Edge declarations are wrapped in a **flow** block. It preserves structure and uses `@json { }` / `@ts { }` / `@sql { }` where appropriate. Used for formatting and round-trip (parse → modify → serialize).
-
-**Exports:** `serialize`.
-
-## Pipeline
-
-Typical usage:
-
-1. **Lex** — `tokenize(source)` or `new Lexer(source).tokenize()` → tokens.
-2. **Parse** — `parse(source)` → `{ ast: SwirlsFile, errors: ParseError[] }`.
-3. If there are parse errors, report them and stop.
-4. **Validate** — `validate(ast)` → `Diagnostic[]`.
-5. Use `ast` for execution, tooling, or **serialize(ast)** to get source again.
-
-The LSP (in `@swirls/swirls-lsp`) uses this pipeline for diagnostics and for resolving symbols (hover, definition, references); it also uses the AST to know where `@ts { }` and `@json { }` blocks are so it can delegate to TypeScript and JSON language services.
-
-## Dependencies
-
-- **@swirls/definition** — for `nodeTypeSchema`, `resourceNameSchema`, `reviewConfigSchema` used by the validator.
+Depends on [`@swirls/definition`](../definition) for the shared schemas (resource names, node types, review config).

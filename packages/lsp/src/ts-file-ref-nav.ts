@@ -37,9 +37,6 @@ export function getTsFileRefDefinition(
   }
 
   const result = parse(document.getText())
-  if (result.errors.length > 0) {
-    return null
-  }
 
   let parentPath: string
   try {
@@ -110,9 +107,6 @@ export function getTsFileRefDocumentLinks(
   }
 
   const result = parse(document.getText())
-  if (result.errors.length > 0) {
-    return []
-  }
 
   let parentPath: string
   try {

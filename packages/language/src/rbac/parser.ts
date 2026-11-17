@@ -276,7 +276,8 @@ export function parseRoleBlock(
       continue
     }
 
-    // Unknown key: consume its value so parsing stays aligned.
+    // Unknown key: report it, then consume its value so parsing stays aligned.
+    d.error(`Unknown role property "${key}"; expected description, match`, t)
     d.parseValue()
   }
 

@@ -97,3 +97,44 @@ describe('shipped .swirls files parse cleanly', () => {
     expect(failures).toEqual([])
   })
 })
+
+describe('serialize is stable', () => {
+  const examples = path.join(import.meta.dir, '../examples')
+  const files = collectSwirlsFiles({ cwd: examples }).filter(
+    (f) => !f.endsWith('.ts.swirls'),
+  )
+
+  test(`a second pass changes nothing (${files.length} files)`, () => {
+    const unstable: string[] = []
+    for (const file of files) {
+      const first = parse(fs.readFileSync(path.join(examples, file), 'utf8'))
+      if (first.errors.length > 0) {
+        continue
+      }
+      const once = serialize(first.ast)
+      const second = parse(once)
+      if (second.errors.length > 0 || serialize(second.ast) !== once) {
+        unstable.push(file)
+      }
+    }
+    expect(unstable).toEqual([])
+  })
+
+  test('embedded code is written back verbatim, at any nesting depth', () => {
+    const source = [
+      'workflow w {',
+      '  root {',
+      '    type: code',
+      '    code: @ts {',
+      '      return `line one',
+      '  line two`',
+      '    }',
+      '  }',
+      '}',
+      '',
+    ].join('\n')
+    const once = serialize(parse(source).ast)
+    expect(once).toContain('      return `line one\n  line two`\n')
+    expect(serialize(parse(once).ast)).toBe(once)
+  })
+})

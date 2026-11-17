@@ -194,10 +194,6 @@ export function getReferences(
 ): Location[] {
   const result = parse(document.getText())
 
-  if (result.errors.length > 0) {
-    return []
-  }
-
   const swirlsDecl = resolveDeclaration(document, position, uri, result.ast)
 
   if (!swirlsDecl) {
