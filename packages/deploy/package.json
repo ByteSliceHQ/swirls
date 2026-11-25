@@ -1,6 +1,6 @@
 {
   "name": "@swirls/deploy",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Lowers .swirls source files into a Swirls deployment definition.",
   "license": "MIT",
   "repository": {
