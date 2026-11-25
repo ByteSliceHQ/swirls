@@ -30,8 +30,9 @@
     "verify": "bun run typecheck && bun run test && bun run lint && bun run fmt:check",
     "changeset": "changeset",
     "check:changeset": "bun run scripts/check-changeset.ts",
-    "version-packages": "changeset version && bun install --lockfile-only && oxfmt editors/vscode/CHANGELOG.md editors/vscode/package.json",
-    "release:extension": "bun run scripts/release-extension.ts"
+    "version-packages": "changeset version && bun install --lockfile-only && oxfmt editors/vscode/CHANGELOG.md editors/vscode/package.json packages/deploy/CHANGELOG.md packages/deploy/package.json",
+    "release:extension": "bun run scripts/release-extension.ts",
+    "release:deploy": "bun run scripts/release-deploy.ts"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
