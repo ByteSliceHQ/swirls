@@ -13,85 +13,11 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
+import { capture, changelogSection, readVersion, run, tagExists } from './release-shared'
+
 const root = resolve(import.meta.dirname, '..')
 const extensionDir = join(root, 'editors', 'vscode')
 const dryRun = process.argv.includes('--dry-run')
-
-interface CommandResult {
-  readonly exitCode: number
-  readonly output: string
-}
-
-/** Run a command, echo what it prints, and return it. */
-async function capture(
-  command: readonly string[],
-  cwd: string,
-  env: Record<string, string | undefined> = process.env,
-): Promise<CommandResult> {
-  const child = Bun.spawn([...command], { cwd, env, stderr: 'pipe', stdout: 'pipe' })
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    child.stdout.text(),
-    child.stderr.text(),
-    child.exited,
-  ])
-
-  const output = `${stdout}${stderr}`
-  process.stdout.write(output)
-
-  return { exitCode, output }
-}
-
-async function run(command: readonly string[], cwd: string): Promise<void> {
-  const { exitCode } = await capture(command, cwd)
-
-  if (exitCode !== 0) {
-    throw new Error(`${command.join(' ')} exited with ${exitCode}`)
-  }
-}
-
-async function readVersion(): Promise<string> {
-  const manifest: unknown = JSON.parse(await readFile(join(extensionDir, 'package.json'), 'utf8'))
-
-  if (
-    typeof manifest !== 'object' ||
-    manifest === null ||
-    !('version' in manifest) ||
-    typeof manifest.version !== 'string'
-  ) {
-    throw new Error('editors/vscode/package.json has no version')
-  }
-
-  return manifest.version
-}
-
-async function tagExists(tag: string): Promise<boolean> {
-  const { exitCode, output } = await capture(
-    ['git', 'ls-remote', '--tags', 'origin', `refs/tags/${tag}`],
-    root,
-  )
-
-  if (exitCode !== 0) {
-    throw new Error(`Could not list tags on origin (exit ${exitCode})`)
-  }
-
-  return output.trim().length > 0
-}
-
-/** The section of the extension's changelog for one version, without its heading. */
-export function changelogSection(changelog: string, version: string): string {
-  const lines = changelog.split('\n')
-  const start = lines.findIndex((line) => line.startsWith('## ') && line.includes(version))
-
-  if (start < 0) {
-    return ''
-  }
-
-  const rest = lines.slice(start + 1)
-  const end = rest.findIndex((line) => line.startsWith('## '))
-
-  return (end < 0 ? rest : rest.slice(0, end)).join('\n').trim()
-}
 
 /**
  * Publish to one registry. A registry that already has this version is not an error: it means an
@@ -115,10 +41,14 @@ async function publish(registry: string, command: readonly string[]): Promise<vo
 }
 
 async function main(): Promise<void> {
-  const version = await readVersion()
+  const version = await readVersion(
+    join(extensionDir, 'package.json'),
+    'editors/vscode/package.json',
+  )
+
   const tag = `vscode-v${version}`
 
-  if (!dryRun && (await tagExists(tag))) {
+  if (!dryRun && (await tagExists(tag, root))) {
     console.log(`${tag} is already released; nothing to do.`)
 
     return

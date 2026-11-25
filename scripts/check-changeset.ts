@@ -1,10 +1,15 @@
 /**
- * Fail pull requests that change what the VS Code extension ships without a changeset.
+ * Fail pull requests that change what a released unit ships without a changeset naming it.
+ *
+ * - The VS Code extension, `vscode-swirls`, ships its own source and the language server,
+ *   language and definition it bundles.
+ * - The npm package `@swirls/deploy` ships its own source and the language and definition it
+ *   compiles in.
  *
  * Skip when:
  * - the PR title starts with `chore(release)`
  * - the PR has the label `skip-changeset`
- * - the diff does not touch source that ends up in the extension
+ * - the diff does not touch source that ends up in a released unit
  */
 
 import { resolve } from 'node:path'
@@ -27,9 +32,31 @@ function argValue(argv: readonly string[], flag: string): string | undefined {
   return argv[index + 1]
 }
 
-/** Source that is bundled into the extension: its own, and the packages the language server is built from. */
-function isReleasedSourcePath(path: string): boolean {
-  if (!/^(packages\/(definition|language|lsp)|editors\/vscode)\//.test(path)) {
+interface ReleasedUnit {
+  /** The package name a changeset must name. */
+  readonly name: string
+  /** What to call it in messages. */
+  readonly label: string
+  /** Matches the directories whose source ends up in it. */
+  readonly source: RegExp
+}
+
+const releasedUnits: readonly ReleasedUnit[] = [
+  {
+    name: 'vscode-swirls',
+    label: 'the VS Code extension',
+    source: /^(packages\/(definition|language|lsp)|editors\/vscode)\//,
+  },
+  {
+    name: '@swirls/deploy',
+    label: 'the @swirls/deploy npm package',
+    source: /^packages\/(definition|language|deploy)\//,
+  },
+]
+
+/** Source under one of a unit's directories that changes what it ships: not docs, tests or tooling. */
+function isShippedSource(path: string, unit: ReleasedUnit): boolean {
+  if (!unit.source.test(path)) {
     return false
   }
 
@@ -49,23 +76,45 @@ function isReleasedSourcePath(path: string): boolean {
   return true
 }
 
+/** The package names in a changeset's front matter. */
+function changesetPackages(text: string): readonly string[] {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)
+
+  if (!match?.[1]) {
+    return []
+  }
+
+  return match[1]
+    .split(/\r?\n/)
+    .map((line) => /^\s*['"]?([^'":]+)['"]?\s*:/.exec(line)?.[1]?.trim())
+    .filter((name): name is string => name !== undefined && name.length > 0)
+}
+
 function isChangesetPath(path: string): boolean {
   return path.startsWith('.changeset/') && path.endsWith('.md') && path !== '.changeset/README.md'
 }
 
-async function changedFiles(base: string, head: string): Promise<readonly string[]> {
-  const child = Bun.spawn(['git', 'diff', '--name-only', `${base}...${head}`], {
-    cwd: resolve(import.meta.dirname, '..'),
-    stderr: 'inherit',
-    stdout: 'pipe',
-  })
+const repoRoot = resolve(import.meta.dirname, '..')
 
+async function git(args: readonly string[]): Promise<string> {
+  const child = Bun.spawn(['git', ...args], { cwd: repoRoot, stderr: 'inherit', stdout: 'pipe' })
   const output = await child.stdout.text()
   const exitCode = await child.exited
 
   if (exitCode !== 0) {
-    throw new Error(`git diff --name-only ${base}...${head} exited with ${exitCode}`)
+    throw new Error(`git ${args.join(' ')} exited with ${exitCode}`)
   }
+
+  return output
+}
+
+/** Files changed between the merge base and `head`; `filter` is a `git diff --diff-filter`. */
+async function changedFiles(
+  base: string,
+  head: string,
+  filter = 'ACDMRT',
+): Promise<readonly string[]> {
+  const output = await git(['diff', '--name-only', `--diff-filter=${filter}`, `${base}...${head}`])
 
   return output
     .split('\n')
@@ -101,29 +150,58 @@ if (labels.has('skip-changeset')) {
 }
 
 const files = await changedFiles(base, head)
-const releasedSource = files.filter(isReleasedSourcePath)
-const changesets = files.filter(isChangesetPath)
+// Changesets the PR adds or edits; one it deletes names nothing.
+const changesets = (await changedFiles(base, head, 'ACMR')).filter(isChangesetPath)
+const named = new Set<string>()
 
-if (releasedSource.length === 0) {
-  console.log('No change to what the extension ships; changeset not required.')
-  process.exit(0)
+for (const path of changesets) {
+  for (const name of changesetPackages(await git(['show', `${head}:${path}`]))) {
+    named.add(name)
+  }
 }
 
 if (changesets.length > 0) {
-  console.log(`Found changeset(s): ${changesets.join(', ')}`)
+  console.log(
+    `Found changeset(s): ${changesets.join(', ')} naming ${[...named].join(', ') || 'nothing'}`,
+  )
+}
+
+const failures: string[] = []
+
+for (const unit of releasedUnits) {
+  const shipped = files.filter((path) => isShippedSource(path, unit))
+
+  if (shipped.length === 0) {
+    console.log(`${unit.name}: nothing it ships changed.`)
+    continue
+  }
+
+  if (named.has(unit.name)) {
+    console.log(`${unit.name}: changed, and a changeset names it.`)
+    continue
+  }
+
+  failures.push(
+    [
+      `This PR changes source ${unit.label} ships but no changeset names \`${unit.name}\`.`,
+      '',
+      `Changed paths (${shipped.length}):`,
+      ...shipped.slice(0, 20).map((path) => `  - ${path}`),
+      ...(shipped.length > 20 ? [`  … and ${shipped.length - 20} more`] : []),
+      '',
+    ].join('\n'),
+  )
+}
+
+if (failures.length === 0) {
   process.exit(0)
 }
 
 console.error(
   [
-    'This PR changes source the VS Code extension ships but does not add a changeset.',
-    '',
-    `Changed paths (${releasedSource.length}):`,
-    ...releasedSource.slice(0, 20).map((path) => `  - ${path}`),
-    ...(releasedSource.length > 20 ? [`  … and ${releasedSource.length - 20} more`] : []),
-    '',
-    'Add one with `bun run changeset` (a patch or minor for `vscode-swirls`),',
-    'or apply the `skip-changeset` label when users of the extension will not notice the change.',
+    ...failures,
+    'Add one with `bun run changeset` (a patch or minor for each package named above),',
+    'or apply the `skip-changeset` label when nobody using them will notice the change.',
   ].join('\n'),
 )
 
