@@ -1,0 +1,167 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "image_request",
+        "label": "Generate Image",
+        "schema": {
+          "type": "object",
+          "required": ["description"],
+          "properties": {
+            "description": {
+              "type": "string",
+              "title": "Image Description"
+            },
+            "style": {
+              "type": "string",
+              "title": "Style",
+              "enum": ["photorealistic", "illustration", "minimalist", "3d_render"]
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "generate_image",
+        "label": "Generate Image",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract request",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "style": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "create_prompt",
+            "type": "ai",
+            "label": "Refine prompt",
+            "config": {
+              "type": "ai",
+              "kind": "text",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const req = context.nodes.root.output\n      return \"Rewrite this image description as an optimized prompt for an image generation model. Style: \" + (req.style || \"photorealistic\") + \"\\n\\nDescription: \" + req.description + \"\\n\\nReturn only the optimized prompt, nothing else.\"\n    ",
+              "temperature": 0.7
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "generate",
+            "type": "ai",
+            "label": "Generate image",
+            "config": {
+              "type": "ai",
+              "kind": "image",
+              "model": "openai/dall-e-3",
+              "prompt": " return context.nodes.create_prompt.output ",
+              "options": {
+                "n": 1,
+                "size": "1024x1024"
+              }
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "result",
+            "type": "code",
+            "label": "Format result",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        original_description: context.nodes.root.output.description,\n        optimized_prompt: context.nodes.create_prompt.output,\n        image: context.nodes.generate.output\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-10",
+        "name": "on_image_request",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "d5a05477e0ca86369827f889b57242409513c4c0c281b8decb9668e8618e34b4",
+  "sourceFingerprint": "3be47898ccd1c7fc9ba22324a50362913d05859cbea979610ad22e9c7c044030"
+}

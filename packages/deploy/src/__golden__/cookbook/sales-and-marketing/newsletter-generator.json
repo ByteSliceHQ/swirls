@@ -1,0 +1,237 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [
+      {
+        "id": "id-1",
+        "name": "weekly_newsletter",
+        "label": "Weekly Newsletter",
+        "cron": "0 8 * * 1",
+        "timezone": "America/Los_Angeles"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "generate_newsletter",
+        "label": "Generate Newsletter",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Start",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      return { week_of: new Date().toISOString().split(\"T\")[0] }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "week_of": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "scrape_blog",
+            "type": "scrape",
+            "label": "Scrape company blog",
+            "config": {
+              "type": "scrape",
+              "url": " return \"https://byteslice.co/blog\" ",
+              "onlyMainContent": true,
+              "formats": ["markdown"]
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "scrape_industry",
+            "type": "scrape",
+            "label": "Scrape industry news",
+            "config": {
+              "type": "scrape",
+              "url": " return \"https://news.ycombinator.com\" ",
+              "onlyMainContent": true,
+              "formats": ["markdown"]
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "compose",
+            "type": "ai",
+            "label": "Compose newsletter",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const blog = context.nodes.scrape_blog.output\n      const news = context.nodes.scrape_industry.output\n      return \"Write a weekly newsletter for the week of \" + context.nodes.root.output.week_of + \".\\n\\nOur blog content:\\n\" + JSON.stringify(blog) + \"\\n\\nIndustry news:\\n\" + JSON.stringify(news) + \"\\n\\nFormat: intro paragraph, 3-5 highlights with brief summaries, closing note.\"\n    ",
+              "temperature": 0.8
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["subject", "body_html"],
+              "properties": {
+                "subject": {
+                  "type": "string"
+                },
+                "body_html": {
+                  "type": "string"
+                },
+                "preview_text": {
+                  "type": "string"
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "review_draft",
+            "type": "code",
+            "label": "Review draft",
+            "config": {
+              "type": "code",
+              "code": " return {} "
+            },
+            "reviewConfig": {
+              "enabled": true,
+              "title": "Review newsletter draft",
+              "description": "Approve to send this week's newsletter, or discard to stop the run. The draft is in the compose node's output.",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "notes": {
+                    "type": "string",
+                    "title": "Notes"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "actions": [
+                {
+                  "id": "send",
+                  "label": "Send",
+                  "outcome": "approve"
+                },
+                {
+                  "id": "discard",
+                  "label": "Discard",
+                  "outcome": "reject"
+                }
+              ]
+            }
+          },
+          {
+            "id": "id-8",
+            "name": "send_newsletter",
+            "type": "email",
+            "label": "Send newsletter",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return \"team@example.com\" ",
+              "subject": " return context.nodes.compose.output.subject ",
+              "html": " return context.nodes.compose.output.body_html "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "html": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7"
+          },
+          {
+            "id": "id-14",
+            "sourceNodeId": "id-7",
+            "targetNodeId": "id-8"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-15",
+        "name": "on_weekly",
+        "resourceType": "schedule",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "61878391487881dd329c7fcb00aff13aa30640106f7ff5c3f124f7717c882ff6",
+  "sourceFingerprint": "bc6f9421d50cb3976b7e0dd615a03351a0443d55ace51f83cc1d11907279ef41"
+}

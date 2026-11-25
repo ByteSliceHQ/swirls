@@ -1,0 +1,335 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "job_application",
+        "label": "Job Application",
+        "schema": {
+          "type": "object",
+          "required": ["name", "email", "role", "resume_text"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Full Name"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "title": "Email"
+            },
+            "role": {
+              "type": "string",
+              "title": "Role Applied For"
+            },
+            "resume_text": {
+              "type": "string",
+              "title": "Resume (paste text)"
+            },
+            "linkedin_url": {
+              "type": "string",
+              "title": "LinkedIn URL"
+            }
+          }
+        },
+        "visibility": "public"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "screen_application",
+        "label": "Screen Application",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract application",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "resume_text": {
+                  "type": "string"
+                },
+                "linkedin_url": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "evaluate",
+            "type": "ai",
+            "label": "Evaluate candidate",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const app = context.nodes.root.output\n      return \"Evaluate this candidate for the \" + app.role + \" role. Score their fit.\\n\\nName: \" + app.name + \"\\n\\nResume:\\n\" + app.resume_text\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["score", "strengths", "concerns", "recommendation"],
+              "properties": {
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "strengths": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "concerns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "recommendation": {
+                  "type": "string",
+                  "enum": ["advance", "maybe", "pass"]
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "route",
+            "type": "switch",
+            "label": "Route by recommendation",
+            "config": {
+              "type": "switch",
+              "cases": ["advance", "maybe", "pass"],
+              "router": "\n      return context.nodes.evaluate.output.recommendation\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "prepare_review",
+            "type": "code",
+            "label": "Human review",
+            "config": {
+              "type": "code",
+              "code": " return {} "
+            },
+            "reviewConfig": {
+              "enabled": true,
+              "title": "Review candidate",
+              "description": "Decide whether to advance this candidate to interview. See the evaluate node output for the AI screening summary. Submit your decision; rejected candidates are notified automatically.",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "title": "Decision",
+                    "enum": ["interview", "reject"]
+                  },
+                  "notes": {
+                    "type": "string",
+                    "title": "Notes"
+                  }
+                },
+                "required": ["decision"]
+              },
+              "actions": [
+                {
+                  "id": "submit",
+                  "label": "Submit Decision",
+                  "outcome": "approve"
+                }
+              ]
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "review_decision",
+            "type": "switch",
+            "label": "Route on review decision",
+            "config": {
+              "type": "switch",
+              "cases": ["interview", "reject"],
+              "router": "\n      const review = context.reviews.prepare_review || {}\n      return review.decision === \"interview\" ? \"interview\" : \"reject\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-8",
+            "name": "schedule_interview",
+            "type": "code",
+            "label": "Schedule interview",
+            "config": {
+              "type": "code",
+              "code": "\n      const review = context.reviews.prepare_review || {}\n      return {\n        status: \"interview\",\n        name: context.nodes.root.output.name,\n        email: context.nodes.root.output.email,\n        role: context.nodes.root.output.role,\n        score: context.nodes.evaluate.output.score,\n        reviewer_notes: review.notes || \"\"\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-9",
+            "name": "review_rejection",
+            "type": "email",
+            "label": "Send rejection after review",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.email ",
+              "subject": " return \"Update on your application for \" + context.nodes.root.output.role ",
+              "text": "\n      return \"Hi \" + context.nodes.root.output.name + \",\\n\\nThank you for applying. After careful review, we have decided to move forward with other candidates. We appreciate your interest and wish you the best.\"\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          },
+          {
+            "id": "id-10",
+            "name": "send_rejection",
+            "type": "email",
+            "label": "Send rejection",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.email ",
+              "subject": " return \"Update on your application for \" + context.nodes.root.output.role ",
+              "text": "\n      return \"Hi \" + context.nodes.root.output.name + \",\\n\\nThank you for applying. After careful review, we have decided to move forward with other candidates. We appreciate your interest and wish you the best.\"\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          },
+          {
+            "id": "id-11",
+            "name": "maybe_pool",
+            "type": "code",
+            "label": "Add to maybe pool",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"maybe_pool\",\n        name: context.nodes.root.output.name,\n        email: context.nodes.root.output.email,\n        role: context.nodes.root.output.role,\n        score: context.nodes.evaluate.output.score\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-14",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6",
+            "label": "advance"
+          },
+          {
+            "id": "id-15",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-10",
+            "label": "pass"
+          },
+          {
+            "id": "id-16",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-11",
+            "label": "maybe"
+          },
+          {
+            "id": "id-17",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7"
+          },
+          {
+            "id": "id-18",
+            "sourceNodeId": "id-7",
+            "targetNodeId": "id-8",
+            "label": "interview"
+          },
+          {
+            "id": "id-19",
+            "sourceNodeId": "id-7",
+            "targetNodeId": "id-9",
+            "label": "reject"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-20",
+        "name": "on_application",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "167a1998ade7d7f21da7c61afd12a7badf7b68f34c3ebf1c1a0bb609de432993",
+  "sourceFingerprint": "edfcf3f4eb48b604cd23c01ef88ce6360e03f8a679af9facb7cf4e74c412e140"
+}

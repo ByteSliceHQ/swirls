@@ -1,0 +1,145 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [
+      {
+        "id": "id-1",
+        "name": "hourly_weather",
+        "label": "Hourly Weather",
+        "cron": "0 * * * *"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "fetch_weather",
+        "label": "Fetch Weather",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Prepare request",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      return { city: \"San Francisco\", units: \"imperial\" }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "get_weather",
+            "type": "http",
+            "label": "Call weather API",
+            "config": {
+              "type": "http",
+              "url": "\n      const params = context.nodes.root.output\n      const base = context.secrets.weather_creds.WEATHER_API_URL || \"https://api.openweathermap.org\"\n      return base + \"/data/2.5/weather?q=\" + params.city + \"&units=\" + params.units\n    "
+            },
+            "reviewConfig": null,
+            "secretsMap": {
+              "weather_creds": ["WEATHER_API_URL"]
+            },
+            "authRef": "weather_auth",
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "format",
+            "type": "code",
+            "label": "Format result",
+            "config": {
+              "type": "code",
+              "code": "\n      const data = context.nodes.get_weather.output\n      return {\n        city: data.name || \"unknown\",\n        temp: data.main ? data.main.temp : 0,\n        description: data.weather && data.weather[0] ? data.weather[0].description : \"unknown\",\n        humidity: data.main ? data.main.humidity : 0\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_weather",
+        "resourceType": "schedule",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [
+      {
+        "id": "id-9",
+        "name": "weather_creds",
+        "label": "Weather API",
+        "vars": ["WEATHER_API_KEY", "WEATHER_API_URL"]
+      }
+    ],
+    "authBlocks": [
+      {
+        "id": "id-10",
+        "name": "weather_auth",
+        "label": "Weather API Auth",
+        "authType": "api_key",
+        "secretBlockName": "weather_creds",
+        "config": {
+          "key": "WEATHER_API_KEY",
+          "query_param": "appid"
+        }
+      }
+    ],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "b31e3ad1b89acf319ab16606d08b11f8e16eb01d27edb29eefc1057e6937d1f9",
+  "sourceFingerprint": "f26398e9dd875c4f029dd6daca9f00d349b771680e8df6bab56844f1c94e3655"
+}

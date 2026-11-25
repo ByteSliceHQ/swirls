@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "error": "crm-enrichment.swirls:41: Validation error: Integration node references undefined action block \"attio_query_records\"."
+}

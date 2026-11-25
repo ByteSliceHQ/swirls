@@ -1,0 +1,203 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [
+      {
+        "id": "id-1",
+        "name": "weekly_intel",
+        "label": "Weekly Intel Scan",
+        "cron": "0 9 * * 1",
+        "timezone": "America/New_York"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "scan_competitors",
+        "label": "Scan Competitors",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Start",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      return { scanned_at: new Date().toISOString() }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "scanned_at": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "scrape_homepage",
+            "type": "scrape",
+            "label": "Scrape competitor homepage",
+            "config": {
+              "type": "scrape",
+              "url": " return \"https://stripe.com\" ",
+              "onlyMainContent": true,
+              "formats": ["markdown"]
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "scrape_changelog",
+            "type": "scrape",
+            "label": "Scrape competitor changelog",
+            "config": {
+              "type": "scrape",
+              "url": " return \"https://stripe.com/blog\" ",
+              "onlyMainContent": true,
+              "formats": ["markdown"]
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "analyze",
+            "type": "ai",
+            "label": "Analyze changes",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Analyze these competitor pages for notable changes, new features, or strategic shifts.\\n\\nHomepage:\\n\" + JSON.stringify(context.nodes.scrape_homepage.output) + \"\\n\\nChangelog:\\n\" + JSON.stringify(context.nodes.scrape_changelog.output)\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["summary", "key_changes"],
+              "properties": {
+                "summary": {
+                  "type": "string"
+                },
+                "key_changes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "new_features": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "strategic_implications": {
+                  "type": "string"
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "send_report",
+            "type": "email",
+            "label": "Send intel report",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return \"team@example.com\" ",
+              "subject": " return \"Weekly Competitive Intel - \" + context.nodes.root.output.scanned_at.split(\"T\")[0] ",
+              "text": "\n      const report = context.nodes.analyze.output\n      const changes = report.key_changes.map(function(c, i) { return (i + 1) + \". \" + c }).join(\"\\n\")\n      return \"Summary: \" + report.summary + \"\\n\\nKey Changes:\\n\" + changes + \"\\n\\nStrategic Implications: \" + (report.strategic_implications || \"None noted\")\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-13",
+        "name": "on_weekly_intel",
+        "resourceType": "schedule",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "5502c54283a90ce0424231a479f1dcf8ca7bf7e28280f3f0c37ccd4a0908c7c8",
+  "sourceFingerprint": "735f2fc7318736fdf668b6af1afb5dfc529ac47aa2cefcf4f02abdf1573202e7"
+}

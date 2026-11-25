@@ -5,6 +5,10 @@ The only thing this repository releases today is the VS Code extension, `vscode-
 server, so `@swirls/lsp`, `@swirls/language` and `@swirls/definition` reach users through it. Those
 three packages are not published to npm yet.
 
+`@swirls/deploy` is built to be published: `bun run build` writes a `dist` that has
+`@swirls/language` and `@swirls/definition` compiled in, so it does not wait on them. A change to it
+takes a changeset naming `@swirls/deploy`. The release workflow does not publish it to npm yet.
+
 ## Version policy
 
 The extension uses SemVer and Changesets.

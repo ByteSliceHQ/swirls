@@ -1,0 +1,236 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "log_event",
+        "label": "Log Event",
+        "schema": {
+          "type": "object",
+          "required": ["event_type", "value"],
+          "properties": {
+            "event_type": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            },
+            "source": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [
+      {
+        "id": "id-2",
+        "name": "daily_report",
+        "label": "Daily Report",
+        "cron": "0 17 * * *",
+        "timezone": "UTC"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-3",
+        "name": "record_event",
+        "label": "Record Event",
+        "nodes": [
+          {
+            "id": "id-4",
+            "name": "root",
+            "type": "code",
+            "label": "Store event",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "event_type": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "source": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "edges": []
+      },
+      {
+        "id": "id-5",
+        "name": "generate_report",
+        "label": "Generate Daily Report",
+        "nodes": [
+          {
+            "id": "id-6",
+            "name": "root",
+            "type": "code",
+            "label": "Start",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return { date: new Date().toISOString().split(\"T\")[0] } "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "recent_events",
+            "type": "stream",
+            "label": "Query recent events",
+            "config": {
+              "type": "stream",
+              "stream": "events",
+              "version": "v1",
+              "filter": "\n      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()\n      return { created_at: { gte: since } }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-8",
+            "name": "summarize",
+            "type": "code",
+            "label": "Summarize events",
+            "config": {
+              "type": "code",
+              "code": "\n      const events = context.nodes.recent_events.output || []\n      const byType = {}\n      for (const event of events) {\n        const t = event.event_type || \"unknown\"\n        if (!byType[t]) byType[t] = { count: 0, total_value: 0 }\n        byType[t].count += 1\n        byType[t].total_value += event.value || 0\n      }\n      return {\n        date: context.nodes.root.output.date,\n        total_events: events.length,\n        by_type: byType\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-9",
+            "name": "send_report",
+            "type": "email",
+            "label": "Send report",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return \"team@example.com\" ",
+              "subject": " return \"Daily Event Report - \" + context.nodes.root.output.date ",
+              "text": "\n      const summary = context.nodes.summarize.output\n      return \"Daily Event Report\\n\\nTotal events: \" + summary.total_events + \"\\n\\nBreakdown:\\n\" + JSON.stringify(summary.by_type, null, 2)\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-7",
+            "targetNodeId": "id-8"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-8",
+            "targetNodeId": "id-9"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-13",
+        "name": "on_event",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-3",
+        "enabled": true
+      },
+      {
+        "id": "id-14",
+        "name": "on_daily_report",
+        "resourceType": "schedule",
+        "resourceId": "id-2",
+        "workflowId": "id-5",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-15",
+        "name": "events",
+        "label": "Events",
+        "workflowName": "record_event",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["event_type", "value"],
+              "properties": {
+                "event_type": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "source": {
+                  "type": "string"
+                }
+              }
+            },
+            "conditionCode": "return context.output.root != null",
+            "prepareCode": "return context.output.root"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "53c835aad85821a8ee3b24e8922276c14569c15149c0f2b5239ee4ffbd38fa80",
+  "sourceFingerprint": "94d47097edc4734a29f67377d747ca68f654c178d317c7460a7917312cbcf010"
+}

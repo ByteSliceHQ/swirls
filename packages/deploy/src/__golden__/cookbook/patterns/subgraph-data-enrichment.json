@@ -1,0 +1,233 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "company_data",
+        "label": "Company Data",
+        "schema": {
+          "type": "object",
+          "required": ["company_name", "domain"],
+          "properties": {
+            "company_name": {
+              "type": "string"
+            },
+            "domain": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "enrich_company",
+        "label": "Enrich Company Data",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Receive company",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "company_name": {
+                  "type": "string"
+                },
+                "domain": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "scrape_site",
+            "type": "scrape",
+            "label": "Scrape company site",
+            "config": {
+              "type": "scrape",
+              "url": " return \"https://\" + context.nodes.root.output.domain ",
+              "onlyMainContent": true,
+              "formats": ["markdown"]
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "extract_info",
+            "type": "ai",
+            "label": "Extract company info",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Extract company information from this website content.\\n\\nCompany: \" + context.nodes.root.output.company_name + \"\\n\\n\" + JSON.stringify(context.nodes.scrape_site.output)\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["description", "industry"],
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "industry": {
+                  "type": "string"
+                },
+                "employee_count_estimate": {
+                  "type": "string"
+                },
+                "products": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "technologies": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      },
+      {
+        "id": "id-8",
+        "name": "process_company",
+        "label": "Process Company",
+        "nodes": [
+          {
+            "id": "id-9",
+            "name": "root",
+            "type": "code",
+            "label": "Extract input",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "company_name": {
+                  "type": "string"
+                },
+                "domain": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-10",
+            "name": "enrich",
+            "type": "workflow",
+            "label": "Enrich company",
+            "config": {
+              "type": "workflow",
+              "workflow": "enrich_company",
+              "input": "\n      return {\n        company_name: context.nodes.root.output.company_name,\n        domain: context.nodes.root.output.domain\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-11",
+            "name": "combine",
+            "type": "code",
+            "label": "Combine results",
+            "config": {
+              "type": "code",
+              "code": "\n      const original = context.nodes.root.output\n      // A workflow node's output is keyed by the child workflow's leaf node\n      // name -- extract_info is the leaf of enrich_company.\n      const enriched = context.nodes.enrich.output.extract_info\n      return {\n        company_name: original.company_name,\n        domain: original.domain,\n        description: enriched.description,\n        industry: enriched.industry,\n        products: enriched.products || [],\n        technologies: enriched.technologies || []\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-9",
+            "targetNodeId": "id-10"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-10",
+            "targetNodeId": "id-11"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-14",
+        "name": "on_company",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-8",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "3d694f539bc6af77dec7933253632596a338618dc5ad01146db999200008cd29",
+  "sourceFingerprint": "9df0eb8595c1a658da3293b11de3d2bceac41ec8ffaaa3a25d004f72ec027764"
+}

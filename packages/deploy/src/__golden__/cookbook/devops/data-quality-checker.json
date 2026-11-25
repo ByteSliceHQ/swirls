@@ -1,0 +1,200 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "data_record",
+        "label": "Data Record",
+        "schema": {
+          "type": "object",
+          "required": ["source", "payload"],
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "payload": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "check_quality",
+        "label": "Check Data Quality",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract record",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "validate",
+            "type": "code",
+            "label": "Run validation rules",
+            "config": {
+              "type": "code",
+              "code": "\n      const record = context.nodes.root.output\n      const issues = []\n\n      if (!record.payload || typeof record.payload !== \"object\") {\n        issues.push(\"payload is not an object\")\n      }\n\n      const keys = Object.keys(record.payload || {})\n      if (keys.length === 0) {\n        issues.push(\"payload is empty\")\n      }\n\n      for (const key of keys) {\n        if (record.payload[key] === null || record.payload[key] === undefined) {\n          issues.push(\"null value for key: \" + key)\n        }\n      }\n\n      return {\n        source: record.source,\n        field_count: keys.length,\n        issues: issues,\n        is_valid: issues.length === 0\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-5",
+            "name": "route",
+            "type": "switch",
+            "label": "Route by validity",
+            "config": {
+              "type": "switch",
+              "cases": ["valid", "invalid"],
+              "router": "\n      if (context.nodes.validate.output.is_valid) return \"valid\"\n      return \"invalid\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "accept",
+            "type": "code",
+            "label": "Accept record",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"accepted\",\n        source: context.nodes.validate.output.source,\n        fields: context.nodes.validate.output.field_count\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "quarantine",
+            "type": "code",
+            "label": "Quarantine record",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"quarantined\",\n        source: context.nodes.validate.output.source,\n        issues: context.nodes.validate.output.issues\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6",
+            "label": "valid"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-7",
+            "label": "invalid"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-12",
+        "name": "on_data",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-13",
+        "name": "quality_log",
+        "label": "Quality log",
+        "workflowName": "check_quality",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["status", "source"],
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "fields": {
+                  "type": "number"
+                },
+                "issues": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "conditionCode": "return true",
+            "prepareCode": "const accepted = context.output.accept\n        if (accepted) return accepted\n        return context.output.quarantine"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "8611c73e4c07dc0b20c9ca1c134b0bda9ff3e24ea4b520a85e01ece3430ce28b",
+  "sourceFingerprint": "8bb4789324811f234902409e63d7275e3ff02d22677355baf4639e48bb5202db"
+}

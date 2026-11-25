@@ -1,0 +1,200 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "recipe_request",
+        "label": "Recipe Generator",
+        "schema": {
+          "type": "object",
+          "required": ["ingredients"],
+          "properties": {
+            "ingredients": {
+              "type": "string",
+              "title": "Available Ingredients (comma-separated)"
+            },
+            "dietary": {
+              "type": "string",
+              "title": "Dietary Preference",
+              "enum": ["none", "vegetarian", "vegan", "gluten_free", "keto", "paleo"]
+            },
+            "cuisine": {
+              "type": "string",
+              "title": "Preferred Cuisine"
+            },
+            "max_time_minutes": {
+              "type": "number",
+              "title": "Max Cooking Time (minutes)"
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "generate_recipe",
+        "label": "Generate Recipe",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract request",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "ingredients": {
+                  "type": "string"
+                },
+                "dietary": {
+                  "type": "string"
+                },
+                "cuisine": {
+                  "type": "string"
+                },
+                "max_time_minutes": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "create_recipe",
+            "type": "ai",
+            "label": "Create recipe",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const req = context.nodes.root.output\n      return \"Create a recipe using these ingredients: \" + req.ingredients + \"\\n\\nDietary preference: \" + (req.dietary || \"none\") + \"\\nCuisine: \" + (req.cuisine || \"any\") + \"\\nMax time: \" + (req.max_time_minutes || \"no limit\") + \" minutes\"\n    ",
+              "temperature": 0.8
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["name", "ingredients_list", "instructions", "prep_time", "cook_time"],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "ingredients_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "item": {
+                        "type": "string"
+                      },
+                      "amount": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "instructions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "prep_time": {
+                  "type": "number"
+                },
+                "cook_time": {
+                  "type": "number"
+                },
+                "servings": {
+                  "type": "number"
+                },
+                "difficulty": {
+                  "type": "string",
+                  "enum": ["easy", "medium", "hard"]
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "format",
+            "type": "code",
+            "label": "Format recipe",
+            "config": {
+              "type": "code",
+              "code": "\n      const recipe = context.nodes.create_recipe.output\n      return {\n        name: recipe.name,\n        description: recipe.description || \"\",\n        total_time: recipe.prep_time + recipe.cook_time,\n        servings: recipe.servings || 4,\n        difficulty: recipe.difficulty || \"medium\",\n        ingredients: recipe.ingredients_list,\n        steps: recipe.instructions\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_recipe_request",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "f93cb75656b350183e00a87b7bff6488b4902b2c2fce48216700d9834c0299f5",
+  "sourceFingerprint": "9fbd42c3754af3dc74e4c9573b2aa60aa7145481f271ad02451f1fcb3c5d68fd"
+}

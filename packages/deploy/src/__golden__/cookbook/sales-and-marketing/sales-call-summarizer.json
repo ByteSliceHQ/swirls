@@ -1,0 +1,239 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "call_transcript",
+        "label": "Call Transcript",
+        "schema": {
+          "type": "object",
+          "required": ["rep_name", "prospect_company", "transcript"],
+          "properties": {
+            "rep_name": {
+              "type": "string"
+            },
+            "prospect_company": {
+              "type": "string"
+            },
+            "transcript": {
+              "type": "string"
+            },
+            "call_duration_minutes": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "summarize_call",
+        "label": "Summarize Sales Call",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract transcript",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "rep_name": {
+                  "type": "string"
+                },
+                "prospect_company": {
+                  "type": "string"
+                },
+                "transcript": {
+                  "type": "string"
+                },
+                "call_duration_minutes": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "analyze",
+            "type": "ai",
+            "label": "Analyze call",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const call = context.nodes.root.output\n      return \"Analyze this sales call transcript.\\n\\nRep: \" + call.rep_name + \"\\nProspect: \" + call.prospect_company + \"\\nDuration: \" + (call.call_duration_minutes || \"unknown\") + \" minutes\\n\\nTranscript:\\n\" + call.transcript\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["summary", "deal_stage", "next_steps", "sentiment", "deal_probability"],
+              "properties": {
+                "summary": {
+                  "type": "string"
+                },
+                "deal_stage": {
+                  "type": "string",
+                  "enum": [
+                    "discovery",
+                    "demo",
+                    "proposal",
+                    "negotiation",
+                    "closed_won",
+                    "closed_lost"
+                  ]
+                },
+                "buying_signals": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "objections": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "next_steps": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "sentiment": {
+                  "type": "string",
+                  "enum": ["positive", "neutral", "negative"]
+                },
+                "deal_probability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "result",
+            "type": "code",
+            "label": "Format result",
+            "config": {
+              "type": "code",
+              "code": "\n      const call = context.nodes.root.output\n      const analysis = context.nodes.analyze.output\n      return {\n        rep: call.rep_name,\n        company: call.prospect_company,\n        summary: analysis.summary,\n        stage: analysis.deal_stage,\n        probability: analysis.deal_probability,\n        sentiment: analysis.sentiment,\n        next_steps: analysis.next_steps\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_transcript",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-9",
+        "name": "call_summaries",
+        "label": "Call summaries",
+        "workflowName": "summarize_call",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["rep", "company", "summary", "stage", "probability", "sentiment"],
+              "properties": {
+                "rep": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "stage": {
+                  "type": "string"
+                },
+                "probability": {
+                  "type": "number"
+                },
+                "sentiment": {
+                  "type": "string"
+                },
+                "next_steps": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "conditionCode": "return context.output.result != null",
+            "prepareCode": "return context.output.result"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "96c5456c44d7ea8f889a3b1cd3401d2b0ea983e83b31955572032c4eae63983f",
+  "sourceFingerprint": "87a917257ff1e9b6ab4f4f11afb7608864af0f88064669e5f834aba48b1aceab"
+}

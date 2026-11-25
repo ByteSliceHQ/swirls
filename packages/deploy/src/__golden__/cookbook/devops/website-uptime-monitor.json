@@ -1,0 +1,222 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [
+      {
+        "id": "id-1",
+        "name": "health_check",
+        "label": "Health Check",
+        "cron": "*/15 * * * *"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "check_uptime",
+        "label": "Check Uptime",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Prepare check",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      return { timestamp: new Date().toISOString() }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "ping",
+            "type": "http",
+            "label": "Ping website",
+            "config": {
+              "type": "http",
+              "url": " return context.secrets.monitor_config.MONITOR_URL ",
+              "failurePolicy": {
+                "strategy": "fallback",
+                "fallbackValue": {}
+              }
+            },
+            "reviewConfig": null,
+            "secretsMap": {
+              "monitor_config": ["MONITOR_URL"]
+            },
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "evaluate",
+            "type": "code",
+            "label": "Evaluate response",
+            "config": {
+              "type": "code",
+              "code": "\n      var statusCode = context.nodes.ping.meta ? context.nodes.ping.meta.status : 0\n      var isUp = statusCode >= 200 && statusCode < 400\n      return {\n        status: isUp ? \"up\" : \"down\",\n        status_code: statusCode,\n        timestamp: context.nodes.root.output.timestamp\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "route",
+            "type": "switch",
+            "label": "Route by status",
+            "config": {
+              "type": "switch",
+              "cases": ["up", "down"],
+              "router": "\n      return context.nodes.evaluate.output.status\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "log_ok",
+            "type": "code",
+            "label": "Log healthy",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"up\",\n        checked_at: context.nodes.evaluate.output.timestamp\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-8",
+            "name": "alert_down",
+            "type": "email",
+            "label": "Send downtime alert",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return \"team@example.com\" ",
+              "subject": " return \"ALERT: Website is DOWN\" ",
+              "text": "\n      return \"Website is unreachable.\\nStatus code: \" + context.nodes.evaluate.output.status_code + \"\\nChecked at: \" + context.nodes.evaluate.output.timestamp\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7",
+            "label": "up"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-8",
+            "label": "down"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-14",
+        "name": "on_health_check",
+        "resourceType": "schedule",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [
+      {
+        "id": "id-15",
+        "name": "monitor_config",
+        "label": "",
+        "vars": ["MONITOR_URL"]
+      }
+    ],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-16",
+        "name": "uptime_checks",
+        "label": "Uptime checks",
+        "workflowName": "check_uptime",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["status"],
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "checked_at": {
+                  "type": "string"
+                },
+                "status_code": {
+                  "type": "number"
+                }
+              }
+            },
+            "conditionCode": "return true",
+            "prepareCode": "const ok = context.output.log_ok\n        if (ok) return ok\n        return {\n          status: \"down\",\n          checked_at: context.nodes.evaluate.output.timestamp,\n          status_code: context.nodes.evaluate.output.status_code\n        }"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "efbc80ed0f21d8e5d782c76c3089d1e20c26df1fa0d5972c6bef2a0bbc2b758a",
+  "sourceFingerprint": "fae0736c6c58acef3bd036daada9e182bd8c9367709285e8121e0ca3ce65267c"
+}

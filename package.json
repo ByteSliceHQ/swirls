@@ -19,7 +19,7 @@
   },
   "type": "module",
   "scripts": {
-    "build": "bun run --filter '@swirls/lsp' build && bun run --filter 'vscode-swirls' build",
+    "build": "bun run --filter '@swirls/deploy' build && bun run --filter '@swirls/lsp' build && bun run --filter 'vscode-swirls' build",
     "typecheck": "bun run --filter '*' typecheck && tsc -p scripts/tsconfig.json",
     "test": "bun run --filter '*' test",
     "test:grammar": "cd editors/tree-sitter-swirls && npm test",

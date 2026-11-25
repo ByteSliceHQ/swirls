@@ -1,0 +1,167 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "new_user",
+        "label": "New User",
+        "schema": {
+          "type": "object",
+          "required": ["email", "name"],
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "delayed_followup",
+        "label": "Delayed Follow-up",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract user",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "format": "email"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "send_welcome",
+            "type": "email",
+            "label": "Send welcome",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.email ",
+              "subject": " return \"Welcome, \" + context.nodes.root.output.name + \"!\" ",
+              "text": "\n      return \"Hi \" + context.nodes.root.output.name + \",\\n\\nWelcome aboard! We are excited to have you.\"\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "wait_3_days",
+            "type": "wait",
+            "label": "Wait 3 days",
+            "config": {
+              "type": "wait",
+              "amount": 3,
+              "unit": "days"
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "send_checkin",
+            "type": "email",
+            "label": "Send check-in",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.email ",
+              "subject": " return \"How is it going, \" + context.nodes.root.output.name + \"?\" ",
+              "text": "\n      return \"Hi \" + context.nodes.root.output.name + \",\\n\\nJust checking in. Is there anything we can help you with? Reply to this email anytime.\"\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-10",
+        "name": "on_new_user",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "ede48e32747c00ea4b1866eaf9e645e7e876a401dbfb8245851785564277632e",
+  "sourceFingerprint": "93836c99ad8ee2558c16ed4e93733e2b2e4a6800883d38bc1d817d0708ff3d48"
+}

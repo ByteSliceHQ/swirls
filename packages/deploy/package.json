@@ -1,0 +1,47 @@
+{
+  "name": "@swirls/deploy",
+  "version": "0.0.0",
+  "description": "Lowers .swirls source files into a Swirls deployment definition.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ByteSliceHQ/swirls.git",
+    "directory": "packages/deploy"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@types/json-schema": "catalog:",
+    "ajv": "catalog:",
+    "pathe": "2.0.3",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@swirls/definition": "workspace:*",
+    "@swirls/language": "workspace:*",
+    "@types/bun": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

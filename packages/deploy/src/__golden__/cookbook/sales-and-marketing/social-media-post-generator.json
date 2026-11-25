@@ -1,0 +1,174 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "social_post",
+        "label": "Generate Social Post",
+        "schema": {
+          "type": "object",
+          "required": ["topic", "key_points"],
+          "properties": {
+            "topic": {
+              "type": "string",
+              "title": "Topic"
+            },
+            "key_points": {
+              "type": "string",
+              "title": "Key Points"
+            },
+            "tone": {
+              "type": "string",
+              "title": "Tone",
+              "enum": ["professional", "casual", "witty", "inspirational"]
+            },
+            "platform": {
+              "type": "string",
+              "title": "Platform",
+              "enum": ["twitter", "linkedin", "both"]
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "generate_posts",
+        "label": "Generate Social Posts",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract request",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "topic": {
+                  "type": "string"
+                },
+                "key_points": {
+                  "type": "string"
+                },
+                "tone": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "generate",
+            "type": "ai",
+            "label": "Generate post variants",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const req = context.nodes.root.output\n      return \"Generate social media posts about: \" + req.topic + \"\\n\\nKey points: \" + req.key_points + \"\\nTone: \" + (req.tone || \"professional\") + \"\\nPlatform: \" + (req.platform || \"both\") + \"\\n\\nGenerate a Twitter post (max 280 chars) and a LinkedIn post (2-3 paragraphs). Include relevant hashtags.\"\n    ",
+              "temperature": 0.8
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["twitter", "linkedin", "hashtags"],
+              "properties": {
+                "twitter": {
+                  "type": "string"
+                },
+                "linkedin": {
+                  "type": "string"
+                },
+                "hashtags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "format",
+            "type": "code",
+            "label": "Format output",
+            "config": {
+              "type": "code",
+              "code": "\n      const posts = context.nodes.generate.output\n      return {\n        topic: context.nodes.root.output.topic,\n        twitter_post: posts.twitter,\n        twitter_length: posts.twitter.length,\n        linkedin_post: posts.linkedin,\n        hashtags: posts.hashtags\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_social_request",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "d5ab2e25dd044cde4727e8e6ab49abf185f2535ccafb4ddcf6a6adce72b7edce",
+  "sourceFingerprint": "7206689866b7ae9816cfd30b3dd61cace6aff9d72ba64a70427d99e5da21bc68"
+}

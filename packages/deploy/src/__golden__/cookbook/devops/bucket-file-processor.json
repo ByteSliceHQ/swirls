@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "error": "bucket-file-processor.swirls:38: Validation error: Invalid node type \"bucket\". Must be one of: agent, ai, code, database, decision, device, disk, email, fanout, http, integration, map, parallel, postgres, scrape, search, shell, stream, switch, wait, while, workflow"
+}

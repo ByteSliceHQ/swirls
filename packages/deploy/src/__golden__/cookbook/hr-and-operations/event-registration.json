@@ -1,0 +1,245 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "event_registration",
+        "label": "Event Registration",
+        "schema": {
+          "type": "object",
+          "required": ["name", "email", "event_name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Full Name"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "title": "Email"
+            },
+            "event_name": {
+              "type": "string",
+              "title": "Event"
+            },
+            "company": {
+              "type": "string",
+              "title": "Company"
+            },
+            "dietary_restrictions": {
+              "type": "string",
+              "title": "Dietary Restrictions"
+            }
+          }
+        },
+        "visibility": "public"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "register_attendee",
+        "label": "Register Attendee",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract registration",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "event_name": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "dietary_restrictions": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "check_capacity",
+            "type": "stream",
+            "label": "Check current registrations",
+            "config": {
+              "type": "stream",
+              "stream": "registrations",
+              "version": "v1",
+              "filter": "\n      return { status: { eq: \"registered\" } }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-5",
+            "name": "route",
+            "type": "switch",
+            "label": "Route by capacity",
+            "config": {
+              "type": "switch",
+              "cases": ["registered", "waitlisted"],
+              "router": "\n      const rows = context.nodes.check_capacity.output || []\n      const count = Array.isArray(rows) ? rows.length : 0\n      if (count < 100) return \"registered\"\n      return \"waitlisted\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "confirm_registration",
+            "type": "email",
+            "label": "Send confirmation",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.email ",
+              "subject": " return \"Confirmed: \" + context.nodes.root.output.event_name ",
+              "text": "\n      const reg = context.nodes.root.output\n      return \"Hi \" + reg.name + \",\\n\\nYou are confirmed for \" + reg.event_name + \". We look forward to seeing you there!\"\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "waitlist_notification",
+            "type": "email",
+            "label": "Send waitlist notice",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.email ",
+              "subject": " return \"Waitlisted: \" + context.nodes.root.output.event_name ",
+              "text": "\n      return \"Hi \" + context.nodes.root.output.name + \",\\n\\nThe event is currently at capacity. You have been added to the waitlist. We will notify you if a spot opens up.\"\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6",
+            "label": "registered"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-7",
+            "label": "waitlisted"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-12",
+        "name": "on_register",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-13",
+        "name": "registrations",
+        "label": "Event registrations",
+        "workflowName": "register_attendee",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["name", "email", "event_name", "status"],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "event_name": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              }
+            },
+            "conditionCode": "return true",
+            "prepareCode": "const reg = context.nodes.root.output\n        const status = context.output.confirm_registration != null ? \"registered\" : \"waitlisted\"\n        return {\n          name: reg.name,\n          email: reg.email,\n          event_name: reg.event_name,\n          company: reg.company || \"\",\n          status: status\n        }"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "4f2944f72cc06153ecbe6eae0f377988b0e5b6ee7792234b0e270c2e2e080633",
+  "sourceFingerprint": "5a0ddce9db79c1ff8b375edb52c8b3a587f42153fe64b35f7d9ce3dd326d3d4a"
+}

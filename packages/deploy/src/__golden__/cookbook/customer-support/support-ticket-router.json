@@ -1,0 +1,218 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "support_ticket",
+        "label": "Support Ticket Webhook",
+        "schema": {
+          "type": "object",
+          "required": ["subject", "body", "customer_email", "plan"],
+          "properties": {
+            "subject": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "customer_email": {
+              "type": "string"
+            },
+            "plan": {
+              "type": "string",
+              "enum": ["free", "pro", "enterprise"]
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "route_ticket",
+        "label": "Route Support Ticket",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Parse ticket",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "customer_email": {
+                  "type": "string"
+                },
+                "plan": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "classify",
+            "type": "ai",
+            "label": "Classify ticket",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Classify this support ticket.\\n\\nSubject: \" + context.nodes.root.output.subject + \"\\nBody: \" + context.nodes.root.output.body + \"\\nPlan: \" + context.nodes.root.output.plan\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["urgency", "department"],
+              "properties": {
+                "urgency": {
+                  "type": "string",
+                  "enum": ["critical", "high", "normal", "low"]
+                },
+                "department": {
+                  "type": "string",
+                  "enum": ["billing", "technical", "account", "general"]
+                },
+                "suggested_response": {
+                  "type": "string"
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "route_urgency",
+            "type": "switch",
+            "label": "Route by urgency",
+            "config": {
+              "type": "switch",
+              "cases": ["critical", "standard"],
+              "router": "\n      if (context.nodes.classify.output.urgency === \"critical\") return \"critical\"\n      return \"standard\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "escalate",
+            "type": "http",
+            "label": "Escalate to on-call",
+            "config": {
+              "type": "http",
+              "url": " return context.secrets.ticket_slack.SLACK_WEBHOOK_URL ",
+              "method": "POST",
+              "headers": " return { \"Content-Type\": \"application/json\" } ",
+              "body": "\n      const ticket = context.nodes.root.output\n      const classification = context.nodes.classify.output\n      return JSON.stringify({\n        text: \"CRITICAL TICKET from \" + ticket.customer_email + \" (\" + ticket.plan + \")\\nDept: \" + classification.department + \"\\nSubject: \" + ticket.subject\n      })\n    "
+            },
+            "reviewConfig": null,
+            "secretsMap": {
+              "ticket_slack": ["SLACK_WEBHOOK_URL"]
+            },
+            "configValueKinds": {
+              "url": "ts",
+              "body": "ts"
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "queue_standard",
+            "type": "code",
+            "label": "Queue standard ticket",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        queue: context.nodes.classify.output.department,\n        urgency: context.nodes.classify.output.urgency,\n        customer: context.nodes.root.output.customer_email,\n        subject: context.nodes.root.output.subject\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6",
+            "label": "critical"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-7",
+            "label": "standard"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-12",
+        "name": "on_ticket",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [
+      {
+        "id": "id-13",
+        "name": "ticket_slack",
+        "label": "",
+        "vars": ["SLACK_WEBHOOK_URL"]
+      }
+    ],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "1897fc528e2a2dcaa0e2f56086023a6ad64c23d902d8b99dbc2b84804bde863f",
+  "sourceFingerprint": "2bccacb65c0cafc929bede8ecfb1744c50ef72e491b59003e02dce9c249e8bbd"
+}

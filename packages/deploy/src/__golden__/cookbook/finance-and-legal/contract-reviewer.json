@@ -1,0 +1,272 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "contract_review",
+        "label": "Contract Review",
+        "schema": {
+          "type": "object",
+          "required": ["contract_text", "contract_type"],
+          "properties": {
+            "contract_text": {
+              "type": "string",
+              "title": "Contract Text"
+            },
+            "contract_type": {
+              "type": "string",
+              "title": "Contract Type",
+              "enum": ["nda", "saas_agreement", "employment", "vendor", "partnership"]
+            },
+            "our_role": {
+              "type": "string",
+              "title": "Our Role",
+              "enum": ["buyer", "seller", "partner"]
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "review_contract",
+        "label": "Review Contract",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract contract",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "contract_text": {
+                  "type": "string"
+                },
+                "contract_type": {
+                  "type": "string",
+                  "enum": ["nda", "saas_agreement", "employment", "vendor", "partnership"]
+                },
+                "our_role": {
+                  "type": "string",
+                  "enum": ["buyer", "seller", "partner"]
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "analyze",
+            "type": "ai",
+            "label": "Analyze contract",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const req = context.nodes.root.output\n      return \"Review this \" + req.contract_type + \" contract from the perspective of the \" + (req.our_role || \"buyer\") + \". Identify risks, unusual clauses, and key terms.\\n\\n\" + req.contract_text\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["risk_level", "key_terms", "risks", "recommendations"],
+              "properties": {
+                "risk_level": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high", "critical"]
+                },
+                "key_terms": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "clause": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "concern_level": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "risks": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "missing_clauses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "recommendations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "route_risk",
+            "type": "switch",
+            "label": "Route by risk",
+            "config": {
+              "type": "switch",
+              "cases": ["needs_legal", "low_risk"],
+              "router": "\n      const level = context.nodes.analyze.output.risk_level\n      if (level === \"high\" || level === \"critical\") return \"needs_legal\"\n      return \"low_risk\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "legal_review",
+            "type": "code",
+            "label": "Queue for legal",
+            "config": {
+              "type": "code",
+              "code": " return {} "
+            },
+            "reviewConfig": {
+              "enabled": true,
+              "title": "Legal Review Required",
+              "description": "This contract has been flagged as high risk. See the analyze node output for the flagged risks and key terms.",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "notes": {
+                    "type": "string",
+                    "title": "Notes"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "actions": [
+                {
+                  "id": "approve",
+                  "label": "Approve with Notes",
+                  "outcome": "approve"
+                },
+                {
+                  "id": "reject",
+                  "label": "Do Not Sign",
+                  "outcome": "reject"
+                }
+              ]
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "record_approval",
+            "type": "code",
+            "label": "Record legal approval",
+            "config": {
+              "type": "code",
+              "code": "\n      const analysis = context.nodes.analyze.output\n      const review = context.reviews.legal_review || {}\n      return {\n        status: \"approved_by_legal\",\n        risk_level: analysis.risk_level,\n        risks: analysis.risks,\n        key_terms: analysis.key_terms,\n        contract_type: context.nodes.root.output.contract_type,\n        legal_notes: review.notes || \"\"\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-8",
+            "name": "summary",
+            "type": "code",
+            "label": "Generate summary",
+            "config": {
+              "type": "code",
+              "code": "\n      const analysis = context.nodes.analyze.output\n      return {\n        status: \"reviewed\",\n        risk_level: analysis.risk_level,\n        term_count: analysis.key_terms.length,\n        risk_count: analysis.risks.length,\n        recommendations: analysis.recommendations\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6",
+            "label": "needs_legal"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-8",
+            "label": "low_risk"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-14",
+        "name": "on_contract",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "5e83ffe8f5af55c3f16ad7a41ef7fdce9e3c0f71c110b08d66f60e8af84401b7",
+  "sourceFingerprint": "192584c3cd11d656bac15d5b8d1e5cbe00c0515de799370d04b13ec17e989736"
+}

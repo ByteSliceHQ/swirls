@@ -1,0 +1,250 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "invoice_received",
+        "label": "Invoice Received",
+        "schema": {
+          "type": "object",
+          "required": ["vendor", "invoice_text", "amount"],
+          "properties": {
+            "vendor": {
+              "type": "string"
+            },
+            "invoice_text": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "number"
+            },
+            "due_date": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "process_invoice",
+        "label": "Process Invoice",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract invoice",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "vendor": {
+                  "type": "string"
+                },
+                "invoice_text": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "due_date": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "extract_details",
+            "type": "ai",
+            "label": "Extract line items",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Extract structured line items from this invoice.\\n\\nVendor: \" + context.nodes.root.output.vendor + \"\\nTotal: $\" + context.nodes.root.output.amount + \"\\n\\n\" + context.nodes.root.output.invoice_text\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["line_items", "total_matches"],
+              "properties": {
+                "line_items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "description": {
+                        "type": "string"
+                      },
+                      "quantity": {
+                        "type": "number"
+                      },
+                      "unit_price": {
+                        "type": "number"
+                      },
+                      "total": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                },
+                "total_matches": {
+                  "type": "boolean"
+                },
+                "discrepancy_note": {
+                  "type": "string"
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "check_anomaly",
+            "type": "switch",
+            "label": "Check for anomalies",
+            "config": {
+              "type": "switch",
+              "cases": ["ok", "flagged"],
+              "router": "\n      if (context.nodes.extract_details.output.total_matches) return \"ok\"\n      return \"flagged\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "approve",
+            "type": "code",
+            "label": "Auto-approve",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"approved\",\n        vendor: context.nodes.root.output.vendor,\n        amount: context.nodes.root.output.amount,\n        line_items: context.nodes.extract_details.output.line_items.length\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "flag",
+            "type": "code",
+            "label": "Flag for review",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"flagged\",\n        vendor: context.nodes.root.output.vendor,\n        amount: context.nodes.root.output.amount,\n        note: context.nodes.extract_details.output.discrepancy_note\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6",
+            "label": "ok"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-7",
+            "label": "flagged"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-12",
+        "name": "on_invoice",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-13",
+        "name": "invoices",
+        "label": "Invoices",
+        "workflowName": "process_invoice",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["status", "vendor", "amount"],
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "vendor": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "line_items": {
+                  "type": "number"
+                },
+                "note": {
+                  "type": "string"
+                }
+              }
+            },
+            "conditionCode": "return true",
+            "prepareCode": "const approved = context.output.approve\n        if (approved) return approved\n        return context.output.flag"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "3cd1b5c338543e5aabe563ba6b761858fb2970e2dc1e17b64ae733265e65ca27",
+  "sourceFingerprint": "e0e9083ae04ef4690c1e3e3c059af35c6b57f6e032eef1ed9ea8cc7cb94aa1f3"
+}

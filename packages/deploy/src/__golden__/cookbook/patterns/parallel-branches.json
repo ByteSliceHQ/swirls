@@ -1,0 +1,202 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "article_submitted",
+        "label": "Article Submitted",
+        "schema": {
+          "type": "object",
+          "required": ["title", "body", "author"],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "author": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "process_article",
+        "label": "Process Article",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract article",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "extract_keywords",
+            "type": "ai",
+            "label": "Extract keywords",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Extract 5-10 keywords from this article.\\n\\nTitle: \" + context.nodes.root.output.title + \"\\n\\n\" + context.nodes.root.output.body\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["keywords"],
+              "properties": {
+                "keywords": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "generate_summary",
+            "type": "ai",
+            "label": "Generate summary",
+            "config": {
+              "type": "ai",
+              "kind": "text",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Write a 2-sentence summary of this article.\\n\\nTitle: \" + context.nodes.root.output.title + \"\\n\\n\" + context.nodes.root.output.body\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "estimate_read_time",
+            "type": "code",
+            "label": "Estimate read time",
+            "config": {
+              "type": "code",
+              "code": "\n      const words = context.nodes.root.output.body.split(\" \").length\n      return { read_time_minutes: Math.ceil(words / 200) }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "combine",
+            "type": "code",
+            "label": "Combine results",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        title: context.nodes.root.output.title,\n        author: context.nodes.root.output.author,\n        summary: context.nodes.generate_summary.output,\n        keywords: context.nodes.extract_keywords.output.keywords,\n        read_time: context.nodes.estimate_read_time.output.read_time_minutes\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-7"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-7"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-14",
+        "name": "on_article",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "0750b2f5a994f969ccd2d4574587fff140f0165eacfb6c683483bd4a4b6ea1a9",
+  "sourceFingerprint": "42174e742b72c07f9d78c7d1957edefa2f76818c56f332b456dfd5c133def8ec"
+}

@@ -1,0 +1,148 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "data_input",
+        "label": "Data Input",
+        "schema": {
+          "type": "object",
+          "required": ["items"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "title": "Items",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "process_data",
+        "label": "Process Data",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract data",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "transform",
+            "type": "code",
+            "label": "Transform data",
+            "config": {
+              "type": "code",
+              "code": "// Function body for the \"Transform data\" node in external-ts-file-pattern.swirls.\n// The same context object is in scope as in an inline @ts block.\nconst items = context.nodes.root.output.items || []\nconst processed = items.map(function(item) {\n  return {\n    name: item.name ? item.name.toUpperCase() : \"\",\n    value: item.value || 0,\n    doubled: (item.value || 0) * 2\n  }\n})\nconst total = processed.reduce(function(sum, item) { return sum + item.value }, 0)\nreturn { items: processed, total: total }\n"
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-5",
+            "name": "summarize",
+            "type": "code",
+            "label": "Summarize results",
+            "config": {
+              "type": "code",
+              "code": "\n      const result = context.nodes.transform.output\n      return {\n        item_count: result.items ? result.items.length : 0,\n        total: result.total || 0,\n        processed_at: new Date().toISOString()\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_data",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "afb1963e813baac6d23f8f848f5ebb6ff95dc996ebaca759c655e84f758d877d",
+  "sourceFingerprint": "20ece7a1aa1d1a9147b5cd7ddb4d5feb691ae02a029c50256bdad6d0eeac37f4"
+}

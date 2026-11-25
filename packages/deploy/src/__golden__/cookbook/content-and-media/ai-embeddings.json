@@ -1,0 +1,136 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "embed_request",
+        "label": "Embed Request",
+        "schema": {
+          "type": "object",
+          "required": ["text"],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "metadata": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "generate_embedding",
+        "label": "Generate Embedding",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract text",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "embed",
+            "type": "ai",
+            "label": "Generate embedding",
+            "config": {
+              "type": "ai",
+              "kind": "embed",
+              "model": "openai/text-embedding-3-small",
+              "prompt": " return context.nodes.root.output.text "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "result",
+            "type": "code",
+            "label": "Format result",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        text: context.nodes.root.output.text,\n        embedding: context.nodes.embed.output,\n        metadata: context.nodes.root.output.metadata || {}\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_embed",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "daf0bc430500a41ad60bebf8342455a494674b6efcbef33a06a3bcc9b89d75da",
+  "sourceFingerprint": "588bb396bdc6118f98dd056edcdd19cea47c5edcb2a2622f6f225568499bcc71"
+}

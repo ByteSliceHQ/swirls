@@ -1,0 +1,237 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "nps_response",
+        "label": "NPS Response",
+        "schema": {
+          "type": "object",
+          "required": ["email", "score", "feedback"],
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10
+            },
+            "feedback": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "process_nps",
+        "label": "Process NPS Response",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Parse response",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      const input = context.nodes.root.input\n      const category = input.score >= 9 ? \"promoter\" : input.score >= 7 ? \"passive\" : \"detractor\"\n      return {\n        email: input.email,\n        score: input.score,\n        feedback: input.feedback,\n        category: category\n      }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "feedback": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "route",
+            "type": "switch",
+            "label": "Route by category",
+            "config": {
+              "type": "switch",
+              "cases": ["detractor", "other"],
+              "router": "\n      if (context.nodes.root.output.category === \"detractor\") return \"detractor\"\n      return \"other\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-5",
+            "name": "analyze_detractor",
+            "type": "ai",
+            "label": "Analyze detractor feedback",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"A customer gave an NPS score of \" + context.nodes.root.output.score + \"/10. Analyze their feedback and suggest a recovery action.\\n\\nFeedback: \" + context.nodes.root.output.feedback\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["root_cause", "suggested_action"],
+              "properties": {
+                "root_cause": {
+                  "type": "string"
+                },
+                "suggested_action": {
+                  "type": "string"
+                },
+                "urgency": {
+                  "type": "string",
+                  "enum": ["high", "medium", "low"]
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "followup_email",
+            "type": "email",
+            "label": "Send follow-up",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.email ",
+              "subject": " return \"We heard you - let us make it right\" ",
+              "text": "\n      return \"We noticed your recent experience was not up to our standards. We take your feedback seriously and would love to chat about how we can improve. Reply to this email and we will get back to you within 24 hours.\"\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "log_score",
+            "type": "code",
+            "label": "Log score",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        email: context.nodes.root.output.email,\n        score: context.nodes.root.output.score,\n        category: context.nodes.root.output.category\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5",
+            "label": "detractor"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-7",
+            "label": "other"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-12",
+        "name": "on_nps",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-13",
+        "name": "nps_scores",
+        "label": "NPS scores",
+        "workflowName": "process_nps",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["email", "score", "category"],
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "category": {
+                  "type": "string"
+                }
+              }
+            },
+            "conditionCode": "return true",
+            "prepareCode": "const logged = context.output.log_score\n        if (logged) return logged\n        return {\n          email: context.nodes.root.output.email,\n          score: context.nodes.root.output.score,\n          category: context.nodes.root.output.category\n        }"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "e8ab59d9ab18d064fdaaddd322677813e972f5497547191b034f558dfb8be22a",
+  "sourceFingerprint": "28b32e075f90e20b7f6f62292f21ad30a8fb3b9fa72191be4142d49fd37b567b"
+}
