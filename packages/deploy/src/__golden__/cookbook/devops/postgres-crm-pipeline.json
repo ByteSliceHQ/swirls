@@ -1,0 +1,242 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [
+      {
+        "id": "id-1",
+        "name": "daily_scoring",
+        "label": "Daily Lead Scoring",
+        "cron": "0 6 * * *",
+        "timezone": "America/New_York"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "score_leads",
+        "label": "Score Leads from DB",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "postgres",
+            "label": "Fetch unscored leads",
+            "isRoot": true,
+            "config": {
+              "type": "postgres",
+              "postgres": "crm_db",
+              "select": "\n      SELECT id, email, company\n      FROM leads\n      WHERE score IS NULL\n      ORDER BY created_at DESC\n      LIMIT 20\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "company": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "score",
+            "type": "ai",
+            "label": "Score leads",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const leads = context.nodes.root.output\n      return \"Score these leads from 0-100 based on their email domain and company name. Return scores for each lead.\\n\\n\" + JSON.stringify(leads)\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["scores"],
+              "properties": {
+                "scores": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "score": {
+                        "type": "number"
+                      },
+                      "tier": {
+                        "type": "string",
+                        "enum": ["hot", "warm", "cold"]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "pick_top",
+            "type": "code",
+            "label": "Pick top lead",
+            "config": {
+              "type": "code",
+              "code": "\n      const scores = context.nodes.score.output.scores || []\n      const top = scores.sort(function(a, b) { return b.score - a.score })[0]\n      return top || { id: \"\", score: 0, tier: \"cold\" }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "save_top_score",
+            "type": "postgres",
+            "label": "Save top score",
+            "config": {
+              "type": "postgres",
+              "postgres": "crm_db",
+              "insert": "\n      INSERT INTO lead_scores (lead_id, score, tier, scored_at)\n      VALUES ({{lead_id}}, {{score}}, {{tier}}, {{scored_at}})\n    ",
+              "params": "\n      const top = context.nodes.pick_top.output\n      return {\n        lead_id: top.id,\n        score: top.score,\n        tier: top.tier,\n        scored_at: new Date().toISOString()\n      }\n    ",
+              "condition": "\n      return context.nodes.pick_top.output.id !== \"\"\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-10",
+        "name": "on_daily_scoring",
+        "resourceType": "schedule",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [
+      {
+        "id": "id-11",
+        "name": "db_creds",
+        "label": "Database",
+        "vars": ["DATABASE_URL"]
+      }
+    ],
+    "authBlocks": [],
+    "postgresBlocks": [
+      {
+        "id": "id-12",
+        "name": "crm_db",
+        "secretsRef": "db_creds",
+        "connection": "DATABASE_URL",
+        "connectionIsLiteral": false,
+        "tables": [
+          {
+            "name": "leads",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": ["id", "email"]
+            }
+          },
+          {
+            "name": "lead_scores",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "lead_id": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "tier": {
+                  "type": "string"
+                },
+                "scored_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "e4f1dee9a7e6f39b712b155cb319c85349e7045bc8d88f5937a9e4340b0fce45",
+  "sourceFingerprint": "0c5c20b823c6627a79bc481a1a492ee61d915d832ec4595028b55252680b3e1e"
+}

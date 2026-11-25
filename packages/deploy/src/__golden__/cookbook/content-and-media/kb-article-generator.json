@@ -1,0 +1,242 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "kb_request",
+        "label": "KB Article Request",
+        "schema": {
+          "type": "object",
+          "required": ["topic", "common_questions"],
+          "properties": {
+            "topic": {
+              "type": "string",
+              "title": "Topic"
+            },
+            "common_questions": {
+              "type": "string",
+              "title": "Common Questions (one per line)"
+            },
+            "audience": {
+              "type": "string",
+              "title": "Audience",
+              "enum": ["beginner", "intermediate", "advanced"]
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "generate_kb_article",
+        "label": "Generate KB Article",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract request",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "topic": {
+                  "type": "string"
+                },
+                "common_questions": {
+                  "type": "string"
+                },
+                "audience": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "research",
+            "type": "ai",
+            "label": "Research and outline",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const req = context.nodes.root.output\n      return \"Create a detailed outline for a knowledge base article.\\n\\nTopic: \" + req.topic + \"\\nCommon questions:\\n\" + req.common_questions + \"\\nAudience level: \" + (req.audience || \"intermediate\") + \"\\n\\nInclude sections, key points, and suggested code examples.\"\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["title", "sections"],
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "sections": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "heading": {
+                        "type": "string"
+                      },
+                      "key_points": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "needs_code_example": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "write_article",
+            "type": "ai",
+            "label": "Write full article",
+            "config": {
+              "type": "ai",
+              "kind": "text",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const outline = context.nodes.research.output\n      return \"Write a complete knowledge base article based on this outline. Use markdown formatting. Be clear and concise.\\n\\nTitle: \" + outline.title + \"\\n\\nOutline:\\n\" + JSON.stringify(outline.sections)\n    ",
+              "temperature": 0.5,
+              "maxTokens": 2000
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "review_article",
+            "type": "code",
+            "label": "Review article",
+            "config": {
+              "type": "code",
+              "code": " return {} "
+            },
+            "reviewConfig": {
+              "enabled": true,
+              "title": "Review KB Article",
+              "description": "Review the generated article (see the write_article node output) before publishing. Approve to publish or reject to discard.",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "notes": {
+                    "type": "string",
+                    "title": "Reviewer Notes"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "actions": [
+                {
+                  "id": "publish",
+                  "label": "Publish",
+                  "outcome": "approve"
+                },
+                {
+                  "id": "discard",
+                  "label": "Discard",
+                  "outcome": "reject"
+                }
+              ]
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "publish",
+            "type": "code",
+            "label": "Publish article",
+            "config": {
+              "type": "code",
+              "code": "\n      const review = context.reviews.review_article || {}\n      return {\n        title: context.nodes.research.output.title,\n        article: context.nodes.write_article.output,\n        section_count: context.nodes.research.output.sections.length,\n        reviewer_notes: review.notes || \"\"\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-12",
+        "name": "on_kb_request",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "99de6e0d4874173e1e7eba060be9eaa4bc70d01f883fa37ef720da16031e80d2",
+  "sourceFingerprint": "93e01a49f9637caba2bb582ea2ac89bdd0dd0f96364a5fc7f27280c00f9d9a7a"
+}

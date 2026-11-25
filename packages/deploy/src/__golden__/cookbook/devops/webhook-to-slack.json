@@ -1,0 +1,147 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "incoming_event",
+        "label": "Incoming Event",
+        "schema": {
+          "type": "object",
+          "required": ["event_type", "data"],
+          "properties": {
+            "event_type": {
+              "type": "string"
+            },
+            "data": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "forward_to_slack",
+        "label": "Forward to Slack",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Parse event",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "event_type": {
+                  "type": "string"
+                },
+                "data": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "format_message",
+            "type": "code",
+            "label": "Format Slack message",
+            "config": {
+              "type": "code",
+              "code": "\n      const event = context.nodes.root.output\n      return {\n        text: \"*Event:* \" + event.event_type + \"\\n\" + JSON.stringify(event.data, null, 2)\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-5",
+            "name": "send_slack",
+            "type": "http",
+            "label": "Post to Slack",
+            "config": {
+              "type": "http",
+              "url": " return context.secrets.slack_config.SLACK_WEBHOOK_URL ",
+              "method": "POST",
+              "headers": " return { \"Content-Type\": \"application/json\" } ",
+              "body": "\n      return JSON.stringify(context.nodes.format_message.output)\n    "
+            },
+            "reviewConfig": null,
+            "secretsMap": {
+              "slack_config": ["SLACK_WEBHOOK_URL"]
+            },
+            "configValueKinds": {
+              "url": "ts",
+              "body": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_event",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [
+      {
+        "id": "id-9",
+        "name": "slack_config",
+        "label": "",
+        "vars": ["SLACK_WEBHOOK_URL"]
+      }
+    ],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "ea6f3481b5d4a5d109103ea1da4bba98bd154734ae09df551f81ed4b145a4941",
+  "sourceFingerprint": "62c5c42b641ccf45dc618368dd919f848bab0413f2d695e54ad8cf254af113f8"
+}

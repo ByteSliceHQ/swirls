@@ -1,0 +1,226 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "blog_submission",
+        "label": "Submit Blog Post",
+        "schema": {
+          "type": "object",
+          "required": ["title", "body", "author_email"],
+          "properties": {
+            "title": {
+              "type": "string",
+              "title": "Title"
+            },
+            "body": {
+              "type": "string",
+              "title": "Body"
+            },
+            "author_email": {
+              "type": "string",
+              "format": "email",
+              "title": "Author Email"
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "moderate_post",
+        "label": "Moderate Blog Post",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract post",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "author_email": {
+                  "type": "string",
+                  "format": "email"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "check_content",
+            "type": "ai",
+            "label": "Check for policy violations",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Review this blog post for policy violations (spam, hate speech, misinformation, adult content). Return a moderation result.\\n\\nTitle: \" + context.nodes.root.output.title + \"\\n\\nBody: \" + context.nodes.root.output.body\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["safe", "reason"],
+              "properties": {
+                "safe": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "flags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "route",
+            "type": "switch",
+            "label": "Route by safety",
+            "config": {
+              "type": "switch",
+              "cases": ["safe", "flagged"],
+              "router": "\n      if (context.nodes.check_content.output.safe) return \"safe\"\n      return \"flagged\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "auto_approve",
+            "type": "code",
+            "label": "Auto-approve",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"published\",\n        title: context.nodes.root.output.title,\n        message: \"Post auto-approved by moderation.\"\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "flag_for_review",
+            "type": "code",
+            "label": "Flag for manual review",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"flagged\",\n        title: context.nodes.root.output.title,\n        reason: context.nodes.check_content.output.reason,\n        flags: context.nodes.check_content.output.flags\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-8",
+            "name": "notify_author",
+            "type": "email",
+            "label": "Notify author",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.author_email ",
+              "subject": " return \"Your post: \" + context.nodes.root.output.title ",
+              "text": "\n      return \"Your blog post has been submitted and is being reviewed. You will hear back shortly.\"\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6",
+            "label": "safe"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-7",
+            "label": "flagged"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-8"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-14",
+        "name": "on_blog_submit",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "e301c91d6d0adc6ffbe98b9871b820b924f958f7a5b7b51d37e2b11ad02fedc2",
+  "sourceFingerprint": "4db190ce1a05d4ab4e3abc21caea40fdd1a421d460630943b1d995d193c11fff"
+}

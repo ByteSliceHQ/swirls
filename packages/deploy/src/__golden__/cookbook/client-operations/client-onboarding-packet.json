@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "error": "client-onboarding-packet.swirls:61: Validation error: Integration node references undefined action block \"microsoft_create_folder\"."
+}

@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "error": "client-quote-generator.swirls:113: Validation error: Integration node references undefined action block \"microsoft_send_mail\"."
+}

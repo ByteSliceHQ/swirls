@@ -1,0 +1,191 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [
+      {
+        "id": "id-1",
+        "name": "inventory_check",
+        "label": "Inventory Check",
+        "cron": "0 8,14,20 * * *",
+        "timezone": "America/Chicago"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "check_inventory",
+        "label": "Check Inventory",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Start",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      return { checked_at: new Date().toISOString() }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "checked_at": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "fetch_levels",
+            "type": "http",
+            "label": "Fetch inventory levels",
+            "config": {
+              "type": "http",
+              "url": " return context.secrets.inventory_config.INVENTORY_API_URL + \"/levels\" ",
+              "headers": "\n      return { Authorization: \"Bearer \" + context.secrets.inventory_config.INVENTORY_API_KEY }\n    "
+            },
+            "reviewConfig": null,
+            "secretsMap": {
+              "inventory_config": ["INVENTORY_API_URL", "INVENTORY_API_KEY"]
+            },
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "find_low_stock",
+            "type": "code",
+            "label": "Find low stock items",
+            "config": {
+              "type": "code",
+              "code": "\n      const items = context.nodes.fetch_levels.output.items || []\n      const low = items.filter(function(item) {\n        return item.quantity <= item.reorder_point\n      })\n      return {\n        total_items: items.length,\n        low_stock_count: low.length,\n        low_stock_items: low,\n        has_alerts: low.length > 0\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "route",
+            "type": "switch",
+            "label": "Check if alerts needed",
+            "config": {
+              "type": "switch",
+              "cases": ["alert", "ok"],
+              "router": "\n      if (context.nodes.find_low_stock.output.has_alerts) return \"alert\"\n      return \"ok\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "send_alert",
+            "type": "email",
+            "label": "Send low stock alert",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return \"team@example.com\" ",
+              "subject": "\n      return \"Low Stock Alert: \" + context.nodes.find_low_stock.output.low_stock_count + \" items need reorder\"\n    ",
+              "text": "\n      const items = context.nodes.find_low_stock.output.low_stock_items\n      const list = items.map(function(item) {\n        return \"- \" + item.name + \": \" + item.quantity + \" remaining (reorder at \" + item.reorder_point + \")\"\n      }).join(\"\\n\")\n      return \"The following items are below reorder levels:\\n\\n\" + list\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          },
+          {
+            "id": "id-8",
+            "name": "log_ok",
+            "type": "code",
+            "label": "Log all clear",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"ok\",\n        total_items: context.nodes.find_low_stock.output.total_items,\n        checked_at: context.nodes.root.output.checked_at\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7",
+            "label": "alert"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-8",
+            "label": "ok"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-14",
+        "name": "on_inventory_check",
+        "resourceType": "schedule",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [
+      {
+        "id": "id-15",
+        "name": "inventory_config",
+        "label": "",
+        "vars": ["INVENTORY_API_URL", "INVENTORY_API_KEY"]
+      }
+    ],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "4cee0c0660efc9e332ce9996e755a3835258cf0be80607b042dcd8a2511c312a",
+  "sourceFingerprint": "b0cc57f6fea321b0b4183d3a4014bfd42af4075379ac254017529de4d1928c3e"
+}

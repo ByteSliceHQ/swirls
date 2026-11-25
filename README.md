@@ -40,6 +40,7 @@ Write `.swirls` files and deploy with `swirls deploy` or `git push`.
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | [`packages/definition`](./packages/definition)               | `@swirls/definition`: the deployment definition schema, the contract between the language and a runtime |
 | [`packages/language`](./packages/language)                   | `@swirls/language`: lexer, parser, AST, validator, serializer and workspace index                       |
+| [`packages/deploy`](./packages/deploy)                       | `@swirls/deploy`: lowers `.swirls` source files into a deployment definition                            |
 | [`packages/lsp`](./packages/lsp)                             | `@swirls/lsp`: the language server                                                                      |
 | [`packages/swirls`](./packages/swirls)                       | The `swirls` npm package                                                                                |
 | [`editors/vscode`](./editors/vscode)                         | The VS Code extension                                                                                   |
@@ -54,7 +55,7 @@ is passed in through `LanguageHost` (see
 ```bash
 bun install
 bun run verify   # type check and tests
-bun run build    # language server and VS Code extension
+bun run build    # @swirls/deploy, language server and VS Code extension
 ```
 
 ## Cookbook

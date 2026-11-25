@@ -1,0 +1,277 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "document_submission",
+        "label": "Submit Document",
+        "schema": {
+          "type": "object",
+          "required": ["title", "content", "author", "author_email", "doc_type"],
+          "properties": {
+            "title": {
+              "type": "string",
+              "title": "Document Title"
+            },
+            "content": {
+              "type": "string",
+              "title": "Document Content"
+            },
+            "author": {
+              "type": "string",
+              "title": "Author"
+            },
+            "author_email": {
+              "type": "string",
+              "format": "email",
+              "title": "Author Email"
+            },
+            "doc_type": {
+              "type": "string",
+              "title": "Document Type",
+              "enum": ["policy", "procedure", "contract", "proposal"]
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "approve_document",
+        "label": "Document Approval",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract document",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "author_email": {
+                  "type": "string"
+                },
+                "doc_type": {
+                  "type": "string",
+                  "enum": ["policy", "procedure", "contract", "proposal"]
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "quality_check",
+            "type": "ai",
+            "label": "Quality check",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const doc = context.nodes.root.output\n      return \"Review this \" + doc.doc_type + \" document for quality. Check grammar, clarity, completeness, and formatting.\\n\\nTitle: \" + doc.title + \"\\n\\n\" + doc.content\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["quality_score", "issues"],
+              "properties": {
+                "quality_score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "issues": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "suggestions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "manager_review",
+            "type": "code",
+            "label": "Manager review",
+            "config": {
+              "type": "code",
+              "code": " return {} "
+            },
+            "reviewConfig": {
+              "enabled": true,
+              "title": "Manager Approval Required",
+              "description": "Review this document and approve or request revisions. See the quality_check node output for the AI quality report. Reject fails the run; Request Revisions emails the author.",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "title": "Decision",
+                    "enum": ["approve", "revise"]
+                  },
+                  "comments": {
+                    "type": "string",
+                    "title": "Comments"
+                  }
+                },
+                "required": ["decision"]
+              },
+              "actions": [
+                {
+                  "id": "submit",
+                  "label": "Submit Decision",
+                  "outcome": "approve"
+                },
+                {
+                  "id": "reject",
+                  "label": "Reject",
+                  "outcome": "reject"
+                }
+              ]
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "route_decision",
+            "type": "switch",
+            "label": "Route decision",
+            "config": {
+              "type": "switch",
+              "cases": ["approved", "needs_work"],
+              "router": "\n      const review = context.reviews.manager_review\n      if (review.decision === \"approve\") return \"approved\"\n      return \"needs_work\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "publish",
+            "type": "code",
+            "label": "Mark as published",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"published\",\n        title: context.nodes.root.output.title,\n        author: context.nodes.root.output.author,\n        published_at: new Date().toISOString()\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-8",
+            "name": "request_revisions",
+            "type": "email",
+            "label": "Request revisions",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.author_email ",
+              "subject": " return \"Revisions requested: \" + context.nodes.root.output.title ",
+              "text": "\n      const review = context.reviews.manager_review\n      return \"Your document requires revisions.\\n\\nDecision: \" + review.decision + \"\\nComments: \" + (review.comments || \"No additional comments.\")\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7",
+            "label": "approved"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-8",
+            "label": "needs_work"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-14",
+        "name": "on_doc_submit",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "802d451e412762ff6ae9c0d3ec101beef71279a395fa6ab56eec136138c88244",
+  "sourceFingerprint": "2c9c0e04b62485a3d41602e7a5db351d5ec328b3f5d8a242fa640249c3988288"
+}

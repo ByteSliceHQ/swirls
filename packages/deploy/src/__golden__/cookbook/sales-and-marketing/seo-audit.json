@@ -1,0 +1,219 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "seo_audit",
+        "label": "SEO Audit",
+        "schema": {
+          "type": "object",
+          "required": ["url"],
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "title": "Page URL"
+            },
+            "target_keyword": {
+              "type": "string",
+              "title": "Target Keyword"
+            },
+            "competitors": {
+              "type": "string",
+              "title": "Competitor URLs (comma-separated)"
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "run_seo_audit",
+        "label": "Run SEO Audit",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract request",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "target_keyword": {
+                  "type": "string"
+                },
+                "competitors": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "scrape_page",
+            "type": "scrape",
+            "label": "Scrape target page",
+            "config": {
+              "type": "scrape",
+              "url": " return context.nodes.root.output.url ",
+              "onlyMainContent": false,
+              "formats": ["markdown", "html"]
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "analyze_seo",
+            "type": "ai",
+            "label": "Analyze SEO",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const req = context.nodes.root.output\n      const page = context.nodes.scrape_page.output\n      return \"Perform an SEO audit of this page.\\n\\nURL: \" + req.url + \"\\nTarget keyword: \" + (req.target_keyword || \"not specified\") + \"\\n\\nPage content:\\n\" + JSON.stringify(page)\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["score", "issues", "recommendations", "word_count"],
+              "properties": {
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "issues": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "category": {
+                        "type": "string"
+                      },
+                      "severity": {
+                        "type": "string",
+                        "enum": ["critical", "warning", "info"]
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "fix": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "recommendations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "keyword_density": {
+                  "type": "number"
+                },
+                "has_meta_description": {
+                  "type": "boolean"
+                },
+                "has_h1": {
+                  "type": "boolean"
+                },
+                "word_count": {
+                  "type": "number"
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "format_report",
+            "type": "code",
+            "label": "Format report",
+            "config": {
+              "type": "code",
+              "code": "\n      const audit = context.nodes.analyze_seo.output\n      const critical = audit.issues.filter(function(i) { return i.severity === \"critical\" })\n      return {\n        url: context.nodes.root.output.url,\n        score: audit.score,\n        critical_issues: critical.length,\n        total_issues: audit.issues.length,\n        issues: audit.issues,\n        recommendations: audit.recommendations,\n        word_count: audit.word_count\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-10",
+        "name": "on_audit",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "44149a20310ac7b7c1104353f5122fa9b4ed3750315d6e2c824d22b810203918",
+  "sourceFingerprint": "57ba501c22fa0e192519cf913680fd2bcd058f7e8bedc82674ffd53083ad5d12"
+}

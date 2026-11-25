@@ -1,0 +1,207 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "content_brief",
+        "label": "Content Calendar Brief",
+        "schema": {
+          "type": "object",
+          "required": ["themes", "goal", "frequency"],
+          "properties": {
+            "themes": {
+              "type": "string",
+              "title": "Content Themes (comma-separated)"
+            },
+            "goal": {
+              "type": "string",
+              "title": "Primary Goal (e.g., brand awareness, lead gen)"
+            },
+            "frequency": {
+              "type": "string",
+              "title": "Posting Frequency",
+              "enum": ["daily", "3x_week", "weekly"]
+            },
+            "audience": {
+              "type": "string",
+              "title": "Target Audience"
+            },
+            "channels": {
+              "type": "string",
+              "title": "Channels (comma-separated)"
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "generate_calendar",
+        "label": "Generate Content Calendar",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract brief",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "themes": {
+                  "type": "string"
+                },
+                "goal": {
+                  "type": "string"
+                },
+                "frequency": {
+                  "type": "string"
+                },
+                "audience": {
+                  "type": "string"
+                },
+                "channels": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "plan",
+            "type": "ai",
+            "label": "Plan content calendar",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const brief = context.nodes.root.output\n      return \"Create a 4-week content calendar.\\n\\nThemes: \" + brief.themes + \"\\nGoal: \" + brief.goal + \"\\nFrequency: \" + brief.frequency + \"\\nAudience: \" + (brief.audience || \"general\") + \"\\nChannels: \" + (brief.channels || \"blog, social\")\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["weeks"],
+              "properties": {
+                "weeks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "week_number": {
+                        "type": "number"
+                      },
+                      "theme": {
+                        "type": "string"
+                      },
+                      "posts": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "day": {
+                              "type": "string"
+                            },
+                            "channel": {
+                              "type": "string"
+                            },
+                            "topic": {
+                              "type": "string"
+                            },
+                            "format": {
+                              "type": "string"
+                            },
+                            "hook": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "total_posts": {
+                  "type": "number"
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "format_calendar",
+            "type": "code",
+            "label": "Format calendar",
+            "config": {
+              "type": "code",
+              "code": "\n      const cal = context.nodes.plan.output\n      return {\n        goal: context.nodes.root.output.goal,\n        total_posts: cal.weeks.reduce(function(n, w) { return n + (w.posts ? w.posts.length : 0) }, 0),\n        weeks: cal.weeks\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_brief",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "4adb96b9ae314a73f9f7163e94808ff81291a0d7c950e3aef9043c0566e6840e",
+  "sourceFingerprint": "445926be7c6cb2d8c15cc356417fdf387facfda0517d4aca538af98ed802d398"
+}

@@ -1,0 +1,193 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "contact",
+        "label": "Contact Us",
+        "schema": {
+          "type": "object",
+          "required": ["name", "email", "message"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "title": "Email"
+            },
+            "message": {
+              "type": "string",
+              "title": "Message"
+            }
+          },
+          "additionalProperties": false
+        },
+        "visibility": "public"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "handle_contact",
+        "label": "Handle Contact Form",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract submission",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "classify",
+            "type": "ai",
+            "label": "Classify inquiry",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Classify this customer inquiry into one of: sales, support, partnership, other.\\n\\nName: \" + context.nodes.root.output.name + \"\\nMessage: \" + context.nodes.root.output.message\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["category", "summary"],
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "enum": ["sales", "support", "partnership", "other"]
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "draft_reply",
+            "type": "ai",
+            "label": "Draft reply",
+            "config": {
+              "type": "ai",
+              "kind": "text",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Write a short, friendly auto-reply for this \" + context.nodes.classify.output.category + \" inquiry from \" + context.nodes.root.output.name + \". Summary: \" + context.nodes.classify.output.summary + \"\\n\\nKeep it under 3 sentences.\"\n    ",
+              "temperature": 0.7
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "send_reply",
+            "type": "email",
+            "label": "Send autoresponse",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.email ",
+              "subject": " return \"Re: Your inquiry\" ",
+              "text": " return context.nodes.draft_reply.output "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-10",
+        "name": "on_contact",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "9d4457ff53f54f8a147907e6b6409dc311bab2e8c06154db8d3cc5d64598309d",
+  "sourceFingerprint": "b56d56a76b9b44f8aba1a1b14175aba245bb7495804eb12089a9d371889e6e76"
+}

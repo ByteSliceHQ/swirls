@@ -1,0 +1,193 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "manual_entry",
+        "label": "Manual Entry",
+        "schema": {
+          "type": "object",
+          "required": ["message"],
+          "properties": {
+            "message": {
+              "type": "string",
+              "title": "Message"
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [
+      {
+        "id": "id-2",
+        "name": "api_entry",
+        "label": "API Entry",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [
+      {
+        "id": "id-3",
+        "name": "periodic_entry",
+        "label": "Periodic Entry",
+        "cron": "0 12 * * *"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-4",
+        "name": "process_message",
+        "label": "Process Message",
+        "nodes": [
+          {
+            "id": "id-5",
+            "name": "root",
+            "type": "code",
+            "label": "Normalize input",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      const input = context.nodes.root.input || {}\n      const triggerType = context.meta.triggerType\n      return {\n        message: input.message || \"Scheduled run at \" + new Date().toISOString(),\n        source: triggerType,\n        received_at: new Date().toISOString()\n      }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "received_at": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "process",
+            "type": "ai",
+            "label": "Process message",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Analyze this message and extract key information.\\n\\nSource: \" + context.nodes.root.output.source + \"\\nMessage: \" + context.nodes.root.output.message\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["summary", "intent"],
+              "properties": {
+                "summary": {
+                  "type": "string"
+                },
+                "intent": {
+                  "type": "string"
+                },
+                "entities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "result",
+            "type": "code",
+            "label": "Format result",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        source: context.nodes.root.output.source,\n        message: context.nodes.root.output.message,\n        summary: context.nodes.process.output.summary,\n        intent: context.nodes.process.output.intent\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-10",
+        "name": "from_form",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-4",
+        "enabled": true
+      },
+      {
+        "id": "id-11",
+        "name": "from_webhook",
+        "resourceType": "webhook",
+        "resourceId": "id-2",
+        "workflowId": "id-4",
+        "enabled": true
+      },
+      {
+        "id": "id-12",
+        "name": "from_schedule",
+        "resourceType": "schedule",
+        "resourceId": "id-3",
+        "workflowId": "id-4",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "051c1a9e5b5cb651798dbb0fbedbf908f98d1cff18737b991c25abf91a4b1ed2",
+  "sourceFingerprint": "9a999f7bf00fad888302f73b616dc1b6b9bc55742a85a18fd99727a26e1c2bb6"
+}

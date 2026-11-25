@@ -1,0 +1,215 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "product_review",
+        "label": "Product Review",
+        "schema": {
+          "type": "object",
+          "required": ["product_id", "review_text", "rating"],
+          "properties": {
+            "product_id": {
+              "type": "string"
+            },
+            "review_text": {
+              "type": "string"
+            },
+            "rating": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "reviewer_name": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "analyze_review",
+        "label": "Analyze Review Sentiment",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract review",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string"
+                },
+                "review_text": {
+                  "type": "string"
+                },
+                "rating": {
+                  "type": "number"
+                },
+                "reviewer_name": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "analyze",
+            "type": "ai",
+            "label": "Analyze sentiment",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const review = context.nodes.root.output\n      return \"Analyze the sentiment of this product review.\\n\\nRating: \" + review.rating + \"/5\\nReview: \" + review.review_text\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["sentiment", "score", "themes"],
+              "properties": {
+                "sentiment": {
+                  "type": "string",
+                  "enum": ["positive", "neutral", "negative", "mixed"]
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1
+                },
+                "themes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "actionable_feedback": {
+                  "type": "string"
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "result",
+            "type": "code",
+            "label": "Combine results",
+            "config": {
+              "type": "code",
+              "code": "\n      const review = context.nodes.root.output\n      const analysis = context.nodes.analyze.output\n      return {\n        product_id: review.product_id,\n        rating: review.rating,\n        sentiment: analysis.sentiment,\n        score: analysis.score,\n        themes: analysis.themes,\n        actionable_feedback: analysis.actionable_feedback || \"\"\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_review",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-9",
+        "name": "review_sentiments",
+        "label": "Review sentiments",
+        "workflowName": "analyze_review",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["product_id", "rating", "sentiment", "score"],
+              "properties": {
+                "product_id": {
+                  "type": "string"
+                },
+                "rating": {
+                  "type": "number"
+                },
+                "sentiment": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "themes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "actionable_feedback": {
+                  "type": "string"
+                }
+              }
+            },
+            "conditionCode": "return context.output.result != null",
+            "prepareCode": "return context.output.result"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "35a84456f58470f29f638f6c6e2330d53f19bfa0f5aae85f17364ea372e79544",
+  "sourceFingerprint": "bb0fd9d6c50e8f90e88247af39929c59eb6c9c11c653081c2332ad0d6ef2b636"
+}

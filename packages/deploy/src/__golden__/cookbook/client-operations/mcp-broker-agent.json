@@ -1,0 +1,108 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [],
+    "schemas": [],
+    "triggers": [],
+    "secretBlocks": [
+      {
+        "id": "id-1",
+        "name": "vendor_keys",
+        "label": "",
+        "vars": ["OPENROUTER_API_KEY"]
+      }
+    ],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [
+      {
+        "id": "id-2",
+        "name": "office_concierge",
+        "label": "Office Concierge",
+        "description": "One chat that reaches billing, docs, and projects through governed MCP connections.",
+        "provider": "openrouter",
+        "model": "anthropic/claude-sonnet-4.5",
+        "secretsRef": "vendor_keys",
+        "secretVars": ["OPENROUTER_API_KEY"],
+        "defaultSystemCode": "\n    return [\n      \"You are the office concierge for a small business. You broker three systems through your tools:\",\n      \"- Stripe for billing questions (invoices, subscriptions, payment links)\",\n      \"- Notion for company docs and how-to questions\",\n      \"- Linear for project and issue status\",\n      \"Always answer from tool results, never from memory. Say which system the answer came from.\",\n      \"If a tool you need is missing, tell the user an administrator must connect it on the project's MCP servers page in Swirls Cloud.\",\n      \"Never take a destructive action (refunds, deletions, cancellations). Describe the steps and hand it to a human instead.\",\n    ].join(\"\\n\")\n  ",
+        "maxSteps": 24,
+        "mcp": ["stripe_billing", "notion_docs", "linear_projects"],
+        "roles": [],
+        "suggestions": [
+          {
+            "label": "Unpaid invoices",
+            "message": "Which invoices are currently unpaid, and how overdue is each one?"
+          },
+          {
+            "label": "Find a policy",
+            "message": "Find our refund policy in Notion and summarize it."
+          },
+          {
+            "label": "Project status",
+            "message": "What shipped in Linear this week and what is blocked?"
+          }
+        ]
+      }
+    ],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [
+      {
+        "id": "id-3",
+        "name": "concierge_web",
+        "label": "Concierge (Web)",
+        "platform": "web",
+        "agent": "office_concierge",
+        "mode": "mention"
+      }
+    ],
+    "connectionBlocks": [],
+    "mcpBlocks": [
+      {
+        "id": "id-4",
+        "name": "stripe_billing",
+        "label": "Stripe",
+        "description": "Customer billing: invoices, subscriptions, payment links",
+        "url": "https://mcp.stripe.com",
+        "auth": "static"
+      },
+      {
+        "id": "id-5",
+        "name": "notion_docs",
+        "label": "Notion",
+        "description": "Company docs and internal knowledge base",
+        "url": "https://mcp.notion.com/mcp",
+        "auth": "interactive"
+      },
+      {
+        "id": "id-6",
+        "name": "linear_projects",
+        "label": "Linear",
+        "description": "Project and issue tracking",
+        "url": "https://mcp.linear.app/mcp",
+        "auth": "interactive"
+      }
+    ],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "6c2f9291adf0f4a784df80ca957dbe1dca3ba1943f910622326b3c0d42e99046",
+  "sourceFingerprint": "2dc12ec88d39b2647c0e78628f0f54ce3a476a0b39d45e0fd123cae93357cfdf"
+}

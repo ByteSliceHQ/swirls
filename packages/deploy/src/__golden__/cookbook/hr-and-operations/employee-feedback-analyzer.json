@@ -1,0 +1,213 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "employee_feedback",
+        "label": "Employee Feedback",
+        "schema": {
+          "type": "object",
+          "required": ["feedback", "department"],
+          "properties": {
+            "feedback": {
+              "type": "string",
+              "title": "Your Feedback"
+            },
+            "department": {
+              "type": "string",
+              "title": "Department",
+              "enum": ["engineering", "product", "design", "sales", "marketing", "operations", "hr"]
+            },
+            "satisfaction_score": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 5,
+              "title": "Satisfaction (1-5)"
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "analyze_feedback",
+        "label": "Analyze Feedback",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract feedback",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "feedback": {
+                  "type": "string"
+                },
+                "department": {
+                  "type": "string"
+                },
+                "satisfaction_score": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "analyze",
+            "type": "ai",
+            "label": "Analyze themes",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const fb = context.nodes.root.output\n      return \"Analyze this anonymous employee feedback. Identify themes and suggest actions.\\n\\nDepartment: \" + fb.department + \"\\nSatisfaction: \" + (fb.satisfaction_score || \"not provided\") + \"/5\\n\\nFeedback: \" + fb.feedback\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["themes", "sentiment", "action_items", "priority"],
+              "properties": {
+                "themes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "sentiment": {
+                  "type": "string",
+                  "enum": ["positive", "neutral", "negative", "mixed"]
+                },
+                "action_items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": ["high", "medium", "low"]
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "result",
+            "type": "code",
+            "label": "Store result",
+            "config": {
+              "type": "code",
+              "code": "\n      const fb = context.nodes.root.output\n      const analysis = context.nodes.analyze.output\n      return {\n        department: fb.department,\n        satisfaction: fb.satisfaction_score || 0,\n        sentiment: analysis.sentiment,\n        themes: analysis.themes,\n        priority: analysis.priority\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_feedback",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-9",
+        "name": "employee_feedback",
+        "label": "Employee feedback",
+        "workflowName": "analyze_feedback",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["department", "sentiment", "themes", "priority"],
+              "properties": {
+                "department": {
+                  "type": "string"
+                },
+                "satisfaction": {
+                  "type": "number"
+                },
+                "sentiment": {
+                  "type": "string"
+                },
+                "themes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "priority": {
+                  "type": "string"
+                }
+              }
+            },
+            "conditionCode": "return context.output.result != null",
+            "prepareCode": "return context.output.result"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "7c301a8decfa6dc261bc8dc8562162380e8c57ea915bc4361a1f9e194997e37b",
+  "sourceFingerprint": "d7c6f6f8d683269f745cc2f409fb6ff6045b8fbaa4712ff414c27ad3b96bb5de"
+}

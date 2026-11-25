@@ -1,0 +1,144 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [
+      {
+        "id": "id-1",
+        "name": "daily_stats",
+        "label": "Daily Repo Stats",
+        "cron": "0 9 * * *"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "fetch_repo_stats",
+        "label": "Fetch Repo Stats",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Configure",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      return { repo: \"owner/repo\" }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "repo": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "fetch_repo",
+            "type": "http",
+            "label": "Fetch repo info",
+            "config": {
+              "type": "http",
+              "url": "\n      const base = context.secrets.github_creds.GITHUB_API_URL || \"https://api.github.com\"\n      return base + \"/repos/\" + context.nodes.root.output.repo\n    "
+            },
+            "reviewConfig": null,
+            "secretsMap": {
+              "github_creds": ["GITHUB_API_URL"]
+            },
+            "authRef": "github_oauth",
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "extract",
+            "type": "code",
+            "label": "Extract stats",
+            "config": {
+              "type": "code",
+              "code": "\n      const repo = context.nodes.fetch_repo.output\n      return {\n        name: repo.full_name || context.nodes.root.output.repo,\n        stars: repo.stargazers_count || 0,\n        forks: repo.forks_count || 0,\n        open_issues: repo.open_issues_count || 0,\n        watchers: repo.watchers_count || 0\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_stats",
+        "resourceType": "schedule",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [
+      {
+        "id": "id-9",
+        "name": "github_creds",
+        "label": "GitHub OAuth",
+        "vars": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "GITHUB_API_URL"]
+      }
+    ],
+    "authBlocks": [
+      {
+        "id": "id-10",
+        "name": "github_oauth",
+        "label": "GitHub API",
+        "authType": "oauth",
+        "secretBlockName": "github_creds",
+        "config": {
+          "grant_type": "client_credentials",
+          "client_id": "GITHUB_CLIENT_ID",
+          "client_secret": "GITHUB_CLIENT_SECRET",
+          "token_url": "https://github.com/login/oauth/access_token"
+        }
+      }
+    ],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "57b59e0f56f19b654a8f094c1121f4b5e1fe712bceeb4642189dba0653ee40ed",
+  "sourceFingerprint": "80fa47c42f1c08eeee78c33315e7a872dfc0e2f05f39fe0e48e73976cf2d612d"
+}

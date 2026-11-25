@@ -1,0 +1,229 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [
+      {
+        "id": "id-1",
+        "name": "morning_digest",
+        "label": "Morning Digest",
+        "cron": "0 7 * * *",
+        "timezone": "America/New_York"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "build_digest",
+        "label": "Build Daily Digest",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Start",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return { timestamp: new Date().toISOString() } "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "fetch_tech",
+            "type": "http",
+            "label": "Fetch tech news",
+            "config": {
+              "type": "http",
+              "url": " return \"https://hacker-news.firebaseio.com/v0/topstories.json?limitToFirst=10&orderBy=%22$key%22\" "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "fetch_stories",
+            "type": "code",
+            "label": "Extract story IDs",
+            "config": {
+              "type": "code",
+              "code": "\n      const ids = context.nodes.fetch_tech.output\n      return { ids: Array.isArray(ids) ? ids.slice(0, 5) : [] }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "fetch_details",
+            "type": "map",
+            "label": "Fetch each story",
+            "config": {
+              "type": "map",
+              "items": " return context.nodes.fetch_stories.output.ids ",
+              "maxItems": 5,
+              "graph": "build_digest__fetch_details__iter"
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "collect_stories",
+            "type": "code",
+            "label": "Collect story titles",
+            "config": {
+              "type": "code",
+              "code": "\n      const rows = context.nodes.fetch_details.output || []\n      const stories = rows\n        .map(function(row) { return row.root })\n        .filter(function(story) { return story && story.title })\n        .map(function(story) { return { title: story.title, url: story.url || \"\", score: story.score || 0 } })\n      return { stories: stories }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-8",
+            "name": "summarize",
+            "type": "ai",
+            "label": "Summarize headlines",
+            "config": {
+              "type": "ai",
+              "kind": "text",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const stories = context.nodes.collect_stories.output.stories\n      const list = stories.map(function(s) { return \"- \" + s.title + \" (\" + s.score + \" points) \" + s.url }).join(\"\\n\")\n      return \"Write a brief daily tech news digest for \" + context.nodes.root.output.timestamp + \". Open with a 2-3 sentence intro, then list each story with a one-line takeaway.\\n\\nToday's top Hacker News stories:\\n\" + list\n    ",
+              "temperature": 0.7
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-9",
+            "name": "send_digest",
+            "type": "email",
+            "label": "Send digest email",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return \"team@example.com\" ",
+              "subject": "\n      const d = new Date(context.nodes.root.output.timestamp)\n      return \"Daily Tech Digest - \" + d.toLocaleDateString()\n    ",
+              "text": " return context.nodes.summarize.output "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-7"
+          },
+          {
+            "id": "id-14",
+            "sourceNodeId": "id-7",
+            "targetNodeId": "id-8"
+          },
+          {
+            "id": "id-15",
+            "sourceNodeId": "id-8",
+            "targetNodeId": "id-9"
+          }
+        ]
+      },
+      {
+        "id": "id-16",
+        "name": "build_digest__fetch_details__iter",
+        "label": "build_digest__fetch_details__iter",
+        "nodes": [
+          {
+            "id": "id-17",
+            "name": "root",
+            "type": "http",
+            "label": "Fetch story",
+            "isRoot": true,
+            "config": {
+              "type": "http",
+              "url": " return \"https://hacker-news.firebaseio.com/v0/item/\" + context.iteration.item + \".json\" "
+            },
+            "reviewConfig": null,
+            "inputSchema": {
+              "type": "number"
+            },
+            "configValueKinds": {
+              "url": "ts"
+            }
+          }
+        ],
+        "edges": [],
+        "synthetic": true
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-18",
+        "name": "daily_trigger",
+        "resourceType": "schedule",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "2ec37129ed87e80949f4f94e2348ec1bb0a5c64071f0a36d9cd678f1bf957e22",
+  "sourceFingerprint": "ae5225e7ebdf3a502e104cc40f63f3d1c659c72ca623657d8dc2712a67251076"
+}

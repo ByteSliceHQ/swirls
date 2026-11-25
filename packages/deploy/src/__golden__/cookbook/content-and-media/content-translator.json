@@ -1,0 +1,164 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "translate_form",
+        "label": "Translate Content",
+        "schema": {
+          "type": "object",
+          "required": ["content", "target_language"],
+          "properties": {
+            "content": {
+              "type": "string",
+              "title": "Content to Translate"
+            },
+            "target_language": {
+              "type": "string",
+              "title": "Target Language",
+              "enum": ["Spanish", "French", "German", "Japanese", "Portuguese", "Chinese"]
+            },
+            "tone": {
+              "type": "string",
+              "title": "Tone",
+              "enum": ["formal", "casual", "technical"],
+              "default": "formal"
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "translate_content",
+        "label": "Translate Content",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract request",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "target_language": {
+                  "type": "string"
+                },
+                "tone": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "translate",
+            "type": "ai",
+            "label": "Translate",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const req = context.nodes.root.output\n      return \"Translate the following content into \" + req.target_language + \" using a \" + (req.tone || \"formal\") + \" tone. Preserve formatting.\\n\\nContent:\\n\" + req.content\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["translation", "source_language"],
+              "properties": {
+                "translation": {
+                  "type": "string"
+                },
+                "source_language": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "format_result",
+            "type": "code",
+            "label": "Format result",
+            "config": {
+              "type": "code",
+              "code": "\n      const req = context.nodes.root.output\n      const result = context.nodes.translate.output\n      return {\n        original: req.content,\n        translated: result.translation,\n        from: result.source_language,\n        to: req.target_language,\n        notes: result.notes || \"\"\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_translate",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "696116d1879942a0324ab7b9ef03d501dca2af381c3ecb2004df1441e4b2738c",
+  "sourceFingerprint": "f0434857691d666c6889b92cd23049c16c04afb7c51a2540139346d7153411d3"
+}

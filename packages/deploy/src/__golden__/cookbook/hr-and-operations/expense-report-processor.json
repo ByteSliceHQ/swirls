@@ -1,0 +1,241 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "expense_report",
+        "label": "Expense Report",
+        "schema": {
+          "type": "object",
+          "required": ["employee_email", "description", "amount", "category"],
+          "properties": {
+            "employee_email": {
+              "type": "string",
+              "format": "email",
+              "title": "Your Email"
+            },
+            "description": {
+              "type": "string",
+              "title": "Description"
+            },
+            "amount": {
+              "type": "number",
+              "title": "Amount (USD)"
+            },
+            "category": {
+              "type": "string",
+              "title": "Category",
+              "enum": ["travel", "meals", "software", "equipment", "other"]
+            },
+            "receipt_url": {
+              "type": "string",
+              "title": "Receipt URL"
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "process_expense",
+        "label": "Process Expense",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract expense",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "employee_email": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "receipt_url": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "check_policy",
+            "type": "code",
+            "label": "Check policy limits",
+            "config": {
+              "type": "code",
+              "code": "\n      const expense = context.nodes.root.output\n      const limits = { travel: 500, meals: 100, software: 200, equipment: 1000, other: 250 }\n      const limit = limits[expense.category] || 250\n      const over_limit = expense.amount > limit\n      return {\n        amount: expense.amount,\n        category: expense.category,\n        limit: limit,\n        over_limit: over_limit,\n        needs_approval: expense.amount > 250\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-5",
+            "name": "route",
+            "type": "switch",
+            "label": "Route by amount",
+            "config": {
+              "type": "switch",
+              "cases": ["auto_approve", "needs_approval"],
+              "router": "\n      if (context.nodes.check_policy.output.needs_approval) return \"needs_approval\"\n      return \"auto_approve\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "auto_approve",
+            "type": "code",
+            "label": "Auto-approve",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        status: \"approved\",\n        employee: context.nodes.root.output.employee_email,\n        amount: context.nodes.root.output.amount,\n        category: context.nodes.root.output.category\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "manager_review",
+            "type": "code",
+            "label": "Manager review",
+            "config": {
+              "type": "code",
+              "code": " return {} "
+            },
+            "reviewConfig": {
+              "enabled": true,
+              "title": "Expense Approval Required",
+              "description": "This expense exceeds the auto-approval threshold. See the check_policy node output for the expense details. Submit your decision; the employee is notified either way.",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "approved": {
+                    "type": "boolean",
+                    "title": "Approved"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "title": "Notes"
+                  }
+                },
+                "required": ["approved"]
+              },
+              "actions": [
+                {
+                  "id": "submit",
+                  "label": "Submit Decision",
+                  "outcome": "approve"
+                }
+              ]
+            }
+          },
+          {
+            "id": "id-8",
+            "name": "notify_employee",
+            "type": "email",
+            "label": "Notify employee",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return context.nodes.root.output.employee_email ",
+              "subject": " return \"Expense report update\" ",
+              "text": "\n      const expense = context.nodes.root.output\n      const review = context.reviews.manager_review || {}\n      const decision = review.approved ? \"approved\" : \"denied\"\n      const notes = review.notes ? \"\\n\\nManager notes: \" + review.notes : \"\"\n      return \"Your expense report for $\" + expense.amount + \" (\" + expense.category + \") has been \" + decision + \".\" + notes\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6",
+            "label": "auto_approve"
+          },
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-7",
+            "label": "needs_approval"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-7",
+            "targetNodeId": "id-8"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-14",
+        "name": "on_expense",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "af4d6240de33564938e2f14ae7460e643397dab0c290a35aae6375c1303330cf",
+  "sourceFingerprint": "ec88cb2c09cff5be6a9032fdb498e3e89325760d660723a285ec087a45f674b0"
+}

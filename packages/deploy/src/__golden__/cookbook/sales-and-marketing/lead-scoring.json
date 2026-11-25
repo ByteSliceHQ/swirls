@@ -1,0 +1,249 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "new_lead",
+        "label": "New Lead Webhook",
+        "schema": {
+          "type": "object",
+          "required": ["email", "company", "source"],
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "company": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "job_title": {
+              "type": "string"
+            },
+            "company_size": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "score_lead",
+        "label": "Score Lead",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract lead",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "job_title": {
+                  "type": "string"
+                },
+                "company_size": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "score",
+            "type": "ai",
+            "label": "Score the lead",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const lead = context.nodes.root.output\n      return \"Score this B2B lead from 0-100 based on likelihood to convert.\\n\\nEmail: \" + lead.email + \"\\nCompany: \" + lead.company + \"\\nSource: \" + lead.source + \"\\nJob title: \" + (lead.job_title || \"unknown\") + \"\\nCompany size: \" + (lead.company_size || \"unknown\")\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["score", "reasoning", "tier"],
+              "properties": {
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "reasoning": {
+                  "type": "string"
+                },
+                "tier": {
+                  "type": "string",
+                  "enum": ["hot", "warm", "cold"]
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "route",
+            "type": "switch",
+            "label": "Route by score",
+            "config": {
+              "type": "switch",
+              "cases": ["hot", "other"],
+              "router": "\n      if (context.nodes.score.output.tier === \"hot\") return \"hot\"\n      return \"other\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-6",
+            "name": "alert_sales",
+            "type": "email",
+            "label": "Alert sales team",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return \"sales@example.com\" ",
+              "subject": "\n      return \"Hot lead: \" + context.nodes.root.output.company + \" (Score: \" + context.nodes.score.output.score + \")\"\n    ",
+              "text": "\n      const lead = context.nodes.root.output\n      const result = context.nodes.score.output\n      return \"New hot lead!\\n\\nCompany: \" + lead.company + \"\\nEmail: \" + lead.email + \"\\nScore: \" + result.score + \"\\nReason: \" + result.reasoning\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "log_result",
+            "type": "code",
+            "label": "Log score",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        email: context.nodes.root.output.email,\n        company: context.nodes.root.output.company,\n        score: context.nodes.score.output.score,\n        tier: context.nodes.score.output.tier\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6",
+            "label": "hot"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-7",
+            "label": "other"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-12",
+        "name": "on_lead",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-13",
+        "name": "scored_leads",
+        "label": "Scored leads",
+        "workflowName": "score_lead",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["email", "company", "score", "tier"],
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "tier": {
+                  "type": "string"
+                }
+              }
+            },
+            "conditionCode": "return true",
+            "prepareCode": "const logged = context.output.log_result\n        if (logged) return logged\n        return {\n          email: context.nodes.root.output.email,\n          company: context.nodes.root.output.company,\n          score: context.nodes.score.output.score,\n          tier: context.nodes.score.output.tier\n        }"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "998e832e817230cb8c49e28891f1e3be3825902355b433081f6945e2be0f586c",
+  "sourceFingerprint": "34491a09326c39a372eab01ede5f12edb4db999e0d1cc69b4dbd99d92fe400b2"
+}

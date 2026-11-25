@@ -1,0 +1,191 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [
+      {
+        "id": "id-1",
+        "name": "meeting_notes",
+        "label": "Meeting Notes",
+        "schema": {
+          "type": "object",
+          "required": ["title", "notes"],
+          "properties": {
+            "title": {
+              "type": "string",
+              "title": "Meeting Title"
+            },
+            "attendees": {
+              "type": "string",
+              "title": "Attendees (comma-separated)"
+            },
+            "notes": {
+              "type": "string",
+              "title": "Raw Notes"
+            },
+            "date": {
+              "type": "string",
+              "title": "Meeting Date"
+            }
+          }
+        },
+        "visibility": "internal"
+      }
+    ],
+    "webhooks": [],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "summarize_meeting",
+        "label": "Summarize Meeting",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract notes",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": " return context.nodes.root.input "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "attendees": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "summarize",
+            "type": "ai",
+            "label": "Generate summary",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const notes = context.nodes.root.output\n      return \"Summarize these meeting notes into a structured format.\\n\\nTitle: \" + notes.title + \"\\nAttendees: \" + (notes.attendees || \"not specified\") + \"\\nDate: \" + (notes.date || \"not specified\") + \"\\n\\nNotes:\\n\" + notes.notes\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["summary", "action_items", "decisions"],
+              "properties": {
+                "summary": {
+                  "type": "string"
+                },
+                "action_items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "task": {
+                        "type": "string"
+                      },
+                      "owner": {
+                        "type": "string"
+                      },
+                      "deadline": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "decisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "follow_ups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "format_output",
+            "type": "code",
+            "label": "Format final output",
+            "config": {
+              "type": "code",
+              "code": "\n      const notes = context.nodes.root.output\n      const result = context.nodes.summarize.output\n      return {\n        title: notes.title,\n        date: notes.date || \"not specified\",\n        attendees: notes.attendees || \"not specified\",\n        summary: result.summary,\n        action_items: result.action_items,\n        decisions: result.decisions,\n        follow_ups: result.follow_ups || []\n      }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-6",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-7",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-8",
+        "name": "on_notes",
+        "resourceType": "form",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "c00fd43957b70048c6556abb390e44382913d2f6f17587a480c0777440c3cae4",
+  "sourceFingerprint": "e171dd3682c0dad77f80a8642ff253c7ddf73a7eaf1cc3899fab1bee32dd20f1"
+}

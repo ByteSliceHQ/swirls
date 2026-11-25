@@ -1,0 +1,301 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [],
+    "schedules": [
+      {
+        "id": "id-1",
+        "name": "check_prices",
+        "label": "Check Prices",
+        "cron": "0 6 * * *",
+        "timezone": "America/New_York"
+      }
+    ],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "monitor_prices",
+        "label": "Monitor Competitor Prices",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Start",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      return { checked_at: new Date().toISOString() }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "checked_at": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "scrape_competitor",
+            "type": "scrape",
+            "label": "Scrape pricing page",
+            "config": {
+              "type": "scrape",
+              "url": " return \"https://competitor.example.com/pricing\" ",
+              "onlyMainContent": true,
+              "formats": ["markdown"]
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "url": "ts"
+            }
+          },
+          {
+            "id": "id-5",
+            "name": "extract_prices",
+            "type": "ai",
+            "label": "Extract pricing data",
+            "config": {
+              "type": "ai",
+              "kind": "object",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      return \"Extract all pricing tiers and their prices from this pricing page content. Return structured data.\\n\\n\" + JSON.stringify(context.nodes.scrape_competitor.output)\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "required": ["tiers"],
+              "properties": {
+                "tiers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "monthly_price": {
+                        "type": "number"
+                      },
+                      "annual_price": {
+                        "type": "number"
+                      },
+                      "features": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "check_history",
+            "type": "stream",
+            "label": "Get previous prices",
+            "config": {
+              "type": "stream",
+              "stream": "price_history",
+              "version": "v1",
+              "filter": "\n      return {}\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-7",
+            "name": "store_result",
+            "type": "code",
+            "label": "Store prices",
+            "config": {
+              "type": "code",
+              "code": "\n      return {\n        checked_at: context.nodes.root.output.checked_at,\n        tiers: context.nodes.extract_prices.output.tiers,\n        tier_count: context.nodes.extract_prices.output.tiers.length\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-8",
+            "name": "compare",
+            "type": "code",
+            "label": "Compare with previous prices",
+            "config": {
+              "type": "code",
+              "code": "\n      const rows = context.nodes.check_history.output || []\n      const previous = rows.length > 0 && rows[0].tiers ? rows[0].tiers : null\n      const current = context.nodes.extract_prices.output.tiers\n      const key = function(tiers) {\n        return JSON.stringify((tiers || []).map(function(t) {\n          return { name: t.name, monthly_price: t.monthly_price, annual_price: t.annual_price }\n        }))\n      }\n      const changed = previous !== null && key(previous) !== key(current)\n      return {\n        changed: changed,\n        current_count: current.length,\n        previous_count: previous ? previous.length : 0,\n        current_tiers: current\n      }\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-9",
+            "name": "route_change",
+            "type": "switch",
+            "label": "Route on change",
+            "config": {
+              "type": "switch",
+              "cases": ["changed", "unchanged"],
+              "router": "\n      if (context.nodes.compare.output.changed) return \"changed\"\n      return \"unchanged\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-10",
+            "name": "alert_change",
+            "type": "email",
+            "label": "Alert on price change",
+            "config": {
+              "type": "email",
+              "from": " return \"no-reply@transactional.byteslice.co\" ",
+              "to": " return \"team@example.com\" ",
+              "subject": " return \"Competitor pricing changed\" ",
+              "text": "\n      const cmp = context.nodes.compare.output\n      return \"Competitor pricing changed.\\n\\nTiers now: \" + cmp.current_count + \" (was \" + cmp.previous_count + \")\\n\\nCurrent tiers:\\n\" + JSON.stringify(cmp.current_tiers, null, 2)\n    "
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "from": "ts",
+              "to": "ts",
+              "subject": "ts",
+              "text": "ts"
+            }
+          },
+          {
+            "id": "id-11",
+            "name": "no_change",
+            "type": "code",
+            "label": "No change",
+            "config": {
+              "type": "code",
+              "code": "\n      return { changed: false }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-12",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-13",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5"
+          },
+          {
+            "id": "id-14",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-15",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-7"
+          },
+          {
+            "id": "id-16",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-8"
+          },
+          {
+            "id": "id-17",
+            "sourceNodeId": "id-6",
+            "targetNodeId": "id-8"
+          },
+          {
+            "id": "id-18",
+            "sourceNodeId": "id-8",
+            "targetNodeId": "id-9"
+          },
+          {
+            "id": "id-19",
+            "sourceNodeId": "id-9",
+            "targetNodeId": "id-10",
+            "label": "changed"
+          },
+          {
+            "id": "id-20",
+            "sourceNodeId": "id-9",
+            "targetNodeId": "id-11",
+            "label": "unchanged"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-21",
+        "name": "on_price_check",
+        "resourceType": "schedule",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [
+      {
+        "id": "id-22",
+        "name": "price_history",
+        "label": "Price history",
+        "workflowName": "monitor_prices",
+        "version": "v1",
+        "versions": {
+          "v1": {
+            "schema": {
+              "type": "object",
+              "required": ["checked_at", "tier_count"],
+              "properties": {
+                "checked_at": {
+                  "type": "string"
+                },
+                "tiers": {
+                  "type": "array"
+                },
+                "tier_count": {
+                  "type": "number"
+                }
+              }
+            },
+            "conditionCode": "return context.output.store_result != null",
+            "prepareCode": "return context.output.store_result"
+          }
+        }
+      }
+    ],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "028673ca50d796e13d4831ca632abf049c593a171aaad539eb07dc65ac0525b7",
+  "sourceFingerprint": "6971c414fc39571a15360a308c7dc59c9e59ddbac684a5175ae6274acb077f86"
+}

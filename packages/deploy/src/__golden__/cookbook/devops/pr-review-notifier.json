@@ -1,0 +1,230 @@
+{
+  "ok": true,
+  "definition": {
+    "forms": [],
+    "webhooks": [
+      {
+        "id": "id-1",
+        "name": "github_pr",
+        "label": "GitHub PR Event",
+        "schema": {
+          "type": "object",
+          "required": ["action", "pull_request"],
+          "properties": {
+            "action": {
+              "type": "string"
+            },
+            "pull_request": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "user": {
+                  "type": "object"
+                },
+                "html_url": {
+                  "type": "string"
+                },
+                "additions": {
+                  "type": "number"
+                },
+                "deletions": {
+                  "type": "number"
+                },
+                "changed_files": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      }
+    ],
+    "schedules": [],
+    "workflows": [
+      {
+        "id": "id-2",
+        "name": "notify_pr",
+        "label": "Notify PR",
+        "nodes": [
+          {
+            "id": "id-3",
+            "name": "root",
+            "type": "code",
+            "label": "Extract PR data",
+            "isRoot": true,
+            "config": {
+              "type": "code",
+              "code": "\n      const input = context.nodes.root.input\n      const pr = input.pull_request || {}\n      return {\n        action: input.action,\n        title: pr.title || \"Untitled\",\n        body: pr.body || \"\",\n        author: pr.user ? pr.user.login : \"unknown\",\n        url: pr.html_url || \"\",\n        additions: pr.additions || 0,\n        deletions: pr.deletions || 0,\n        changed_files: pr.changed_files || 0\n      }\n    "
+            },
+            "reviewConfig": null,
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "additions": {
+                  "type": "number"
+                },
+                "deletions": {
+                  "type": "number"
+                },
+                "changed_files": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "id": "id-4",
+            "name": "route_action",
+            "type": "switch",
+            "label": "Filter action",
+            "config": {
+              "type": "switch",
+              "cases": ["opened", "ignore"],
+              "router": "\n      const action = context.nodes.root.output.action\n      if (action === \"opened\" || action === \"ready_for_review\") return \"opened\"\n      return \"ignore\"\n    "
+            },
+            "reviewConfig": null
+          },
+          {
+            "id": "id-5",
+            "name": "summarize",
+            "type": "ai",
+            "label": "Summarize PR",
+            "config": {
+              "type": "ai",
+              "kind": "text",
+              "model": "google/gemini-2.5-flash",
+              "prompt": "\n      const pr = context.nodes.root.output\n      return \"Write a 1-2 sentence summary of this pull request for a Slack notification.\\n\\nTitle: \" + pr.title + \"\\nDescription: \" + pr.body + \"\\nFiles changed: \" + pr.changed_files + \" (+\" + pr.additions + \" -\" + pr.deletions + \")\"\n    ",
+              "maxTokens": 150
+            },
+            "reviewConfig": null,
+            "configValueKinds": {
+              "prompt": "ts",
+              "model": "literal"
+            }
+          },
+          {
+            "id": "id-6",
+            "name": "post_slack",
+            "type": "http",
+            "label": "Post to Slack",
+            "config": {
+              "type": "http",
+              "url": " return context.secrets.pr_config.SLACK_WEBHOOK_URL ",
+              "method": "POST",
+              "headers": " return { \"Content-Type\": \"application/json\" } ",
+              "body": "\n      const pr = context.nodes.root.output\n      const summary = context.nodes.summarize.output\n      return JSON.stringify({\n        text: \"*New PR:* \" + pr.title + \" by \" + pr.author + \"\\n\" + summary + \"\\n<\" + pr.url + \"|View PR>\"\n      })\n    "
+            },
+            "reviewConfig": null,
+            "secretsMap": {
+              "pr_config": ["SLACK_WEBHOOK_URL"]
+            },
+            "configValueKinds": {
+              "url": "ts",
+              "body": "ts"
+            }
+          },
+          {
+            "id": "id-7",
+            "name": "skip",
+            "type": "code",
+            "label": "Skip",
+            "config": {
+              "type": "code",
+              "code": "\n      return { skipped: true, action: context.nodes.root.output.action }\n    "
+            },
+            "reviewConfig": null
+          }
+        ],
+        "edges": [
+          {
+            "id": "id-8",
+            "sourceNodeId": "id-3",
+            "targetNodeId": "id-4"
+          },
+          {
+            "id": "id-9",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-5",
+            "label": "opened"
+          },
+          {
+            "id": "id-10",
+            "sourceNodeId": "id-5",
+            "targetNodeId": "id-6"
+          },
+          {
+            "id": "id-11",
+            "sourceNodeId": "id-4",
+            "targetNodeId": "id-7",
+            "label": "ignore"
+          }
+        ]
+      }
+    ],
+    "schemas": [],
+    "triggers": [
+      {
+        "id": "id-12",
+        "name": "on_pr",
+        "resourceType": "webhook",
+        "resourceId": "id-1",
+        "workflowId": "id-2",
+        "enabled": true
+      }
+    ],
+    "secretBlocks": [
+      {
+        "id": "id-13",
+        "name": "pr_config",
+        "label": "",
+        "vars": ["SLACK_WEBHOOK_URL"]
+      }
+    ],
+    "authBlocks": [],
+    "postgresBlocks": [],
+    "databaseBlocks": [],
+    "databaseMigrations": [],
+    "diskBlocks": [],
+    "computerBlocks": [],
+    "operationBlocks": [],
+    "skillBlocks": [],
+    "agentBlocks": [],
+    "decisionBlocks": [],
+    "queryBlocks": [],
+    "channelBlocks": [],
+    "connectionBlocks": [],
+    "mcpBlocks": [],
+    "networkBlocks": [],
+    "connectorBlocks": [],
+    "actionBlocks": [],
+    "streams": [],
+    "views": [],
+    "apps": [],
+    "roles": [],
+    "policies": [],
+    "mockBlocks": [],
+    "playbookBlocks": []
+  },
+  "definitionFingerprint": "9e6ca6195fadc4eb8fb8c6eb9945598803216fb2a4cbdc955de4f4509fffcb5d",
+  "sourceFingerprint": "41a7c2067f36b3647b2ade91e1700beca9ba480eabbbfcd07f514bb06db6cffb"
+}

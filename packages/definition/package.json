@@ -12,6 +12,7 @@
   "exports": {
     ".": "./src/deployment-definition.ts",
     "./deployment-definition": "./src/deployment-definition.ts",
+    "./deployment-source-schemas": "./src/deployment-source-schemas.ts",
     "./schemas": "./src/schemas.ts",
     "./app-audience": "./src/app-audience.ts",
     "./app-avatar": "./src/app-avatar.ts",
